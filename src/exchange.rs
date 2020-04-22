@@ -177,8 +177,9 @@ impl Exchange {
     }
 
     pub fn buy_market(&mut self, amount_base: i64) -> bool {
-        assert!(amount_base > 0);
-        // TODO: return false if not valid amount_base instead of panic
+        if amount_base <= 0 {
+            return false
+        }
 
         let fee_base = (self.config.fee_taker * amount_base as f64).round();
         let fee_asset = fee_base / self.ask;
@@ -226,8 +227,9 @@ impl Exchange {
     }
 
     pub fn sell_market(&mut self, amount_base: i64) -> bool {
-        assert!(amount_base > 0);
-        // TODO: return false if not valid amount_base instead of panic
+        if amount_base < 0 {
+            return false
+        }
 
         let fee_base = self.config.fee_taker * amount_base as f64;
         let fee_asset = fee_base / self.bid;
@@ -292,8 +294,8 @@ impl Exchange {
             return Some(OrderError::NotEnoughAvailableBalance)
         }
         // increase order_margin
-        self.margin.order_margin += order_margin;
-        self.margin.available_balance -= order_margin;
+        self.margin.order_margin += init_margin;
+        self.margin.available_balance -= init_margin;
 
         // assign unique order id
         o.id = self.next_order_id;
@@ -609,6 +611,26 @@ mod tests {
             assert!(o.id as i64 > last_order_id);
             last_order_id = o.id as i64;
         }
+    }
+
+    #[test]
+    fn test_order_margin() {
+        let config = Config::xbt_usd();
+        let mut exchange = new(config);
+        let t = Trade {
+            timestamp: 0,
+            price: 100.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o = Order::stop_market(Side::Buy, 101.0, 10.0);
+        let err = exchange.submit_order(o);
+        assert!(err.is_none());
+
+        assert!(exchange.margin.available_balance < exchange.margin.wallet_balance);
+        assert!(exchange.margin.order_margin > 0.0);
+
     }
 
     #[test]

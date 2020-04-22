@@ -7,6 +7,8 @@ pub struct Config {
     pub step: u32,
     pub base_maintenance_margin: f64,
     pub base_initial_margin: f64,
+    pub fee_maker: f64,
+    pub fee_taker: f64,
 }
 
 impl Config {
@@ -20,6 +22,8 @@ impl Config {
             step: 100,
             base_maintenance_margin: 0.0045,
             base_initial_margin: 0.01,
+            fee_maker: -0.00025,
+            fee_taker: 0.00075,
         }
     }
 
