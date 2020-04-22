@@ -26,7 +26,6 @@ pub enum Side {
 pub enum OrderType {
     Market,
     Limit,
-    StopLimit,
     StopMarket,
     TakeProfitLimit,
     TakeProfitMarket,

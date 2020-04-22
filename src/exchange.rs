@@ -180,21 +180,12 @@ impl Exchange {
         None
     }
 
-    fn buy_market(&mut self, amount_base: i64) -> bool {
-        if amount_base <= 0 {
-            return false
-        }
-
-        let fee_base = (self.config.fee_taker * amount_base as f64).round();
+    fn buy_market(&mut self, amount_base: f64) {
+        let fee_base = (self.config.fee_taker * amount_base).round();
         let fee_asset = fee_base / self.ask;
 
-        let add_margin = amount_base as f64 / self.ask / self.position.leverage;
-        if add_margin + fee_asset > self.margin.available_balance {
-            return false
-        }
-
         if self.position.size < 0.0 {
-            let rpnl = (amount_base as f64 - fee_base) * (1.0 / self.position.entry_price - 1.0 / self.ask);
+            let rpnl = (amount_base - fee_base) * (1.0 / self.position.entry_price - 1.0 / self.ask);
             self.total_rpnl += rpnl;
             self.margin.wallet_balance += rpnl;
 
@@ -208,11 +199,11 @@ impl Exchange {
             self.position.margin += add_margin;
         }
 
-        self.position.entry_price = ((self.ask * amount_base as f64)
+        self.position.entry_price = ((self.ask * amount_base)
             + (self.position.entry_price * self.position.size.abs() ))
-            / (amount_base as f64 + self.position.size.abs());
+            / (amount_base + self.position.size.abs());
 
-        self.position.size += amount_base as f64;
+        self.position.size += amount_base;
         self.position.value = self.position.size.abs() / self.ask;
 
         let upnl = self.unrealized_pnl();
@@ -226,25 +217,14 @@ impl Exchange {
 
         self.acc_tracker.num_buys += 1;
         self.acc_tracker.num_trades += 1;
-
-        return true
     }
 
-    fn sell_market(&mut self, amount_base: i64) -> bool {
-        if amount_base < 0 {
-            return false
-        }
-
-        let fee_base = self.config.fee_taker * amount_base as f64;
+    fn sell_market(&mut self, amount_base: f64) {
+        let fee_base = self.config.fee_taker * amount_base;
         let fee_asset = fee_base / self.bid;
 
-        let add_margin = amount_base as f64 / self.bid / self.position.leverage;
-        if add_margin + fee_asset > self.margin.available_balance {
-            return false
-        }
-
         if self.position.size > 0.0 {
-            let rpnl = (amount_base as f64 - fee_base) * (1.0 / self.bid - 1.0 / self.position.entry_price) ;
+            let rpnl = (amount_base - fee_base) * (1.0 / self.bid - 1.0 / self.position.entry_price) ;
             self.total_rpnl += rpnl;
             self.margin.wallet_balance += rpnl;
             self.margin.available_balance += add_margin - fee_asset;
@@ -257,11 +237,11 @@ impl Exchange {
             self.position.margin += add_margin;
         }
 
-        self.position.entry_price = ((self.bid * amount_base as f64) + self.position.entry_price * self.position.size.abs() as f64)
-            / (amount_base as f64 + self.position.size.abs() as f64);
+        self.position.entry_price = ((self.bid * amount_base) + self.position.entry_price * self.position.size.abs())
+            / (amount_base + self.position.size.abs());
 
-        self.position.size -= amount_base as f64;
-        self.position.value = self.position.size.abs() as f64 / self.bid;
+        self.position.size -= amount_base;
+        self.position.value = self.position.size.abs() / self.bid;
 
         let upnl = self.unrealized_pnl();
         self.position.unrealized_pnl = upnl;
@@ -273,8 +253,6 @@ impl Exchange {
         self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
 
         self.acc_tracker.num_trades += 1;
-
-        return true
     }
 
     pub fn submit_order(&mut self, mut o: Order) -> Option<OrderError> {
@@ -285,7 +263,6 @@ impl Exchange {
             OrderType::Market => self.validate_market_order(&o),
             OrderType::Limit => self.validate_limit_order(&o),
             OrderType::StopMarket => self.validate_stop_market_order(&o),
-            OrderType::StopLimit => self.validate_stop_limit_order(&o),
             OrderType::TakeProfitLimit => self.validate_take_profit_limit_order(&o),
             OrderType::TakeProfitMarket => self.validate_take_profit_market_order(&o),
         };
@@ -391,11 +368,10 @@ impl Exchange {
     fn check_orders(&mut self) {
         for i in 0..self.orders_active.len() {
             match self.orders_active[i].order_type {
-                OrderType::Market => {},
-                OrderType::Limit => panic!("limit order not implemented yet"),
+                OrderType::Market => self.handle_market_order(i),
+                OrderType::Limit => self.handle_limit_order(i),
                 OrderType::StopMarket => self.handle_stop_market_order(i),
-                OrderType::StopLimit => panic!("stop limit orders not implemented yet"),
-                OrderType::TakeProfitLimit => panic!("take profit limit orders not implemented yet"),
+                OrderType::TakeProfitLimit => self.handle_take_profit_limit_order(i),
                 OrderType::TakeProfitMarket => self.handle_take_profit_market_order(i),
             }
         }
@@ -417,11 +393,11 @@ impl Exchange {
         let o: &Order = &self.orders_active[order_index];
         match o.side {
             Side::Buy => { if o.price > self.ask { return }
-                self.buy_market((o.size * self.ask) as i64);
+                self.buy_market(o.size * self.ask);
                 self.orders_active[order_index].mark_done();
             },
             Side::Sell => { if o.price > self.bid { return }
-                self.sell_market((o.size * self.bid) as i64);
+                self.sell_market(o.size * self.bid);
                 self.orders_active[order_index].mark_done();
             },
         }
@@ -431,27 +407,45 @@ impl Exchange {
         let o: &Order = &self.orders_active[order_index];
         match o.side {
             Side::Buy => { if o.price < self.bid { return }
-                self.buy_market((o.size * self.ask) as i64);
+                self.buy_market(o.size * self.ask);
                 self.orders_active[order_index].mark_done();
             },
             Side::Sell => { if o.price > self.ask { return }
-                self.sell_market((o.size * self.bid) as i64);
+                self.sell_market(o.size * self.bid);
                 self.orders_active[order_index].mark_done();
             },
         }
     }
 
-    fn validate_market_order(&self, o: &Order) -> bool {
+    fn handle_market_order(&mut self, order_index: usize) {
+        let o: &Order = &self.orders_active[order_index];
+        match o.side {
+            Side::Buy => self.buy_market(o.size),
+            Side::Sell => self.sell_market(o.size),
+        }
+    }
+
+    fn handle_limit_order(&mut self, order_index: usize) {
         // TODO:
-        return false
+    }
+
+    fn handle_take_profit_limit_order(&mut self, order_index: usize) {
+        // TODO:
+    }
+
+    fn validate_market_order(&self, o: &Order) -> bool {
+        if o.size < 0.0 {
+            return false
+        }
+        let add_margin = amount_base / self.bid / self.position.leverage;
+        if add_margin + fee_asset > self.margin.available_balance {
+            return false
+        }
+
+        return true
     }
 
     fn validate_limit_order(&self, o: &Order) -> bool {
-        // TODO:
-        return false
-    }
-
-    fn validate_stop_limit_order(&self, o: &Order) -> bool {
         // TODO:
         return false
     }
