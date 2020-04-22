@@ -1,4 +1,4 @@
-pub (crate) enum OrderError {
+pub enum OrderError {
     MaxActiveOrders,
     InvalidOrder,
 }

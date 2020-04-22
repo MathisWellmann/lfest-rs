@@ -555,7 +555,10 @@ mod tests {
 
         let o = Order::stop_market(Side::Buy, 1050.0, 10.0);
         let valid = exchange.submit_order(o);
-        assert!(valid);
+        match valid {
+            Some(_) => {},
+            None => panic!("order not valid!")
+        }
         exchange.handle_stop_market_order(0);
     }
 
@@ -573,10 +576,10 @@ mod tests {
             exchange.submit_order(o);
         }
         let active_orders = exchange.orders_active;
-        let mut last_order_id: u64 = 0;
+        let mut last_order_id: i64 = -1;
         for o in &active_orders {
-            assert!(o.id > last_order_id);
-            last_order_id = o.id;
+            assert!(o.id as i64 > last_order_id);
+            last_order_id = o.id as i64;
         }
     }
 }
