@@ -2,14 +2,13 @@ extern crate trade_aggregation;
 
 use trade_aggregation::common::*;
 use crate::orders::*;
+use crate::config::*;
 use chrono::prelude::*;
 
-const MAX_ACTIVE_ORDERS: usize = 100;
-const MIN_LEVERAGE: f64 = 1.0;
-const MAX_LEVERAGE: f64 = 100.0;
 
 #[derive(Debug, Clone)]
 pub struct Exchange {
+    pub config: Config,
     pub position: Position,
     pub margin: Margin,
     pub acc_tracker: AccTracker,
@@ -17,8 +16,6 @@ pub struct Exchange {
     pub ask: f64,
     init: bool,
     pub total_rpnl: f64,
-    fee_maker: f64,
-    fee_taker: f64,
     pub rpnls: Vec<f64>,
     orders_done: Vec<Order>,
     pub orders_active: Vec<Order>,
@@ -30,6 +27,7 @@ pub struct Margin {
     pub wallet_balance: f64,
     pub margin_balance: f64,
     position_margin: f64,
+    order_margin: f64,
     pub available_balance: f64,
 }
 
@@ -51,8 +49,9 @@ pub struct AccTracker {
     pub num_buys: i64,
 }
 
-pub fn new(fee_maker: f64, fee_taker: f64) -> Exchange {
+pub fn new(config: Config) -> Exchange {
     return Exchange{
+        config,
         position: Position{
             size: 0.0,
             value: 0.0,
@@ -67,6 +66,7 @@ pub fn new(fee_maker: f64, fee_taker: f64) -> Exchange {
             wallet_balance: 1.0,
             margin_balance: 1.0,
             position_margin: 0.0,
+            order_margin: 0.0,
             available_balance: 1.0,
         },
         acc_tracker: AccTracker{
@@ -77,8 +77,6 @@ pub fn new(fee_maker: f64, fee_taker: f64) -> Exchange {
         bid: 0.0,
         ask: 0.0,
         init: true,
-        fee_maker,
-        fee_taker,
         rpnls: Vec::new(),
         orders_done: Vec::new(),
         orders_active: Vec::new(),
@@ -89,14 +87,20 @@ pub fn new(fee_maker: f64, fee_taker: f64) -> Exchange {
 impl Exchange {
     // sets the new leverage of position
     // returns true if successful
-    pub fn set_leverage(l: f64) -> bool {
-        if l > MAX_LEVERAGE {
+    pub fn set_leverage(&mut self, l: f64) -> bool {
+        if l > self.config.max_leverage {
             return false
-        } else if l < MIN_LEVERAGE {
+        } else if l < self.config.min_leverage {
             return false
         }
 
-        // TODO:
+        let new_position_margin = (self.position.value / l) + self.position.unrealized_pnl;
+        if new_position_margin > self.margin.wallet_balance {
+            return false
+        }
+        self.position.leverage = l;
+        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
+        self.margin.available_balance = self.margin.margin_balance - self.margin.order_margin - self.margin.position_margin;
 
         return true
     }
@@ -145,7 +149,12 @@ impl Exchange {
         return false
     }
 
-    // TODO: consume_candle
+    // consume_candle update the bid and ask price given a candle using its close price
+    // returns true if position has been liquidated
+    pub fn consume_candle(&mut self, candle: &Candle) -> bool {
+        // TODO: consume_candle
+        return false
+    }
 
     // candle an active order
     // returns true if successful with given order_id
@@ -169,8 +178,9 @@ impl Exchange {
 
     pub fn buy_market(&mut self, amount_base: i64) -> bool {
         assert!(amount_base > 0);
+        // TODO: return false if not valid amount_base instead of panic
 
-        let fee_base = (self.fee_taker * amount_base as f64).round();
+        let fee_base = (self.config.fee_taker * amount_base as f64).round();
         let fee_asset = fee_base / self.ask;
 
         let add_margin = amount_base as f64 / self.ask / self.position.leverage;
@@ -217,8 +227,9 @@ impl Exchange {
 
     pub fn sell_market(&mut self, amount_base: i64) -> bool {
         assert!(amount_base > 0);
+        // TODO: return false if not valid amount_base instead of panic
 
-        let fee_base = amount_base as f64 / self.bid / self.position.leverage;
+        let fee_base = self.config.fee_taker * amount_base as f64;
         let fee_asset = fee_base / self.bid;
 
         let add_margin = amount_base as f64 / self.bid / self.position.leverage;
@@ -261,7 +272,7 @@ impl Exchange {
     }
 
     pub fn submit_order(&mut self, mut o: Order) -> Option<OrderError> {
-        if self.orders_active.len() >= MAX_ACTIVE_ORDERS {
+        if self.orders_active.len() >= self.config.max_active_orders {
             return Some(OrderError::MaxActiveOrders)
         }
         let valid: bool = match o.order_type {
@@ -272,15 +283,28 @@ impl Exchange {
             OrderType::TakeProfitLimit => panic!("take profit limit orders not implemented yet"),
             OrderType::TakeProfitMarket => self.validate_take_profit_market_order(&o),
         };
-        if valid {
-            o.id = self.next_order_id;
-            self.next_order_id += 1;
-            let now = Utc::now();
-            o.timestamp = now.timestamp_millis() as u64;
-            self.orders_active.push(o);
-            return None
+        if !valid {
+            return Some(OrderError::InvalidOrder)
         }
-        return Some(OrderError::InvalidOrder)
+        // check if enough available balance for initial margin requirements
+        let init_margin = o.size / self.bid / self.position.leverage;
+        if init_margin > self.margin.available_balance {
+            return Some(OrderError::NotEnoughAvailableBalance)
+        }
+        // increase order_margin
+        self.margin.order_margin += order_margin;
+        self.margin.available_balance -= order_margin;
+
+        // assign unique order id
+        o.id = self.next_order_id;
+        self.next_order_id += 1;
+
+        // assign timestamp
+        let now = Utc::now();
+        o.timestamp = now.timestamp_millis() as u64;
+        self.orders_active.push(o);
+
+        return None
     }
 
     pub fn unrealized_pnl(&self) -> f64 {
@@ -483,7 +507,8 @@ mod tests {
 
     #[test]
     fn test_validate_stop_market_order() {
-        let mut exchange = new(0.0, 0.0);
+        let config = Config::xbt_usd();
+        let mut exchange = new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -518,7 +543,8 @@ mod tests {
 
     #[test]
     fn test_validate_take_profit_market_order() {
-        let mut exchange = new(0.0, 0.0);
+        let config = Config::xbt_usd();
+        let mut exchange = new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -545,7 +571,8 @@ mod tests {
 
     #[test]
     fn test_handle_stop_market_order() {
-        let mut exchange = new(0.0, 0.0);
+        let config = Config::xbt_usd();
+        let mut exchange = new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -564,7 +591,8 @@ mod tests {
 
     #[test]
     fn test_order_ids() {
-        let mut exchange = new(0.0, 0.0);
+        let config = Config::xbt_usd();
+        let mut exchange = new(config);
         let t = Trade{
             timestamp: 0,
             price: 100.0,
@@ -581,5 +609,10 @@ mod tests {
             assert!(o.id as i64 > last_order_id);
             last_order_id = o.id as i64;
         }
+    }
+
+    #[test]
+    fn test_set_leverage() {
+        // TODO:
     }
 }

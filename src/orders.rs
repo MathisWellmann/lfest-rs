@@ -1,6 +1,7 @@
 pub enum OrderError {
     MaxActiveOrders,
     InvalidOrder,
+    NotEnoughAvailableBalance,
 }
 
 #[derive(Debug, Clone)]
