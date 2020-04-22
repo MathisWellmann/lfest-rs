@@ -45,12 +45,12 @@ impl Order {
         }
     }
 
-    pub fn market(side: Side, price: f64, size: f64) -> Order {
+    pub fn market(side: Side, size: f64) -> Order {
         return Order{
             id: 0,
             timestamp: 0,
             order_type: OrderType::Market,
-            price,
+            price: 0.0,
             price_opt: 0.0,
             size,
             side,
@@ -58,12 +58,12 @@ impl Order {
         }
     }
 
-    pub fn stop_market(side: Side, price: f64, size: f64) -> Order {
+    pub fn stop_market(side: Side, trigger_price: f64, size: f64) -> Order {
         return Order{
             id: 0,
             timestamp: 0,
             order_type: OrderType::StopMarket,
-            price,
+            price: trigger_price,
             price_opt: 0.0,
             size,
             side,
@@ -71,25 +71,12 @@ impl Order {
         }
     }
 
-    pub fn stop_limit(side: Side, trigger_price: f64, limit_price: f64, size: f64) -> Order {
-        return Order {
-            id: 0,
-            timestamp: 0,
-            order_type: OrderType::StopLimit,
-            price: trigger_price,
-            price_opt: limit_price,
-            size,
-            side,
-            done: false,
-        }
-    }
-
-    pub fn take_profit_market(side: Side, price: f64, size: f64) -> Order {
+    pub fn take_profit_market(side: Side, trigger_price: f64, size: f64) -> Order {
         return Order {
             id: 0,
             timestamp: 0,
             order_type: OrderType::TakeProfitMarket,
-            price,
+            price: trigger_price,
             price_opt: 0.0,
             size,
             side,

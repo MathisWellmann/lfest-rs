@@ -184,6 +184,8 @@ impl Exchange {
         let fee_base = (self.config.fee_taker * amount_base).round();
         let fee_asset = fee_base / self.ask;
 
+        let add_margin = amount_base / self.bid / self.position.leverage;
+
         if self.position.size < 0.0 {
             let rpnl = (amount_base - fee_base) * (1.0 / self.position.entry_price - 1.0 / self.ask);
             self.total_rpnl += rpnl;
@@ -222,6 +224,8 @@ impl Exchange {
     fn sell_market(&mut self, amount_base: f64) {
         let fee_base = self.config.fee_taker * amount_base;
         let fee_asset = fee_base / self.bid;
+
+        let add_margin = amount_base / self.bid / self.position.leverage;
 
         if self.position.size > 0.0 {
             let rpnl = (amount_base - fee_base) * (1.0 / self.bid - 1.0 / self.position.entry_price) ;
@@ -437,7 +441,10 @@ impl Exchange {
         if o.size < 0.0 {
             return false
         }
-        let add_margin = amount_base / self.bid / self.position.leverage;
+        let fee_base = self.config.fee_taker * o.size;
+        let fee_asset = fee_base / self.bid;
+
+        let add_margin = o.size / self.bid / self.position.leverage;
         if add_margin + fee_asset > self.margin.available_balance {
             return false
         }
@@ -503,28 +510,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn buy_market() {
+    fn test_validate_market_order() {
+        let config = Config::xbt_usd();
+        let mut exchange = new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
 
+        let size = exchange.ask * exchange.margin.available_balance * 0.4;
+        let o = Order::market(Side::Buy, size);
+        let valid = exchange.validate_market_order(&o);
+        assert!(valid);
+
+        let o = Order::market(Side::Sell, size);
+        let valid = exchange.validate_market_order(&o);
+        assert!(valid);
+
+        let size = exchange.ask * exchange.margin.available_balance * 2.0;
+        let o = Order::market(Side::Buy, size);
+        let valid = exchange.validate_market_order(&o);
+        assert!(!valid);
+
+        let o = Order::market(Side::Sell, size);
+        let valid = exchange.validate_market_order(&o);
+        assert!(!valid);
     }
 
     #[test]
-    fn sell_market() {
-
-    }
-
-    #[test]
-    fn liq_price() {
-
-    }
-
-    #[test]
-    fn unrealize_pnl() {
-
-    }
-
-    #[test]
-    fn roe() {
-
+    fn test_validate_limit_order() {
+        // TODO
     }
 
     #[test]
@@ -550,7 +567,7 @@ mod tests {
         let valid = exchange.validate_stop_market_order(&o);
         assert!(!valid);
 
-        let o = Order::market(Side::Sell, 980.0, 10.0);
+        let o = Order::stop_market(Side::Sell, 980.0, 10.0);
         let valid = exchange.validate_stop_market_order(&o);
         assert!(valid);
 
@@ -592,6 +609,21 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_take_profit_limit_order() {
+        // TODO:
+    }
+
+    #[test]
+    fn test_handle_market_order() {
+        // TODO:
+    }
+
+    #[test]
+    fn test_handle_limit_order() {
+        // TODO:
+    }
+
+    #[test]
     fn test_handle_stop_market_order() {
         let config = Config::xbt_usd();
         let mut exchange = new(config);
@@ -609,6 +641,16 @@ mod tests {
             None => panic!("order not valid!")
         }
         exchange.handle_stop_market_order(0);
+    }
+
+    #[test]
+    fn test_handle_take_profit_market_order()  {
+        // TODO:
+    }
+
+    #[test]
+    fn test_handle_take_profit_limit_order() {
+        // TODO:
     }
 
     #[test]
@@ -656,5 +698,20 @@ mod tests {
     #[test]
     fn test_set_leverage() {
         // TODO:
+    }
+
+    #[test]
+    fn liq_price() {
+
+    }
+
+    #[test]
+    fn unrealize_pnl() {
+
+    }
+
+    #[test]
+    fn roe() {
+
     }
 }
