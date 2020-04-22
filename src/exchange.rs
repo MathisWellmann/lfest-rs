@@ -161,7 +161,11 @@ impl Exchange {
     pub fn cancel_order(&mut self, order_id: u64) -> Option<Order> {
         for (i, o) in self.orders_active.iter().enumerate() {
             if o.id == order_id {
-                return Some(self.orders_active.remove(i));
+                let old_order = self.orders_active.remove(i);
+                let margin = old_order.size / old_order.price / self.position.leverage;
+                self.margin.order_margin -= margin;
+                self.margin.available_balance += margin;
+                return Some(old_order);
             }
         }
         None
@@ -176,7 +180,7 @@ impl Exchange {
         None
     }
 
-    pub fn buy_market(&mut self, amount_base: i64) -> bool {
+    fn buy_market(&mut self, amount_base: i64) -> bool {
         if amount_base <= 0 {
             return false
         }
@@ -226,7 +230,7 @@ impl Exchange {
         return true
     }
 
-    pub fn sell_market(&mut self, amount_base: i64) -> bool {
+    fn sell_market(&mut self, amount_base: i64) -> bool {
         if amount_base < 0 {
             return false
         }
@@ -278,24 +282,16 @@ impl Exchange {
             return Some(OrderError::MaxActiveOrders)
         }
         let valid: bool = match o.order_type {
-            OrderType::Market => true,
-            OrderType::Limit => panic!("not implemented yet"),
+            OrderType::Market => self.validate_market_order(&o),
+            OrderType::Limit => self.validate_limit_order(&o),
             OrderType::StopMarket => self.validate_stop_market_order(&o),
-            OrderType::StopLimit => panic!("stop limit orders not implemented yet"),
-            OrderType::TakeProfitLimit => panic!("take profit limit orders not implemented yet"),
+            OrderType::StopLimit => self.validate_stop_limit_order(&o),
+            OrderType::TakeProfitLimit => self.validate_take_profit_limit_order(&o),
             OrderType::TakeProfitMarket => self.validate_take_profit_market_order(&o),
         };
         if !valid {
             return Some(OrderError::InvalidOrder)
         }
-        // check if enough available balance for initial margin requirements
-        let init_margin = o.size / self.bid / self.position.leverage;
-        if init_margin > self.margin.available_balance {
-            return Some(OrderError::NotEnoughAvailableBalance)
-        }
-        // increase order_margin
-        self.margin.order_margin += init_margin;
-        self.margin.available_balance -= init_margin;
 
         // assign unique order id
         o.id = self.next_order_id;
@@ -304,6 +300,16 @@ impl Exchange {
         // assign timestamp
         let now = Utc::now();
         o.timestamp = now.timestamp_millis() as u64;
+
+        // check if enough available balance for initial margin requirements
+        let init_margin = o.size / o.price / self.position.leverage;
+        if init_margin > self.margin.available_balance {
+            return Some(OrderError::NotEnoughAvailableBalance)
+        }
+        // increase order_margin
+        self.margin.order_margin += init_margin;
+        self.margin.available_balance -= init_margin;
+
         self.orders_active.push(o);
 
         return None
@@ -433,6 +439,26 @@ impl Exchange {
                 self.orders_active[order_index].mark_done();
             },
         }
+    }
+
+    fn validate_market_order(&self, o: &Order) -> bool {
+        // TODO:
+        return false
+    }
+
+    fn validate_limit_order(&self, o: &Order) -> bool {
+        // TODO:
+        return false
+    }
+
+    fn validate_stop_limit_order(&self, o: &Order) -> bool {
+        // TODO:
+        return false
+    }
+
+    fn validate_take_profit_limit_order(&self, o: &Order) -> bool {
+        // TODO:
+        return false
     }
 
     // returns true if order is valid
