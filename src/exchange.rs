@@ -253,14 +253,14 @@ impl Exchange {
         self.position.size += amount_base;
         self.position.value = self.position.size.abs() / self.ask;
 
-        let upnl = self.unrealized_pnl();
-        self.position.unrealized_pnl = upnl;
+        self.position.unrealized_pnl = self.unrealized_pnl();
         self.position.roe_percent = self.roe();
 
         self.update_liq_price();
 
         self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
         self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
+        self.margin.order_margin -= add_margin;
 
         self.acc_tracker.num_buys += 1;
         self.acc_tracker.num_trades += 1;
@@ -292,14 +292,14 @@ impl Exchange {
         self.position.size -= amount_base;
         self.position.value = self.position.size.abs() / self.bid;
 
-        let upnl = self.unrealized_pnl();
-        self.position.unrealized_pnl = upnl;
+        self.position.unrealized_pnl = self.unrealized_pnl();
         self.position.roe_percent = self.roe();
 
         self.update_liq_price();
 
         self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
         self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
+        self.margin.order_margin -= add_margin;
 
         self.acc_tracker.num_trades += 1;
     }
