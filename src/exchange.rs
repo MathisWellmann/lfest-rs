@@ -49,6 +49,12 @@ pub struct AccTracker {
     pub num_buys: i64,
 }
 
+#[derive(Debug, Clone)]
+pub enum FeeType {
+    Maker,
+    Taker,
+}
+
 pub fn new(config: Config) -> Exchange {
     return Exchange{
         config,
@@ -226,82 +232,110 @@ impl Exchange {
     }
 
     fn buy_market(&mut self, amount_base: f64) {
-        let fee_base = (self.config.fee_taker * amount_base).round();
-        let fee_asset = fee_base / self.ask;
+        self.deduce_fees(FeeType::Taker, Side::Buy, amount_base);
 
-        let add_margin = amount_base / self.bid / self.position.leverage;
+        let order_margin: f64 = amount_base / self.ask / self.position.leverage;
 
-        if self.position.size < 0.0 {
-            let rpnl = (amount_base - fee_base) * (1.0 / self.position.entry_price - 1.0 / self.ask);
-            self.total_rpnl += rpnl;
-            self.margin.wallet_balance += rpnl;
-
-            self.margin.available_balance += add_margin - fee_asset;
-            self.position.margin -= add_margin;
-
-            self.rpnls.push(rpnl);
-
-        } else {
-            self.margin.available_balance -= add_margin - fee_asset;
-            self.position.margin += add_margin;
-        }
-
-        self.position.entry_price = ((self.ask * amount_base)
-            + (self.position.entry_price * self.position.size.abs() ))
-            / (amount_base + self.position.size.abs());
-
-        self.position.size += amount_base;
-        self.position.value = self.position.size.abs() / self.ask;
-
-        self.position.unrealized_pnl = self.unrealized_pnl();
-        self.position.roe_percent = self.roe();
-
-        self.update_liq_price();
-
-        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
-        self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-        self.margin.order_margin -= add_margin;
-
-        self.acc_tracker.num_buys += 1;
-        self.acc_tracker.num_trades += 1;
-    }
-
-    fn sell_market(&mut self, amount_base: f64) {
-        let fee_base = self.config.fee_taker * amount_base;
-        let fee_asset = fee_base / self.bid;
-
-        let add_margin = amount_base / self.bid / self.position.leverage;
-
-        if self.position.size > 0.0 {
-            let rpnl = (amount_base - fee_base) * (1.0 / self.bid - 1.0 / self.position.entry_price) ;
-            self.total_rpnl += rpnl;
-            self.margin.wallet_balance += rpnl;
-            self.margin.available_balance += add_margin - fee_asset;
-            self.position.margin -= add_margin;
-
-            self.rpnls.push(rpnl);
-
-        } else {
-            self.margin.available_balance -= add_margin - fee_asset;
-            self.position.margin += add_margin;
-        }
+        self.margin.order_margin -= order_margin;
 
         self.position.entry_price = ((self.bid * amount_base) + self.position.entry_price * self.position.size.abs())
             / (amount_base + self.position.size.abs());
-
-        self.position.size -= amount_base;
+        self.position.size += amount_base;
         self.position.value = self.position.size.abs() / self.bid;
+
+        let mut amount_remaining: f64 = amount_base;
+        let mut margin_remaining: f64 = order_margin;
+        if self.position.size < 0.0 {
+            // use margin from position
+            // use margin from position
+            let amount: f64 = min(amount_base, self.position.size);
+            amount_remaining = amount_base - amount;
+            let margin_exec = min(order_margin, self.position.value);
+            margin_remaining = order_margin - margin_exec;
+
+            let rpnl = amount * (1.0 / self.position.entry_price - 1.0 / self.ask);
+            self.total_rpnl += rpnl;
+
+            self.margin.wallet_balance += rpnl;
+            self.margin.available_balance += rpnl;
+
+            self.position.margin -= margin_exec;
+
+            self.rpnls.push(rpnl);
+
+            if amount_remaining == 0.0 {
+                return
+            }
+        }
+        self.position.margin += margin_remaining;
 
         self.position.unrealized_pnl = self.unrealized_pnl();
         self.position.roe_percent = self.roe();
-
         self.update_liq_price();
 
         self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
         self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-        self.margin.order_margin -= add_margin;
+    }
 
-        self.acc_tracker.num_trades += 1;
+    fn deduce_fees(&mut self, t: FeeType, side: Side, amount_base: f64) {
+        let price = match side {
+            Side::Buy => self.ask,
+            Side::Sell => self.bid,
+        };
+        let fee: f64 = match t {
+            FeeType::Maker => self.config.fee_maker,
+            FeeType::Taker => self.config.fee_taker,
+        };
+        let fee_base = fee * amount_base;
+        let fee_asset = fee_base / price;
+        self.margin.wallet_balance -= fee_asset;
+        self.margin.available_balance -= fee_asset;
+        self.margin.margin_balance -= fee_asset;
+    }
+
+    fn sell_market(&mut self, amount_base: f64) {
+        self.deduce_fees(FeeType::Taker,Side::Sell, amount_base);
+
+        let order_margin: f64 = amount_base / self.bid / self.position.leverage;
+
+        self.margin.order_margin -= order_margin;
+
+        self.position.entry_price = ((self.bid * amount_base) + self.position.entry_price * self.position.size.abs())
+            / (amount_base + self.position.size.abs());
+        self.position.size -= amount_base;
+        self.position.value = self.position.size.abs() / self.bid;
+
+        let mut amount_remaining: f64 = amount_base;
+        let mut margin_remaining: f64 = order_margin;
+        if self.position.size > 0.0 {
+            // use margin from position
+            let amount: f64 = min(amount_base, self.position.size);
+            amount_remaining = amount_base - amount;
+            let margin_exec = min(order_margin, self.position.value);
+            margin_remaining = order_margin - margin_exec;
+
+            let rpnl: f64 = amount * (1.0 / self.bid - 1.0 / self.position.entry_price) ;
+            self.total_rpnl += rpnl;
+
+            self.margin.wallet_balance += rpnl;
+            self.margin.available_balance += rpnl;
+
+            self.position.margin -= margin_exec;
+
+            self.rpnls.push(rpnl);
+
+            if amount_remaining == 0.0 {
+                return
+            }
+        }
+        self.position.margin += margin_remaining;
+
+        self.position.unrealized_pnl = self.unrealized_pnl();
+        self.position.roe_percent = self.roe();
+        self.update_liq_price();
+
+        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
+        self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
     }
 
     fn liquidate(&mut self) {
@@ -380,6 +414,11 @@ impl Exchange {
                 break
             }
             if self.orders_active[i].done() {
+                self.acc_tracker.num_trades += 1;
+                match self.orders_active[i].side {
+                    Side::Buy => self.acc_tracker.num_buys += 1,
+                    Side::Sell => {},
+                }
                 self.orders_active.remove(i);
                 // self.orders_done.push(done_order);
             }
@@ -421,6 +460,7 @@ impl Exchange {
             Side::Buy => self.buy_market(o.size),
             Side::Sell => self.sell_market(o.size),
         }
+        self.orders_active[order_index].mark_done();
     }
 
     fn handle_limit_order(&mut self, order_index: usize) {
@@ -442,8 +482,36 @@ impl Exchange {
 
         // check if enough available balance for initial margin requirements
         let init_margin = o.size / price / self.position.leverage;
-        if init_margin + fee_asset > self.margin.available_balance {
-            return Some(OrderError::NotEnoughAvailableBalance)
+        let order_err: Option<OrderError> = match o.side {
+            Side::Buy => {
+                if self.position.size > 0.0 {
+                    if init_margin + fee_asset > self.margin.available_balance {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+                } else {
+                    if init_margin + fee_asset > self.position.value + self.margin.available_balance {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+                }
+            },
+            Side::Sell => {
+                if self.position.size > 0.0 {
+                    if init_margin + fee_asset > self.position.value + self.margin.available_balance {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+                } else {
+                    if init_margin + fee_asset > self.margin.available_balance {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+                }
+            }
+        };
+        if order_err.is_some() {
+            return order_err
         }
 
         // increase order_margin
@@ -504,6 +572,13 @@ impl Exchange {
         }
     }
 
+}
+
+pub fn min(val0: f64, val1: f64) -> f64 {
+    if val0 < val1 {
+        return val0
+    }
+    return val1
 }
 
 #[cfg(test)]
@@ -642,6 +717,7 @@ mod tests {
     #[test]
     fn test_buy_market()  {
         let config = Config::xbt_usd();
+        let fee_taker = config.fee_taker;
         let mut exchange = new(config);
         let t = Trade{
             timestamp: 0,
@@ -652,7 +728,6 @@ mod tests {
 
         let value = exchange.margin.available_balance * 0.4;
         let size = exchange.ask * value;
-        println!("value: {}, size: {}", value, size);
         let o = Order::market(Side::Buy, size);
         let order_err = exchange.submit_order(o);
         match order_err {
@@ -661,24 +736,28 @@ mod tests {
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
             None => {},
         }
-        exchange.handle_market_order(0);
+        exchange.check_orders();
 
-        assert_eq!(exchange.position.size,  size);
+        let fee_base = size * fee_taker;
+        let fee_asset = fee_base / exchange.bid;
+
+        assert_eq!(exchange.position.size, size);
         assert_eq!(exchange.position.entry_price, 1000.0);
         assert_eq!(exchange.position.value, value);
         assert_eq!(exchange.position.margin, value);
         assert_eq!(exchange.position.unrealized_pnl, 0.0);
         assert_eq!(exchange.position.roe_percent, 0.0);
-        assert_eq!(exchange.margin.wallet_balance, 1.0);
-        assert_eq!(exchange.margin.margin_balance, 1.0);
+        assert_eq!(exchange.margin.wallet_balance, 1.0 - fee_asset);
+        assert_eq!(exchange.margin.margin_balance, 1.0 - fee_asset);
         assert_eq!(exchange.margin.position_margin, 0.4);
         assert_eq!(exchange.margin.order_margin, 0.0);
-        assert!(exchange.margin.available_balance < exchange.margin.wallet_balance);
+        assert_eq!(exchange.margin.available_balance, 0.6 - fee_asset);
     }
 
     #[test]
     fn test_sell_market()  {
         let config = Config::xbt_usd();
+        let fee_taker = config.fee_taker;
         let mut exchange = new(config);
         let t = Trade{
             timestamp: 0,
@@ -692,19 +771,75 @@ mod tests {
         let o = Order::market(Side::Sell, size);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_none());
-        exchange.handle_market_order(0);
+        exchange.check_orders();
 
-        assert_eq!(exchange.position.size,  size);
+        let fee_base = size * fee_taker;
+        let fee_asset = fee_base / exchange.bid;
+
+        assert_eq!(exchange.position.size,  -size);
         assert_eq!(exchange.position.entry_price, 1000.0);
         assert_eq!(exchange.position.value, value);
         assert_eq!(exchange.position.margin, value);
         assert_eq!(exchange.position.unrealized_pnl, 0.0);
         assert_eq!(exchange.position.roe_percent, 0.0);
-        assert_eq!(exchange.margin.wallet_balance, 1.0);
-        assert_eq!(exchange.margin.margin_balance, 1.0);
+        assert_eq!(exchange.margin.wallet_balance, 1.0 - fee_asset);
+        assert_eq!(exchange.margin.margin_balance, 1.0 - fee_asset);
         assert_eq!(exchange.margin.position_margin, 0.4);
         assert_eq!(exchange.margin.order_margin, 0.0);
-        assert!(exchange.margin.available_balance < exchange.margin.wallet_balance);
+        assert_eq!(exchange.margin.available_balance, 0.6 - fee_asset);
+    }
+
+    #[test]
+    fn test_market_roundtrip() {
+        let config = Config::xbt_usd();
+        let fee_taker = config.fee_taker;
+        let mut exchange = new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let value = exchange.margin.available_balance * 0.9;
+        let size = exchange.ask * value;
+        let o = Order::market(Side::Buy, size);
+        let order_err = exchange.submit_order(o);
+        match order_err {
+            Some(OrderError::InvalidOrder) => panic!("invalid order"),
+            Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
+            Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            None => {},
+        }
+        exchange.check_orders();
+
+        let o = Order::market(Side::Sell, size);
+
+        let order_err = exchange.submit_order(o);
+        match order_err {
+            Some(OrderError::InvalidOrder) => panic!("invalid order"),
+            Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
+            Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            None => {},
+        }
+        exchange.check_orders();
+
+        println!("exchange: {:#?}", exchange);
+
+        let fee_base = 2.0 * size * fee_taker;
+        let fee_asset = fee_base / exchange.ask;
+
+        assert_eq!(exchange.position.size,  0.0);
+        assert_eq!(exchange.position.entry_price, 1000.0);
+        assert_eq!(exchange.position.value, 0.0);
+        assert_eq!(exchange.position.margin, 0.0);
+        assert_eq!(exchange.position.unrealized_pnl, 0.0);
+        assert_eq!(exchange.position.roe_percent, 0.0);
+        assert_eq!(exchange.margin.wallet_balance, 1.0 - fee_asset);
+        assert_eq!(exchange.margin.margin_balance, 1.0 - fee_asset);
+        assert_eq!(exchange.margin.position_margin, 0.0);
+        assert_eq!(exchange.margin.order_margin, 0.0);
+        assert_eq!(exchange.margin.available_balance, 1.0 - fee_asset);
     }
 
     #[test]
