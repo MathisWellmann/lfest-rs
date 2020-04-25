@@ -16,7 +16,7 @@ pub struct Order {
     done: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Side {
     Buy,
     Sell,
