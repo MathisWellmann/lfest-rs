@@ -264,18 +264,14 @@ impl Exchange {
         };
         self.position.entry_price = ((price * amount_base) + self.position.entry_price * self.position.size.abs())
             / (amount_base + self.position.size.abs());
-        match side {
-            Side::Buy => self.position.size += amount_base,
-            Side::Sell => self.position.size -= amount_base,
-        }
-        self.position.value = self.position.size.abs() / self.bid;
+
         let order_margin = amount_base / price / self.position.leverage;
 
         // margin to be used from position. only if
         let margin_from_position: f64 = match side {
             Side::Buy => {
                 let mut mfp: f64 = 0.0;
-                if self.position.size > 0.0 {
+                if self.position.size < 0.0 {
                     mfp =  min(self.margin.position_margin, order_margin);
                 }
                 mfp
@@ -288,11 +284,15 @@ impl Exchange {
                 mfp
             },
         };
-        println!("margin_from_position: {}", margin_from_position);
         let add_margin = order_margin - margin_from_position;
-        println!("add_margin: {}", add_margin);
         self.margin.available_balance -= add_margin;
-        self.position.margin += add_margin;
+        self.position.margin += add_margin - margin_from_position;
+
+        match side {
+            Side::Buy => self.position.size += amount_base,
+            Side::Sell => self.position.size -= amount_base,
+        }
+        self.position.value = self.position.size.abs() / self.bid;
 
         if self.position.size > 0.0 {
             let amount = margin_from_position * price;
@@ -771,8 +771,8 @@ mod tests {
 
         let value = exchange.margin.available_balance * 0.9;
         let size = exchange.ask * value;
-        let o = Order::market(Side::Buy, size);
-        let order_err = exchange.submit_order(o);
+        let buy_order = Order::market(Side::Buy, size);
+        let order_err = exchange.submit_order(buy_order);
         match order_err {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
@@ -781,9 +781,9 @@ mod tests {
         }
         exchange.check_orders();
 
-        let o = Order::market(Side::Sell, size);
+        let sell_order = Order::market(Side::Sell, size);
 
-        let order_err = exchange.submit_order(o);
+        let order_err = exchange.submit_order(sell_order);
         match order_err {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
@@ -807,6 +807,7 @@ mod tests {
         assert_eq!(exchange.margin.position_margin, 0.0);
         assert_eq!(exchange.margin.order_margin, 0.0);
         assert_eq!(exchange.margin.available_balance, 1.0 - 2.0 * fee_asset);
+
     }
 
     #[test]
