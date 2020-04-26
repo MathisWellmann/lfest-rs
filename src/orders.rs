@@ -1,3 +1,7 @@
+use rust_decimal::Decimal;
+use rust_decimal::prelude::FromPrimitive;
+
+
 pub enum OrderError {
     MaxActiveOrders,
     InvalidOrder,
@@ -9,9 +13,9 @@ pub struct Order {
     pub id: u64,  // id will be filled in using exchange.submit_order()
     pub timestamp: u64,  // timestamp will be filled in using exchange.submit_order()
     pub order_type: OrderType,
-    pub price: f64,
-    pub price_opt: f64,
-    pub size: f64,
+    pub price: Decimal,
+    pub price_opt: Decimal,
+    pub size: Decimal,
     pub side: Side,
     done: bool,
 }
@@ -37,9 +41,9 @@ impl Order {
             id: 0,
             timestamp: 0,
             order_type: OrderType::Limit,
-            price,
-            price_opt: 0.0,
-            size,
+            price: Decimal::from_f64(price).unwrap(),
+            price_opt: Decimal::new(0, 0),
+            size: Decimal::from_f64(size).unwrap(),
             side,
             done: false,
         }
@@ -50,9 +54,9 @@ impl Order {
             id: 0,
             timestamp: 0,
             order_type: OrderType::Market,
-            price: 0.0,
-            price_opt: 0.0,
-            size,
+            price: Decimal::new(0, 0),
+            price_opt: Decimal::new(0, 0),
+            size: Decimal::from_f64(size).unwrap(),
             side,
             done: false,
         }
@@ -63,9 +67,9 @@ impl Order {
             id: 0,
             timestamp: 0,
             order_type: OrderType::StopMarket,
-            price: trigger_price,
-            price_opt: 0.0,
-            size,
+            price: Decimal::from_f64(trigger_price).unwrap(),
+            price_opt: Decimal::new(0, 0),
+            size: Decimal::from_f64(size).unwrap(),
             side,
             done: false,
         }
@@ -76,9 +80,9 @@ impl Order {
             id: 0,
             timestamp: 0,
             order_type: OrderType::TakeProfitMarket,
-            price: trigger_price,
-            price_opt: 0.0,
-            size,
+            price: Decimal::from_f64(trigger_price).unwrap(),
+            price_opt: Decimal::new(0, 0),
+            size: Decimal::from_f64(size).unwrap(),
             side,
             done: false,
         }
@@ -89,9 +93,9 @@ impl Order {
             id: 0,
             timestamp: 0,
             order_type: OrderType::TakeProfitLimit,
-            price: trigger_price,
-            price_opt: limit_price,
-            size,
+            price: Decimal::from_f64(trigger_price).unwrap(),
+            price_opt: Decimal::from_f64(limit_price).unwrap(),
+            size: Decimal::from_f64(size).unwrap(),
             side,
             done: false,
         }

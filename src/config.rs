@@ -1,32 +1,41 @@
+use rust_decimal::Decimal;
+
+
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub max_leverage: f64,
-    pub min_leverage: f64,
+    pub max_leverage: Decimal,
+    pub min_leverage: Decimal,
     pub max_active_orders: usize,
-    pub base_risk_limit: u32,
-    pub step: u32,
-    pub base_maintenance_margin: f64,
-    pub base_initial_margin: f64,
-    pub fee_maker: f64,
-    pub fee_taker: f64,
+    pub fee_maker: Decimal,
+    pub fee_taker: Decimal,
 }
 
 impl Config {
     // bitmex xbtusd contract
     pub fn xbt_usd() -> Config {
         return Config{
-            max_leverage: 100.0,
-            min_leverage: 1.0,
+            max_leverage: Decimal::new(100, 0),
+            min_leverage: Decimal::new(1, 0),
             max_active_orders: 100,
-            base_risk_limit: 200,
-            step: 100,
-            base_maintenance_margin: 0.0045,
-            base_initial_margin: 0.01,
-            fee_maker: -0.00025,
-            fee_taker: 0.00075,
+            fee_maker: Decimal::new(-000025, 5),
+            fee_taker: Decimal::new(00075, 5),
         }
     }
 
     // TODO: query more configs from bitmex api
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_xbt_usd() {
+        let config = Config::xbt_usd();
+
+        assert!(config.fee_maker.is_sign_negative());
+        assert_eq!(config.fee_maker.to_string(), "-0.00025");
+        assert_eq!(config.fee_taker.to_string(), "0.00075");
+    }
 }

@@ -8,5 +8,6 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4.11"
+rust_decimal = "1.4.1"
 
 trade_aggregation = { git = "https://github.com/MathisWellmann/rust_trade_aggregation" }
