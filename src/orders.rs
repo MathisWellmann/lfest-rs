@@ -5,6 +5,8 @@ use rust_decimal::prelude::FromPrimitive;
 pub enum OrderError {
     MaxActiveOrders,
     InvalidOrder,
+    InvalidTriggerPrice,
+    InvalidOrderSize,
     NotEnoughAvailableBalance,
 }
 

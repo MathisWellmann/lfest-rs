@@ -499,14 +499,19 @@ impl Exchange {
 
     // returns true if order is valid
     fn validate_stop_market_order(&mut self, o: &Order) -> Option<OrderError> {
-        return match o.side {
-            Side::Buy => { if o.price <= self.ask { return Some(OrderError::InvalidOrder) }
+        let order_err =  match o.side {
+            Side::Buy => { if o.price <= self.ask { return Some(OrderError::InvalidTriggerPrice) }
                 None
             },
-            Side::Sell => { if o.price >= self.bid { return Some(OrderError::InvalidOrder) }
+            Side::Sell => { if o.price >= self.bid { return Some(OrderError::InvalidTriggerPrice) }
                 None
             },
+        };
+        if order_err.is_some() {
+            return order_err
         }
+
+        None
     }
 
     fn validate_take_profit_market_order(&self, o: &Order) -> Option<OrderError> {
@@ -706,6 +711,8 @@ mod tests {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
+            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
             None => {},
         }
 
@@ -787,6 +794,8 @@ mod tests {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
+            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
             None => {},
         }
         exchange.check_orders();
@@ -798,6 +807,8 @@ mod tests {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
+            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
             None => {},
         }
 
@@ -826,6 +837,8 @@ mod tests {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
+            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
             None => {},
         }
         exchange.check_orders();
@@ -838,6 +851,8 @@ mod tests {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
+            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
             None => {},
         }
 
@@ -894,12 +909,39 @@ mod tests {
         // };
         // exchange.consume_trade(&t);
         //
-        // let o = Order::stop_market(Side::Buy, 101.0, 10.0);
+        // let o = Order::stop_market(Side::Buy, 110.0, 11.0);
         // let err = exchange.submit_order(o);
         // assert!(err.is_none());
         //
-        // assert!(exchange.margin.available_balance < exchange.margin.wallet_balance);
-        // assert!(exchange.margin.order_margin > Decimal::new(0, 0));
+        // let order_margin = Decimal::new(1, 1);
+        // assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0) - order_margin);
+        // assert_eq!(exchange.margin.order_margin, order_margin);
+        //
+        // let canceled_order = exchange.cancel_order(0);
+        // assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0));
+        // assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        //
+        // let o = Order::stop_market(Side::Sell, 110.0, 11.0);
+        // let err = exchange.submit_order(o);
+        // assert!(err.is_some());
+        // assert_eq!(exchange.orders_active.len(), 0);
+        //
+        // let o = Order::stop_market(Side::Buy, 90.0, 11.0);
+        // let err = exchange.submit_order(o);
+        // assert!(err.is_some());
+        // assert_eq!(exchange.orders_active.len(), 0);
+        //
+        // let o = Order::stop_market(Side::Sell, 90.0, 9.0);
+        // let err = exchange.submit_order(o);
+        // assert!(err.is_none());
+        //
+        // let order_margin = Decimal::new(1, 1);
+        // assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0) - order_margin);
+        // assert_eq!(exchange.margin.order_margin, order_margin);
+        //
+        // let canceled_order = exchange.cancel_order(exchange.next_order_id - 1);
+        // assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0));
+        // assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
     }
 
     #[test]
