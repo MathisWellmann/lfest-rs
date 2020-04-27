@@ -108,8 +108,9 @@ impl Exchange {
             return false
         }
         self.position.leverage = l;
-        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
+        self.margin.position_margin = (self.position.value / self.position.leverage) + self.unrealized_pnl();
         self.margin.available_balance = self.margin.margin_balance - self.margin.order_margin - self.margin.position_margin;
+        self.position.margin = (self.position.value / self.position.leverage);
 
         return true
     }
@@ -223,9 +224,9 @@ impl Exchange {
         if self.position.size == Decimal::new(0, 0) {
             return Decimal::new(0, 0);
         } else if self.position.size > Decimal::new(0, 0) {
-            return (Decimal::new(1, 0) / self.position.entry_price - Decimal::new(1, 0) / self.bid) * self.position.size.abs();
+            return ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / self.bid)) * self.position.size.abs();
         } else {
-            return (Decimal::new(1, 0) / self.ask - Decimal::new(1, 0) / self.position.entry_price) * self.position.size.abs();
+            return ((Decimal::new(1, 0) / self.ask) - (Decimal::new(1, 0) / self.position.entry_price)) * self.position.size.abs();
         }
     }
 
@@ -441,7 +442,7 @@ impl Exchange {
         // TODO:
     }
 
-    // check if market order is correct and assign order_margin
+    // check if market order is correct
     fn validate_market_order(&mut self, o: &Order) -> Option<OrderError> {
         let price = match o.side {
             Side::Buy => self.ask,
@@ -908,64 +909,169 @@ mod tests {
         //     size: 100.0,
         // };
         // exchange.consume_trade(&t);
-        //
-        // let o = Order::stop_market(Side::Buy, 110.0, 11.0);
-        // let err = exchange.submit_order(o);
-        // assert!(err.is_none());
-        //
-        // let order_margin = Decimal::new(1, 1);
-        // assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0) - order_margin);
-        // assert_eq!(exchange.margin.order_margin, order_margin);
-        //
-        // let canceled_order = exchange.cancel_order(0);
-        // assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0));
-        // assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
-        //
-        // let o = Order::stop_market(Side::Sell, 110.0, 11.0);
-        // let err = exchange.submit_order(o);
-        // assert!(err.is_some());
-        // assert_eq!(exchange.orders_active.len(), 0);
-        //
-        // let o = Order::stop_market(Side::Buy, 90.0, 11.0);
-        // let err = exchange.submit_order(o);
-        // assert!(err.is_some());
-        // assert_eq!(exchange.orders_active.len(), 0);
-        //
-        // let o = Order::stop_market(Side::Sell, 90.0, 9.0);
-        // let err = exchange.submit_order(o);
-        // assert!(err.is_none());
-        //
-        // let order_margin = Decimal::new(1, 1);
-        // assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0) - order_margin);
-        // assert_eq!(exchange.margin.order_margin, order_margin);
-        //
-        // let canceled_order = exchange.cancel_order(exchange.next_order_id - 1);
-        // assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0));
-        // assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+
     }
 
     #[test]
-    fn test_set_leverage() {
-        // TODO:
+    fn set_leverage() {
+        let config = Config::xbt_usd();
+        let fee_taker = config.fee_taker;
+        let mut exchange = new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let valid = exchange.set_leverage(101.0);
+        assert!(!valid);
+        let valid = exchange.set_leverage(0.5);
+        assert!(!valid);
+
+        exchange.set_leverage(5.0);
+        assert_eq!(exchange.position.leverage, Decimal::new(5, 0));
+
+        exchange.set_leverage(1.0);
+        assert_eq!(exchange.position.leverage, Decimal::new(1, 0));
+
+        let o = Order::market(Side::Buy, 100.0);
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_none());
+
+        exchange.check_orders();
+
+        let valid = exchange.set_leverage(10.0);
+        assert!(valid);
+
+        let fee_base = Decimal::new(100, 0) * fee_taker;
+        let fee_asset = fee_base / exchange.bid;
+
+        // should change with different leverage
+        assert_eq!(exchange.position.margin, Decimal::new(1, 2));
+        assert_eq!(exchange.margin.position_margin, Decimal::new(1, 2));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(99, 2) - fee_asset);
+
+        let valid = exchange.set_leverage(5.0);
+        assert_eq!(exchange.position.margin, Decimal::new(2, 2));
+        assert_eq!(exchange.margin.position_margin, Decimal::new(2, 2));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(98, 2) - fee_asset);
+
+
+        let o = Order::market(Side::Buy, 4800.0);
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_none());
+
+        let fee_asset2 = (fee_taker * Decimal::new(4800, 0)) / exchange.bid;
+
+        exchange.check_orders();
+
+        assert_eq!(exchange.position.margin, Decimal::new(98, 2));
+        assert_eq!(exchange.margin.position_margin, Decimal::new(98, 2));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(2, 2) - (fee_asset + fee_asset2));
+
     }
 
     #[test]
     fn liq_price() {
-        // TODO:
+        let config = Config::xbt_usd();
+        let fee_taker = config.fee_taker;
+        let mut exchange = new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o = Order::market(Side::Buy, 100.0);
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_none());
+
+        exchange.check_orders();
+
+        assert_eq!(exchange.position.liq_price, Decimal::new(0, 0));
+
+        // TODO: test liq_price with higher leverage and with short position as well
     }
 
     #[test]
     fn unrealized_pnl() {
-        // TODO:
+        let config = Config::xbt_usd();
+        let mut exchange = new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o = Order::market(Side::Buy, 100.0);
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_none());
+
+        exchange.check_orders();
+
+        assert_eq!(exchange.position.size, Decimal::new(100, 0));
+        let upnl = exchange.unrealized_pnl();
+        assert_eq!(upnl, Decimal::new(0, 0));
+
+        let t = Trade{
+            timestamp: 1,
+            price: 1100.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let t = Trade{
+            timestamp: 1,
+            price: 1100.0,
+            size: -100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let upnl = exchange.unrealized_pnl();
+        assert!(upnl > Decimal::new(0, 0));
     }
 
     #[test]
     fn roe() {
-        // TODO:
+        let config = Config::xbt_usd();
+        let mut exchange = new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o = Order::market(Side::Buy, 100.0);
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_none());
+        exchange.check_orders();
+
+        assert_eq!(exchange.position.size, Decimal::new(100, 0));
+
+        let t = Trade{
+            timestamp: 1,
+            price: 1100.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let t = Trade{
+            timestamp: 1,
+            price: 1100.0,
+            size: -100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let roe = exchange.roe();
+        assert_eq!(roe, Decimal::new(1, 1));
     }
 
     #[test]
     fn test_liquidate() {
-
+        // TODO:
     }
 }
