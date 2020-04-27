@@ -400,12 +400,14 @@ impl Exchange {
     fn handle_stop_market_order(&mut self, order_index: usize) {
         let o: &Order = &self.orders_active[order_index];
         match o.side {
-            Side::Buy => { if o.price > self.ask { return }
-                self.execute_market(Side::Buy, o.size * self.ask);
+            Side::Buy => {
+                if o.price > self.ask { return }
+                self.execute_market(Side::Buy, o.size);
                 self.orders_active[order_index].mark_done();
             },
-            Side::Sell => { if o.price > self.bid { return }
-                self.execute_market(Side::Sell, o.size * self.bid);
+            Side::Sell => {
+                if o.price > self.bid { return }
+                self.execute_market(Side::Sell, o.size);
                 self.orders_active[order_index].mark_done();
             },
         }
@@ -671,7 +673,7 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_stop_market_order() {
+    fn handle_stop_market_order() {
         let config = Config::xbt_usd();
         let mut exchange = new(config);
         let t = Trade{
@@ -681,13 +683,28 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::stop_market(Side::Buy, 1050.0, 10.0);
+        let o = Order::stop_market(Side::Buy, 1010.0, 100.0);
         let valid = exchange.submit_order(o);
         match valid {
             Some(_) => panic!("order not valid!"),
             None => {},
         }
-        exchange.handle_stop_market_order(0);
+        exchange.check_orders();
+
+        assert_eq!(exchange.orders_active.len(), 1);
+
+        let t = Trade{
+            timestamp: 2,
+            price: 1010.0,
+            size: 100.0
+        };
+        exchange.consume_trade(&t);
+
+        exchange.check_orders();
+
+        assert_eq!(exchange.position.size, Decimal::new(100, 0));
+        assert_eq!(exchange.position.entry_price, Decimal::new(1010, 0));
+
     }
 
     #[test]
