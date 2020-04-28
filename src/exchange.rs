@@ -57,42 +57,43 @@ pub enum FeeType {
     Taker,
 }
 
-pub fn new(config: Config) -> Exchange {
-    return Exchange{
-        config,
-        position: Position{
-            size: Decimal::new(0, 0),
-            value: Decimal::new(0, 0),
-            entry_price: Decimal::new(0, 0),
-            liq_price: Decimal::new(0, 0),
-            margin: Decimal::new(0, 0),
-            leverage: Decimal::new(1, 0),
-            unrealized_pnl: Decimal::new(0, 0),
-            roe_percent: Decimal::new(0, 0),
-        },
-        margin: Margin{
-            wallet_balance: Decimal::new(1, 0),
-            margin_balance: Decimal::new(1, 0),
-            position_margin: Decimal::new(0, 0),
-            order_margin: Decimal::new(0, 0),
-            available_balance: Decimal::new(1, 0),
-        },
-        acc_tracker: AccTracker{
-            num_trades: 0,
-            num_buys: 0,
-        },
-        total_rpnl: 0.0,
-        bid: Decimal::new(0, 0),
-        ask: Decimal::new(0, 0),
-        init: true,
-        rpnls: Vec::new(),
-        orders_done: Vec::new(),
-        orders_active: Vec::new(),
-        next_order_id: 0,
-    }
-}
-
 impl Exchange {
+
+    pub fn new(config: Config) -> Exchange {
+        return Exchange{
+            config,
+            position: Position{
+                size: Decimal::new(0, 0),
+                value: Decimal::new(0, 0),
+                entry_price: Decimal::new(0, 0),
+                liq_price: Decimal::new(0, 0),
+                margin: Decimal::new(0, 0),
+                leverage: Decimal::new(1, 0),
+                unrealized_pnl: Decimal::new(0, 0),
+                roe_percent: Decimal::new(0, 0),
+            },
+            margin: Margin{
+                wallet_balance: Decimal::new(1, 0),
+                margin_balance: Decimal::new(1, 0),
+                position_margin: Decimal::new(0, 0),
+                order_margin: Decimal::new(0, 0),
+                available_balance: Decimal::new(1, 0),
+            },
+            acc_tracker: AccTracker{
+                num_trades: 0,
+                num_buys: 0,
+            },
+            total_rpnl: 0.0,
+            bid: Decimal::new(0, 0),
+            ask: Decimal::new(0, 0),
+            init: true,
+            rpnls: Vec::new(),
+            orders_done: Vec::new(),
+            orders_active: Vec::new(),
+            next_order_id: 0,
+        }
+    }
+
     // sets the new leverage of position
     // returns true if successful
     pub fn set_leverage(&mut self, l: f64) -> bool {
@@ -117,7 +118,7 @@ impl Exchange {
 
     // consume_candle update the exchange state with th new candle.
     // returns true if position has been liquidated
-    pub fn consume_trade(&mut self, trade: &Trade) -> bool{
+    pub fn consume_trade(&mut self, trade: &Trade) -> bool {
         let price = Decimal::from_f64(trade.price).unwrap();
         if self.init {
             self.init = false;
@@ -562,7 +563,7 @@ mod tests {
     #[test]
     fn test_validate_market_order() {
         let config = Config::xbt_usd();
-        let mut exchange = new(config);
+        let mut exchange = Exchange::new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -601,7 +602,7 @@ mod tests {
     #[test]
     fn test_validate_stop_market_order() {
         let config = Config::xbt_usd();
-        let mut exchange = new(config);
+        let mut exchange = Exchange::new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -637,7 +638,7 @@ mod tests {
     #[test]
     fn test_validate_take_profit_market_order() {
         let config = Config::xbt_usd();
-        let mut exchange = new(config);
+        let mut exchange = Exchange::new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -675,7 +676,7 @@ mod tests {
     #[test]
     fn handle_stop_market_order() {
         let config = Config::xbt_usd();
-        let mut exchange = new(config);
+        let mut exchange = Exchange::new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -711,7 +712,7 @@ mod tests {
     fn test_buy_market()  {
         let config = Config::xbt_usd();
         let fee_taker = config.fee_taker;
-        let mut exchange = new(config);
+        let mut exchange = Exchange::new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -756,7 +757,7 @@ mod tests {
     fn test_sell_market()  {
         let config = Config::xbt_usd();
         let fee_taker = config.fee_taker;
-        let mut exchange = new(config);
+        let mut exchange = Exchange::new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -794,7 +795,7 @@ mod tests {
     fn test_market_roundtrip() {
         let config = Config::xbt_usd();
         let fee_taker = config.fee_taker;
-        let mut exchange = new(config);
+        let mut exchange = Exchange::new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -897,7 +898,7 @@ mod tests {
     #[test]
     fn test_order_ids() {
         let config = Config::xbt_usd();
-        let mut exchange = new(config);
+        let mut exchange = Exchange::new(config);
         let t = Trade{
             timestamp: 0,
             price: 100.0,
@@ -933,7 +934,7 @@ mod tests {
     fn set_leverage() {
         let config = Config::xbt_usd();
         let fee_taker = config.fee_taker;
-        let mut exchange = new(config);
+        let mut exchange = Exchange::new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -993,7 +994,7 @@ mod tests {
     fn liq_price() {
         let config = Config::xbt_usd();
         let fee_taker = config.fee_taker;
-        let mut exchange = new(config);
+        let mut exchange = Exchange::new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -1015,7 +1016,7 @@ mod tests {
     #[test]
     fn unrealized_pnl() {
         let config = Config::xbt_usd();
-        let mut exchange = new(config);
+        let mut exchange = Exchange::new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -1054,7 +1055,7 @@ mod tests {
     #[test]
     fn roe() {
         let config = Config::xbt_usd();
-        let mut exchange = new(config);
+        let mut exchange = Exchange::new(config);
         let t = Trade{
             timestamp: 0,
             price: 1000.0,
@@ -1090,5 +1091,23 @@ mod tests {
     #[test]
     fn test_liquidate() {
         // TODO:
+    }
+
+    #[test]
+    fn cancel_order() {
+        let config = Config::xbt_usd();
+        let mut exchange = Exchange::new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o = Order::stop_market(Side::Buy, 1010.0, 100.0);
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_none());
+
+        // TODO: test cancel order
     }
 }
