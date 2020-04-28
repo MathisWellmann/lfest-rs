@@ -20,6 +20,7 @@ pub struct Exchange {
     pub total_rpnl: f64,
     pub rpnls: Vec<f64>,
     orders_done: Vec<Order>,
+    orders_executed: Vec<Order>,
     pub orders_active: Vec<Order>,
     next_order_id: u64,
 }
@@ -89,6 +90,7 @@ impl Exchange {
             init: true,
             rpnls: Vec::new(),
             orders_done: Vec::new(),
+            orders_executed: Vec::new(),
             orders_active: Vec::new(),
             next_order_id: 0,
         }
@@ -190,7 +192,7 @@ impl Exchange {
         None
     }
 
-    pub fn submit_order(&mut self, mut o: Order) -> Option<OrderError> {
+    pub fn submit_order(&mut self, mut o: &Order) -> Option<OrderError> {
         if self.orders_active.len() >= self.config.max_active_orders {
             return Some(OrderError::MaxActiveOrders)
         }
@@ -198,15 +200,17 @@ impl Exchange {
             return Some(OrderError::InvalidOrder)
         }
         let order_err: Option<OrderError> = match o.order_type {
-            OrderType::Market => self.validate_market_order(&o),
-            OrderType::Limit => self.validate_limit_order(&o),
-            OrderType::StopMarket => self.validate_stop_market_order(&o),
-            OrderType::TakeProfitLimit => self.validate_take_profit_limit_order(&o),
-            OrderType::TakeProfitMarket => self.validate_take_profit_market_order(&o),
+            OrderType::Market => self.validate_market_order(o),
+            OrderType::Limit => self.validate_limit_order(o),
+            OrderType::StopMarket => self.validate_stop_market_order(o),
+            OrderType::TakeProfitLimit => self.validate_take_profit_limit_order(o),
+            OrderType::TakeProfitMarket => self.validate_take_profit_market_order(o),
         };
         if order_err.is_some() {
             return order_err
         }
+
+        let mut o = o.clone();
 
         // assign unique order id
         o.id = self.next_order_id;
@@ -233,6 +237,22 @@ impl Exchange {
 
     pub fn num_active_orders(&self) -> usize {
         return self.orders_active.len()
+    }
+
+    pub fn executed_orders(&mut self) -> Vec<Order> {
+        let exec_orders: Vec<Order> = self.orders_executed.clone();
+        // move to orders_done if needed
+        // for o in &exec_orders {
+        //     self.orders_done.push(o);
+        // }
+        // clear executed orders
+        self.orders_executed.clear();
+        return exec_orders
+    }
+
+    pub fn ammend_order(&mut self, order_id: u64, new_order: Order) -> Option<OrderError> {
+        // TODO:
+        return None
     }
 
     fn deduce_fees(&mut self, t: FeeType, side: Side, amount_base: Decimal) {
@@ -391,8 +411,8 @@ impl Exchange {
                     Side::Buy => self.acc_tracker.num_buys += 1,
                     Side::Sell => {},
                 }
-                self.orders_active.remove(i);
-                // self.orders_done.push(done_order);
+                let exec_order = self.orders_active.remove(i);
+                self.orders_executed.push(exec_order);
             }
             i += 1;
         }
@@ -685,7 +705,7 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::stop_market(Side::Buy, 1010.0, 100.0);
-        let valid = exchange.submit_order(o);
+        let valid = exchange.submit_order(&o);
         match valid {
             Some(_) => panic!("order not valid!"),
             None => {},
@@ -725,7 +745,7 @@ mod tests {
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
         let o = Order::market(Side::Buy, s);
-        let order_err = exchange.submit_order(o);
+        let order_err = exchange.submit_order(&o);
         match order_err {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
@@ -770,7 +790,7 @@ mod tests {
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
         let o = Order::market(Side::Sell, s);
-        let order_err = exchange.submit_order(o);
+        let order_err = exchange.submit_order(&o);
         assert!(order_err.is_none());
 
         exchange.check_orders();
@@ -808,7 +828,7 @@ mod tests {
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
         let buy_order = Order::market(Side::Buy, s);
-        let order_err = exchange.submit_order(buy_order);
+        let order_err = exchange.submit_order(&buy_order);
         match order_err {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
@@ -821,7 +841,7 @@ mod tests {
 
         let sell_order = Order::market(Side::Sell, s);
 
-        let order_err = exchange.submit_order(sell_order);
+        let order_err = exchange.submit_order(&sell_order);
         match order_err {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
@@ -851,7 +871,7 @@ mod tests {
 
         let size = 900.0;
         let buy_order = Order::market(Side::Buy, size);
-        let order_err = exchange.submit_order(buy_order);
+        let order_err = exchange.submit_order(&buy_order);
         match order_err {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
@@ -865,7 +885,7 @@ mod tests {
         let size = 950.0;
         let sell_order = Order::market(Side::Sell, size);
 
-        let order_err = exchange.submit_order(sell_order);
+        let order_err = exchange.submit_order(&sell_order);
         match order_err {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
@@ -907,7 +927,7 @@ mod tests {
         exchange.consume_trade(&t);
         for i in 0..100 {
             let o = Order::stop_market(Side::Buy, 101.0 + i as f64, 10.0);
-            exchange.submit_order(o);
+            exchange.submit_order(&o);
         }
         let active_orders = exchange.orders_active;
         let mut last_order_id: i64 = -1;
@@ -954,7 +974,7 @@ mod tests {
         assert_eq!(exchange.position.leverage, Decimal::new(1, 0));
 
         let o = Order::market(Side::Buy, 100.0);
-        let order_err = exchange.submit_order(o);
+        let order_err = exchange.submit_order(&o);
         assert!(order_err.is_none());
 
         exchange.check_orders();
@@ -977,7 +997,7 @@ mod tests {
 
 
         let o = Order::market(Side::Buy, 4800.0);
-        let order_err = exchange.submit_order(o);
+        let order_err = exchange.submit_order(&o);
         assert!(order_err.is_none());
 
         let fee_asset2 = (fee_taker * Decimal::new(4800, 0)) / exchange.bid;
@@ -1003,7 +1023,7 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::market(Side::Buy, 100.0);
-        let order_err = exchange.submit_order(o);
+        let order_err = exchange.submit_order(&o);
         assert!(order_err.is_none());
 
         exchange.check_orders();
@@ -1025,7 +1045,7 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::market(Side::Buy, 100.0);
-        let order_err = exchange.submit_order(o);
+        let order_err = exchange.submit_order(&o);
         assert!(order_err.is_none());
 
         exchange.check_orders();
@@ -1064,7 +1084,7 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::market(Side::Buy, 100.0);
-        let order_err = exchange.submit_order(o);
+        let order_err = exchange.submit_order(&o);
         assert!(order_err.is_none());
         exchange.check_orders();
 
@@ -1105,7 +1125,7 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::stop_market(Side::Buy, 1010.0, 100.0);
-        let order_err = exchange.submit_order(o);
+        let order_err = exchange.submit_order(&o);
         assert!(order_err.is_none());
 
         // TODO: test cancel order
