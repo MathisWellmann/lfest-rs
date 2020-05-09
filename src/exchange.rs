@@ -133,29 +133,9 @@ impl Exchange {
             self.bid = price;
         }
 
-        if self.position.size > Decimal::new(0, 0) {
-            // liquidation check for long position
-            if price < self.position.liq_price {
-                self.liquidate();
-                return true
-            }
-            self.position.unrealized_pnl = self.unrealized_pnl();
-            self.position.roe_percent = self.roe();
-
-        } else if self.position.size < Decimal::new(0, 0) {
-            // liquidation check for short position
-            if price > self.position.liq_price {
-                self.liquidate();
-                return true
-            }
-            self.position.unrealized_pnl = self.unrealized_pnl();
-            self.position.roe_percent = self.roe();
+        if self.check_liquidation() {
+            return true
         }
-
-        self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
-        self.margin.available_balance = self.margin.margin_balance - self.margin.position_margin;
-
         self.check_orders();
 
         return false
@@ -164,7 +144,13 @@ impl Exchange {
     // consume_candle update the bid and ask price given a candle using its close price
     // returns true if position has been liquidated
     pub fn consume_candle(&mut self, candle: &Candle) -> bool {
-        // TODO: consume_candle
+        self.bid = Decimal::from_f64(candle.close).unwrap();
+        self.ask = Decimal::from_f64(candle.close).unwrap();
+
+        if self.check_liqidation() {
+            return true
+        }
+        self.check_orders();
         return false
     }
 
@@ -253,6 +239,31 @@ impl Exchange {
     pub fn ammend_order(&mut self, order_id: u64, new_order: Order) -> Option<OrderError> {
         // TODO:
         return None
+    }
+
+    fn check_liqidation(&mut self) -> bool {
+        if self.position.size > Decimal::new(0, 0) {
+            // liquidation check for long position
+            if price < self.position.liq_price {
+                self.liquidate();
+                return true
+            }
+            self.position.unrealized_pnl = self.unrealized_pnl();
+            self.position.roe_percent = self.roe();
+
+        } else if self.position.size < Decimal::new(0, 0) {
+            // liquidation check for short position
+            if price > self.position.liq_price {
+                self.liquidate();
+                return true
+            }
+            self.position.unrealized_pnl = self.unrealized_pnl();
+            self.position.roe_percent = self.roe();
+        }
+
+        self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
+        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
+        self.margin.available_balance = self.margin.margin_balance - self.margin.position_margin;
     }
 
     fn deduce_fees(&mut self, t: FeeType, side: Side, amount_base: Decimal) {
