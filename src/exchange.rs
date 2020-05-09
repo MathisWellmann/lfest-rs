@@ -136,6 +136,11 @@ impl Exchange {
         if self.check_liquidation() {
             return true
         }
+
+        self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
+        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
+        self.margin.available_balance = self.margin.margin_balance - self.margin.position_margin;
+
         self.check_orders();
 
         return false
@@ -147,9 +152,14 @@ impl Exchange {
         self.bid = Decimal::from_f64(candle.close).unwrap();
         self.ask = Decimal::from_f64(candle.close).unwrap();
 
-        if self.check_liqidation() {
+        if self.check_liquidation() {
             return true
         }
+
+        self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
+        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
+        self.margin.available_balance = self.margin.margin_balance - self.margin.position_margin;
+
         self.check_orders();
         return false
     }
@@ -241,10 +251,10 @@ impl Exchange {
         return None
     }
 
-    fn check_liqidation(&mut self) -> bool {
+    fn check_liquidation(&mut self) -> bool {
         if self.position.size > Decimal::new(0, 0) {
             // liquidation check for long position
-            if price < self.position.liq_price {
+            if self.ask < self.position.liq_price {
                 self.liquidate();
                 return true
             }
@@ -253,7 +263,7 @@ impl Exchange {
 
         } else if self.position.size < Decimal::new(0, 0) {
             // liquidation check for short position
-            if price > self.position.liq_price {
+            if self.bid > self.position.liq_price {
                 self.liquidate();
                 return true
             }
@@ -261,9 +271,7 @@ impl Exchange {
             self.position.roe_percent = self.roe();
         }
 
-        self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
-        self.margin.available_balance = self.margin.margin_balance - self.margin.position_margin;
+        return false
     }
 
     fn deduce_fees(&mut self, t: FeeType, side: Side, amount_base: Decimal) {
