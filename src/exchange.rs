@@ -5,7 +5,7 @@ use crate::orders::*;
 use crate::config::*;
 use chrono::prelude::*;
 use rust_decimal::Decimal;
-use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 
 
 #[derive(Debug, Clone)]
@@ -43,7 +43,6 @@ pub struct Position {
     margin: Decimal,
     pub leverage: Decimal,
     pub unrealized_pnl: Decimal,
-    roe_percent: Decimal,
 }
 
 #[derive(Debug, Clone)]
@@ -71,7 +70,6 @@ impl Exchange {
                 margin: Decimal::new(0, 0),
                 leverage: Decimal::new(1, 0),
                 unrealized_pnl: Decimal::new(0, 0),
-                roe_percent: Decimal::new(0, 0),
             },
             margin: Margin{
                 wallet_balance: Decimal::new(1, 0),
@@ -259,7 +257,6 @@ impl Exchange {
                 return true
             }
             self.position.unrealized_pnl = self.unrealized_pnl();
-            self.position.roe_percent = self.roe();
 
         } else if self.position.size < Decimal::new(0, 0) {
             // liquidation check for short position
@@ -268,7 +265,6 @@ impl Exchange {
                 return true
             }
             self.position.unrealized_pnl = self.unrealized_pnl();
-            self.position.roe_percent = self.roe();
         }
 
         return false
@@ -286,16 +282,16 @@ impl Exchange {
         let fee_base = fee * amount_base;
         let fee_asset = fee_base / price;
         self.margin.wallet_balance -= fee_asset;
-        self.margin.available_balance -= fee_asset;
-        self.margin.margin_balance -= fee_asset;
+        self.update_position_stats();
     }
 
     fn update_position_stats(&mut self) {
-        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
+        self.position.unrealized_pnl = self.unrealized_pnl();
+        let position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
+        self.position.margin = position_margin;
+        self.margin.position_margin = position_margin;
         self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
         self.margin.available_balance = self.margin.wallet_balance - self.margin.position_margin - self.margin.order_margin;
-        self.position.unrealized_pnl = self.unrealized_pnl();
-        self.position.roe_percent = self.roe();
     }
 
     fn execute_market(&mut self, side: Side, amount_base: Decimal) {
@@ -305,47 +301,71 @@ impl Exchange {
             Side::Buy => self.ask,
             Side::Sell => self.bid,
         };
-        self.position.entry_price = ((price * amount_base) + self.position.entry_price * self.position.size.abs())
-            / (amount_base + self.position.size.abs());
-
-        let order_margin: Decimal = amount_base / price / self.position.leverage;
-
-        // margin to be used from position. only if
-        let margin_from_position: Decimal = match side {
-            Side::Buy => {
-                let mut mfp: Decimal = Decimal::new(0, 0);
-                if self.position.size < Decimal::new(0, 0) {
-                    mfp =  min(self.margin.position_margin, order_margin);
-                }
-                mfp
-            },
-            Side::Sell => {
-                let mut mfp: Decimal = Decimal::new(0, 0);
-                if self.position.size > Decimal::new(0, 0) {
-                    mfp = min(self.margin.position_margin, order_margin);
-                }
-                mfp
-            },
-        };
-        let add_margin = order_margin - margin_from_position;
-        self.margin.available_balance -= add_margin;
-        self.position.margin += add_margin - margin_from_position;
+        let old_position_size = self.position.size;
 
         match side {
-            Side::Buy => self.position.size += amount_base,
-            Side::Sell => self.position.size -= amount_base,
-        }
-        self.position.value = self.position.size.abs() / self.bid;
+            Side::Buy => {
+                if self.position.size < Decimal::new(0,0) {
+                    if amount_base > self.position.size {
+                        // realize_pnl
+                        let rpnl = self.position.size * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
+                        self.margin.wallet_balance += rpnl;
+                        let rpnl_f64 = rpnl.to_f64().unwrap();
+                        self.total_rpnl += rpnl_f64;
+                        self.rpnls.push(rpnl_f64);
 
-        if self.position.size > Decimal::new(0, 0) {
-            let amount = margin_from_position * price;
-            let rpnl: Decimal = amount * (Decimal::new(1, 0) / self.bid - Decimal::new(1, 0) / self.position.entry_price) ;
-            let r = rpnl.to_string();
-            let r = r.parse::<f64>().unwrap();
-            self.total_rpnl += r;
-            self.rpnls.push(r);
-            self.margin.wallet_balance += rpnl;
+                        let size_diff = amount_base - self.position.size;
+                        self.position.size += amount_base;
+                        self.position.value = size_diff / price;
+
+                    } else {
+                        self.position.size += amount_base;
+                        self.position.value -= amount_base / price;
+                        // realize pnl
+                        let rpnl = amount_base * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
+                        self.margin.wallet_balance += rpnl;
+                        let rpnl_f64 = rpnl.to_f64().unwrap();
+                        self.total_rpnl += rpnl_f64;
+                        self.rpnls.push(rpnl_f64);
+                    }
+                } else {
+                    self.position.size += amount_base;
+                    self.position.value += amount_base / price;
+                }
+            },
+            Side::Sell => {
+                if self.position.size > Decimal::new(0, 0) {
+                    if amount_base > self.position.size {
+                        // realize pnl
+                        let rpnl = self.position.size * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
+                        self.margin.wallet_balance += rpnl;
+                        let rpnl_f64 = rpnl.to_f64().unwrap();
+                        self.total_rpnl += rpnl_f64;
+                        self.rpnls.push(rpnl_f64);
+
+                        let size_diff = amount_base - self.position.size;
+                        self.position.size -= amount_base;
+                        self.position.value = size_diff / price;
+
+                    } else {
+                        self.position.size -= amount_base;
+                        self.position.value -= amount_base / price;
+                        // realize pnl
+                        let rpnl = amount_base * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
+                        self.margin.wallet_balance += rpnl;
+                        let rpnl_f64 = rpnl.to_f64().unwrap();
+                        self.total_rpnl += rpnl_f64;
+                        self.rpnls.push(rpnl_f64);
+                    }
+                } else {
+                    self.position.size -= amount_base;
+                    self.position.value += amount_base / price;
+                }
+            },
         }
+
+        self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+            / (amount_base + old_position_size.abs());
 
         self.update_position_stats();
         self.update_liq_price();
@@ -355,10 +375,9 @@ impl Exchange {
         // TODO: better liquidate function
         if self.position.size > Decimal::new(0, 0) {
             let rpnl: Decimal = self.position.size.abs() * (Decimal::new(1, 0) / self.position.entry_price - Decimal::new(1, 0) / self.bid);
-            let r = rpnl.to_string();
-            let r = r.parse::<f64>().unwrap();
-            self.total_rpnl += r;
-            self.rpnls.push(r);
+            let rpnl_f64 = rpnl.to_f64().unwrap();
+            self.total_rpnl += rpnl_f64;
+            self.rpnls.push(rpnl_f64);
             self.margin.wallet_balance += rpnl;
 
             self.position.margin = Decimal::new(0, 0);
@@ -369,7 +388,6 @@ impl Exchange {
             self.position.value = Decimal::new(0, 0);
 
             self.position.unrealized_pnl = Decimal::new(0, 0);
-            self.position.roe_percent = Decimal::new(0, 0);
 
             self.update_liq_price();
 
@@ -380,10 +398,9 @@ impl Exchange {
 
         } else {
             let rpnl = self.position.size.abs() * (Decimal::new(1, 0) / self.position.entry_price - Decimal::new(1, 0) / self.ask);
-            let r = rpnl.to_string();
-            let r = r.parse::<f64>().unwrap();
-            self.total_rpnl += r;
-            self.rpnls.push(r);
+            let rpnl_f64 = rpnl.to_f64().unwrap();
+            self.total_rpnl += rpnl_f64;
+            self.rpnls.push(rpnl_f64);
             self.margin.wallet_balance += rpnl;
 
             self.position.margin = Decimal::new(0, 0);
@@ -394,7 +411,6 @@ impl Exchange {
             self.position.value = Decimal::new(0, 0);
 
             self.position.unrealized_pnl = Decimal::new(0, 0);
-            self.position.roe_percent = Decimal::new(0, 0);
 
             self.update_liq_price();
 
@@ -784,7 +800,6 @@ mod tests {
         assert_eq!(exchange.position.value, value);
         assert_eq!(exchange.position.margin, value);
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.position.roe_percent, Decimal::new(0, 0));
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset);
         assert_eq!(exchange.margin.position_margin, Decimal::new(4, 1));
@@ -822,7 +837,6 @@ mod tests {
         assert_eq!(exchange.position.value, value);
         assert_eq!(exchange.position.margin, value);
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.position.roe_percent, Decimal::new(0, 0));
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset);
         assert_eq!(exchange.margin.position_margin, Decimal::new(4, 1));
@@ -880,7 +894,6 @@ mod tests {
         assert_eq!(exchange.position.value, Decimal::new(0, 0));
         assert_eq!(exchange.position.margin, Decimal::new(0, 0));
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.position.roe_percent, Decimal::new(0, 0));
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - Decimal::new(2, 0) * fee_asset);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - Decimal::new(2, 0) * fee_asset);
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
@@ -921,7 +934,6 @@ mod tests {
         assert_eq!(exchange.position.value, Decimal::new(5, 2));
         assert_eq!(exchange.position.margin, Decimal::new(5, 2));
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.position.roe_percent, Decimal::new(0, 0));
         assert!(exchange.margin.wallet_balance < Decimal::new(1, 0));
         assert!(exchange.margin.margin_balance < Decimal::new(1, 0));
         assert_eq!(exchange.margin.position_margin, Decimal::new(5, 2));
