@@ -135,10 +135,7 @@ impl Exchange {
             return true
         }
 
-        self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
-        self.margin.available_balance = self.margin.margin_balance - self.margin.position_margin;
-
+        self.update_position_stats();
         self.check_orders();
 
         return false
@@ -154,10 +151,7 @@ impl Exchange {
             return true
         }
 
-        self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
-        self.margin.available_balance = self.margin.margin_balance - self.margin.position_margin;
-
+        self.update_position_stats();
         self.check_orders();
         return false
     }
@@ -214,6 +208,14 @@ impl Exchange {
         let now = Utc::now();
         o.timestamp = now.timestamp_millis() as u64;
 
+        match o.order_type {
+            OrderType::Market => {
+                // immediately execute market order
+                self.execute_market(o.side, o.size);
+                return None
+            }
+            _ => {},
+        }
         self.orders_active.push(o);
 
         return None
@@ -517,16 +519,26 @@ impl Exchange {
                     }
                     None
                 } else {
-                    if order_margin + fee_asset > self.margin.position_margin + self.margin.available_balance {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                    if order_margin > self.margin.position_margin {
+                        // check if there is enough available balance for the rest of order_margin
+                        let margin_diff = order_margin - self.position.margin;
+                        if margin_diff + fee_asset > self.margin.available_balance + self.position.margin {
+                            return Some(OrderError::NotEnoughAvailableBalance)
+                        }
+                        return None
                     }
                     None
                 }
             },
             Side::Sell => {
                 if self.position.size > Decimal::new(0, 0) {
-                    if order_margin + fee_asset > self.margin.position_margin + self.margin.available_balance {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                    if order_margin > self.margin.position_margin {
+                        // check if there is enough available balance for the rest of order_margin
+                        let margin_diff = order_margin - self.position.margin;
+                        if margin_diff + fee_asset > self.margin.available_balance + self.position.margin {
+                            return Some(OrderError::NotEnoughAvailableBalance)
+                        }
+                        return None
                     }
                     None
                 } else {
@@ -537,11 +549,7 @@ impl Exchange {
                 }
             }
         };
-        if order_err.is_some() {
-            return order_err
-        }
-
-        return None
+        return order_err
     }
 
     fn validate_limit_order(&self, o: &Order) -> Option<OrderError> {
@@ -614,7 +622,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_validate_market_order() {
+    fn validate_market_order() {
         let config = Config::xbt_usd();
         let mut exchange = Exchange::new(config);
         let t = Trade{
@@ -624,6 +632,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
+        // valid order
         let size = exchange.ask * exchange.margin.available_balance * Decimal::new(4, 1);
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
@@ -631,20 +640,61 @@ mod tests {
         let order_err = exchange.validate_market_order(&o);
         assert!(order_err.is_none());
 
+        // valid order
         let o = Order::market(Side::Sell, s);
         let order_err = exchange.validate_market_order(&o);
         assert!(order_err.is_none());
 
-        let size = exchange.ask * exchange.margin.available_balance * Decimal::new(2, 0);
+        // invalid order
+        let size = exchange.ask * exchange.margin.available_balance * Decimal::new(105, 2);
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
         let o = Order::market(Side::Buy, s);
         let order_err = exchange.validate_market_order(&o);
         assert!(order_err.is_some());
 
+        // invalid order
         let o = Order::market(Side::Sell, s);
         let order_err = exchange.validate_market_order(&o);
         assert!(order_err.is_some());
+
+        let o = Order::market(Side::Buy, 800.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        exchange.check_orders();
+
+        assert_eq!(exchange.position.size, Decimal::new(800, 0));
+
+        // valid order
+        let o = Order::market(Side::Buy, 190.0);
+        let order_err = exchange.validate_market_order(&o);
+        assert!(order_err.is_none());
+
+        // invalid order
+        let o = Order::market(Side::Buy, 210.0);
+        let order_err = exchange.validate_market_order(&o);
+        assert!(order_err.is_some());
+
+        // valid order
+        let o = Order::market(Side::Sell, 800.0);
+        let order_err = exchange.validate_market_order(&o);
+        assert!(order_err.is_none());
+
+        // invalid order
+        let o = Order::market(Side::Sell, 2100.0);
+        let order_err = exchange.validate_market_order(&o);
+        assert!(order_err.is_some());
+
+        // valid order
+        let o = Order::market(Side::Sell, 1600.0);
+        let order_err = exchange.validate_market_order(&o);
+        match order_err {
+            Some(OrderError::InvalidOrder) => panic!("invalid order"),
+            Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
+            Some(_) => panic!("other order err"),
+            None => {},
+        }
     }
 
     #[test]
