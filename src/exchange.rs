@@ -222,12 +222,12 @@ impl Exchange {
     }
 
     pub fn unrealized_pnl(&self) -> Decimal {
-        if self.position.size == Decimal::new(0, 0) {
-            return Decimal::new(0, 0);
+        return if self.position.size == Decimal::new(0, 0) {
+            Decimal::new(0, 0)
         } else if self.position.size > Decimal::new(0, 0) {
-            return ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / self.bid)) * self.position.size.abs();
+            ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / self.bid)) * self.position.size.abs()
         } else {
-            return ((Decimal::new(1, 0) / self.ask) - (Decimal::new(1, 0) / self.position.entry_price)) * self.position.size.abs();
+            ((Decimal::new(1, 0) / self.ask) - (Decimal::new(1, 0) / self.position.entry_price)) * self.position.size.abs()
         }
     }
 
@@ -295,9 +295,7 @@ impl Exchange {
         };
         self.position.unrealized_pnl = self.unrealized_pnl();
         self.position.value = self.position.size.abs() / price;
-        let position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
-        self.position.margin = position_margin;
-        self.margin.position_margin = position_margin;
+        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
         self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
         self.margin.available_balance = self.margin.wallet_balance - self.margin.position_margin - self.margin.order_margin;
     }
@@ -310,11 +308,16 @@ impl Exchange {
             Side::Sell => self.bid,
         };
         let old_position_size = self.position.size;
+        let old_entry_price: Decimal =  if self.position.size == Decimal::new(0, 0) {
+            price
+        } else {
+            self.position.entry_price
+        };
 
         match side {
             Side::Buy => {
                 if self.position.size < Decimal::new(0,0) {
-                    if amount_base >= self.position.size {
+                    if amount_base >= self.position.size.abs() {
                         // realize_pnl
                         let rpnl = self.position.size.abs() * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
@@ -322,24 +325,33 @@ impl Exchange {
                         self.total_rpnl += rpnl_f64;
                         self.rpnls.push(rpnl_f64);
 
+                        let size_diff = amount_base - self.position.size.abs();
                         self.position.size += amount_base;
+                        self.position.margin = size_diff / price / self.position.leverage;
+                        self.position.entry_price = price;
 
                     } else {
-                        self.position.size += amount_base;
                         // realize pnl
                         let rpnl = amount_base * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
                         self.total_rpnl += rpnl_f64;
                         self.rpnls.push(rpnl_f64);
+
+                        self.position.size += amount_base;
+                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.entry_price = old_entry_price;
                     }
                 } else {
                     self.position.size += amount_base;
+                    self.position.margin += amount_base / old_entry_price/ self.position.leverage;
+                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                        / (amount_base + old_position_size.abs());
                 }
             },
             Side::Sell => {
                 if self.position.size > Decimal::new(0, 0) {
-                    if amount_base >= self.position.size {
+                    if amount_base >= self.position.size.abs() {
                         // realize pnl
                         let rpnl = self.position.size.abs() * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
                         self.margin.wallet_balance += rpnl;
@@ -347,25 +359,31 @@ impl Exchange {
                         self.total_rpnl += rpnl_f64;
                         self.rpnls.push(rpnl_f64);
 
+                        let size_diff = amount_base - self.position.size.abs();
                         self.position.size -= amount_base;
+                        self.position.margin = size_diff / price / self.position.leverage;
+                        self.position.entry_price = price;
 
                     } else {
-                        self.position.size -= amount_base;
                         // realize pnl
                         let rpnl = amount_base * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
                         self.total_rpnl += rpnl_f64;
                         self.rpnls.push(rpnl_f64);
+
+                        self.position.size -= amount_base;
+                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.entry_price = old_entry_price;
                     }
                 } else {
                     self.position.size -= amount_base;
+                    self.position.margin += amount_base / old_entry_price / self.position.leverage;
+                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                        / (amount_base + old_position_size.abs());
                 }
             },
         }
-
-        self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
-            / (amount_base + old_position_size.abs());
 
         self.update_position_stats();
         self.update_liq_price();
@@ -812,7 +830,7 @@ mod tests {
     }
 
     #[test]
-    fn buy_market()  {
+    fn long_market_win_full()  {
         let config = Config::xbt_usd();
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
@@ -823,7 +841,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let value = exchange.margin.available_balance * Decimal::new(4, 1);
+        let value = exchange.margin.available_balance * Decimal::new(8, 1);
         let size = exchange.ask * value;
         let o = Order::market(Side::Buy, size.to_f64().unwrap());
         let order_err = exchange.submit_order(&o);
@@ -848,9 +866,9 @@ mod tests {
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset1);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset1);
-        assert_eq!(exchange.margin.position_margin, Decimal::new(4, 1));
+        assert_eq!(exchange.margin.position_margin, Decimal::new(8, 1));
         assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(6, 1) - fee_asset1);
+        assert_eq!(exchange.margin.available_balance, Decimal::new(2, 1) - fee_asset1);
 
         let t = Trade{
             timestamp: 0,
@@ -865,11 +883,11 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let size = Decimal::new(400, 0);
+        let size = Decimal::new(800, 0);
         let fee_base2 = size * fee_taker;
         let fee_asset2 = fee_base2 / Decimal::new(2000, 0);
 
-        assert_eq!(exchange.position.unrealized_pnl, Decimal::new(2, 1));
+        assert_eq!(exchange.position.unrealized_pnl, Decimal::new(4, 1));
 
         let o = Order::market(Side::Sell, size.to_f64().unwrap());
         let order_err = exchange.submit_order(&o);
@@ -881,16 +899,133 @@ mod tests {
         assert_eq!(exchange.position.value, Decimal::new(0, 0));
         assert_eq!(exchange.position.margin, Decimal::new(0, 0));
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(12, 1) - fee_asset1 - fee_asset2);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(12, 1) - fee_asset1 - fee_asset2);
+        assert_eq!(exchange.margin.wallet_balance, Decimal::new(14, 1) - fee_asset1 - fee_asset2);
+        assert_eq!(exchange.margin.margin_balance, Decimal::new(14, 1) - fee_asset1 - fee_asset2);
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
         assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(12, 1) - fee_asset1 - fee_asset2);
+        assert_eq!(exchange.margin.available_balance, Decimal::new(14, 1) - fee_asset1 - fee_asset2);
 
     }
 
     #[test]
-    fn sell_market()  {
+    fn long_market_loss_full() {
+        let config = Config::xbt_usd();
+        let fee_taker = config.fee_taker;
+        let mut exchange = Exchange::new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o = Order::market(Side::Buy, 800.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        exchange.check_orders();
+
+        assert_eq!(exchange.position.size, Decimal::new(800, 0));
+
+        let t = Trade{
+            timestamp: 0,
+            price: 800.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+        let t = Trade{
+            timestamp: 0,
+            price: 800.0,
+            size: -100.0,
+        };
+        exchange.consume_trade(&t);
+
+        assert_eq!(exchange.unrealized_pnl(), Decimal::new(-2, 1));
+
+        let o = Order::market(Side::Sell, 800.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        exchange.check_orders();
+
+        let fee_base0 = fee_taker * Decimal::new(800, 0);
+        let fee_asset0 = fee_base0 / Decimal::new(1000, 0);
+
+        let fee_base1 = fee_taker * Decimal::new(800, 0);
+        let fee_asset1 = fee_base1 / Decimal::new(800, 0);
+
+        let fee_combined = fee_asset0 + fee_asset1;
+
+        assert_eq!(exchange.position.size, Decimal::new(0, 0));
+        assert_eq!(exchange.position.value, Decimal::new(0, 0));
+        assert_eq!(exchange.position.margin, Decimal::new(0, 0));
+        assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.wallet_balance, Decimal::new(8, 1) - fee_combined);
+        assert_eq!(exchange.margin.margin_balance, Decimal::new(8, 1) - fee_combined);
+        assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(8, 1) - fee_combined);
+
+    }
+
+    #[test]
+    fn short_market_win_full() {
+        let config = Config::xbt_usd();
+        let fee_taker = config.fee_taker;
+        let mut exchange = Exchange::new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o = Order::market(Side::Sell, 800.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        exchange.check_orders();
+
+        assert_eq!(exchange.position.size, Decimal::new(-800, 0));
+
+        let t = Trade{
+            timestamp: 0,
+            price: 800.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+        let t = Trade{
+            timestamp: 0,
+            price: 800.0,
+            size: -100.0,
+        };
+        exchange.consume_trade(&t);
+
+        assert_eq!(exchange.unrealized_pnl(), Decimal::new(2, 1));
+
+        let o = Order::market(Side::Buy, 800.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        exchange.check_orders();
+
+        let fee_base0 = fee_taker * Decimal::new(800, 0);
+        let fee_asset0 = fee_base0 / Decimal::new(1000, 0);
+
+        let fee_base1 = fee_taker * Decimal::new(800, 0);
+        let fee_asset1 = fee_base1 / Decimal::new(800, 0);
+
+        let fee_combined = fee_asset0 + fee_asset1;
+
+        assert_eq!(exchange.position.size, Decimal::new(0, 0));
+        assert_eq!(exchange.position.value, Decimal::new(0, 0));
+        assert_eq!(exchange.position.margin, Decimal::new(0, 0));
+        assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.wallet_balance, Decimal::new(12, 1) - fee_combined);
+        assert_eq!(exchange.margin.margin_balance, Decimal::new(12, 1) - fee_combined);
+        assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(12, 1) - fee_combined);
+    }
+
+    #[test]
+    fn short_market_loss_full()  {
         let config = Config::xbt_usd();
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
@@ -957,6 +1092,274 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
+
+    }
+
+    #[test]
+    fn long_market_win_partial()  {
+        let config = Config::xbt_usd();
+        let fee_taker = config.fee_taker;
+        let mut exchange = Exchange::new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let value = exchange.margin.available_balance * Decimal::new(8, 1);
+        let size = exchange.ask * value;
+        let o = Order::market(Side::Buy, size.to_f64().unwrap());
+        let order_err = exchange.submit_order(&o);
+        match order_err {
+            Some(OrderError::InvalidOrder) => panic!("invalid order"),
+            Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
+            Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
+            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
+            None => {},
+        }
+
+        exchange.check_orders();
+
+        let fee_base = size * fee_taker;
+        let fee_asset1 = fee_base / exchange.bid;
+
+        assert_eq!(exchange.position.size, size);
+        assert_eq!(exchange.position.entry_price, Decimal::new(1000, 0));
+        assert_eq!(exchange.position.value, value);
+        assert_eq!(exchange.position.margin, value);
+        assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset1);
+        assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset1);
+        assert_eq!(exchange.margin.position_margin, Decimal::new(8, 1));
+        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(2, 1) - fee_asset1);
+
+        let t = Trade{
+            timestamp: 0,
+            price: 2000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+        let t = Trade{
+            timestamp: 0,
+            price: 2000.0,
+            size: -100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let size = Decimal::new(400, 0);
+        let fee_base2 = size * fee_taker;
+        let fee_asset2 = fee_base2 / Decimal::new(2000, 0);
+
+        assert_eq!(exchange.position.unrealized_pnl, Decimal::new(4, 1));
+
+        let o = Order::market(Side::Sell, size.to_f64().unwrap());
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+
+        exchange.check_orders();
+
+        assert_eq!(exchange.position.size, Decimal::new(400, 0));
+        assert_eq!(exchange.position.value, Decimal::new(2, 1));
+        assert_eq!(exchange.position.margin, Decimal::new(4, 1));
+        assert_eq!(exchange.position.unrealized_pnl, Decimal::new(2, 1));
+        assert_eq!(exchange.margin.wallet_balance, Decimal::new(12, 1) - fee_asset1 - fee_asset2);
+        assert_eq!(exchange.margin.margin_balance, Decimal::new(14, 1) - fee_asset1 - fee_asset2);
+        assert_eq!(exchange.margin.position_margin, Decimal::new(4, 1));
+        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
+
+    }
+
+    #[test]
+    fn long_market_loss_partial() {
+        let config = Config::xbt_usd();
+        let fee_taker = config.fee_taker;
+        let mut exchange = Exchange::new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o = Order::market(Side::Buy, 800.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        exchange.check_orders();
+
+        assert_eq!(exchange.position.size, Decimal::new(800, 0));
+
+        let t = Trade{
+            timestamp: 0,
+            price: 800.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+        let t = Trade{
+            timestamp: 0,
+            price: 800.0,
+            size: -100.0,
+        };
+        exchange.consume_trade(&t);
+
+        assert_eq!(exchange.unrealized_pnl(), Decimal::new(-2, 1));
+
+        let o = Order::market(Side::Sell, 400.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        exchange.check_orders();
+
+        let fee_base0 = fee_taker * Decimal::new(800, 0);
+        let fee_asset0 = fee_base0 / Decimal::new(1000, 0);
+
+        let fee_base1 = fee_taker * Decimal::new(400, 0);
+        let fee_asset1 = fee_base1 / Decimal::new(800, 0);
+
+        let fee_combined = fee_asset0 + fee_asset1;
+
+        assert_eq!(exchange.position.size, Decimal::new(400, 0));
+        assert_eq!(exchange.position.value, Decimal::new(5, 1));
+        assert_eq!(exchange.position.margin, Decimal::new(4, 1));
+        assert_eq!(exchange.position.unrealized_pnl, Decimal::new(-1, 1));
+        assert_eq!(exchange.margin.wallet_balance, Decimal::new(9, 1) - fee_combined);
+        assert_eq!(exchange.margin.margin_balance, Decimal::new(8, 1) - fee_combined);
+        assert_eq!(exchange.margin.position_margin, Decimal::new(4, 1));
+        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1) - fee_combined);
+
+    }
+
+    #[test]
+    fn short_market_win_partial() {
+        let config = Config::xbt_usd();
+        let fee_taker = config.fee_taker;
+        let mut exchange = Exchange::new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o = Order::market(Side::Sell, 800.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        exchange.check_orders();
+
+        assert_eq!(exchange.position.size, Decimal::new(-800, 0));
+
+        let t = Trade{
+            timestamp: 0,
+            price: 800.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+        let t = Trade{
+            timestamp: 0,
+            price: 800.0,
+            size: -100.0,
+        };
+        exchange.consume_trade(&t);
+
+        assert_eq!(exchange.unrealized_pnl(), Decimal::new(2, 1));
+
+        let o = Order::market(Side::Buy, 400.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        exchange.check_orders();
+
+        let fee_base0 = fee_taker * Decimal::new(800, 0);
+        let fee_asset0 = fee_base0 / Decimal::new(1000, 0);
+
+        let fee_base1 = fee_taker * Decimal::new(400, 0);
+        let fee_asset1 = fee_base1 / Decimal::new(800, 0);
+
+        let fee_combined = fee_asset0 + fee_asset1;
+
+        assert_eq!(exchange.position.size, Decimal::new(-400, 0));
+        assert_eq!(exchange.position.value, Decimal::new(5, 1));
+        assert_eq!(exchange.position.margin, Decimal::new(4, 1));
+        assert_eq!(exchange.position.unrealized_pnl, Decimal::new(1, 1));
+        assert_eq!(exchange.margin.wallet_balance, Decimal::new(11, 1) - fee_combined);
+        assert_eq!(exchange.margin.margin_balance, Decimal::new(12, 1) - fee_combined);
+        assert_eq!(exchange.margin.position_margin, Decimal::new(6, 1));
+        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1) - fee_combined);
+    }
+
+    #[test]
+    fn short_market_loss_partial()  {
+        let config = Config::xbt_usd();
+        let fee_taker = config.fee_taker;
+        let mut exchange = Exchange::new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let value = exchange.margin.available_balance * Decimal::new(8, 1);
+        let size = exchange.ask * value;
+        let s = size.to_string();
+        let s = s.parse::<f64>().unwrap();
+        let o = Order::market(Side::Sell, s);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+
+        exchange.check_orders();
+
+        let fee_base1 = size * fee_taker;
+        let fee_asset1 = fee_base1 / exchange.bid;
+
+        assert_eq!(exchange.position.size,  -size);
+        assert_eq!(exchange.position.entry_price, Decimal::new(1000, 0));
+        assert_eq!(exchange.position.value, value);
+        assert_eq!(exchange.position.margin, value);
+        assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset1);
+        assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset1);
+        assert_eq!(exchange.margin.position_margin, Decimal::new(8, 1));
+        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(2, 1) - fee_asset1);
+
+        let t = Trade{
+            timestamp: 0,
+            price: 2000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+        let t = Trade{
+            timestamp: 0,
+            price: 2000.0,
+            size: -100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let size = Decimal::new(400, 0);
+        let fee_base2 = size * fee_taker;
+        let fee_asset2 = fee_base2 / Decimal::new(2000, 0);
+
+        assert_eq!(exchange.position.unrealized_pnl, Decimal::new(-4, 1));
+
+        let o = Order::market(Side::Buy, size.to_f64().unwrap());
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+
+        exchange.check_orders();
+
+        assert_eq!(exchange.position.size, Decimal::new(-400, 0));
+        assert_eq!(exchange.position.value, Decimal::new(2, 1));
+        assert_eq!(exchange.position.margin, Decimal::new(4, 1));
+        assert_eq!(exchange.position.unrealized_pnl, Decimal::new(-2, 1));
+        assert_eq!(exchange.margin.wallet_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
+        assert_eq!(exchange.margin.margin_balance, Decimal::new(6, 1) - fee_asset1 - fee_asset2);
+        assert_eq!(exchange.margin.position_margin, Decimal::new(0, 1));
         assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
 
