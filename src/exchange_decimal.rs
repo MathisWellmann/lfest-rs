@@ -29,18 +29,18 @@ pub struct ExchangeDecimal {
 pub struct Margin {
     pub wallet_balance: Decimal,
     pub margin_balance: Decimal,
-    position_margin: Decimal,
-    order_margin: Decimal,
+    pub position_margin: Decimal,
+    pub order_margin: Decimal,
     pub available_balance: Decimal,
 }
 
 #[derive(Debug, Clone)]
 pub struct Position {
     pub size: Decimal,
-    value: Decimal,
+    pub value: Decimal,
     pub entry_price: Decimal,
-    liq_price: Decimal,
-    margin: Decimal,
+    pub liq_price: Decimal,
+    pub margin: Decimal,
     pub leverage: Decimal,
     pub unrealized_pnl: Decimal,
 }

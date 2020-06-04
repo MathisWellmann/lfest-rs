@@ -29,18 +29,18 @@ pub struct ExchangeFloat {
 pub struct MarginFloat {
     pub wallet_balance: f64,
     pub margin_balance: f64,
-    position_margin: f64,
-    order_margin: f64,
+    pub position_margin: f64,
+    pub order_margin: f64,
     pub available_balance: f64,
 }
 
 #[derive(Debug, Clone)]
 pub struct PositionFloat {
     pub size: f64,
-    value: f64,
+    pub value: f64,  // value of positoin in units of quoteCurrency
     pub entry_price: f64,
-    liq_price: f64,
-    margin: f64,
+    pub liq_price: f64,
+    pub margin: f64,
     pub leverage: f64,
     pub unrealized_pnl: f64,
 }
