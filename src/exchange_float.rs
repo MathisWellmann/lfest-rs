@@ -104,7 +104,7 @@ impl ExchangeFloat {
         self.position.leverage = l;
         self.margin.position_margin = (self.position.value / self.position.leverage) + self.unrealized_pnl();
         self.margin.available_balance = self.margin.margin_balance - self.margin.order_margin - self.margin.position_margin;
-        self.position.margin = (self.position.value / self.position.leverage);
+        self.position.margin = self.position.value / self.position.leverage;
 
         return true
     }
@@ -173,7 +173,7 @@ impl ExchangeFloat {
         None
     }
 
-    pub fn submit_order(&mut self, mut o: &OrderFloat) -> Option<OrderError> {
+    pub fn submit_order(&mut self, o: &OrderFloat) -> Option<OrderError> {
         if self.orders_active.len() >= self.config.max_active_orders {
             return Some(OrderError::MaxActiveOrders)
         }
@@ -239,9 +239,9 @@ impl ExchangeFloat {
         return exec_orders
     }
 
-    pub fn ammend_order(&mut self, order_id: u64, new_order: OrderFloat) -> Option<OrderError> {
-        // TODO:
-        return None
+    pub fn ammend_order(&mut self, _order_id: u64, _new_order: OrderFloat) -> Option<OrderError> {
+        // TODO: exchange_float: ammend_order
+        unimplemented!("exchange_float ammend_order is not implemented yet");
     }
 
     fn check_liquidation(&mut self) -> bool {
@@ -459,50 +459,49 @@ impl ExchangeFloat {
     }
 
     fn handle_stop_market_order(&mut self, order_index: usize) {
-        let o: &OrderFloat = &self.orders_active[order_index];
-        match o.side {
+        match self.orders_active[order_index].side {
             Side::Buy => {
-                if o.price > self.ask { return }
-                self.execute_market(Side::Buy, o.size);
+                if self.orders_active[order_index].price > self.ask { return }
+                self.execute_market(Side::Buy, self.orders_active[order_index].size);
                 self.orders_active[order_index].mark_done();
             },
             Side::Sell => {
-                if o.price > self.bid { return }
-                self.execute_market(Side::Sell, o.size);
+                if self.orders_active[order_index].price > self.bid { return }
+                self.execute_market(Side::Sell, self.orders_active[order_index].size);
                 self.orders_active[order_index].mark_done();
             },
         }
     }
 
     fn handle_take_profit_market_order(&mut self, order_index: usize) {
-        let o: &OrderFloat = &self.orders_active[order_index];
-        match o.side {
-            Side::Buy => { if o.price < self.bid { return }
-                self.execute_market(Side::Buy, o.size * self.ask);
+        match self.orders_active[order_index].side {
+            Side::Buy => { if self.orders_active[order_index].price < self.bid { return }
+                self.execute_market(Side::Buy, self.orders_active[order_index].size * self.ask);
                 self.orders_active[order_index].mark_done();
             },
-            Side::Sell => { if o.price > self.ask { return }
-                self.execute_market(Side::Sell, o.size * self.bid);
+            Side::Sell => { if self.orders_active[order_index].price > self.ask { return }
+                self.execute_market(Side::Sell, self.orders_active[order_index].size * self.bid);
                 self.orders_active[order_index].mark_done();
             },
         }
     }
 
     fn handle_market_order(&mut self, order_index: usize) {
-        let o: &OrderFloat = &self.orders_active[order_index];
-        match o.side {
-            Side::Buy => self.execute_market(Side::Buy, o.size),
-            Side::Sell => self.execute_market(Side:: Sell, o.size),
+        match self.orders_active[order_index].side {
+            Side::Buy => self.execute_market(Side::Buy, self.orders_active[order_index].size),
+            Side::Sell => self.execute_market(Side:: Sell, self.orders_active[order_index].size),
         }
         self.orders_active[order_index].mark_done();
     }
 
-    fn handle_limit_order(&mut self, order_index: usize) {
-        // TODO:
+    fn handle_limit_order(&mut self, _order_index: usize) {
+        // TODO: exchange_float: handle_limit_order
+        unimplemented!("exchange_float: handle_limit_order is not implemented yet");
     }
 
-    fn handle_take_profit_limit_order(&mut self, order_index: usize) {
-        // TODO:
+    fn handle_take_profit_limit_order(&mut self, _order_index: usize) {
+        // TODO: exchange_float: handle_take_profit_limit_order
+        unimplemented!("exchange_float: handle_take_profit_limit_order is not implemented yet");
     }
 
     // check if market order is correct
@@ -557,14 +556,14 @@ impl ExchangeFloat {
         return order_err
     }
 
-    fn validate_limit_order(&self, o: &OrderFloat) -> Option<OrderError> {
-        // TODO:
-        return None
+    fn validate_limit_order(&self, _o: &OrderFloat) -> Option<OrderError> {
+        // TODO: exchange_float: validate_limit_order
+        unimplemented!("exchange_float: validate_limit_order is not implemented yet");
     }
 
-    fn validate_take_profit_limit_order(&self, o: &OrderFloat) -> Option<OrderError> {
-        // TODO:
-        return None
+    fn validate_take_profit_limit_order(&self, _o: &OrderFloat) -> Option<OrderError> {
+        // TODO: exchange_float: validate_take_profit_limit_order
+        unimplemented!("exchange_float: validate_take_profit_limit_order is not implemented yet");
     }
 
     // returns true if order is valid
@@ -605,7 +604,7 @@ impl ExchangeFloat {
         }
     }
 
-    fn roe(&self) -> f64 {
+    pub fn roe(&self) -> f64 {
         return if self.position.size > 0.0 {
             (self.bid - self.position.entry_price) / self.position.entry_price
         } else {

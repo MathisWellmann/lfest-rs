@@ -111,7 +111,7 @@ impl ExchangeDecimal {
         self.position.leverage = l;
         self.margin.position_margin = (self.position.value / self.position.leverage) + self.unrealized_pnl();
         self.margin.available_balance = self.margin.margin_balance - self.margin.order_margin - self.margin.position_margin;
-        self.position.margin = (self.position.value / self.position.leverage);
+        self.position.margin = self.position.value / self.position.leverage;
 
         return true
     }
@@ -180,7 +180,7 @@ impl ExchangeDecimal {
         None
     }
 
-    pub fn submit_order(&mut self, mut o: &Order) -> Option<OrderError> {
+    pub fn submit_order(&mut self, o: &Order) -> Option<OrderError> {
         if self.orders_active.len() >= self.config.max_active_orders {
             return Some(OrderError::MaxActiveOrders)
         }
@@ -246,9 +246,9 @@ impl ExchangeDecimal {
         return exec_orders
     }
 
-    pub fn ammend_order(&mut self, order_id: u64, new_order: Order) -> Option<OrderError> {
-        // TODO:
-        return None
+    pub fn ammend_order(&mut self, _order_id: u64, _new_order: Order) -> Option<OrderError> {
+        // TODO: exchange_decimal: ammend_order
+        unimplemented!("exchange_decimal: ammend_order is not implemented yet");
     }
 
     fn check_liquidation(&mut self) -> bool {
@@ -472,50 +472,49 @@ impl ExchangeDecimal {
     }
 
     fn handle_stop_market_order(&mut self, order_index: usize) {
-        let o: &Order = &self.orders_active[order_index];
-        match o.side {
+        match self.orders_active[order_index].side {
             Side::Buy => {
-                if o.price > self.ask { return }
-                self.execute_market(Side::Buy, o.size);
+                if self.orders_active[order_index].price > self.ask { return }
+                self.execute_market(Side::Buy, self.orders_active[order_index].size);
                 self.orders_active[order_index].mark_done();
             },
             Side::Sell => {
-                if o.price > self.bid { return }
-                self.execute_market(Side::Sell, o.size);
+                if self.orders_active[order_index].price > self.bid { return }
+                self.execute_market(Side::Sell, self.orders_active[order_index].size);
                 self.orders_active[order_index].mark_done();
             },
         }
     }
 
     fn handle_take_profit_market_order(&mut self, order_index: usize) {
-        let o: &Order = &self.orders_active[order_index];
-        match o.side {
-            Side::Buy => { if o.price < self.bid { return }
-                self.execute_market(Side::Buy, o.size * self.ask);
+        match self.orders_active[order_index].side {
+            Side::Buy => { if self.orders_active[order_index].price < self.bid { return }
+                self.execute_market(Side::Buy, self.orders_active[order_index].size * self.ask);
                 self.orders_active[order_index].mark_done();
             },
-            Side::Sell => { if o.price > self.ask { return }
-                self.execute_market(Side::Sell, o.size * self.bid);
+            Side::Sell => { if self.orders_active[order_index].price > self.ask { return }
+                self.execute_market(Side::Sell, self.orders_active[order_index].size * self.bid);
                 self.orders_active[order_index].mark_done();
             },
         }
     }
 
     fn handle_market_order(&mut self, order_index: usize) {
-        let o: &Order = &self.orders_active[order_index];
-        match o.side {
-            Side::Buy => self.execute_market(Side::Buy, o.size),
-            Side::Sell => self.execute_market(Side:: Sell, o.size),
+        match self.orders_active[order_index].side {
+            Side::Buy => self.execute_market(Side::Buy, self.orders_active[order_index].size),
+            Side::Sell => self.execute_market(Side:: Sell, self.orders_active[order_index].size),
         }
         self.orders_active[order_index].mark_done();
     }
 
-    fn handle_limit_order(&mut self, order_index: usize) {
-        // TODO:
+    fn handle_limit_order(&mut self, _order_index: usize) {
+        // TODO: exchange_decimal: handle_limit_order is not implemented yet
+        unimplemented!("exchange_decimal: handle_limit_order is not implemented yet");
     }
 
-    fn handle_take_profit_limit_order(&mut self, order_index: usize) {
-        // TODO:
+    fn handle_take_profit_limit_order(&mut self, _order_index: usize) {
+        // TODO: exchange_decimal: handle_take_profit_limit_order
+        unimplemented!("exchange_decimal: handle_take_profit_limit_order is not implemented yet");
     }
 
     // check if market order is correct
@@ -570,14 +569,14 @@ impl ExchangeDecimal {
         return order_err
     }
 
-    fn validate_limit_order(&self, o: &Order) -> Option<OrderError> {
-        // TODO:
-        return None
+    fn validate_limit_order(&self, _o: &Order) -> Option<OrderError> {
+        // TODO: exchange_decimal: validate_limit_order
+        unimplemented!("exchange_decimal: validate_limit_order is not implemented yet");
     }
 
-    fn validate_take_profit_limit_order(&self, o: &Order) -> Option<OrderError> {
-        // TODO:
-        return None
+    fn validate_take_profit_limit_order(&self, _o: &Order) -> Option<OrderError> {
+        // TODO: exchange_decimal: validate_take_profit_limit_order
+        unimplemented!("exchange_decimal: validate_take_profit_limit_order is not implemented yet");
     }
 
     // returns true if order is valid
@@ -618,7 +617,7 @@ impl ExchangeDecimal {
         }
     }
 
-    fn roe(&self) -> Decimal {
+    pub fn roe(&self) -> Decimal {
         return if self.position.size > Decimal::new(0, 0) {
             (self.bid - self.position.entry_price) / self.position.entry_price
         } else {
@@ -1543,6 +1542,7 @@ mod tests {
         assert_eq!(exchange.margin.available_balance, Decimal::new(99, 2) - fee_asset);
 
         let valid = exchange.set_leverage(5.0);
+        assert!(valid);
         assert_eq!(exchange.position.margin, Decimal::new(2, 2));
         assert_eq!(exchange.margin.position_margin, Decimal::new(2, 2));
         assert_eq!(exchange.margin.available_balance, Decimal::new(98, 2) - fee_asset);
@@ -1565,7 +1565,7 @@ mod tests {
     #[test]
     fn liq_price() {
         let config = Config::xbt_usd();
-        let fee_taker = config.fee_taker;
+        // let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,

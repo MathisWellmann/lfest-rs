@@ -1,6 +1,3 @@
-use rust_decimal::Decimal;
-
-
 #[derive(Debug, Clone)]
 pub struct Config {
     pub max_leverage: f64,
