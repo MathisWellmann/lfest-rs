@@ -518,7 +518,7 @@ impl ExchangeDecimal {
     }
 
     // check if market order is correct
-    fn validate_market_order(&mut self, o: &Order) -> Option<OrderError> {
+    pub fn validate_market_order(&mut self, o: &Order) -> Option<OrderError> {
         let price = match o.side {
             Side::Buy => self.ask,
             Side::Sell => self.bid,
@@ -569,18 +569,18 @@ impl ExchangeDecimal {
         return order_err
     }
 
-    fn validate_limit_order(&self, _o: &Order) -> Option<OrderError> {
+    pub fn validate_limit_order(&self, _o: &Order) -> Option<OrderError> {
         // TODO: exchange_decimal: validate_limit_order
         unimplemented!("exchange_decimal: validate_limit_order is not implemented yet");
     }
 
-    fn validate_take_profit_limit_order(&self, _o: &Order) -> Option<OrderError> {
+    pub fn validate_take_profit_limit_order(&self, _o: &Order) -> Option<OrderError> {
         // TODO: exchange_decimal: validate_take_profit_limit_order
         unimplemented!("exchange_decimal: validate_take_profit_limit_order is not implemented yet");
     }
 
     // returns true if order is valid
-    fn validate_stop_market_order(&mut self, o: &Order) -> Option<OrderError> {
+    pub fn validate_stop_market_order(&mut self, o: &Order) -> Option<OrderError> {
         let order_err =  match o.side {
             Side::Buy => { if o.price <= self.ask { return Some(OrderError::InvalidTriggerPrice) }
                 None
@@ -596,7 +596,7 @@ impl ExchangeDecimal {
         None
     }
 
-    fn validate_take_profit_market_order(&self, o: &Order) -> Option<OrderError> {
+    pub fn validate_take_profit_market_order(&self, o: &Order) -> Option<OrderError> {
         return match o.side {
             Side::Buy => { if o.price > self.bid { return Some(OrderError::InvalidOrder) }
                 None
