@@ -178,7 +178,7 @@ impl ExchangeFloat {
             return Some(OrderError::MaxActiveOrders)
         }
         if o.size <= 0.0 {
-            return Some(OrderError::InvalidOrder)
+            return Some(OrderError::InvalidOrderSize)
         }
         let order_err: Option<OrderError> = match o.order_type {
             OrderType::Market => self.validate_market_order(o),
