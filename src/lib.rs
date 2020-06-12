@@ -6,3 +6,4 @@ pub mod exchange_float;
 pub mod orders_float;
 pub mod config_float;
 
+pub mod contracts;
