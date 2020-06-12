@@ -91,9 +91,7 @@ impl ExchangeFloat {
     // sets the new leverage of position
     // returns true if successful
     pub fn set_leverage(&mut self, l: f64) -> bool {
-        if l > self.config.max_leverage {
-            return false
-        } else if l < self.config.min_leverage {
+        if l < 1.0 {
             return false
         }
 
@@ -174,8 +172,9 @@ impl ExchangeFloat {
     }
 
     pub fn submit_order(&mut self, o: &OrderFloat) -> Option<OrderError> {
-        if self.orders_active.len() >= self.config.max_active_orders {
-            return Some(OrderError::MaxActiveOrders)
+        match o.order_type {
+            OrderType::StopMarket => { if self.orders_active.len() >= 10 { return Some(OrderError::MaxActiveOrders ) } },
+            _ => { if self.orders_active.len() >= 200 { return Some(OrderError::MaxActiveOrders) } }
         }
         if o.size <= 0.0 {
             return Some(OrderError::InvalidOrderSize)

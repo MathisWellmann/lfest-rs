@@ -98,9 +98,7 @@ impl ExchangeDecimal {
     // returns true if successful
     pub fn set_leverage(&mut self, l: f64) -> bool {
         let l = Decimal::from_f64(l).unwrap();
-        if l > self.config.max_leverage {
-            return false
-        } else if l < self.config.min_leverage {
+        if l < Decimal::new(1, 0) {
             return false
         }
 
@@ -181,9 +179,11 @@ impl ExchangeDecimal {
     }
 
     pub fn submit_order(&mut self, o: &Order) -> Option<OrderError> {
-        if self.orders_active.len() >= self.config.max_active_orders {
-            return Some(OrderError::MaxActiveOrders)
+        match o.order_type {
+            OrderType::StopMarket => { if self.orders_active.len() >= 10 { return Some(OrderError::MaxActiveOrders ) } },
+            _ => { if self.orders_active.len() >= 200 { return Some(OrderError::MaxActiveOrders) } }
         }
+
         if o.size <= Decimal::new(0, 0) {
             return Some(OrderError::InvalidOrderSize)
         }
@@ -640,7 +640,7 @@ mod tests {
 
     #[test]
     fn validate_market_order() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -721,7 +721,7 @@ mod tests {
 
     #[test]
     fn test_validate_stop_market_order() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -757,7 +757,7 @@ mod tests {
 
     #[test]
     fn test_validate_take_profit_market_order() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -795,7 +795,7 @@ mod tests {
 
     #[test]
     fn handle_stop_market_order() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -830,7 +830,7 @@ mod tests {
 
     #[test]
     fn long_market_win_full()  {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -908,7 +908,7 @@ mod tests {
 
     #[test]
     fn long_market_loss_full() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -967,7 +967,7 @@ mod tests {
 
     #[test]
     fn short_market_win_full() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1025,7 +1025,7 @@ mod tests {
 
     #[test]
     fn short_market_loss_full()  {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1098,7 +1098,7 @@ mod tests {
 
     #[test]
     fn long_market_win_partial()  {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1176,7 +1176,7 @@ mod tests {
 
     #[test]
     fn long_market_loss_partial() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1235,7 +1235,7 @@ mod tests {
 
     #[test]
     fn short_market_win_partial() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1293,7 +1293,7 @@ mod tests {
 
     #[test]
     fn short_market_loss_partial()  {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1366,7 +1366,7 @@ mod tests {
 
     #[test]
     fn test_market_roundtrip() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1468,7 +1468,7 @@ mod tests {
 
     #[test]
     fn test_order_ids() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -1503,7 +1503,7 @@ mod tests {
 
     #[test]
     fn set_leverage() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1564,7 +1564,7 @@ mod tests {
 
     #[test]
     fn liq_price() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         // let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1587,7 +1587,7 @@ mod tests {
 
     #[test]
     fn unrealized_pnl() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -1626,7 +1626,7 @@ mod tests {
 
     #[test]
     fn roe() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -1667,7 +1667,7 @@ mod tests {
 
     #[test]
     fn cancel_order() {
-        let config = Config::xbt_usd();
+        let config = Config::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
