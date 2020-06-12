@@ -18,7 +18,7 @@ impl Config {
     pub fn altcoin_futures() -> Self {
         Config {
             fee_maker: Decimal::new(-00005, 4),
-            fee_taker: Decimal::new(00025, 5),
+            fee_taker: Decimal::new(00025, 4),
         }
     }
 }

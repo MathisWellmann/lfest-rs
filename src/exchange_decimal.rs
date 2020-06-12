@@ -1513,8 +1513,6 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let valid = exchange.set_leverage(101.0);
-        assert!(!valid);
         let valid = exchange.set_leverage(0.5);
         assert!(!valid);
 
