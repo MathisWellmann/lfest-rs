@@ -243,6 +243,104 @@ impl ExchangeFloat {
         unimplemented!("exchange_float ammend_order is not implemented yet");
     }
 
+    // check if market order is correct
+    pub fn validate_market_order(&mut self, o: &OrderFloat) -> Option<OrderError> {
+        let price = match o.side {
+            Side::Buy => self.ask,
+            Side::Sell => self.bid,
+        };
+        let fee_base = self.config.fee_taker * o.size;
+        let fee_asset = fee_base / self.bid;
+
+        // check if enough available balance for initial margin requirements
+        let order_margin: f64 = o.size / price / self.position.leverage;
+        let order_err: Option<OrderError> = match o.side {
+            Side::Buy => {
+                if self.position.size > 0.0 {
+                    if order_margin + fee_asset > self.margin.available_balance {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+                } else {
+                    if order_margin > self.margin.position_margin {
+                        // check if there is enough available balance for the rest of order_margin
+                        let margin_diff = order_margin - self.position.margin;
+                        if margin_diff + fee_asset > self.margin.available_balance + self.position.margin {
+                            return Some(OrderError::NotEnoughAvailableBalance)
+                        }
+                        return None
+                    }
+                    None
+                }
+            },
+            Side::Sell => {
+                if self.position.size > 0.0 {
+                    if order_margin > self.margin.position_margin {
+                        // check if there is enough available balance for the rest of order_margin
+                        let margin_diff = order_margin - self.position.margin;
+                        if margin_diff + fee_asset > self.margin.available_balance + self.position.margin {
+                            return Some(OrderError::NotEnoughAvailableBalance)
+                        }
+                        return None
+                    }
+                    None
+                } else {
+                    if order_margin + fee_asset > self.margin.available_balance {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+                }
+            }
+        };
+        return order_err
+    }
+
+    pub fn validate_limit_order(&self, _o: &OrderFloat) -> Option<OrderError> {
+        // TODO: exchange_float: validate_limit_order
+        unimplemented!("exchange_float: validate_limit_order is not implemented yet");
+    }
+
+    pub fn validate_take_profit_limit_order(&self, _o: &OrderFloat) -> Option<OrderError> {
+        // TODO: exchange_float: validate_take_profit_limit_order
+        unimplemented!("exchange_float: validate_take_profit_limit_order is not implemented yet");
+    }
+
+    // returns true if order is valid
+    pub fn validate_stop_market_order(&mut self, o: &OrderFloat) -> Option<OrderError> {
+        let order_err =  match o.side {
+            Side::Buy => { if o.price <= self.ask { return Some(OrderError::InvalidTriggerPrice) }
+                None
+            },
+            Side::Sell => { if o.price >= self.bid { return Some(OrderError::InvalidTriggerPrice) }
+                None
+            },
+        };
+        if order_err.is_some() {
+            return order_err
+        }
+
+        None
+    }
+
+    pub fn validate_take_profit_market_order(&self, o: &OrderFloat) -> Option<OrderError> {
+        return match o.side {
+            Side::Buy => { if o.price > self.bid { return Some(OrderError::InvalidOrder) }
+                None
+            },
+            Side::Sell => { if o.price < self.ask { return Some(OrderError::InvalidOrder) }
+                None
+            },
+        }
+    }
+
+    pub fn roe(&self) -> f64 {
+        return if self.position.size > 0.0 {
+            (self.bid - self.position.entry_price) / self.position.entry_price
+        } else {
+            (self.position.entry_price - self.ask) / self.position.entry_price
+        }
+    }
+
     fn check_liquidation(&mut self) -> bool {
         if self.position.size > 0.0 {
             // liquidation check for long position
@@ -503,96 +601,6 @@ impl ExchangeFloat {
         unimplemented!("exchange_float: handle_take_profit_limit_order is not implemented yet");
     }
 
-    // check if market order is correct
-    pub fn validate_market_order(&mut self, o: &OrderFloat) -> Option<OrderError> {
-        let price = match o.side {
-            Side::Buy => self.ask,
-            Side::Sell => self.bid,
-        };
-        let fee_base = self.config.fee_taker * o.size;
-        let fee_asset = fee_base / self.bid;
-
-        // check if enough available balance for initial margin requirements
-        let order_margin: f64 = o.size / price / self.position.leverage;
-        let order_err: Option<OrderError> = match o.side {
-            Side::Buy => {
-                if self.position.size > 0.0 {
-                    if order_margin + fee_asset > self.margin.available_balance {
-                        return Some(OrderError::NotEnoughAvailableBalance)
-                    }
-                    None
-                } else {
-                    if order_margin > self.margin.position_margin {
-                        // check if there is enough available balance for the rest of order_margin
-                        let margin_diff = order_margin - self.position.margin;
-                        if margin_diff + fee_asset > self.margin.available_balance + self.position.margin {
-                            return Some(OrderError::NotEnoughAvailableBalance)
-                        }
-                        return None
-                    }
-                    None
-                }
-            },
-            Side::Sell => {
-                if self.position.size > 0.0 {
-                    if order_margin > self.margin.position_margin {
-                        // check if there is enough available balance for the rest of order_margin
-                        let margin_diff = order_margin - self.position.margin;
-                        if margin_diff + fee_asset > self.margin.available_balance + self.position.margin {
-                            return Some(OrderError::NotEnoughAvailableBalance)
-                        }
-                        return None
-                    }
-                    None
-                } else {
-                    if order_margin + fee_asset > self.margin.available_balance {
-                        return Some(OrderError::NotEnoughAvailableBalance)
-                    }
-                    None
-                }
-            }
-        };
-        return order_err
-    }
-
-    pub fn validate_limit_order(&self, _o: &OrderFloat) -> Option<OrderError> {
-        // TODO: exchange_float: validate_limit_order
-        unimplemented!("exchange_float: validate_limit_order is not implemented yet");
-    }
-
-    pub fn validate_take_profit_limit_order(&self, _o: &OrderFloat) -> Option<OrderError> {
-        // TODO: exchange_float: validate_take_profit_limit_order
-        unimplemented!("exchange_float: validate_take_profit_limit_order is not implemented yet");
-    }
-
-    // returns true if order is valid
-    pub fn validate_stop_market_order(&mut self, o: &OrderFloat) -> Option<OrderError> {
-        let order_err =  match o.side {
-            Side::Buy => { if o.price <= self.ask { return Some(OrderError::InvalidTriggerPrice) }
-                None
-            },
-            Side::Sell => { if o.price >= self.bid { return Some(OrderError::InvalidTriggerPrice) }
-                None
-            },
-        };
-        if order_err.is_some() {
-            return order_err
-        }
-
-        None
-    }
-
-    pub fn validate_take_profit_market_order(&self, o: &OrderFloat) -> Option<OrderError> {
-        return match o.side {
-            Side::Buy => { if o.price > self.bid { return Some(OrderError::InvalidOrder) }
-                None
-            },
-            Side::Sell => { if o.price < self.ask { return Some(OrderError::InvalidOrder) }
-                None
-            },
-        }
-    }
-
     fn update_liq_price(&mut self) {
         if self.position.size == 0.0 {
             self.position.liq_price = 0.0;
@@ -600,14 +608,6 @@ impl ExchangeFloat {
             self.position.liq_price = self.position.entry_price - (self.position.entry_price / self.position.leverage);
         } else {
             self.position.liq_price = self.position.entry_price + (self.position.entry_price / self.position.leverage);
-        }
-    }
-
-    pub fn roe(&self) -> f64 {
-        return if self.position.size > 0.0 {
-            (self.bid - self.position.entry_price) / self.position.entry_price
-        } else {
-            (self.position.entry_price - self.ask) / self.position.entry_price
         }
     }
 
