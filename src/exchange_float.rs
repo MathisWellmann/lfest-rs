@@ -6,6 +6,7 @@ use crate::orders_decimal::{OrderType, OrderError, Side};
 use crate::config_float::*;
 use chrono::prelude::*;
 use crate::exchange_decimal::FeeType;
+use crate::acc_tracker::AccTracker;
 
 
 #[derive(Debug, Clone)]
@@ -22,6 +23,7 @@ pub struct ExchangeFloat {
     orders_executed: Vec<OrderFloat>,
     pub orders_active: Vec<OrderFloat>,
     next_order_id: u64,
+    acc_tracker: AccTracker,
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +76,7 @@ impl ExchangeFloat {
             orders_executed: Vec::new(),
             orders_active: Vec::new(),
             next_order_id: 0,
+            acc_tracker: AccTracker::new(1.0),
         }
     }
 
@@ -392,6 +395,7 @@ impl ExchangeFloat {
         } else {
             self.position.entry_price
         };
+        self.acc_tracker.log_trade(side, amount_base);
 
         match side {
             Side::Buy => {
@@ -402,6 +406,7 @@ impl ExchangeFloat {
                         self.margin.wallet_balance += rpnl;
                         self.total_rpnl += rpnl;
                         self.rpnls.push(rpnl);
+                        self.acc_tracker.log_rpnl(rpnl);
 
                         let size_diff = amount_base - self.position.size.abs();
                         self.position.size += amount_base;
@@ -414,6 +419,7 @@ impl ExchangeFloat {
                         self.margin.wallet_balance += rpnl;
                         self.total_rpnl += rpnl;
                         self.rpnls.push(rpnl);
+                        self.acc_tracker.log_rpnl(rpnl);
 
                         self.position.size += amount_base;
                         self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
@@ -434,6 +440,7 @@ impl ExchangeFloat {
                         self.margin.wallet_balance += rpnl;
                         self.total_rpnl += rpnl;
                         self.rpnls.push(rpnl);
+                        self.acc_tracker.log_rpnl(rpnl);
 
                         let size_diff = amount_base - self.position.size.abs();
                         self.position.size -= amount_base;
@@ -446,6 +453,7 @@ impl ExchangeFloat {
                         self.margin.wallet_balance += rpnl;
                         self.total_rpnl += rpnl;
                         self.rpnls.push(rpnl);
+                        self.acc_tracker.log_rpnl(rpnl);
 
                         self.position.size -= amount_base;
                         self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;

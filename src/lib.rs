@@ -5,7 +5,7 @@ extern crate pretty_env_logger;
 pub mod exchange_decimal;
 pub mod orders_decimal;
 pub mod config_decimal;
-mod acc_tracker_decimal;
+mod acc_tracker;
 
 pub mod exchange_float;
 pub mod orders_float;
