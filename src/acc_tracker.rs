@@ -50,7 +50,7 @@ impl AccTracker {
         self.num_buys as f64 / self.num_trades as f64
     }
 
-    pub fn total_turnover(&self) -> f64 {
+    pub fn turnover(&self) -> f64 {
         self.total_turnover
     }
 
@@ -105,7 +105,7 @@ mod tests {
             acc_tracker.log_trade(t.0, t.1);
         }
 
-        assert_eq!(acc_tracker.total_turnover(), 4.0);
+        assert_eq!(acc_tracker.turnover(), 4.0);
         assert_eq!(acc_tracker.num_trades(), 4);
         assert_eq!(acc_tracker.num_buys, 2);
         assert_eq!(acc_tracker.buy_ratio(), 0.5);

@@ -23,7 +23,7 @@ pub struct ExchangeFloat {
     orders_executed: Vec<OrderFloat>,
     pub orders_active: Vec<OrderFloat>,
     next_order_id: u64,
-    acc_tracker: AccTracker,
+    pub acc_tracker: AccTracker,
 }
 
 #[derive(Debug, Clone)]
