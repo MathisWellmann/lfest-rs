@@ -13,7 +13,6 @@ pub struct ExchangeFloat {
     pub config: Config,
     pub position: PositionFloat,
     pub margin: MarginFloat,
-    pub acc_tracker: AccTrackerFloat,
     pub bid: f64,
     pub ask: f64,
     init: bool,
@@ -45,12 +44,6 @@ pub struct PositionFloat {
     pub unrealized_pnl: f64,
 }
 
-#[derive(Debug, Clone)]
-pub struct AccTrackerFloat {
-    pub num_trades: i64,
-    pub num_buys: i64,
-}
-
 impl ExchangeFloat {
 
     pub fn new(config: Config) -> ExchangeFloat {
@@ -71,10 +64,6 @@ impl ExchangeFloat {
                 position_margin: 0.0,
                 order_margin: 0.0,
                 available_balance: 1.0,
-            },
-            acc_tracker: AccTrackerFloat{
-                num_trades: 0,
-                num_buys: 0,
             },
             total_rpnl: 0.0,
             bid: 0.0,
@@ -497,7 +486,6 @@ impl ExchangeFloat {
             self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
             self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
 
-            self.acc_tracker.num_trades += 1;
 
         } else {
             let rpnl = self.position.size.abs() * (1.0 / self.position.entry_price - 1.0 / self.ask);
@@ -519,8 +507,6 @@ impl ExchangeFloat {
             self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
             self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
 
-            self.acc_tracker.num_buys += 1;
-            self.acc_tracker.num_trades += 1;
         }
 
         self.update_position_stats();
@@ -543,11 +529,6 @@ impl ExchangeFloat {
                 break
             }
             if self.orders_active[i].done() {
-                self.acc_tracker.num_trades += 1;
-                match self.orders_active[i].side {
-                    Side::Buy => self.acc_tracker.num_buys += 1,
-                    Side::Sell => {},
-                }
                 let exec_order = self.orders_active.remove(i);
                 self.orders_executed.push(exec_order);
             }
