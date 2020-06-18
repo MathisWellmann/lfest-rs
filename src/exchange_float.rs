@@ -465,48 +465,10 @@ impl ExchangeFloat {
     }
 
     fn liquidate(&mut self) {
-        // TODO: better liquidate function
         if self.position.size > 0.0 {
-            let rpnl: f64 = self.position.size.abs() * (1.0 / self.position.entry_price - 1.0 / self.bid);
-            self.total_rpnl += rpnl;
-            self.rpnls.push(rpnl);
-            self.margin.wallet_balance += rpnl;
-
-            self.position.margin = 0.0;
-
-            self.position.entry_price = 0.0;
-
-            self.position.size = 0.0;
-            self.position.value = 0.0;
-
-            self.position.unrealized_pnl = 0.0;
-
-            self.update_liq_price();
-
-            self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
-            self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-
-
+            self.execute_market(side::Sell, self.position.size);
         } else {
-            let rpnl = self.position.size.abs() * (1.0 / self.position.entry_price - 1.0 / self.ask);
-            self.total_rpnl += rpnl;
-            self.rpnls.push(rpnl);
-            self.margin.wallet_balance += rpnl;
-
-            self.position.margin = 0.0;
-
-            self.position.entry_price = 0.0;
-
-            self.position.size = 0.0;
-            self.position.value = 0.0;
-
-            self.position.unrealized_pnl = 0.0;
-
-            self.update_liq_price();
-
-            self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
-            self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-
+            self.execute_market(side::Buy, self.position.size);
         }
 
         self.update_position_stats();
