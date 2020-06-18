@@ -1,11 +1,13 @@
 extern crate trade_aggregation;
+extern crate sliding_features;
 
-use trade_aggregation::common::*;
-use crate::orders_decimal::*;
-use crate::config_decimal::*;
 use chrono::prelude::*;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use trade_aggregation::common::*;
+use crate::orders_decimal::*;
+use crate::config_decimal::*;
+use crate::acc_tracker_decimal::AccTracker;
 
 
 #[derive(Debug, Clone)]
@@ -17,7 +19,6 @@ pub struct ExchangeDecimal {
     pub bid: Decimal,
     pub ask: Decimal,
     init: bool,
-    pub total_rpnl: f64,
     pub rpnls: Vec<f64>,
     orders_done: Vec<Order>,
     orders_executed: Vec<Order>,
@@ -43,12 +44,6 @@ pub struct Position {
     pub margin: Decimal,
     pub leverage: Decimal,
     pub unrealized_pnl: Decimal,
-}
-
-#[derive(Debug, Clone)]
-pub struct AccTracker {
-    pub num_trades: i64,
-    pub num_buys: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -78,11 +73,7 @@ impl ExchangeDecimal {
                 order_margin: Decimal::new(0, 0),
                 available_balance: Decimal::new(1, 0),
             },
-            acc_tracker: AccTracker{
-                num_trades: 0,
-                num_buys: 0,
-            },
-            total_rpnl: 0.0,
+            acc_tracker: AccTracker::new(1.0),
             bid: Decimal::new(0, 0),
             ask: Decimal::new(0, 0),
             init: true,
@@ -411,6 +402,7 @@ impl ExchangeDecimal {
         } else {
             self.position.entry_price
         };
+        self.acc_tracker.log_trade(side, amount_base.to_f64().unwrap());
 
         match side {
             Side::Buy => {
@@ -420,8 +412,8 @@ impl ExchangeDecimal {
                         let rpnl = self.position.size.abs() * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
-                        self.total_rpnl += rpnl_f64;
                         self.rpnls.push(rpnl_f64);
+                        self.acc_tracker.log_rpnl(rpnl_f64);
 
                         let size_diff = amount_base - self.position.size.abs();
                         self.position.size += amount_base;
@@ -433,8 +425,8 @@ impl ExchangeDecimal {
                         let rpnl = amount_base * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
-                        self.total_rpnl += rpnl_f64;
                         self.rpnls.push(rpnl_f64);
+                        self.acc_tracker.log_rpnl(rpnl_f64);
 
                         self.position.size += amount_base;
                         self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
@@ -454,8 +446,8 @@ impl ExchangeDecimal {
                         let rpnl = self.position.size.abs() * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
-                        self.total_rpnl += rpnl_f64;
                         self.rpnls.push(rpnl_f64);
+                        self.acc_tracker.log_rpnl(rpnl_f64);
 
                         let size_diff = amount_base - self.position.size.abs();
                         self.position.size -= amount_base;
@@ -467,8 +459,8 @@ impl ExchangeDecimal {
                         let rpnl = amount_base * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
-                        self.total_rpnl += rpnl_f64;
                         self.rpnls.push(rpnl_f64);
+                        self.acc_tracker.log_rpnl(rpnl_f64);
 
                         self.position.size -= amount_base;
                         self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
@@ -488,53 +480,12 @@ impl ExchangeDecimal {
     }
 
     fn liquidate(&mut self) {
-        // TODO: better liquidate function
+        debug!("liquidating");
         if self.position.size > Decimal::new(0, 0) {
-            let rpnl: Decimal = self.position.size.abs() * (Decimal::new(1, 0) / self.position.entry_price - Decimal::new(1, 0) / self.bid);
-            let rpnl_f64 = rpnl.to_f64().unwrap();
-            self.total_rpnl += rpnl_f64;
-            self.rpnls.push(rpnl_f64);
-            self.margin.wallet_balance += rpnl;
-
-            self.position.margin = Decimal::new(0, 0);
-
-            self.position.entry_price = Decimal::new(0, 0);
-
-            self.position.size = Decimal::new(0, 0);
-            self.position.value = Decimal::new(0, 0);
-
-            self.position.unrealized_pnl = Decimal::new(0, 0);
-
-            self.update_liq_price();
-
-            self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
-            self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-
-            self.acc_tracker.num_trades += 1;
+            self.execute_market(Side::Sell, self.position.size);
 
         } else {
-            let rpnl = self.position.size.abs() * (Decimal::new(1, 0) / self.position.entry_price - Decimal::new(1, 0) / self.ask);
-            let rpnl_f64 = rpnl.to_f64().unwrap();
-            self.total_rpnl += rpnl_f64;
-            self.rpnls.push(rpnl_f64);
-            self.margin.wallet_balance += rpnl;
-
-            self.position.margin = Decimal::new(0, 0);
-
-            self.position.entry_price = Decimal::new(0, 0);
-
-            self.position.size = Decimal::new(0, 0);
-            self.position.value = Decimal::new(0, 0);
-
-            self.position.unrealized_pnl = Decimal::new(0, 0);
-
-            self.update_liq_price();
-
-            self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
-            self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-
-            self.acc_tracker.num_buys += 1;
-            self.acc_tracker.num_trades += 1;
+            self.execute_market(Side::Buy, self.position.size);
         }
 
         self.update_position_stats();
@@ -557,11 +508,6 @@ impl ExchangeDecimal {
                 break
             }
             if self.orders_active[i].done() {
-                self.acc_tracker.num_trades += 1;
-                match self.orders_active[i].side {
-                    Side::Buy => self.acc_tracker.num_buys += 1,
-                    Side::Sell => {},
-                }
                 let exec_order = self.orders_active.remove(i);
                 self.orders_executed.push(exec_order);
             }

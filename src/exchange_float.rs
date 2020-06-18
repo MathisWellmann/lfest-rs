@@ -465,10 +465,11 @@ impl ExchangeFloat {
     }
 
     fn liquidate(&mut self) {
+        debug!("liquidating");
         if self.position.size > 0.0 {
-            self.execute_market(side::Sell, self.position.size);
+            self.execute_market(Side::Sell, self.position.size);
         } else {
-            self.execute_market(side::Buy, self.position.size);
+            self.execute_market(Side::Buy, self.position.size);
         }
 
         self.update_position_stats();

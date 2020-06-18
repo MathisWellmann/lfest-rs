@@ -9,5 +9,8 @@ edition = "2018"
 [dependencies]
 chrono = "0.4.11"
 rust_decimal = "1.4.1"
+log = "0.4.0"
+pretty_env_logger = "0.4"
 
 trade_aggregation = { git = "https://github.com/MathisWellmann/rust_trade_aggregation" }
+sliding_features = { git = "https://github.com/MathisWellmann/rust_sliding_features" }
