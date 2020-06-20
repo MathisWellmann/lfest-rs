@@ -17,7 +17,6 @@ pub struct ExchangeFloat {
     pub bid: f64,
     pub ask: f64,
     init: bool,
-    pub total_rpnl: f64,
     pub rpnls: Vec<f64>,
     orders_done: Vec<OrderFloat>,
     orders_executed: Vec<OrderFloat>,
@@ -67,7 +66,6 @@ impl ExchangeFloat {
                 order_margin: 0.0,
                 available_balance: 1.0,
             },
-            total_rpnl: 0.0,
             bid: 0.0,
             ask: 0.0,
             init: true,
@@ -404,7 +402,6 @@ impl ExchangeFloat {
                         // realize_pnl
                         let rpnl = self.position.size.abs() * ((1.0 / price) - (1.0 / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
-                        self.total_rpnl += rpnl;
                         self.rpnls.push(rpnl);
                         self.acc_tracker.log_rpnl(rpnl);
 
@@ -417,7 +414,6 @@ impl ExchangeFloat {
                         // realize pnl
                         let rpnl = amount_base * ((1.0 / price) - (1.0 / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
-                        self.total_rpnl += rpnl;
                         self.rpnls.push(rpnl);
                         self.acc_tracker.log_rpnl(rpnl);
 
@@ -438,7 +434,6 @@ impl ExchangeFloat {
                         // realize pnl
                         let rpnl = self.position.size.abs() * ((1.0 / self.position.entry_price) - (1.0 / price));
                         self.margin.wallet_balance += rpnl;
-                        self.total_rpnl += rpnl;
                         self.rpnls.push(rpnl);
                         self.acc_tracker.log_rpnl(rpnl);
 
@@ -451,7 +446,6 @@ impl ExchangeFloat {
                         // realize pnl
                         let rpnl = amount_base * ((1.0 / self.position.entry_price) - (1.0 / price));
                         self.margin.wallet_balance += rpnl;
-                        self.total_rpnl += rpnl;
                         self.rpnls.push(rpnl);
                         self.acc_tracker.log_rpnl(rpnl);
 
