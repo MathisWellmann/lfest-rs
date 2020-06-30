@@ -13,6 +13,7 @@ pub struct AccTracker {
     max_drawdown: f64,
     welford_returns: WelfordOnline,
     welford_pos_returns: WelfordOnline,
+    wins: usize,
 }
 
 
@@ -28,8 +29,10 @@ impl AccTracker {
             max_drawdown: 0.0,
             welford_returns: WelfordOnline::new(),
             welford_pos_returns: WelfordOnline::new(),
+            wins: 0,
         }
     }
+
     pub fn sharpe(&self) -> f64 {
         self.total_rpnl / self.welford_returns.std_dev()
     }
@@ -64,6 +67,7 @@ impl AccTracker {
         self.welford_returns.add(rpnl);
         if rpnl > 0.0 {
             self.welford_pos_returns.add(rpnl);
+            self.wins += 1;
         }
         if self.wallet_balance > self.wb_high {
             self.wb_high = self.wallet_balance;
@@ -81,6 +85,10 @@ impl AccTracker {
             Side::Buy => self.num_buys += 1,
             Side::Sell => {},
         }
+    }
+
+    pub fn win_ratio(&self) -> f64 {
+        self.wins as f64 / self.num_trades as f64
     }
 }
 
