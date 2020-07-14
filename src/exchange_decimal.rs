@@ -501,7 +501,7 @@ impl ExchangeDecimal {
                     }
                 } else {
                     self.position.size += amount_base;
-                    self.position.margin += amount_base / old_entry_price / self.position.leverage;
+                    self.position.margin += amount_base / price / self.position.leverage;
                     self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
                         / (amount_base + old_position_size.abs());
                 }
@@ -533,9 +533,8 @@ impl ExchangeDecimal {
                         self.position.entry_price = old_entry_price;
                     }
                 } else {
-                    // TODO: why is old_entry_price used in the calculation in position.margin?
                     self.position.size -= amount_base;
-                    self.position.margin += amount_base / old_entry_price / self.position.leverage;
+                    self.position.margin += amount_base / price / self.position.leverage;
                     self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
                         / (amount_base + old_position_size.abs());
                 }
