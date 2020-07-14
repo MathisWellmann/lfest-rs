@@ -432,11 +432,7 @@ impl ExchangeDecimal {
         return false
     }
 
-    fn deduce_fees(&mut self, t: FeeType, side: Side, amount_base: Decimal) {
-        let price = match side {
-            Side::Buy => self.ask,
-            Side::Sell => self.bid,
-        };
+    fn deduce_fees(&mut self, t: FeeType, amount_base: Decimal, price: Decimal) {
         let fee: Decimal = match t {
             FeeType::Maker => self.config.fee_maker,
             FeeType::Taker => self.config.fee_taker,
@@ -461,12 +457,13 @@ impl ExchangeDecimal {
     }
 
     fn execute_market(&mut self, side: Side, amount_base: Decimal) {
-        self.deduce_fees(FeeType::Taker, side, amount_base);
-
         let price: Decimal = match side {
             Side::Buy => self.ask,
             Side::Sell => self.bid,
         };
+
+        self.deduce_fees(FeeType::Taker, amount_base, price);
+
         let old_position_size = self.position.size;
         let old_entry_price: Decimal =  if self.position.size == Decimal::new(0, 0) {
             price
@@ -478,8 +475,8 @@ impl ExchangeDecimal {
         match side {
             Side::Buy => {
                 if self.position.size < Decimal::new(0,0) {
+                    // realize_pnl
                     if amount_base >= self.position.size.abs() {
-                        // realize_pnl
                         let rpnl = self.position.size.abs() * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
@@ -492,7 +489,6 @@ impl ExchangeDecimal {
                         self.position.entry_price = price;
 
                     } else {
-                        // realize pnl
                         let rpnl = amount_base * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
@@ -505,15 +501,15 @@ impl ExchangeDecimal {
                     }
                 } else {
                     self.position.size += amount_base;
-                    self.position.margin += amount_base / old_entry_price/ self.position.leverage;
+                    self.position.margin += amount_base / old_entry_price / self.position.leverage;
                     self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
                         / (amount_base + old_position_size.abs());
                 }
             },
             Side::Sell => {
                 if self.position.size > Decimal::new(0, 0) {
+                    // realize_pnl
                     if amount_base >= self.position.size.abs() {
-                        // realize pnl
                         let rpnl = self.position.size.abs() * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
@@ -526,7 +522,6 @@ impl ExchangeDecimal {
                         self.position.entry_price = price;
 
                     } else {
-                        // realize pnl
                         let rpnl = amount_base * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
@@ -538,12 +533,95 @@ impl ExchangeDecimal {
                         self.position.entry_price = old_entry_price;
                     }
                 } else {
+                    // TODO: why is old_entry_price used in the calculation in position.margin?
                     self.position.size -= amount_base;
                     self.position.margin += amount_base / old_entry_price / self.position.leverage;
                     self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
                         / (amount_base + old_position_size.abs());
                 }
             },
+        }
+
+        self.update_position_stats();
+        self.update_liq_price();
+    }
+
+    fn execute_limit(&mut self, side: Side, price: Decimal, amount_base: Decimal) {
+        self.deduce_fees(FeeType::Maker, amount_base, price);
+        self.acc_tracker.log_trade(side, amount_base.to_f64().unwrap());
+
+        let old_position_size = self.position.size;
+        let old_entry_price: Decimal =  if self.position.size == Decimal::new(0, 0) {
+            price
+        } else {
+            self.position.entry_price
+        };
+
+        match side {
+            Side::Buy => {
+                if self.position.size < Decimal::new(0, 0) {
+                    // realize pnl
+                    if amount_base > self.position.size.abs() {
+                        let rpnl = self.position.size.abs() * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
+                        self.margin.wallet_balance += rpnl;
+                        let rpnl_f64 = rpnl.to_f64().unwrap();
+                        self.rpnls.push(rpnl_f64);
+                        self.acc_tracker.log_rpnl(rpnl_f64);
+
+                        let size_diff = amount_base - self.position.size.abs();
+                        self.position.size += amount_base;
+                        self.position.margin = size_diff / price / self.position.leverage;
+                        self.position.entry_price = price;
+                    } else {
+                        let rpnl = amount_base * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
+                        self.margin.wallet_balance += rpnl;
+                        let rpnl_f64 = rpnl.to_f64().unwrap();
+                        self.rpnls.push(rpnl_f64);
+                        self.acc_tracker.log_rpnl(rpnl_f64);
+
+                        self.position.size += amount_base;
+                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.entry_price = old_entry_price;
+                    }
+                } else {
+                    self.position.size += amount_base;
+                    self.position.margin += amount_base / price / self.position.leverage;
+                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                        / (amount_base + old_position_size.abs());
+                }
+            },
+            Side::Sell => {
+                if self.position.size > Decimal::new(0, 0) {
+                    // realize pnl
+                    if amount_base > self.position.size.abs() {
+                        let rpnl = self.position.size.abs() * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
+                        self.margin.wallet_balance += rpnl;
+                        let rpnl_f64 = rpnl.to_f64().unwrap();
+                        self.rpnls.push(rpnl_f64);
+                        self.acc_tracker.log_rpnl(rpnl_f64);
+
+                        let size_diff = amount_base - self.position.size.abs();
+                        self.position.size -= amount_base;
+                        self.position.margin = size_diff / price / self.position.leverage;
+                        self.position.entry_price = price;
+                    } else {
+                        let rpnl = amount_base * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
+                        self.margin.wallet_balance += rpnl;
+                        let rpnl_f64 = rpnl.to_f64().unwrap();
+                        self.rpnls.push(rpnl_f64);
+                        self.acc_tracker.log_rpnl(rpnl_f64);
+
+                        self.position.size -= amount_base;
+                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.entry_price = old_entry_price;
+                    }
+                } else {
+                    self.position.size += amount_base;
+                    self.position.margin += amount_base / price / self.position.leverage;
+                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                        / (amount_base + old_position_size.abs());
+                }
+            }
         }
 
         self.update_position_stats();
@@ -565,7 +643,7 @@ impl ExchangeDecimal {
     fn check_orders(&mut self) {
         for i in 0..self.orders_active.len() {
             match self.orders_active[i].order_type {
-                OrderType::Market => self.handle_market_order(i),
+                OrderType::Market => { panic!("market orders should have been executed immediately!") },
                 OrderType::Limit => self.handle_limit_order(i),
                 OrderType::StopMarket => self.handle_stop_market_order(i),
                 OrderType::TakeProfitLimit => self.handle_take_profit_limit_order(i),
@@ -614,17 +692,27 @@ impl ExchangeDecimal {
         }
     }
 
-    fn handle_market_order(&mut self, order_index: usize) {
-        match self.orders_active[order_index].side {
-            Side::Buy => self.execute_market(Side::Buy, self.orders_active[order_index].size),
-            Side::Sell => self.execute_market(Side:: Sell, self.orders_active[order_index].size),
+    // handle_limit_order will check and conditionally execute the limit order
+    // uses pessimistic order fill model, in which the bid / ask price must have crossed the
+    // limit price in order to get filled
+    fn handle_limit_order(&mut self, order_index: usize) {
+        let o: &Order = &self.orders_active[order_index];
+        match o.side {
+            Side::Buy => {
+                if self.ask < o.price {
+                    // execute
+                    self.execute_limit(o.side, o.price, o.size);
+                    self.orders_active[order_index].mark_done();
+                }
+            },
+            Side::Sell => {
+                if self.bid > o.price {
+                    // execute
+                    self.execute_limit(o.side, o.price, o.size);
+                    self.orders_active[order_index].mark_done();
+                }
+            }
         }
-        self.orders_active[order_index].mark_done();
-    }
-
-    fn handle_limit_order(&mut self, _order_index: usize) {
-        // TODO: exchange_decimal: handle_limit_order is not implemented yet
-        unimplemented!("exchange_decimal: handle_limit_order is not implemented yet");
     }
 
     fn handle_take_profit_limit_order(&mut self, _order_index: usize) {
@@ -1819,5 +1907,10 @@ mod tests {
         assert_eq!(exchange.position.size, Decimal::new(240, 0));
         assert_eq!(exchange.order_margin(), Decimal::new(51, 2));
 
+    }
+
+    #[test]
+    fn execute_limit() {
+        // TODO: test execute_limit
     }
 }
