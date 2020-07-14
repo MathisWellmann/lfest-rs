@@ -31,7 +31,7 @@ pub struct Margin {
     pub wallet_balance: Decimal,
     pub margin_balance: Decimal,
     pub position_margin: Decimal,
-    pub order_margin: Decimal,
+    // pub order_margin: Decimal,
     pub available_balance: Decimal,
 }
 
@@ -70,7 +70,7 @@ impl ExchangeDecimal {
                 wallet_balance: Decimal::new(1, 0),
                 margin_balance: Decimal::new(1, 0),
                 position_margin: Decimal::new(0, 0),
-                order_margin: Decimal::new(0, 0),
+                // order_margin: Decimal::new(0, 0),
                 available_balance: Decimal::new(1, 0),
             },
             acc_tracker: AccTracker::new(1.0),
@@ -99,7 +99,7 @@ impl ExchangeDecimal {
         }
         self.position.leverage = l;
         self.margin.position_margin = (self.position.value / self.position.leverage) + self.unrealized_pnl();
-        self.margin.available_balance = self.margin.margin_balance - self.margin.order_margin - self.margin.position_margin;
+        self.margin.available_balance = self.margin.margin_balance - self.order_margin() - self.margin.position_margin;
         self.position.margin = self.position.value / self.position.leverage;
 
         return true
@@ -151,9 +151,7 @@ impl ExchangeDecimal {
         for (i, o) in self.orders_active.iter().enumerate() {
             if o.id == order_id {
                 let old_order = self.orders_active.remove(i);
-                let margin = old_order.size / old_order.price / self.position.leverage;
-                self.margin.order_margin -= margin;
-                self.margin.available_balance += margin;
+                self.margin.available_balance += self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
                 return Some(old_order);
             }
         }
@@ -205,11 +203,39 @@ impl ExchangeDecimal {
                 self.execute_market(o.side, o.size);
                 return None
             }
+            OrderType::Limit => {
+                self.orders_active.push(o);
+                self.margin.available_balance = self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
+                return None
+            }
             _ => {},
         }
         self.orders_active.push(o);
 
         return None
+    }
+
+    // calculates the total order margin
+    pub fn order_margin(&self) -> Decimal {
+        let mut order_margin_long: Decimal = Decimal::new(0, 0);
+        let mut order_margin_short: Decimal = Decimal::new(0, 0);
+        for o in &self.orders_active {
+            // check which orders belong to position and which are "free"
+            match o.side {
+                Side::Buy => {
+                    order_margin_long += o.size / o.price / self.position.leverage;
+                },
+                Side::Sell => {
+                    order_margin_short += o.size / o.price / self.position.leverage;
+                }
+            }
+        }
+        if self.position.size > Decimal::new(0, 0) {
+            order_margin_short -= self.position.margin;
+        } else {
+            order_margin_long -= self.position.margin;
+        }
+        max(order_margin_long, order_margin_short)
     }
 
     pub fn unrealized_pnl(&self) -> Decimal {
@@ -252,6 +278,7 @@ impl ExchangeDecimal {
         let fee_asset = fee_base / self.bid;
 
         // check if enough available balance for initial margin requirements
+        // TODO: change order_margin calculation for markets denoted in XBT
         let order_margin: Decimal = o.size / price / self.position.leverage;
         let order_err: Option<OrderError> = match o.side {
             Side::Buy => {
@@ -294,9 +321,53 @@ impl ExchangeDecimal {
         return order_err
     }
 
-    pub fn validate_limit_order(&self, _o: &Order) -> Option<OrderError> {
-        // TODO: exchange_decimal: validate_limit_order
-        unimplemented!("exchange_decimal: validate_limit_order is not implemented yet");
+    pub fn validate_limit_order(&mut self, o: &Order) -> Option<OrderError> {
+        // validate order price
+        match o.side {
+            Side::Buy => {
+                if o.price >= self.ask {
+                    return Some(OrderError::InvalidPrice)
+                }
+            },
+            Side::Sell => {
+                if o.price <= self.bid {
+                    return Some(OrderError::InvalidPrice)
+                }
+            },
+        }
+
+        let order_margin: Decimal = o.size / o.price / self.position.leverage;
+        let order_err: Option<OrderError> = match o.side {
+            Side::Buy => {
+                if self.position.size > Decimal::new(0, 0) {
+                    // check if enough margin is available
+                    if order_margin > self.margin.available_balance {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+
+                } else {
+                    if order_margin > self.margin.available_balance + self.position.margin {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+                }
+            },
+            Side::Sell => {
+                if self.position.size > Decimal::new(0, 0) {
+                    if order_margin > self.margin.available_balance + self.position.margin {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+                } else {
+                    if order_margin > self.margin.available_balance {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+                }
+            },
+        };
+        order_err
     }
 
     pub fn validate_take_profit_limit_order(&self, _o: &Order) -> Option<OrderError> {
@@ -386,7 +457,7 @@ impl ExchangeDecimal {
         self.position.value = self.position.size.abs() / price;
         self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
         self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-        self.margin.available_balance = self.margin.wallet_balance - self.margin.position_margin - self.margin.order_margin;
+        self.margin.available_balance = self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
     }
 
     fn execute_market(&mut self, side: Side, amount_base: Decimal) {
@@ -580,6 +651,13 @@ pub fn min(val0: Decimal, val1: Decimal) -> Decimal {
     return val1
 }
 
+pub fn max(val0: Decimal, val1: Decimal) -> Decimal {
+    if val0 > val1 {
+        return val0
+    }
+    val1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -662,7 +740,81 @@ mod tests {
 
     #[test]
     fn test_validate_limit_order() {
-        // TODO
+        let config = Config::perpetuals();
+        let mut exchange = ExchangeDecimal::new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let price: f64 = 990.0;
+        let size = exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
+        let o = Order::limit(Side::Buy, price, size.to_f64().unwrap());
+        let order_err = exchange.validate_limit_order(&o);
+        assert!(order_err.is_none());
+
+        let price: f64 = 1010.0;
+        let size = exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
+        let o = Order::limit(Side::Buy, price, size.to_f64().unwrap());
+        let order_err = exchange.validate_limit_order(&o);
+        assert!(order_err.is_some());
+
+        let price: f64 = 1010.0;
+        let size = exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
+        let o = Order::limit(Side::Sell, price, size.to_f64().unwrap());
+        let order_err = exchange.validate_limit_order(&o);
+        assert!(order_err.is_none());
+
+        let price: f64 = 990.0;
+        let size = exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
+        let o = Order::limit(Side::Sell, price, size.to_f64().unwrap());
+        let order_err = exchange.validate_limit_order(&o);
+        assert!(order_err.is_some());
+
+        let price: f64 = 990.0;
+        let size = exchange.margin.wallet_balance * Decimal::new(11, 1) * Decimal::new(price as i64, 0);
+        let o = Order::limit(Side::Buy, price, size.to_f64().unwrap());
+        let order_err = exchange.validate_limit_order(&o);
+        assert!(order_err.is_some());
+
+        let price: f64 = 1010.0;
+        let size = exchange.margin.wallet_balance * Decimal::new(11, 1) * Decimal::new(price as i64, 0);
+        let o = Order::limit(Side::Sell, price, size.to_f64().unwrap());
+        let order_err = exchange.validate_limit_order(&o);
+        assert!(order_err.is_some());
+    }
+
+    #[test]
+    fn submit_order_limit() {
+        let config = Config::perpetuals();
+        let mut exchange = ExchangeDecimal::new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o = Order::limit(Side::Buy, 900.0, 450.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        assert_eq!(exchange.orders_active.len(), 1);
+        assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0) - Decimal::new(5, 1));
+
+        // submit working market order
+        let o = Order::market(Side::Buy, 450.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+
+        // submit opposite limit order acting as target order
+        let o = Order::limit(Side::Sell, 1200.0, 450.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        assert_eq!(exchange.orders_active.len(), 2);
+
     }
 
     #[test]
@@ -794,6 +946,7 @@ mod tests {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidPrice) => panic!("invalid price!"),
             Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
             Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
             None => {},
@@ -812,7 +965,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset1);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset1);
         assert_eq!(exchange.margin.position_margin, Decimal::new(8, 1));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(2, 1) - fee_asset1);
 
         let t = Trade{
@@ -847,7 +1000,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(14, 1) - fee_asset1 - fee_asset2);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(14, 1) - fee_asset1 - fee_asset2);
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(14, 1) - fee_asset1 - fee_asset2);
 
     }
@@ -906,7 +1059,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(8, 1) - fee_combined);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(8, 1) - fee_combined);
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(8, 1) - fee_combined);
 
     }
@@ -965,7 +1118,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(12, 1) - fee_combined);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(12, 1) - fee_combined);
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(12, 1) - fee_combined);
     }
 
@@ -1002,7 +1155,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset1);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset1);
         assert_eq!(exchange.margin.position_margin, Decimal::new(4, 1));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(6, 1) - fee_asset1);
 
         let t = Trade{
@@ -1037,7 +1190,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
 
     }
@@ -1062,6 +1215,7 @@ mod tests {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidPrice) => panic!("invalid price!"),
             Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
             Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
             None => {},
@@ -1080,7 +1234,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset1);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset1);
         assert_eq!(exchange.margin.position_margin, Decimal::new(8, 1));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(2, 1) - fee_asset1);
 
         let t = Trade{
@@ -1115,7 +1269,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(12, 1) - fee_asset1 - fee_asset2);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(14, 1) - fee_asset1 - fee_asset2);
         assert_eq!(exchange.margin.position_margin, Decimal::new(4, 1));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
 
     }
@@ -1174,7 +1328,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(9, 1) - fee_combined);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(8, 1) - fee_combined);
         assert_eq!(exchange.margin.position_margin, Decimal::new(4, 1));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1) - fee_combined);
 
     }
@@ -1233,7 +1387,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(11, 1) - fee_combined);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(12, 1) - fee_combined);
         assert_eq!(exchange.margin.position_margin, Decimal::new(6, 1));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1) - fee_combined);
     }
 
@@ -1270,7 +1424,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset1);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset1);
         assert_eq!(exchange.margin.position_margin, Decimal::new(8, 1));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(2, 1) - fee_asset1);
 
         let t = Trade{
@@ -1305,7 +1459,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(6, 1) - fee_asset1 - fee_asset2);
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 1));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
 
     }
@@ -1332,6 +1486,7 @@ mod tests {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidPrice) => panic!("invalid price!"),
             Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
             Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
             None => {},
@@ -1345,6 +1500,7 @@ mod tests {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidPrice) => panic!("invalid price!"),
             Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
             Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
             None => {},
@@ -1363,7 +1519,7 @@ mod tests {
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - Decimal::new(2, 0) * fee_asset);
         assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - Decimal::new(2, 0) * fee_asset);
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0) - Decimal::new(2, 0) * fee_asset);
 
 
@@ -1374,6 +1530,7 @@ mod tests {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidPrice) => panic!("invalid price!"),
             Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
             Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
             None => {},
@@ -1388,6 +1545,7 @@ mod tests {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
             Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
+            Some(OrderError::InvalidPrice) => panic!("invalid price!"),
             Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
             Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
             None => {},
@@ -1403,7 +1561,7 @@ mod tests {
         assert!(exchange.margin.wallet_balance < Decimal::new(1, 0));
         assert!(exchange.margin.margin_balance < Decimal::new(1, 0));
         assert_eq!(exchange.margin.position_margin, Decimal::new(5, 2));
-        assert_eq!(exchange.margin.order_margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert!(exchange.margin.available_balance < Decimal::new(1, 0));
     }
 
@@ -1432,19 +1590,6 @@ mod tests {
             assert!(o.id as i64 > last_order_id);
             last_order_id = o.id as i64;
         }
-    }
-
-    #[test]
-    fn test_order_margin() {
-        // let config = Config::xbt_usd();
-        // let mut exchange = new(config);
-        // let t = Trade {
-        //     timestamp: 0,
-        //     price: 100.0,
-        //     size: 100.0,
-        // };
-        // exchange.consume_trade(&t);
-
     }
 
     #[test]
@@ -1625,5 +1770,54 @@ mod tests {
         assert!(order_err.is_none());
 
         // TODO: test cancel order
+    }
+
+    #[test]
+    fn order_margin() {
+        let config = Config::perpetuals();
+        let fee_taker = config.fee_taker;
+        let mut exchange = ExchangeDecimal::new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o = Order::limit(Side::Buy, 900.0, 450.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
+        assert_eq!(exchange.orders_active.len(), 1);
+
+        let o = Order::limit(Side::Sell, 1200.0, 450.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
+        assert_eq!(exchange.orders_active.len(), 2);
+
+        let o = Order::market(Side::Buy, 450.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        assert_eq!(exchange.position.size, Decimal::new(450, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
+
+        let o = Order::limit(Side::Sell, 1200.0, 450.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
+        assert_eq!(exchange.orders_active.len(), 3);
+
+        let o = Order::market(Side::Sell, 450.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        assert_eq!(exchange.order_margin(), Decimal::new(75, 2));
+
+        let o = Order::market(Side::Buy, 240.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        assert_eq!(exchange.position.size, Decimal::new(240, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(51, 2));
+
     }
 }

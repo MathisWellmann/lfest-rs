@@ -1,10 +1,11 @@
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
 
-
+#[derive(Debug)]
 pub enum OrderError {
     MaxActiveOrders,
     InvalidOrder,
+    InvalidPrice,
     InvalidTriggerPrice,
     InvalidOrderSize,
     NotEnoughAvailableBalance,
