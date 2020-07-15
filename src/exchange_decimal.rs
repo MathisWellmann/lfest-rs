@@ -124,8 +124,8 @@ impl ExchangeDecimal {
             return true
         }
 
-        self.update_position_stats();
         self.check_orders();
+        self.update_position_stats();
 
         return false
     }
@@ -133,6 +133,8 @@ impl ExchangeDecimal {
     // consume_candle update the bid and ask price given a candle using its close price
     // returns true if position has been liquidated
     pub fn consume_candle(&mut self, candle: &Candle) -> bool {
+        // TODO: set bid and ask with spread in mind
+
         self.bid = Decimal::from_f64(candle.close).unwrap();
         self.ask = Decimal::from_f64(candle.close).unwrap();
 
@@ -140,8 +142,8 @@ impl ExchangeDecimal {
             return true
         }
 
-        self.update_position_stats();
         self.check_orders();
+        self.update_position_stats();
         return false
     }
 
@@ -642,11 +644,11 @@ impl ExchangeDecimal {
     fn check_orders(&mut self) {
         for i in 0..self.orders_active.len() {
             match self.orders_active[i].order_type {
-                OrderType::Market => { panic!("market orders should have been executed immediately!") },
                 OrderType::Limit => self.handle_limit_order(i),
                 OrderType::StopMarket => self.handle_stop_market_order(i),
                 OrderType::TakeProfitLimit => self.handle_take_profit_limit_order(i),
                 OrderType::TakeProfitMarket => self.handle_take_profit_market_order(i),
+                OrderType::Market => { panic!("market orders should have been executed immediately!") },
             }
         }
         // move executed orders from orders_active to orders_done
@@ -1910,6 +1912,49 @@ mod tests {
 
     #[test]
     fn execute_limit() {
-        // TODO: test execute_limit
+        let config = Config::perpetuals();
+        let fee_taker = config.fee_taker;
+        let mut exchange = ExchangeDecimal::new(config);
+        let t = Trade{
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o: Order = Order::limit(Side::Buy, 900.0, 450.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        assert_eq!(exchange.orders_active.len(), 1);
+        assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1));
+
+        let t = Trade{
+            timestamp: 1,
+            price: 750.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+        let t = Trade{
+            timestamp: 1,
+            price: 750.0,
+            size: -100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let fee_maker: Decimal = Decimal::new(125, 6);
+
+        assert_eq!(exchange.bid, Decimal::new(750, 0));
+        assert_eq!(exchange.ask, Decimal::new(750, 0));
+        assert_eq!(exchange.orders_active.len(), 0);
+        assert_eq!(exchange.position.size, Decimal::new(450, 0));
+        // assert_eq!(exchange.position.value, Decimal::new(45, 2));
+        assert_eq!(exchange.position.margin, Decimal::new(5, 1));
+        assert_eq!(exchange.position.entry_price, Decimal::new(900, 0));
+        assert_eq!(exchange.margin.wallet_balance, Decimal::new(1000125, 6));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
+        // Knapp daneben ist auch vorbei
+        // assert_eq!(exchange.unrealized_pnl(), Decimal::new(-1, 1));
+        // assert_eq!(exchange.margin.position_margin, Decimal::new(5, 1));
+        // assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1) + fee_maker);
     }
 }
