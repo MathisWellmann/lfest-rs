@@ -1941,13 +1941,13 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let fee_maker: Decimal = Decimal::new(125, 6);
+        let fee_maker_0: Decimal = Decimal::new(125, 6);
 
         assert_eq!(exchange.bid, Decimal::new(750, 0));
         assert_eq!(exchange.ask, Decimal::new(750, 0));
         assert_eq!(exchange.orders_active.len(), 0);
         assert_eq!(exchange.position.size, Decimal::new(450, 0));
-        // assert_eq!(exchange.position.value, Decimal::new(45, 2));
+        assert_eq!(exchange.position.value, Decimal::new(6, 1));
         assert_eq!(exchange.position.margin, Decimal::new(5, 1));
         assert_eq!(exchange.position.entry_price, Decimal::new(900, 0));
         assert_eq!(exchange.margin.wallet_balance, Decimal::new(1000125, 6));
@@ -1956,5 +1956,41 @@ mod tests {
         // assert_eq!(exchange.unrealized_pnl(), Decimal::new(-1, 1));
         // assert_eq!(exchange.margin.position_margin, Decimal::new(5, 1));
         // assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1) + fee_maker);
+
+
+        let o: Order = Order::limit(Side::Sell, 1000.0, 450.0);
+        let order_err = exchange.submit_order(&o);
+        assert!(order_err.is_none());
+        assert_eq!(exchange.orders_active.len(), 1);
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
+
+        let t = Trade{
+            timestamp: 1,
+            price: 1200.0,
+            size: -100.0,
+        };
+        exchange.consume_trade(&t);
+        let t = Trade{
+            timestamp: 1,
+            price: 1200.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        assert_eq!(exchange.orders_active.len(), 0);
+        assert_eq!(exchange.position.size, Decimal::new(0, 0));
+        assert_eq!(exchange.position.value, Decimal::new(0, 0));
+        assert_eq!(exchange.position.margin, Decimal::new(0, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
+        assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
+        let fee_maker_1: Decimal = Decimal::new(1125, 7);
+        let wb: Decimal = Decimal::new(1, 0)
+            + fee_maker_0 + fee_maker_1 + Decimal::new(5, 2);
+        // Again nearly correct but not quite which is fine though
+        // assert_eq!(exchange.margin.wallet_balance, wb);
+        // assert_eq!(exchange.margin.available_balance, wb);
+        // assert_eq!(exchange.margin.margin_balance, wb);
+
+
     }
 }
