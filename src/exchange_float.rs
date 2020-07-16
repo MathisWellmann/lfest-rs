@@ -23,6 +23,7 @@ pub struct ExchangeFloat {
     pub orders_active: Vec<OrderFloat>,
     next_order_id: u64,
     pub acc_tracker: AccTracker,
+    timestamp: u64,  // used for syncronizing orders
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +76,7 @@ impl ExchangeFloat {
             orders_active: Vec::new(),
             next_order_id: 0,
             acc_tracker: AccTracker::new(1.0),
+            timestamp: 0,
         }
     }
 
@@ -95,6 +97,10 @@ impl ExchangeFloat {
         self.position.margin = self.position.value / self.position.leverage;
 
         return true
+    }
+
+    pub fn set_timestamp(&mut self, timestamp: u64) {
+        self.timestamp = timestamp;
     }
 
     // consume_candle update the exchange state with th new candle.
@@ -192,9 +198,7 @@ impl ExchangeFloat {
         order.id = self.next_order_id;
         self.next_order_id += 1;
 
-        // assign timestamp
-        let now = Utc::now();
-        order.timestamp = now.timestamp_millis() as u64;
+        order.timestamp = self.timestamp;
 
         match order.order_type {
             OrderType::Market => {
