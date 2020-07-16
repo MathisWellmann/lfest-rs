@@ -318,8 +318,52 @@ impl ExchangeFloat {
     }
 
     pub fn validate_limit_order(&self, _o: &OrderFloat) -> Option<OrderError> {
-        // TODO: exchange_float: validate_limit_order
-        unimplemented!("exchange_float: validate_limit_order is not implemented yet");
+        // validate order price
+        match o.side {
+            Side::Buy => {
+                if o.price >= self.ask {
+                    return Some(OrderError::InvalidPrice)
+                }
+            },
+            Side::Sell => {
+                if o.price <= self.bid {
+                    return Some(OrderError::InvalidPrice)
+                }
+            },
+        }
+
+        let order_margin: f64 = o.size / o.price / self.position.leverage;
+        let order_err: Option<OrderError> = match o.side {
+            Side::Buy => {
+                if self.position.size > 0.0 {
+                    // check if enough margin is available
+                    if order_margin > self.margin.available_balance {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+
+                } else {
+                    if order_margin > self.margin.available_balance + self.position.margin {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+                }
+            },
+            Side::Sell => {
+                if self.position.size > 0.0 {
+                    if order_margin > self.margin.available_balance + self.position.margin {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+                } else {
+                    if order_margin > self.margin.available_balance {
+                        return Some(OrderError::NotEnoughAvailableBalance)
+                    }
+                    None
+                }
+            },
+        };
+        order_err
     }
 
     pub fn validate_take_profit_limit_order(&self, _o: &OrderFloat) -> Option<OrderError> {
