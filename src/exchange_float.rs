@@ -317,7 +317,7 @@ impl ExchangeFloat {
         return order_err
     }
 
-    pub fn validate_limit_order(&self, _o: &OrderFloat) -> Option<OrderError> {
+    pub fn validate_limit_order(&self, o: &OrderFloat) -> Option<OrderError> {
         // validate order price
         match o.side {
             Side::Buy => {
