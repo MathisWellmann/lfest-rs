@@ -116,8 +116,8 @@ impl ExchangeFloat {
             return true
         }
 
-        self.update_position_stats();
         self.check_orders();
+        self.update_position_stats();
 
         return false
     }
@@ -132,8 +132,9 @@ impl ExchangeFloat {
             return true
         }
 
-        self.update_position_stats();
         self.check_orders();
+        self.update_position_stats();
+
         return false
     }
 
@@ -201,6 +202,28 @@ impl ExchangeFloat {
         self.orders_active.push(o);
 
         return None
+    }
+
+    pub fn order_margin(&self) -> f64 {
+        let mut order_margin_long: f64 = 0.0;
+        let mut order_margin_short: f64 = 0.0;
+        for o in &self.orders_active {
+            // check which orders belong to position and which are "free"
+            match o.side {
+                Side::Buy => {
+                    order_margin_long += o.size / o.price / self.position.leverage;
+                },
+                Side::Sell => {
+                    order_margin_short += o.size / o.price / self.position.leverage;
+                }
+            }
+        }
+        if self.position.size > 0.0 {
+            order_margin_short -= self.position.margin;
+        } else {
+            order_margin_long -= self.position.margin;
+        }
+        max(order_margin_long, order_margin_short)
     }
 
     pub fn unrealized_pnl(&self) -> f64 {
@@ -352,11 +375,7 @@ impl ExchangeFloat {
         return false
     }
 
-    fn deduce_fees(&mut self, t: FeeType, side: Side, amount_base: f64) {
-        let price = match side {
-            Side::Buy => self.ask,
-            Side::Sell => self.bid,
-        };
+    fn deduce_fees(&mut self, t: FeeType, amount_base: f64, price: f64) {
         let fee: f64 = match t {
             FeeType::Maker => self.config.fee_maker,
             FeeType::Taker => self.config.fee_taker,
@@ -381,12 +400,13 @@ impl ExchangeFloat {
     }
 
     fn execute_market(&mut self, side: Side, amount_base: f64) {
-        self.deduce_fees(FeeType::Taker, side, amount_base);
-
         let price: f64 = match side {
             Side::Buy => self.ask,
             Side::Sell => self.bid,
         };
+
+        self.deduce_fees(FeeType::Taker, amount_base, price);
+
         let old_position_size = self.position.size;
         let old_entry_price: f64 =  if self.position.size == 0.0 {
             price
@@ -466,6 +486,84 @@ impl ExchangeFloat {
         self.update_liq_price();
     }
 
+    fn execute_limit(&mut self, side: Side, price: f64, amount_base: f64) {
+        self.deduce_fees(FeeType::Maker, amount_base, price);
+        self.acc_tracker.log_trade(side, amount_base);
+
+        let old_position_size = self.position.size;
+        let old_entry_price: f64 =  if self.position.size == 0.0 {
+            price
+        } else {
+            self.position.entry_price
+        };
+
+        match side {
+            Side::Buy => {
+                if self.position.size < 0.0 {
+                    // realize pnl
+                    if amount_base > self.position.size.abs() {
+                        let rpnl = self.position.size.abs() * ((1.0 / price) - (1.0 / self.position.entry_price));
+                        self.margin.wallet_balance += rpnl;
+                        self.rpnls.push(rpnl);
+                        self.acc_tracker.log_rpnl(rpnl);
+
+                        let size_diff = amount_base - self.position.size.abs();
+                        self.position.size += amount_base;
+                        self.position.margin = size_diff / price / self.position.leverage;
+                        self.position.entry_price = price;
+                    } else {
+                        let rpnl = amount_base * ((1.0 / price) - (1.0 / self.position.entry_price));
+                        self.margin.wallet_balance += rpnl;
+                        self.rpnls.push(rpnl);
+                        self.acc_tracker.log_rpnl(rpnl);
+
+                        self.position.size += amount_base;
+                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.entry_price = old_entry_price;
+                    }
+                } else {
+                    self.position.size += amount_base;
+                    self.position.margin += amount_base / price / self.position.leverage;
+                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                        / (amount_base + old_position_size.abs());
+                }
+            },
+            Side::Sell => {
+                if self.position.size > 0.0 {
+                    // realize pnl
+                    if amount_base > self.position.size.abs() {
+                        let rpnl = self.position.size.abs() * ((1.0 / self.position.entry_price) - (1.0 / price));
+                        self.margin.wallet_balance += rpnl;
+                        self.rpnls.push(rpnl);
+                        self.acc_tracker.log_rpnl(rpnl);
+
+                        let size_diff = amount_base - self.position.size.abs();
+                        self.position.size -= amount_base;
+                        self.position.margin = size_diff / price / self.position.leverage;
+                        self.position.entry_price = price;
+                    } else {
+                        let rpnl = amount_base * ((1.0 / self.position.entry_price) - (1.0 / price));
+                        self.margin.wallet_balance += rpnl;
+                        self.rpnls.push(rpnl);
+                        self.acc_tracker.log_rpnl(rpnl);
+
+                        self.position.size -= amount_base;
+                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.entry_price = old_entry_price;
+                    }
+                } else {
+                    self.position.size += amount_base;
+                    self.position.margin += amount_base / price / self.position.leverage;
+                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                        / (amount_base + old_position_size.abs());
+                }
+            }
+        }
+
+        self.update_position_stats();
+        self.update_liq_price();
+    }
+
     fn liquidate(&mut self) {
         debug!("liquidating");
         if self.position.size > 0.0 {
@@ -480,9 +578,9 @@ impl ExchangeFloat {
     fn check_orders(&mut self) {
         for i in 0..self.orders_active.len() {
             match self.orders_active[i].order_type {
-                OrderType::Market => self.handle_market_order(i),
                 OrderType::Limit => self.handle_limit_order(i),
                 OrderType::StopMarket => self.handle_stop_market_order(i),
+                OrderType::Market => self.handle_market_order(i),
                 OrderType::TakeProfitLimit => self.handle_take_profit_limit_order(i),
                 OrderType::TakeProfitMarket => self.handle_take_profit_market_order(i),
             }
@@ -537,9 +635,24 @@ impl ExchangeFloat {
         self.orders_active[order_index].mark_done();
     }
 
-    fn handle_limit_order(&mut self, _order_index: usize) {
-        // TODO: exchange_float: handle_limit_order
-        unimplemented!("exchange_float: handle_limit_order is not implemented yet");
+    fn handle_limit_order(&mut self, order_index: usize) {
+        let o: &OrderFloat = &self.orders_active[order_index];
+        match o.side {
+            Side::Buy => {
+                if self.ask < o.price {
+                    // execute
+                    self.execute_limit(o.side, o.price, o.size);
+                    self.orders_active[order_index].mark_done();
+                }
+            },
+            Side::Sell => {
+                if self.bid > o.price {
+                    // execute
+                    self.execute_limit(o.side, o.price, o.size);
+                    self.orders_active[order_index].mark_done();
+                }
+            }
+        }
     }
 
     fn handle_take_profit_limit_order(&mut self, _order_index: usize) {
@@ -564,5 +677,12 @@ pub fn min(val0: f64, val1: f64) -> f64 {
         return val0
     }
     return val1
+}
+
+pub fn max(val0: f64, val1: f64) -> f64 {
+    if val0 > val1 {
+        return val0
+    }
+    val1
 }
 
