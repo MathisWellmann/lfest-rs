@@ -144,6 +144,7 @@ impl ExchangeDecimal {
 
         self.check_orders();
         self.update_position_stats();
+
         return false
     }
 
@@ -169,52 +170,58 @@ impl ExchangeDecimal {
         None
     }
 
-    pub fn submit_order(&mut self, o: &Order) -> Option<OrderError> {
-        match o.order_type {
-            OrderType::StopMarket => { if self.orders_active.len() >= 10 { return Some(OrderError::MaxActiveOrders ) } },
-            _ => { if self.orders_active.len() >= 200 { return Some(OrderError::MaxActiveOrders) } }
+    pub fn submit_order(&mut self, mut order: Order) -> Result<Order, OrderError> {
+        match order.order_type {
+            OrderType::StopMarket => {
+                if self.orders_active.len() >= 10 {
+                    return Err(OrderError::MaxActiveOrders )
+                }
+            },
+            _ => {
+                if self.orders_active.len() >= 200 {
+                    return Err(OrderError::MaxActiveOrders)
+                }
+            }
         }
 
-        if o.size <= Decimal::new(0, 0) {
-            return Some(OrderError::InvalidOrderSize)
+        if order.size <= Decimal::new(0, 0) {
+            return Err(OrderError::InvalidOrderSize)
         }
-        let order_err: Option<OrderError> = match o.order_type {
-            OrderType::Market => self.validate_market_order(o),
-            OrderType::Limit => self.validate_limit_order(o),
-            OrderType::StopMarket => self.validate_stop_market_order(o),
-            OrderType::TakeProfitLimit => self.validate_take_profit_limit_order(o),
-            OrderType::TakeProfitMarket => self.validate_take_profit_market_order(o),
+        let order_err: Option<OrderError> = match order.order_type {
+            OrderType::Market => self.validate_market_order(&order),
+            OrderType::Limit => self.validate_limit_order(&order),
+            OrderType::StopMarket => self.validate_stop_market_order(&order),
+            OrderType::TakeProfitLimit => self.validate_take_profit_limit_order(&order),
+            OrderType::TakeProfitMarket => self.validate_take_profit_market_order(&order),
         };
         if order_err.is_some() {
-            return order_err
+            return Err(order_err.unwrap())
         }
 
-        let mut o = o.clone();
-
         // assign unique order id
-        o.id = self.next_order_id;
+        order.id = self.next_order_id;
         self.next_order_id += 1;
 
         // assign timestamp
         let now = Utc::now();
-        o.timestamp = now.timestamp_millis() as u64;
+        order.timestamp = now.timestamp_millis() as u64;
 
-        match o.order_type {
+        match order.order_type {
             OrderType::Market => {
                 // immediately execute market order
-                self.execute_market(o.side, o.size);
-                return None
+                self.execute_market(order.side, order.size);
+                return Ok(order)
             }
             OrderType::Limit => {
-                self.orders_active.push(o);
+                self.orders_active.push(order.clone());
                 self.margin.available_balance = self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
-                return None
+                return Ok(order)
             }
             _ => {},
         }
-        self.orders_active.push(o);
+        self.orders_active.push(order.clone());
 
-        return None
+        return Ok(order)
     }
 
     // calculates the total order margin
@@ -789,8 +796,8 @@ mod tests {
         assert!(order_err.is_some());
 
         let o = Order::market(Side::Buy, 800.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         exchange.check_orders();
 
         assert_eq!(exchange.position.size, Decimal::new(800, 0));
@@ -887,21 +894,21 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::limit(Side::Buy, 900.0, 450.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         assert_eq!(exchange.orders_active.len(), 1);
         assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
         assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0) - Decimal::new(5, 1));
 
         // submit working market order
         let o = Order::market(Side::Buy, 450.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         // submit opposite limit order acting as target order
         let o = Order::limit(Side::Sell, 1200.0, 450.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         assert_eq!(exchange.orders_active.len(), 2);
 
     }
@@ -992,11 +999,8 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::stop_market(Side::Buy, 1010.0, 100.0);
-        let valid = exchange.submit_order(&o);
-        match valid {
-            Some(_) => panic!("order not valid!"),
-            None => {},
-        }
+        let valid = exchange.submit_order(o);
+        assert!(valid.is_ok());
         exchange.check_orders();
 
         assert_eq!(exchange.orders_active.len(), 1);
@@ -1030,16 +1034,8 @@ mod tests {
         let value = exchange.margin.available_balance * Decimal::new(8, 1);
         let size = exchange.ask * value;
         let o = Order::market(Side::Buy, size.to_f64().unwrap());
-        let order_err = exchange.submit_order(&o);
-        match order_err {
-            Some(OrderError::InvalidOrder) => panic!("invalid order"),
-            Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
-            Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
-            Some(OrderError::InvalidPrice) => panic!("invalid price!"),
-            Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
-            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
-            None => {},
-        }
+        let order_err = exchange.submit_order(o);
+       assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1077,8 +1073,8 @@ mod tests {
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(4, 1));
 
         let o = Order::market(Side::Sell, size.to_f64().unwrap());
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1107,8 +1103,8 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::market(Side::Buy, 800.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         exchange.check_orders();
 
         assert_eq!(exchange.position.size, Decimal::new(800, 0));
@@ -1129,8 +1125,8 @@ mod tests {
         assert_eq!(exchange.unrealized_pnl(), Decimal::new(-2, 1));
 
         let o = Order::market(Side::Sell, 800.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         exchange.check_orders();
 
         let fee_base0 = fee_taker * Decimal::new(800, 0);
@@ -1166,8 +1162,8 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::market(Side::Sell, 800.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         exchange.check_orders();
 
         assert_eq!(exchange.position.size, Decimal::new(-800, 0));
@@ -1188,8 +1184,8 @@ mod tests {
         assert_eq!(exchange.unrealized_pnl(), Decimal::new(2, 1));
 
         let o = Order::market(Side::Buy, 800.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         exchange.check_orders();
 
         let fee_base0 = fee_taker * Decimal::new(800, 0);
@@ -1228,8 +1224,8 @@ mod tests {
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
         let o = Order::market(Side::Sell, s);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1267,8 +1263,8 @@ mod tests {
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(-2, 1));
 
         let o = Order::market(Side::Buy, size.to_f64().unwrap());
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1299,16 +1295,8 @@ mod tests {
         let value = exchange.margin.available_balance * Decimal::new(8, 1);
         let size = exchange.ask * value;
         let o = Order::market(Side::Buy, size.to_f64().unwrap());
-        let order_err = exchange.submit_order(&o);
-        match order_err {
-            Some(OrderError::InvalidOrder) => panic!("invalid order"),
-            Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
-            Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
-            Some(OrderError::InvalidPrice) => panic!("invalid price!"),
-            Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
-            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
-            None => {},
-        }
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1346,8 +1334,8 @@ mod tests {
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(4, 1));
 
         let o = Order::market(Side::Sell, size.to_f64().unwrap());
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1376,8 +1364,8 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::market(Side::Buy, 800.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         exchange.check_orders();
 
         assert_eq!(exchange.position.size, Decimal::new(800, 0));
@@ -1398,8 +1386,8 @@ mod tests {
         assert_eq!(exchange.unrealized_pnl(), Decimal::new(-2, 1));
 
         let o = Order::market(Side::Sell, 400.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         exchange.check_orders();
 
         let fee_base0 = fee_taker * Decimal::new(800, 0);
@@ -1435,8 +1423,8 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::market(Side::Sell, 800.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         exchange.check_orders();
 
         assert_eq!(exchange.position.size, Decimal::new(-800, 0));
@@ -1457,8 +1445,8 @@ mod tests {
         assert_eq!(exchange.unrealized_pnl(), Decimal::new(2, 1));
 
         let o = Order::market(Side::Buy, 400.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         exchange.check_orders();
 
         let fee_base0 = fee_taker * Decimal::new(800, 0);
@@ -1497,8 +1485,8 @@ mod tests {
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
         let o = Order::market(Side::Sell, s);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1536,8 +1524,8 @@ mod tests {
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(-4, 1));
 
         let o = Order::market(Side::Buy, size.to_f64().unwrap());
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1570,30 +1558,14 @@ mod tests {
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
         let buy_order = Order::market(Side::Buy, s);
-        let order_err = exchange.submit_order(&buy_order);
-        match order_err {
-            Some(OrderError::InvalidOrder) => panic!("invalid order"),
-            Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
-            Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
-            Some(OrderError::InvalidPrice) => panic!("invalid price!"),
-            Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
-            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
-            None => {},
-        }
+        let order_err = exchange.submit_order(buy_order);
+        assert!(order_err.is_ok());
         exchange.check_orders();
 
         let sell_order = Order::market(Side::Sell, s);
 
-        let order_err = exchange.submit_order(&sell_order);
-        match order_err {
-            Some(OrderError::InvalidOrder) => panic!("invalid order"),
-            Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
-            Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
-            Some(OrderError::InvalidPrice) => panic!("invalid price!"),
-            Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
-            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
-            None => {},
-        }
+        let order_err = exchange.submit_order(sell_order);
+        assert!(order_err.is_ok());
 
         let fee_base = size * fee_taker;
         let fee_asset = fee_base / exchange.ask;
@@ -1614,31 +1586,15 @@ mod tests {
 
         let size = 900.0;
         let buy_order = Order::market(Side::Buy, size);
-        let order_err = exchange.submit_order(&buy_order);
-        match order_err {
-            Some(OrderError::InvalidOrder) => panic!("invalid order"),
-            Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
-            Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
-            Some(OrderError::InvalidPrice) => panic!("invalid price!"),
-            Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
-            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
-            None => {},
-        }
+        let order_err = exchange.submit_order(buy_order);
+        assert!(order_err.is_ok());
         exchange.check_orders();
 
         let size = 950.0;
         let sell_order = Order::market(Side::Sell, size);
 
-        let order_err = exchange.submit_order(&sell_order);
-        match order_err {
-            Some(OrderError::InvalidOrder) => panic!("invalid order"),
-            Some(OrderError::MaxActiveOrders) => panic!("max_active_orders"),
-            Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
-            Some(OrderError::InvalidPrice) => panic!("invalid price!"),
-            Some(OrderError::InvalidTriggerPrice) => panic!("invalid trigger price"),
-            Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
-            None => {},
-        }
+        let order_err = exchange.submit_order(sell_order);
+        assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1671,7 +1627,7 @@ mod tests {
         exchange.consume_trade(&t);
         for i in 0..100 {
             let o = Order::stop_market(Side::Buy, 101.0 + i as f64, 10.0);
-            exchange.submit_order(&o);
+            exchange.submit_order(o);
         }
         let active_orders = exchange.orders_active;
         let mut last_order_id: i64 = -1;
@@ -1703,8 +1659,8 @@ mod tests {
         assert_eq!(exchange.position.leverage, Decimal::new(1, 0));
 
         let o = Order::market(Side::Buy, 100.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1727,8 +1683,8 @@ mod tests {
 
 
         let o = Order::market(Side::Buy, 4800.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         let fee_asset2 = (fee_taker * Decimal::new(4800, 0)) / exchange.bid;
 
@@ -1753,8 +1709,8 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::market(Side::Buy, 100.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1775,8 +1731,8 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::market(Side::Buy, 100.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1814,8 +1770,8 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::market(Side::Buy, 100.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         exchange.check_orders();
 
         assert_eq!(exchange.position.size, Decimal::new(100, 0));
@@ -1855,8 +1811,8 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::stop_market(Side::Buy, 1010.0, 100.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
 
         // TODO: test cancel order
     }
@@ -1874,37 +1830,37 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o = Order::limit(Side::Buy, 900.0, 450.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
         assert_eq!(exchange.orders_active.len(), 1);
 
         let o = Order::limit(Side::Sell, 1200.0, 450.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
         assert_eq!(exchange.orders_active.len(), 2);
 
         let o = Order::market(Side::Buy, 450.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         assert_eq!(exchange.position.size, Decimal::new(450, 0));
         assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
 
         let o = Order::limit(Side::Sell, 1200.0, 450.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
         assert_eq!(exchange.orders_active.len(), 3);
 
         let o = Order::market(Side::Sell, 450.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         assert_eq!(exchange.order_margin(), Decimal::new(75, 2));
 
         let o = Order::market(Side::Buy, 240.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         assert_eq!(exchange.position.size, Decimal::new(240, 0));
         assert_eq!(exchange.order_margin(), Decimal::new(51, 2));
 
@@ -1923,8 +1879,8 @@ mod tests {
         exchange.consume_trade(&t);
 
         let o: Order = Order::limit(Side::Buy, 900.0, 450.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         assert_eq!(exchange.orders_active.len(), 1);
         assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1));
 
@@ -1959,8 +1915,8 @@ mod tests {
 
 
         let o: Order = Order::limit(Side::Sell, 1000.0, 450.0);
-        let order_err = exchange.submit_order(&o);
-        assert!(order_err.is_none());
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
         assert_eq!(exchange.orders_active.len(), 1);
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
 

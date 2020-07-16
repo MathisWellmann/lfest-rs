@@ -100,16 +100,15 @@ impl ExchangeFloat {
     // consume_candle update the exchange state with th new candle.
     // returns true if position has been liquidated
     pub fn consume_trade(&mut self, trade: &Trade) -> bool {
-        let price = trade.price;
         if self.init {
             self.init = false;
-            self.bid = price;
-            self.ask = price;
+            self.bid = trade.price;
+            self.ask = trade.price;
         }
         if trade.size > 0.0 {
-            self.ask = price;
+            self.ask = trade.price;
         } else {
-            self.bid = price;
+            self.bid = trade.price;
         }
 
         if self.check_liquidation() {
@@ -117,7 +116,6 @@ impl ExchangeFloat {
         }
 
         self.check_orders();
-        self.update_position_stats();
 
         return false
     }
@@ -133,7 +131,6 @@ impl ExchangeFloat {
         }
 
         self.check_orders();
-        self.update_position_stats();
 
         return false
     }
@@ -162,46 +159,54 @@ impl ExchangeFloat {
         None
     }
 
-    pub fn submit_order(&mut self, o: &OrderFloat) -> Option<OrderError> {
-        match o.order_type {
-            OrderType::StopMarket => { if self.orders_active.len() >= 10 { return Some(OrderError::MaxActiveOrders ) } },
-            _ => { if self.orders_active.len() >= 200 { return Some(OrderError::MaxActiveOrders) } }
+    // submits the order to the exchange
+    // returns the order with timestamp and id filled in or OrderError
+    pub fn submit_order(&mut self, mut order: OrderFloat) -> Result<OrderFloat, OrderError> {
+        match order.order_type {
+            OrderType::StopMarket => {
+                if self.orders_active.len() >= 10 {
+                    return Err(OrderError::MaxActiveOrders )
+                }
+            },
+            _ => {
+                if self.orders_active.len() >= 200 {
+                    return Err(OrderError::MaxActiveOrders)
+                }
+            }
         }
-        if o.size <= 0.0 {
-            return Some(OrderError::InvalidOrderSize)
+        if order.size <= 0.0 {
+            return Err(OrderError::InvalidOrderSize)
         }
-        let order_err: Option<OrderError> = match o.order_type {
-            OrderType::Market => self.validate_market_order(o),
-            OrderType::Limit => self.validate_limit_order(o),
-            OrderType::StopMarket => self.validate_stop_market_order(o),
-            OrderType::TakeProfitLimit => self.validate_take_profit_limit_order(o),
-            OrderType::TakeProfitMarket => self.validate_take_profit_market_order(o),
+        let order_err: Option<OrderError> = match order.order_type {
+            OrderType::Market => self.validate_market_order(&order),
+            OrderType::Limit => self.validate_limit_order(&order),
+            OrderType::StopMarket => self.validate_stop_market_order(&order),
+            OrderType::TakeProfitLimit => self.validate_take_profit_limit_order(&order),
+            OrderType::TakeProfitMarket => self.validate_take_profit_market_order(&order),
         };
         if order_err.is_some() {
-            return order_err
+            return Err(order_err.unwrap())
         }
 
-        let mut o = o.clone();
-
         // assign unique order id
-        o.id = self.next_order_id;
+        order.id = self.next_order_id;
         self.next_order_id += 1;
 
         // assign timestamp
         let now = Utc::now();
-        o.timestamp = now.timestamp_millis() as u64;
+        order.timestamp = now.timestamp_millis() as u64;
 
-        match o.order_type {
+        match order.order_type {
             OrderType::Market => {
                 // immediately execute market order
-                self.execute_market(o.side, o.size);
-                return None
+                self.execute_market(order.side, order.size);
+                return Ok(order)
             }
             _ => {},
         }
-        self.orders_active.push(o);
+        self.orders_active.push(order.clone());
 
-        return None
+        return Ok(order)
     }
 
     pub fn order_margin(&self) -> f64 {
