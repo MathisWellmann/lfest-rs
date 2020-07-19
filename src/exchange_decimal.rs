@@ -155,12 +155,12 @@ impl ExchangeDecimal {
     }
 
     // candle an active order
-    // returns true if successful with given order_id
+    // returns the cancelled order if successful
     pub fn cancel_order(&mut self, order_id: u64) -> Option<Order> {
         for (i, o) in self.orders_active.iter().enumerate() {
             if o.id == order_id {
                 let old_order = self.orders_active.remove(i);
-                self.margin.available_balance += self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
+                self.update_position_stats();
                 return Some(old_order);
             }
         }
@@ -217,6 +217,7 @@ impl ExchangeDecimal {
                 return Ok(order)
             }
             OrderType::Limit => {
+                self.acc_tracker.log_limit_order_submission();
                 self.orders_active.push(order.clone());
                 self.margin.available_balance = self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
                 return Ok(order)
@@ -559,6 +560,7 @@ impl ExchangeDecimal {
     }
 
     fn execute_limit(&mut self, side: Side, price: Decimal, amount_base: Decimal) {
+        self.acc_tracker.log_limit_order_fill();
         self.deduce_fees(FeeType::Maker, amount_base, price);
         self.acc_tracker.log_trade(side, amount_base.to_f64().unwrap());
 
@@ -1814,11 +1816,20 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::stop_market(Side::Buy, 1010.0, 100.0);
+        let o = Order::limit(Side::Buy, 900.0, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
-        // TODO: test cancel order
+        assert_eq!(exchange.orders_active.len(), 1);
+        assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
+
+        exchange.cancel_order(0);
+        assert_eq!(exchange.orders_active.len(), 0);
+        assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0));
+        assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0));
+        assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0));
+        assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
+
     }
 
     #[test]

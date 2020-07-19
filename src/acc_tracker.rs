@@ -94,7 +94,7 @@ impl AccTracker {
     }
 
     pub fn log_limit_order_submission(&mut self) {
-        self.num_submitted_orders += 1;
+        self.num_submitted_limit_orders += 1;
     }
 
     pub fn log_limit_order_cancellation(&mut self) {
