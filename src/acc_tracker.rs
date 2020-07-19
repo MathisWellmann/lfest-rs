@@ -14,6 +14,9 @@ pub struct AccTracker {
     welford_returns: WelfordOnline,
     welford_pos_returns: WelfordOnline,
     wins: usize,
+    num_submitted_limit_orders: usize,
+    num_cancelled_limit_orders: usize,
+    num_filled_limit_orders: usize,
 }
 
 
@@ -30,6 +33,9 @@ impl AccTracker {
             welford_returns: WelfordOnline::new(),
             welford_pos_returns: WelfordOnline::new(),
             wins: 0,
+            num_submitted_limit_orders: 0,
+            num_cancelled_limit_orders: 0,
+            num_filled_limit_orders: 0,
         }
     }
 
@@ -87,8 +93,28 @@ impl AccTracker {
         }
     }
 
+    pub fn log_limit_order_submission(&mut self) {
+        self.num_submitted_orders += 1;
+    }
+
+    pub fn log_limit_order_cancellation(&mut self) {
+        self.num_cancelled_limit_orders += 1;
+    }
+
+    pub fn log_limit_order_fill(&mut self) {
+        self.num_filled_limit_orders += 1;
+    }
+
     pub fn win_ratio(&self) -> f64 {
         self.wins as f64 / self.num_trades as f64
+    }
+
+    pub fn limit_order_fill_ratio(&self) -> f64 {
+        self.num_filled_limit_orders as f64 / self.num_submitted_limit_orders as f64
+    }
+
+    pub fn limit_order_cancellation_ratio(&self) -> f64 {
+        self.num_cancelled_limit_orders as f64 / self.num_submitted_limit_orders as f64
     }
 }
 
