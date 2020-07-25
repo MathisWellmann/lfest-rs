@@ -339,12 +339,12 @@ impl ExchangeDecimal {
         // validate order price
         match o.side {
             Side::Buy => {
-                if o.price >= self.ask {
+                if o.price > self.ask {
                     return Some(OrderError::InvalidPrice)
                 }
             },
             Side::Sell => {
-                if o.price <= self.bid {
+                if o.price < self.bid {
                     return Some(OrderError::InvalidPrice)
                 }
             },
