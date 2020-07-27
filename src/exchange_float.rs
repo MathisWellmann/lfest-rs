@@ -206,6 +206,12 @@ impl ExchangeFloat {
                 self.execute_market(order.side, order.size);
                 return Ok(order)
             }
+            OrderType::Limit => {
+                self.acc_tracker.log_limit_order_submission();
+                self.orders_active.push(order.clone());
+                self.margin.available_balance = self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
+                return Ok(order)
+            }
             _ => {},
         }
         self.orders_active.push(order.clone());
@@ -540,6 +546,7 @@ impl ExchangeFloat {
     }
 
     fn execute_limit(&mut self, side: Side, price: f64, amount_base: f64) {
+        self.acc_tracker.log_limit_order_fill();
         self.deduce_fees(FeeType::Maker, amount_base, price);
         self.acc_tracker.log_trade(side, amount_base);
 
