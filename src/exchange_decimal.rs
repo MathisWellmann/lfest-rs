@@ -154,7 +154,7 @@ impl ExchangeDecimal {
         return false
     }
 
-    // candle an active order
+    // cancels an active order
     // returns the cancelled order if successful
     pub fn cancel_order(&mut self, order_id: u64) -> Option<Order> {
         for (i, o) in self.orders_active.iter().enumerate() {

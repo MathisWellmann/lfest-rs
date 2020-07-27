@@ -141,15 +141,13 @@ impl ExchangeFloat {
         return false
     }
 
-    // candle an active order
+    // cancels an active order
     // returns true if successful with given order_id
     pub fn cancel_order(&mut self, order_id: u64) -> Option<OrderFloat> {
         for (i, o) in self.orders_active.iter().enumerate() {
             if o.id == order_id {
                 let old_order = self.orders_active.remove(i);
-                let margin = old_order.size / old_order.price / self.position.leverage;
-                self.margin.order_margin -= margin;
-                self.margin.available_balance += margin;
+                self.update_position_stats();
                 return Some(old_order);
             }
         }
