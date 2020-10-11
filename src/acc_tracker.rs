@@ -47,6 +47,12 @@ impl AccTracker {
         self.total_rpnl / self.welford_pos_returns.std_dev()
     }
 
+    /// metric that penalizes both std_dev as well as drawdown in returns
+    /// see paper: https://arxiv.org/pdf/2008.09471.pdf
+    pub fn sharpe_sterling_ratio(&self) -> f64 {
+        self.total_rpnl / (self.welford_returns.std_dev() * self.max_drawdown)
+    }
+
     pub fn max_drawdown(&self) -> f64 {
         self.max_drawdown
     }

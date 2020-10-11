@@ -1,7 +1,6 @@
 extern crate trade_aggregation;
 extern crate sliding_features;
 
-use chrono::prelude::*;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use trade_aggregation::common::*;
