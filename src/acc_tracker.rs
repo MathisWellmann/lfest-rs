@@ -59,6 +59,10 @@ impl AccTracker {
         self.max_drawdown
     }
 
+    pub fn max_upnl_drawdown(&self) -> f64 {
+        self.max_upnl_drawdown
+    }
+
     pub fn num_trades(&self) -> i64 {
         self.num_trades
     }
