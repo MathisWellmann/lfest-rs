@@ -11,6 +11,7 @@ pub struct AccTracker {
     total_turnover: f64,
     wb_high: f64,  // wallet balance high
     max_drawdown: f64,
+    max_upnl_drawdown: f64,
     welford_returns: WelfordOnline,
     welford_pos_returns: WelfordOnline,
     wins: usize,
@@ -30,6 +31,7 @@ impl AccTracker {
             total_turnover: 0.0,
             wb_high: starting_wb,
             max_drawdown: 0.0,
+            max_upnl_drawdown: 0.0,
             welford_returns: WelfordOnline::new(),
             welford_pos_returns: WelfordOnline::new(),
             wins: 0,
@@ -90,12 +92,15 @@ impl AccTracker {
         }
     }
 
-    pub fn log_trade(&mut self, side: Side, size: f64) {
+    pub fn log_trade(&mut self, side: Side, size: f64, upnl: f64) {
         self.total_turnover += size;
         self.num_trades += 1;
         match side {
             Side::Buy => self.num_buys += 1,
             Side::Sell => {},
+        }
+        if upnl < self.max_upnl_drawdown {
+            self.max_upnl_drawdown = upnl;
         }
     }
 
@@ -142,7 +147,7 @@ mod tests {
         ];
         let mut acc_tracker = AccTracker::new(1.0);
         for t in trades {
-            acc_tracker.log_trade(t.0, t.1);
+            acc_tracker.log_trade(t.0, t.1, 0.0);
         }
 
         assert_eq!(acc_tracker.turnover(), 4.0);

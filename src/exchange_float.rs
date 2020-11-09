@@ -470,7 +470,8 @@ impl ExchangeFloat {
         } else {
             self.position.entry_price
         };
-        self.acc_tracker.log_trade(side, amount_base);
+        let upnl = self.unrealized_pnl();
+        self.acc_tracker.log_trade(side, amount_base, upnl);
 
         match side {
             Side::Buy => {
@@ -546,7 +547,8 @@ impl ExchangeFloat {
     fn execute_limit(&mut self, side: Side, price: f64, amount_base: f64) {
         self.acc_tracker.log_limit_order_fill();
         self.deduce_fees(FeeType::Maker, amount_base, price);
-        self.acc_tracker.log_trade(side, amount_base);
+        let upnl = self.unrealized_pnl();
+        self.acc_tracker.log_trade(side, amount_base, upnl);
 
         let old_position_size = self.position.size;
         let old_entry_price: f64 =  if self.position.size == 0.0 {

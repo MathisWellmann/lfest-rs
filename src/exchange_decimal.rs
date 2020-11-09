@@ -485,7 +485,8 @@ impl ExchangeDecimal {
         } else {
             self.position.entry_price
         };
-        self.acc_tracker.log_trade(side, amount_base.to_f64().unwrap());
+        let upnl: f64 = self.unrealized_pnl().to_f64().unwrap();
+        self.acc_tracker.log_trade(side, amount_base.to_f64().unwrap(), upnl);
 
         match side {
             Side::Buy => {
@@ -563,7 +564,8 @@ impl ExchangeDecimal {
     fn execute_limit(&mut self, side: Side, price: Decimal, amount_base: Decimal) {
         self.acc_tracker.log_limit_order_fill();
         self.deduce_fees(FeeType::Maker, amount_base, price);
-        self.acc_tracker.log_trade(side, amount_base.to_f64().unwrap());
+        let upnl: f64 = self.unrealized_pnl().to_f64().unwrap();
+        self.acc_tracker.log_trade(side, amount_base.to_f64().unwrap(), upnl);
 
         let old_position_size = self.position.size;
         let old_entry_price: Decimal =  if self.position.size == Decimal::new(0, 0) {
