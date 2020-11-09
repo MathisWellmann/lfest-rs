@@ -128,8 +128,8 @@ impl ExchangeFloat {
     // consume_candle update the bid and ask price given a candle using its close price
     // returns true if position has been liquidated
     pub fn consume_candle(&mut self, candle: &Candle) -> bool {
-        self.bid = candle.close;
-        self.ask = candle.close;
+        self.bid = candle.close - (candle.avg_spread / 2.0);
+        self.ask = candle.close + (candle.avg_spread / 2.0);
 
         if self.check_liquidation() {
             return true
@@ -411,6 +411,7 @@ impl ExchangeFloat {
     }
 
     fn check_liquidation(&mut self) -> bool {
+        // TODO: only liquidate when no more wallet balance is left
         if self.position.size > 0.0 {
             // liquidation check for long position
             if self.ask < self.position.liq_price {

@@ -138,10 +138,12 @@ impl ExchangeDecimal {
     // consume_candle update the bid and ask price given a candle using its close price
     // returns true if position has been liquidated
     pub fn consume_candle(&mut self, candle: &Candle) -> bool {
-        // TODO: set bid and ask with spread in mind
-
         self.bid = Decimal::from_f64(candle.close).unwrap();
         self.ask = Decimal::from_f64(candle.close).unwrap();
+        
+        let half_spread: Decimal = Decimal::from_f64(candle.avg_spread / 2.0).unwrap();
+        self.bid -= half_spread;
+        self.ask += half_spread;
 
         if self.check_liquidation() {
             return true
