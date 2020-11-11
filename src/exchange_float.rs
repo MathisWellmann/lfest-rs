@@ -2,15 +2,13 @@ extern crate trade_aggregation;
 
 use trade_aggregation::common::*;
 use crate::orders_float::*;
-use crate::orders_decimal::{OrderType, OrderError, Side};
 use crate::config_float::*;
-use crate::exchange_decimal::FeeType;
 use crate::acc_tracker::AccTracker;
-
+use crate::{Side, OrderType, OrderError, FeeType};
 
 #[derive(Debug, Clone)]
 pub struct ExchangeFloat {
-    pub config: Config,
+    pub config: ConfigFloat,
     pub position: PositionFloat,
     pub margin: MarginFloat,
     pub bid: f64,
@@ -47,7 +45,7 @@ pub struct PositionFloat {
 
 impl ExchangeFloat {
 
-    pub fn new(config: Config) -> ExchangeFloat {
+    pub fn new(config: ConfigFloat) -> ExchangeFloat {
         return ExchangeFloat {
             config,
             position: PositionFloat{

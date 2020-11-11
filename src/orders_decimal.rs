@@ -1,20 +1,15 @@
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
 
-#[derive(Debug)]
-pub enum OrderError {
-    MaxActiveOrders,
-    InvalidOrder,
-    InvalidPrice,
-    InvalidTriggerPrice,
-    InvalidOrderSize,
-    NotEnoughAvailableBalance,
-}
+use crate::{Side, OrderError, OrderType};
+
 
 #[derive(Debug, Clone)]
-pub struct Order {
-    pub id: u64,  // id will be filled in using exchange.submit_order()
-    pub timestamp: u64,  // timestamp will be filled in using exchange.submit_order()
+pub struct OrderDecimal {
+    pub id: u64,
+    // id will be filled in using exchange.submit_order()
+    pub timestamp: u64,
+    // timestamp will be filled in using exchange.submit_order()
     pub order_type: OrderType,
     pub price: Decimal,
     pub price_opt: Decimal,
@@ -23,24 +18,9 @@ pub struct Order {
     done: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum Side {
-    Buy,
-    Sell,
-}
-
-#[derive(Debug, Clone)]
-pub enum OrderType {
-    Market,
-    Limit,
-    StopMarket,
-    TakeProfitLimit,
-    TakeProfitMarket,
-}
-
-impl Order {
-    pub fn limit(side: Side, price: f64, size: f64) -> Order {
-        return Order {
+impl OrderDecimal {
+    pub fn limit(side: Side, price: f64, size: f64) -> Self {
+        return Self {
             id: 0,
             timestamp: 0,
             order_type: OrderType::Limit,
@@ -52,8 +32,8 @@ impl Order {
         }
     }
 
-    pub fn market(side: Side, size: f64) -> Order {
-        return Order{
+    pub fn market(side: Side, size: f64) -> Self {
+        return Self {
             id: 0,
             timestamp: 0,
             order_type: OrderType::Market,
@@ -65,8 +45,8 @@ impl Order {
         }
     }
 
-    pub fn stop_market(side: Side, trigger_price: f64, size: f64) -> Order {
-        return Order{
+    pub fn stop_market(side: Side, trigger_price: f64, size: f64) -> Self {
+        return Self {
             id: 0,
             timestamp: 0,
             order_type: OrderType::StopMarket,
@@ -78,8 +58,8 @@ impl Order {
         }
     }
 
-    pub fn take_profit_market(side: Side, trigger_price: f64, size: f64) -> Order {
-        return Order {
+    pub fn take_profit_market(side: Side, trigger_price: f64, size: f64) -> Self {
+        return Self {
             id: 0,
             timestamp: 0,
             order_type: OrderType::TakeProfitMarket,
@@ -91,8 +71,8 @@ impl Order {
         }
     }
 
-    pub fn take_profit_limit(side: Side, trigger_price: f64, limit_price: f64, size: f64) -> Order {
-        return Order {
+    pub fn take_profit_limit(side: Side, trigger_price: f64, limit_price: f64, size: f64) -> Self {
+        return Self {
             id: 0,
             timestamp: 0,
             order_type: OrderType::TakeProfitLimit,

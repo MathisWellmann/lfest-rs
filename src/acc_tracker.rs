@@ -1,5 +1,5 @@
 use crate::welford_online::WelfordOnline;
-use crate::orders_decimal::Side;
+use crate::Side;
 
 
 #[derive(Debug, Clone)]

@@ -7,27 +7,27 @@ use trade_aggregation::common::*;
 use crate::orders_decimal::*;
 use crate::config_decimal::*;
 use crate::acc_tracker::AccTracker;
-
+use crate::{OrderError, Side, OrderType, FeeType};
 
 #[derive(Debug, Clone)]
 pub struct ExchangeDecimal {
-    pub config: Config,
-    pub position: Position,
-    pub margin: Margin,
+    pub config: ConfigDecimal,
+    pub position: PositionDecimal,
+    pub margin: MarginDecimal,
     pub acc_tracker: AccTracker,
     pub bid: Decimal,
     pub ask: Decimal,
     init: bool,
     pub rpnls: Vec<f64>,
-    orders_done: Vec<Order>,
-    orders_executed: Vec<Order>,
-    pub orders_active: Vec<Order>,
+    orders_done: Vec<OrderDecimal>,
+    orders_executed: Vec<OrderDecimal>,
+    pub orders_active: Vec<OrderDecimal>,
     next_order_id: u64,
     timestamp: u64,
 }
 
 #[derive(Debug, Clone)]
-pub struct Margin {
+pub struct MarginDecimal {
     pub wallet_balance: Decimal,
     pub margin_balance: Decimal,
     pub position_margin: Decimal,
@@ -36,7 +36,7 @@ pub struct Margin {
 }
 
 #[derive(Debug, Clone)]
-pub struct Position {
+pub struct PositionDecimal {
     pub size: Decimal,
     pub value: Decimal,
     pub entry_price: Decimal,
@@ -46,18 +46,12 @@ pub struct Position {
     pub unrealized_pnl: Decimal,
 }
 
-#[derive(Debug, Clone)]
-pub enum FeeType {
-    Maker,
-    Taker,
-}
-
 impl ExchangeDecimal {
 
-    pub fn new(config: Config) -> ExchangeDecimal {
+    pub fn new(config: ConfigDecimal) -> ExchangeDecimal {
         return ExchangeDecimal {
             config,
-            position: Position{
+            position: PositionDecimal{
                 size: Decimal::new(0, 0),
                 value: Decimal::new(0, 0),
                 entry_price: Decimal::new(0, 0),
@@ -66,7 +60,7 @@ impl ExchangeDecimal {
                 leverage: Decimal::new(1, 0),
                 unrealized_pnl: Decimal::new(0, 0),
             },
-            margin: Margin{
+            margin: MarginDecimal{
                 wallet_balance: Decimal::new(1, 0),
                 margin_balance: Decimal::new(1, 0),
                 position_margin: Decimal::new(0, 0),
@@ -157,7 +151,7 @@ impl ExchangeDecimal {
 
     // cancels an active order
     // returns the cancelled order if successful
-    pub fn cancel_order(&mut self, order_id: u64) -> Option<Order> {
+    pub fn cancel_order(&mut self, order_id: u64) -> Option<OrderDecimal> {
         for (i, o) in self.orders_active.iter().enumerate() {
             if o.id == order_id {
                 let old_order = self.orders_active.remove(i);
@@ -168,7 +162,7 @@ impl ExchangeDecimal {
         None
     }
 
-    pub fn query_active_orders(&self, order_id: u64) -> Option<&Order> {
+    pub fn query_active_orders(&self, order_id: u64) -> Option<&OrderDecimal> {
         for (i, o) in self.orders_active.iter().enumerate() {
             if o.id == order_id {
                 return self.orders_active.get(i);
@@ -177,7 +171,7 @@ impl ExchangeDecimal {
         None
     }
 
-    pub fn submit_order(&mut self, mut order: Order) -> Result<Order, OrderError> {
+    pub fn submit_order(&mut self, mut order: OrderDecimal) -> Result<OrderDecimal, OrderError> {
         match order.order_type {
             OrderType::StopMarket => {
                 if self.orders_active.len() >= 10 {
@@ -267,8 +261,8 @@ impl ExchangeDecimal {
         return self.orders_active.len()
     }
 
-    pub fn executed_orders(&mut self) -> Vec<Order> {
-        let exec_orders: Vec<Order> = self.orders_executed.clone();
+    pub fn executed_orders(&mut self) -> Vec<OrderDecimal> {
+        let exec_orders: Vec<OrderDecimal> = self.orders_executed.clone();
         // move to orders_done if needed
         // for o in &exec_orders {
         //     self.orders_done.push(o);
@@ -278,13 +272,13 @@ impl ExchangeDecimal {
         return exec_orders
     }
 
-    pub fn ammend_order(&mut self, _order_id: u64, _new_order: Order) -> Option<OrderError> {
+    pub fn ammend_order(&mut self, _order_id: u64, _new_order: OrderDecimal) -> Option<OrderError> {
         // TODO: exchange_decimal: ammend_order
         unimplemented!("exchange_decimal: ammend_order is not implemented yet");
     }
 
     // check if market order is correct
-    pub fn validate_market_order(&mut self, o: &Order) -> Option<OrderError> {
+    pub fn validate_market_order(&mut self, o: &OrderDecimal) -> Option<OrderError> {
         let price = match o.side {
             Side::Buy => self.ask,
             Side::Sell => self.bid,
@@ -336,7 +330,7 @@ impl ExchangeDecimal {
         return order_err
     }
 
-    pub fn validate_limit_order(&mut self, o: &Order) -> Option<OrderError> {
+    pub fn validate_limit_order(&mut self, o: &OrderDecimal) -> Option<OrderError> {
         // validate order price
         match o.side {
             Side::Buy => {
@@ -385,13 +379,13 @@ impl ExchangeDecimal {
         order_err
     }
 
-    pub fn validate_take_profit_limit_order(&self, _o: &Order) -> Option<OrderError> {
+    pub fn validate_take_profit_limit_order(&self, _o: &OrderDecimal) -> Option<OrderError> {
         // TODO: exchange_decimal: validate_take_profit_limit_order
         unimplemented!("exchange_decimal: validate_take_profit_limit_order is not implemented yet");
     }
 
     // returns true if order is valid
-    pub fn validate_stop_market_order(&mut self, o: &Order) -> Option<OrderError> {
+    pub fn validate_stop_market_order(&mut self, o: &OrderDecimal) -> Option<OrderError> {
         let order_err =  match o.side {
             Side::Buy => { if o.price <= self.ask { return Some(OrderError::InvalidTriggerPrice) }
                 None
@@ -407,7 +401,7 @@ impl ExchangeDecimal {
         None
     }
 
-    pub fn validate_take_profit_market_order(&self, o: &Order) -> Option<OrderError> {
+    pub fn validate_take_profit_market_order(&self, o: &OrderDecimal) -> Option<OrderError> {
         return match o.side {
             Side::Buy => { if o.price > self.bid { return Some(OrderError::InvalidOrder) }
                 None
@@ -713,7 +707,7 @@ impl ExchangeDecimal {
     // uses pessimistic order fill model, in which the bid / ask price must have crossed the
     // limit price in order to get filled
     fn handle_limit_order(&mut self, order_index: usize) {
-        let o: &Order = &self.orders_active[order_index];
+        let o: &OrderDecimal = &self.orders_active[order_index];
         match o.side {
             Side::Buy => {
                 if self.ask < o.price {
@@ -769,7 +763,7 @@ mod tests {
 
     #[test]
     fn validate_market_order() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -782,12 +776,12 @@ mod tests {
         let size = exchange.ask * exchange.margin.available_balance * Decimal::new(4, 1);
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
-        let o = Order::market(Side::Buy, s);
+        let o = OrderDecimal::market(Side::Buy, s);
         let order_err = exchange.validate_market_order(&o);
         assert!(order_err.is_none());
 
         // valid order
-        let o = Order::market(Side::Sell, s);
+        let o = OrderDecimal::market(Side::Sell, s);
         let order_err = exchange.validate_market_order(&o);
         assert!(order_err.is_none());
 
@@ -795,16 +789,16 @@ mod tests {
         let size = exchange.ask * exchange.margin.available_balance * Decimal::new(105, 2);
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
-        let o = Order::market(Side::Buy, s);
+        let o = OrderDecimal::market(Side::Buy, s);
         let order_err = exchange.validate_market_order(&o);
         assert!(order_err.is_some());
 
         // invalid order
-        let o = Order::market(Side::Sell, s);
+        let o = OrderDecimal::market(Side::Sell, s);
         let order_err = exchange.validate_market_order(&o);
         assert!(order_err.is_some());
 
-        let o = Order::market(Side::Buy, 800.0);
+        let o = OrderDecimal::market(Side::Buy, 800.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         exchange.check_orders();
@@ -812,27 +806,27 @@ mod tests {
         assert_eq!(exchange.position.size, Decimal::new(800, 0));
 
         // valid order
-        let o = Order::market(Side::Buy, 190.0);
+        let o = OrderDecimal::market(Side::Buy, 190.0);
         let order_err = exchange.validate_market_order(&o);
         assert!(order_err.is_none());
 
         // invalid order
-        let o = Order::market(Side::Buy, 210.0);
+        let o = OrderDecimal::market(Side::Buy, 210.0);
         let order_err = exchange.validate_market_order(&o);
         assert!(order_err.is_some());
 
         // valid order
-        let o = Order::market(Side::Sell, 800.0);
+        let o = OrderDecimal::market(Side::Sell, 800.0);
         let order_err = exchange.validate_market_order(&o);
         assert!(order_err.is_none());
 
         // invalid order
-        let o = Order::market(Side::Sell, 2100.0);
+        let o = OrderDecimal::market(Side::Sell, 2100.0);
         let order_err = exchange.validate_market_order(&o);
         assert!(order_err.is_some());
 
         // valid order
-        let o = Order::market(Side::Sell, 1600.0);
+        let o = OrderDecimal::market(Side::Sell, 1600.0);
         let order_err = exchange.validate_market_order(&o);
         match order_err {
             Some(OrderError::InvalidOrder) => panic!("invalid order"),
@@ -845,7 +839,7 @@ mod tests {
 
     #[test]
     fn test_validate_limit_order() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -856,44 +850,44 @@ mod tests {
 
         let price: f64 = 990.0;
         let size = exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
-        let o = Order::limit(Side::Buy, price, size.to_f64().unwrap());
+        let o = OrderDecimal::limit(Side::Buy, price, size.to_f64().unwrap());
         let order_err = exchange.validate_limit_order(&o);
         assert!(order_err.is_none());
 
         let price: f64 = 1010.0;
         let size = exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
-        let o = Order::limit(Side::Buy, price, size.to_f64().unwrap());
+        let o = OrderDecimal::limit(Side::Buy, price, size.to_f64().unwrap());
         let order_err = exchange.validate_limit_order(&o);
         assert!(order_err.is_some());
 
         let price: f64 = 1010.0;
         let size = exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
-        let o = Order::limit(Side::Sell, price, size.to_f64().unwrap());
+        let o = OrderDecimal::limit(Side::Sell, price, size.to_f64().unwrap());
         let order_err = exchange.validate_limit_order(&o);
         assert!(order_err.is_none());
 
         let price: f64 = 990.0;
         let size = exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
-        let o = Order::limit(Side::Sell, price, size.to_f64().unwrap());
+        let o = OrderDecimal::limit(Side::Sell, price, size.to_f64().unwrap());
         let order_err = exchange.validate_limit_order(&o);
         assert!(order_err.is_some());
 
         let price: f64 = 990.0;
         let size = exchange.margin.wallet_balance * Decimal::new(11, 1) * Decimal::new(price as i64, 0);
-        let o = Order::limit(Side::Buy, price, size.to_f64().unwrap());
+        let o = OrderDecimal::limit(Side::Buy, price, size.to_f64().unwrap());
         let order_err = exchange.validate_limit_order(&o);
         assert!(order_err.is_some());
 
         let price: f64 = 1010.0;
         let size = exchange.margin.wallet_balance * Decimal::new(11, 1) * Decimal::new(price as i64, 0);
-        let o = Order::limit(Side::Sell, price, size.to_f64().unwrap());
+        let o = OrderDecimal::limit(Side::Sell, price, size.to_f64().unwrap());
         let order_err = exchange.validate_limit_order(&o);
         assert!(order_err.is_some());
     }
 
     #[test]
     fn submit_order_limit() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -902,7 +896,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::limit(Side::Buy, 900.0, 450.0);
+        let o = OrderDecimal::limit(Side::Buy, 900.0, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         assert_eq!(exchange.orders_active.len(), 1);
@@ -910,12 +904,12 @@ mod tests {
         assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0) - Decimal::new(5, 1));
 
         // submit working market order
-        let o = Order::market(Side::Buy, 450.0);
+        let o = OrderDecimal::market(Side::Buy, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
         // submit opposite limit order acting as target order
-        let o = Order::limit(Side::Sell, 1200.0, 450.0);
+        let o = OrderDecimal::limit(Side::Sell, 1200.0, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         assert_eq!(exchange.orders_active.len(), 2);
@@ -924,7 +918,7 @@ mod tests {
 
     #[test]
     fn test_validate_stop_market_order() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -933,34 +927,34 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::stop_market(Side::Buy, 1010.0, 10.0);
+        let o = OrderDecimal::stop_market(Side::Buy, 1010.0, 10.0);
         let order_err = exchange.validate_stop_market_order(&o);
         assert!(order_err.is_none());
 
-        let o = Order::stop_market(Side::Sell, 1010.0, 10.0);
+        let o = OrderDecimal::stop_market(Side::Sell, 1010.0, 10.0);
         let order_err = exchange.validate_stop_market_order(&o);
         assert!(order_err.is_some());
 
-        let o = Order::stop_market(Side::Buy, 980.0, 10.0);
+        let o = OrderDecimal::stop_market(Side::Buy, 980.0, 10.0);
         let order_err = exchange.validate_stop_market_order(&o);
         assert!(order_err.is_some());
 
-        let o = Order::stop_market(Side::Sell, 980.0, 10.0);
+        let o = OrderDecimal::stop_market(Side::Sell, 980.0, 10.0);
         let order_err = exchange.validate_stop_market_order(&o);
         assert!(order_err.is_none());
 
-        let o = Order::stop_market(Side::Buy, 1000.0, 10.0);
+        let o = OrderDecimal::stop_market(Side::Buy, 1000.0, 10.0);
         let order_err = exchange.validate_stop_market_order(&o);
         assert!(order_err.is_some());
 
-        let o = Order::stop_market(Side::Buy, 1000.0, 10.0);
+        let o = OrderDecimal::stop_market(Side::Buy, 1000.0, 10.0);
         let order_err = exchange.validate_stop_market_order(&o);
         assert!(order_err.is_some());
     }
 
     #[test]
     fn test_validate_take_profit_market_order() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -969,19 +963,19 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::take_profit_market(Side::Buy, 950.0, 10.0);
+        let o = OrderDecimal::take_profit_market(Side::Buy, 950.0, 10.0);
         let order_err = exchange.validate_take_profit_market_order(&o);
         assert!(order_err.is_none());
 
-        let o = Order::take_profit_market(Side::Sell, 950.0, 10.0);
+        let o = OrderDecimal::take_profit_market(Side::Sell, 950.0, 10.0);
         let order_err = exchange.validate_take_profit_market_order(&o);
         assert!(order_err.is_some());
 
-        let o = Order::take_profit_market(Side::Buy, 1050.0, 10.0);
+        let o = OrderDecimal::take_profit_market(Side::Buy, 1050.0, 10.0);
         let order_err = exchange.validate_take_profit_market_order(&o);
         assert!(order_err.is_some());
 
-        let o = Order::take_profit_market(Side::Sell, 1050.0, 10.0);
+        let o = OrderDecimal::take_profit_market(Side::Sell, 1050.0, 10.0);
         let order_err = exchange.validate_take_profit_market_order(&o);
         assert!(order_err.is_none());
     }
@@ -998,7 +992,7 @@ mod tests {
 
     #[test]
     fn handle_stop_market_order() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -1007,7 +1001,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::stop_market(Side::Buy, 1010.0, 100.0);
+        let o = OrderDecimal::stop_market(Side::Buy, 1010.0, 100.0);
         let valid = exchange.submit_order(o);
         assert!(valid.is_ok());
         exchange.check_orders();
@@ -1030,7 +1024,7 @@ mod tests {
 
     #[test]
     fn long_market_win_full()  {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1042,7 +1036,7 @@ mod tests {
 
         let value = exchange.margin.available_balance * Decimal::new(8, 1);
         let size = exchange.ask * value;
-        let o = Order::market(Side::Buy, size.to_f64().unwrap());
+        let o = OrderDecimal::market(Side::Buy, size.to_f64().unwrap());
         let order_err = exchange.submit_order(o);
        assert!(order_err.is_ok());
 
@@ -1081,7 +1075,7 @@ mod tests {
 
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(4, 1));
 
-        let o = Order::market(Side::Sell, size.to_f64().unwrap());
+        let o = OrderDecimal::market(Side::Sell, size.to_f64().unwrap());
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
@@ -1101,7 +1095,7 @@ mod tests {
 
     #[test]
     fn long_market_loss_full() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1111,7 +1105,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::market(Side::Buy, 800.0);
+        let o = OrderDecimal::market(Side::Buy, 800.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         exchange.check_orders();
@@ -1133,7 +1127,7 @@ mod tests {
 
         assert_eq!(exchange.unrealized_pnl(), Decimal::new(-2, 1));
 
-        let o = Order::market(Side::Sell, 800.0);
+        let o = OrderDecimal::market(Side::Sell, 800.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         exchange.check_orders();
@@ -1160,7 +1154,7 @@ mod tests {
 
     #[test]
     fn short_market_win_full() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1170,7 +1164,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::market(Side::Sell, 800.0);
+        let o = OrderDecimal::market(Side::Sell, 800.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         exchange.check_orders();
@@ -1192,7 +1186,7 @@ mod tests {
 
         assert_eq!(exchange.unrealized_pnl(), Decimal::new(2, 1));
 
-        let o = Order::market(Side::Buy, 800.0);
+        let o = OrderDecimal::market(Side::Buy, 800.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         exchange.check_orders();
@@ -1218,7 +1212,7 @@ mod tests {
 
     #[test]
     fn short_market_loss_full()  {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1232,7 +1226,7 @@ mod tests {
         let size = exchange.ask * value;
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
-        let o = Order::market(Side::Sell, s);
+        let o = OrderDecimal::market(Side::Sell, s);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
@@ -1271,7 +1265,7 @@ mod tests {
 
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(-2, 1));
 
-        let o = Order::market(Side::Buy, size.to_f64().unwrap());
+        let o = OrderDecimal::market(Side::Buy, size.to_f64().unwrap());
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
@@ -1291,7 +1285,7 @@ mod tests {
 
     #[test]
     fn long_market_win_partial()  {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1303,7 +1297,7 @@ mod tests {
 
         let value = exchange.margin.available_balance * Decimal::new(8, 1);
         let size = exchange.ask * value;
-        let o = Order::market(Side::Buy, size.to_f64().unwrap());
+        let o = OrderDecimal::market(Side::Buy, size.to_f64().unwrap());
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
@@ -1342,7 +1336,7 @@ mod tests {
 
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(4, 1));
 
-        let o = Order::market(Side::Sell, size.to_f64().unwrap());
+        let o = OrderDecimal::market(Side::Sell, size.to_f64().unwrap());
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
@@ -1362,7 +1356,7 @@ mod tests {
 
     #[test]
     fn long_market_loss_partial() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1372,7 +1366,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::market(Side::Buy, 800.0);
+        let o = OrderDecimal::market(Side::Buy, 800.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         exchange.check_orders();
@@ -1394,7 +1388,7 @@ mod tests {
 
         assert_eq!(exchange.unrealized_pnl(), Decimal::new(-2, 1));
 
-        let o = Order::market(Side::Sell, 400.0);
+        let o = OrderDecimal::market(Side::Sell, 400.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         exchange.check_orders();
@@ -1421,7 +1415,7 @@ mod tests {
 
     #[test]
     fn short_market_win_partial() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1431,7 +1425,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::market(Side::Sell, 800.0);
+        let o = OrderDecimal::market(Side::Sell, 800.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         exchange.check_orders();
@@ -1453,7 +1447,7 @@ mod tests {
 
         assert_eq!(exchange.unrealized_pnl(), Decimal::new(2, 1));
 
-        let o = Order::market(Side::Buy, 400.0);
+        let o = OrderDecimal::market(Side::Buy, 400.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         exchange.check_orders();
@@ -1479,7 +1473,7 @@ mod tests {
 
     #[test]
     fn short_market_loss_partial()  {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1493,7 +1487,7 @@ mod tests {
         let size = exchange.ask * value;
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
-        let o = Order::market(Side::Sell, s);
+        let o = OrderDecimal::market(Side::Sell, s);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
@@ -1532,7 +1526,7 @@ mod tests {
 
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(-4, 1));
 
-        let o = Order::market(Side::Buy, size.to_f64().unwrap());
+        let o = OrderDecimal::market(Side::Buy, size.to_f64().unwrap());
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
@@ -1552,7 +1546,7 @@ mod tests {
 
     #[test]
     fn test_market_roundtrip() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1566,12 +1560,12 @@ mod tests {
         let size = exchange.ask * value;
         let s = size.to_string();
         let s = s.parse::<f64>().unwrap();
-        let buy_order = Order::market(Side::Buy, s);
+        let buy_order = OrderDecimal::market(Side::Buy, s);
         let order_err = exchange.submit_order(buy_order);
         assert!(order_err.is_ok());
         exchange.check_orders();
 
-        let sell_order = Order::market(Side::Sell, s);
+        let sell_order = OrderDecimal::market(Side::Sell, s);
 
         let order_err = exchange.submit_order(sell_order);
         assert!(order_err.is_ok());
@@ -1594,13 +1588,13 @@ mod tests {
 
 
         let size = 900.0;
-        let buy_order = Order::market(Side::Buy, size);
+        let buy_order = OrderDecimal::market(Side::Buy, size);
         let order_err = exchange.submit_order(buy_order);
         assert!(order_err.is_ok());
         exchange.check_orders();
 
         let size = 950.0;
-        let sell_order = Order::market(Side::Sell, size);
+        let sell_order = OrderDecimal::market(Side::Sell, size);
 
         let order_err = exchange.submit_order(sell_order);
         assert!(order_err.is_ok());
@@ -1626,7 +1620,7 @@ mod tests {
 
     #[test]
     fn test_order_ids() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -1635,7 +1629,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
         for i in 0..100 {
-            let o = Order::stop_market(Side::Buy, 101.0 + i as f64, 10.0);
+            let o = OrderDecimal::stop_market(Side::Buy, 101.0 + i as f64, 10.0);
             exchange.submit_order(o);
         }
         let active_orders = exchange.orders_active;
@@ -1648,7 +1642,7 @@ mod tests {
 
     #[test]
     fn set_leverage() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1667,7 +1661,7 @@ mod tests {
         exchange.set_leverage(1.0);
         assert_eq!(exchange.position.leverage, Decimal::new(1, 0));
 
-        let o = Order::market(Side::Buy, 100.0);
+        let o = OrderDecimal::market(Side::Buy, 100.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
@@ -1691,7 +1685,7 @@ mod tests {
         assert_eq!(exchange.margin.available_balance, Decimal::new(98, 2) - fee_asset);
 
 
-        let o = Order::market(Side::Buy, 4800.0);
+        let o = OrderDecimal::market(Side::Buy, 4800.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
@@ -1707,7 +1701,7 @@ mod tests {
 
     #[test]
     fn liq_price() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         // let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1717,7 +1711,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::market(Side::Buy, 100.0);
+        let o = OrderDecimal::market(Side::Buy, 100.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
@@ -1730,7 +1724,7 @@ mod tests {
 
     #[test]
     fn unrealized_pnl() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -1739,7 +1733,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::market(Side::Buy, 100.0);
+        let o = OrderDecimal::market(Side::Buy, 100.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
@@ -1769,7 +1763,7 @@ mod tests {
 
     #[test]
     fn roe() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -1778,7 +1772,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::market(Side::Buy, 100.0);
+        let o = OrderDecimal::market(Side::Buy, 100.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         exchange.check_orders();
@@ -1810,7 +1804,7 @@ mod tests {
 
     #[test]
     fn cancel_order() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
             timestamp: 0,
@@ -1819,7 +1813,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::limit(Side::Buy, 900.0, 450.0);
+        let o = OrderDecimal::limit(Side::Buy, 900.0, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
 
@@ -1837,7 +1831,7 @@ mod tests {
 
     #[test]
     fn order_margin() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1847,36 +1841,36 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::limit(Side::Buy, 900.0, 450.0);
+        let o = OrderDecimal::limit(Side::Buy, 900.0, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
         assert_eq!(exchange.orders_active.len(), 1);
 
-        let o = Order::limit(Side::Sell, 1200.0, 450.0);
+        let o = OrderDecimal::limit(Side::Sell, 1200.0, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
         assert_eq!(exchange.orders_active.len(), 2);
 
-        let o = Order::market(Side::Buy, 450.0);
+        let o = OrderDecimal::market(Side::Buy, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         assert_eq!(exchange.position.size, Decimal::new(450, 0));
         assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
 
-        let o = Order::limit(Side::Sell, 1200.0, 450.0);
+        let o = OrderDecimal::limit(Side::Sell, 1200.0, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
         assert_eq!(exchange.orders_active.len(), 3);
 
-        let o = Order::market(Side::Sell, 450.0);
+        let o = OrderDecimal::market(Side::Sell, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         assert_eq!(exchange.order_margin(), Decimal::new(75, 2));
 
-        let o = Order::market(Side::Buy, 240.0);
+        let o = OrderDecimal::market(Side::Buy, 240.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         assert_eq!(exchange.position.size, Decimal::new(240, 0));
@@ -1886,7 +1880,7 @@ mod tests {
 
     #[test]
     fn execute_limit() {
-        let config = Config::perpetuals();
+        let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config);
         let t = Trade{
@@ -1896,7 +1890,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o: Order = Order::limit(Side::Buy, 900.0, 450.0);
+        let o: OrderDecimal = OrderDecimal::limit(Side::Buy, 900.0, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         assert_eq!(exchange.orders_active.len(), 1);
@@ -1932,7 +1926,7 @@ mod tests {
         // assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1) + fee_maker);
 
 
-        let o: Order = Order::limit(Side::Sell, 1000.0, 450.0);
+        let o: OrderDecimal = OrderDecimal::limit(Side::Sell, 1000.0, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         assert_eq!(exchange.orders_active.len(), 1);

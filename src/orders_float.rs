@@ -1,4 +1,4 @@
-use crate::orders_decimal::{OrderType, Side};
+use crate::{Side, OrderType};
 
 #[derive(Debug, Clone)]
 pub struct OrderFloat {
