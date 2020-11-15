@@ -21,6 +21,9 @@ pub struct ExchangeFloat {
     next_order_id: u64,
     pub acc_tracker: AccTracker,
     timestamp: u64,  // used for syncronizing orders
+    high: f64,
+    low: f64,
+    use_candles: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -45,7 +48,7 @@ pub struct PositionFloat {
 
 impl ExchangeFloat {
 
-    pub fn new(config: ConfigFloat) -> ExchangeFloat {
+    pub fn new(config: ConfigFloat, use_candles: bool) -> ExchangeFloat {
         return ExchangeFloat {
             config,
             position: PositionFloat{
@@ -74,6 +77,9 @@ impl ExchangeFloat {
             next_order_id: 0,
             acc_tracker: AccTracker::new(1.0),
             timestamp: 0,
+            high: 0.0,
+            low: 0.0,
+            use_candles,
         }
     }
 
@@ -128,6 +134,8 @@ impl ExchangeFloat {
     pub fn consume_candle(&mut self, candle: &Candle) -> bool {
         self.bid = candle.close - (candle.avg_spread / 2.0);
         self.ask = candle.close + (candle.avg_spread / 2.0);
+        self.high = candle.high;
+        self.low = candle.low;
 
         if self.check_liquidation() {
             return true
@@ -697,18 +705,43 @@ impl ExchangeFloat {
         let o: &OrderFloat = &self.orders_active[order_index];
         match o.side {
             Side::Buy => {
-                if self.ask < o.price {
-                    // execute
-                    self.execute_limit(o.side, o.price, o.size);
-                    self.orders_active[order_index].mark_done();
+                match self.use_candles {
+                    true => {
+                        // use candle information to specify execution
+                        if self.low <= o.price {
+                            self.execute_limit(o.side, o.price, o.size);
+                            self.orders_active[order_index].mark_done();
+                        }
+                    },
+                    false => {
+                        // use trade information ( bid / ask ) to specify if order executed
+                        if self.bid < o.price {
+                            // execute
+                            self.execute_limit(o.side, o.price, o.size);
+                            self.orders_active[order_index].mark_done();
+                        }
+                    }
                 }
             },
             Side::Sell => {
-                if self.bid > o.price {
-                    // execute
-                    self.execute_limit(o.side, o.price, o.size);
-                    self.orders_active[order_index].mark_done();
+                match self.use_candles {
+                    true => {
+                        // use candle information to specify execution
+                        if self.high >= o.price {
+                            self.execute_limit(o.side, o.price, o.size);
+                            self.orders_active[order_index].mark_done();
+                        }
+                    },
+                    false => {
+                        // use trade information ( bid / ask ) to specify if order executed
+                        if self.ask > o.price {
+                            // execute
+                            self.execute_limit(o.side, o.price, o.size);
+                            self.orders_active[order_index].mark_done();
+                        }
+                    }
                 }
+                
             }
         }
     }

@@ -10,7 +10,8 @@ fn main() {
 
     // configure fees. set custom fees in the struct if needed
     let config = ConfigFloat::bitmex_perpetuals();
-    let mut exchange = ExchangeFloat::new(config);
+    let use_candles: bool = false;  // only set this if you use the consume_candle function instead of consume_trade
+    let mut exchange = ExchangeFloat::new(config, use_candles);
 
     exchange.set_leverage(2.0);
 
