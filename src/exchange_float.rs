@@ -132,8 +132,8 @@ impl ExchangeFloat {
     // consume_candle update the bid and ask price given a candle using its close price
     // returns true if position has been liquidated
     pub fn consume_candle(&mut self, candle: &Candle) -> bool {
-        self.bid = candle.close - (candle.avg_spread / 2.0);
-        self.ask = candle.close + (candle.avg_spread / 2.0);
+        self.bid = candle.close;
+        self.ask = candle.close;
         self.high = candle.high;
         self.low = candle.low;
 
