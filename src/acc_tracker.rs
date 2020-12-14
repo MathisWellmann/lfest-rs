@@ -41,10 +41,12 @@ impl AccTracker {
         }
     }
 
+    /// Return the sharpe ration based on individual trade data
     pub fn sharpe(&self) -> f64 {
         self.total_rpnl / self.welford_returns.std_dev()
     }
 
+    /// Return the Sortino ratio based on individual trade data
     pub fn sortino(&self) -> f64 {
         self.total_rpnl / self.welford_pos_returns.std_dev()
     }
@@ -55,30 +57,37 @@ impl AccTracker {
         self.total_rpnl / (self.welford_returns.std_dev() * self.max_drawdown)
     }
 
+    /// Return the maximum drawdown of the realized profit and loss curve
     pub fn max_drawdown(&self) -> f64 {
         self.max_drawdown
     }
 
+    /// Return the maximum drawdown of the unrealized profit and loss curve
     pub fn max_upnl_drawdown(&self) -> f64 {
         self.max_upnl_drawdown
     }
 
+    /// Return the number of trades the account made
     pub fn num_trades(&self) -> i64 {
         self.num_trades
     }
 
+    /// Return the ratio of buy trades vs total number of trades
     pub fn buy_ratio(&self) -> f64 {
         self.num_buys as f64 / self.num_trades as f64
     }
 
+    /// Return the cumulative turnover value of the trades, measured in QUOTE currency
     pub fn turnover(&self) -> f64 {
         self.total_turnover
     }
 
+    /// Return the total realized profit and loss of the account
     pub fn total_rpnl(&self) -> f64 {
         self.total_rpnl
     }
 
+    /// Log the realized profit and loss of a trade
     pub fn log_rpnl(&mut self, rpnl: f64) {
         self.total_rpnl += rpnl;
         self.wallet_balance += rpnl;
@@ -96,6 +105,7 @@ impl AccTracker {
         }
     }
 
+    /// Log the trade
     pub fn log_trade(&mut self, side: Side, size: f64, upnl: f64) {
         self.total_turnover += size;
         self.num_trades += 1;
@@ -108,26 +118,32 @@ impl AccTracker {
         }
     }
 
+    /// Log a limit order submission
     pub fn log_limit_order_submission(&mut self) {
         self.num_submitted_limit_orders += 1;
     }
 
+    /// Log a limit order cancellation
     pub fn log_limit_order_cancellation(&mut self) {
         self.num_cancelled_limit_orders += 1;
     }
 
+    /// Log a limit order fill
     pub fn log_limit_order_fill(&mut self) {
         self.num_filled_limit_orders += 1;
     }
 
+    /// Return the ratio of winning trades vs all trades
     pub fn win_ratio(&self) -> f64 {
         self.wins as f64 / self.num_trades as f64
     }
 
+    /// Return the ratio of filled limit orders vs number of submitted limit orders
     pub fn limit_order_fill_ratio(&self) -> f64 {
         self.num_filled_limit_orders as f64 / self.num_submitted_limit_orders as f64
     }
 
+    /// Return the ratio of limit order cancellations vs number of submitted limit orders
     pub fn limit_order_cancellation_ratio(&self) -> f64 {
         self.num_cancelled_limit_orders as f64 / self.num_submitted_limit_orders as f64
     }
