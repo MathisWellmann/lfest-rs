@@ -1,10 +1,10 @@
 extern crate trade_aggregation;
 
-use trade_aggregation::common::*;
-use crate::orders_float::*;
-use crate::config_float::*;
 use crate::acc_tracker::AccTracker;
-use crate::{Side, OrderType, OrderError, FeeType};
+use crate::config_float::*;
+use crate::orders_float::*;
+use crate::{FeeType, OrderError, OrderType, Side};
+use trade_aggregation::common::*;
 
 #[derive(Debug, Clone)]
 pub struct ExchangeFloat {
@@ -20,7 +20,7 @@ pub struct ExchangeFloat {
     pub orders_active: Vec<OrderFloat>,
     next_order_id: u64,
     pub acc_tracker: AccTracker,
-    timestamp: u64,  // used for syncronizing orders
+    timestamp: u64, // used for syncronizing orders
     high: f64,
     low: f64,
     use_candles: bool,
@@ -38,7 +38,7 @@ pub struct MarginFloat {
 #[derive(Debug, Clone)]
 pub struct PositionFloat {
     pub size: f64,
-    pub value: f64,  // value of positoin in units of quoteCurrency
+    pub value: f64, // value of positoin in units of quoteCurrency
     pub entry_price: f64,
     pub liq_price: f64,
     pub margin: f64,
@@ -47,11 +47,10 @@ pub struct PositionFloat {
 }
 
 impl ExchangeFloat {
-
     pub fn new(config: ConfigFloat, use_candles: bool) -> ExchangeFloat {
         return ExchangeFloat {
             config,
-            position: PositionFloat{
+            position: PositionFloat {
                 size: 0.0,
                 value: 0.0,
                 entry_price: 0.0,
@@ -60,7 +59,7 @@ impl ExchangeFloat {
                 leverage: 1.0,
                 unrealized_pnl: 0.0,
             },
-            margin: MarginFloat{
+            margin: MarginFloat {
                 wallet_balance: 1.0,
                 margin_balance: 1.0,
                 position_margin: 0.0,
@@ -80,26 +79,28 @@ impl ExchangeFloat {
             high: 0.0,
             low: 0.0,
             use_candles,
-        }
+        };
     }
 
     // sets the new leverage of position
     // returns true if successful
     pub fn set_leverage(&mut self, l: f64) -> bool {
         if l < 1.0 {
-            return false
+            return false;
         }
 
         let new_position_margin = (self.position.value / l) + self.position.unrealized_pnl;
         if new_position_margin > self.margin.wallet_balance {
-            return false
+            return false;
         }
         self.position.leverage = l;
-        self.margin.position_margin = (self.position.value / self.position.leverage) + self.unrealized_pnl();
-        self.margin.available_balance = self.margin.margin_balance - self.margin.order_margin - self.margin.position_margin;
+        self.margin.position_margin =
+            (self.position.value / self.position.leverage) + self.unrealized_pnl();
+        self.margin.available_balance =
+            self.margin.margin_balance - self.margin.order_margin - self.margin.position_margin;
         self.position.margin = self.position.value / self.position.leverage;
 
-        return true
+        return true;
     }
 
     pub fn set_timestamp(&mut self, timestamp: u64) {
@@ -120,13 +121,15 @@ impl ExchangeFloat {
             self.bid = trade.price;
         }
 
+        self.acc_tracker.log_timestamp(trade.timestamp as u64);
+
         if self.check_liquidation() {
-            return true
+            return true;
         }
 
         self.check_orders();
 
-        return false
+        return false;
     }
 
     // consume_candle update the bid and ask price given a candle using its close price
@@ -137,13 +140,15 @@ impl ExchangeFloat {
         self.high = candle.high;
         self.low = candle.low;
 
+        self.acc_tracker.log_timestamp(candle.timestamp as u64);
+
         if self.check_liquidation() {
-            return true
+            return true;
         }
 
         self.check_orders();
 
-        return false
+        return false;
     }
 
     // cancels an active order
@@ -174,17 +179,17 @@ impl ExchangeFloat {
         match order.order_type {
             OrderType::StopMarket => {
                 if self.orders_active.len() >= 10 {
-                    return Err(OrderError::MaxActiveOrders )
+                    return Err(OrderError::MaxActiveOrders);
                 }
-            },
+            }
             _ => {
                 if self.orders_active.len() >= 200 {
-                    return Err(OrderError::MaxActiveOrders)
+                    return Err(OrderError::MaxActiveOrders);
                 }
             }
         }
         if order.size <= 0.0 {
-            return Err(OrderError::InvalidOrderSize)
+            return Err(OrderError::InvalidOrderSize);
         }
         let order_err: Option<OrderError> = match order.order_type {
             OrderType::Market => self.validate_market_order(&order),
@@ -194,7 +199,7 @@ impl ExchangeFloat {
             OrderType::TakeProfitMarket => self.validate_take_profit_market_order(&order),
         };
         if order_err.is_some() {
-            return Err(order_err.unwrap())
+            return Err(order_err.unwrap());
         }
 
         // assign unique order id
@@ -207,19 +212,20 @@ impl ExchangeFloat {
             OrderType::Market => {
                 // immediately execute market order
                 self.execute_market(order.side, order.size);
-                return Ok(order)
+                return Ok(order);
             }
             OrderType::Limit => {
                 self.acc_tracker.log_limit_order_submission();
                 self.orders_active.push(order.clone());
-                self.margin.available_balance = self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
-                return Ok(order)
+                self.margin.available_balance =
+                    self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
+                return Ok(order);
             }
-            _ => {},
+            _ => {}
         }
         self.orders_active.push(order.clone());
 
-        return Ok(order)
+        return Ok(order);
     }
 
     pub fn order_margin(&self) -> f64 {
@@ -230,7 +236,7 @@ impl ExchangeFloat {
             match o.side {
                 Side::Buy => {
                     order_margin_long += o.size / o.price / self.position.leverage;
-                },
+                }
                 Side::Sell => {
                     order_margin_short += o.size / o.price / self.position.leverage;
                 }
@@ -251,11 +257,11 @@ impl ExchangeFloat {
             ((1.0 / self.position.entry_price) - (1.0 / self.bid)) * self.position.size.abs()
         } else {
             ((1.0 / self.ask) - (1.0 / self.position.entry_price)) * self.position.size.abs()
-        }
+        };
     }
 
     pub fn num_active_orders(&self) -> usize {
-        return self.orders_active.len()
+        return self.orders_active.len();
     }
 
     pub fn executed_orders(&mut self) -> Vec<OrderFloat> {
@@ -266,7 +272,7 @@ impl ExchangeFloat {
         // }
         // clear executed orders
         self.orders_executed.clear();
-        return exec_orders
+        return exec_orders;
     }
 
     pub fn ammend_order(&mut self, _order_id: u64, _new_order: OrderFloat) -> Option<OrderError> {
@@ -289,41 +295,45 @@ impl ExchangeFloat {
             Side::Buy => {
                 if self.position.size > 0.0 {
                     if order_margin + fee_asset > self.margin.available_balance {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                        return Some(OrderError::NotEnoughAvailableBalance);
                     }
                     None
                 } else {
                     if order_margin > self.margin.position_margin {
                         // check if there is enough available balance for the rest of order_margin
                         let margin_diff = order_margin - self.position.margin;
-                        if margin_diff + fee_asset > self.margin.available_balance + self.position.margin {
-                            return Some(OrderError::NotEnoughAvailableBalance)
+                        if margin_diff + fee_asset
+                            > self.margin.available_balance + self.position.margin
+                        {
+                            return Some(OrderError::NotEnoughAvailableBalance);
                         }
-                        return None
+                        return None;
                     }
                     None
                 }
-            },
+            }
             Side::Sell => {
                 if self.position.size > 0.0 {
                     if order_margin > self.margin.position_margin {
                         // check if there is enough available balance for the rest of order_margin
                         let margin_diff = order_margin - self.position.margin;
-                        if margin_diff + fee_asset > self.margin.available_balance + self.position.margin {
-                            return Some(OrderError::NotEnoughAvailableBalance)
+                        if margin_diff + fee_asset
+                            > self.margin.available_balance + self.position.margin
+                        {
+                            return Some(OrderError::NotEnoughAvailableBalance);
                         }
-                        return None
+                        return None;
                     }
                     None
                 } else {
                     if order_margin + fee_asset > self.margin.available_balance {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                        return Some(OrderError::NotEnoughAvailableBalance);
                     }
                     None
                 }
             }
         };
-        return order_err
+        return order_err;
     }
 
     pub fn validate_limit_order(&self, o: &OrderFloat) -> Option<OrderError> {
@@ -331,14 +341,14 @@ impl ExchangeFloat {
         match o.side {
             Side::Buy => {
                 if o.price > self.ask {
-                    return Some(OrderError::InvalidPrice)
+                    return Some(OrderError::InvalidPrice);
                 }
-            },
+            }
             Side::Sell => {
                 if o.price < self.bid {
-                    return Some(OrderError::InvalidPrice)
+                    return Some(OrderError::InvalidPrice);
                 }
-            },
+            }
         }
 
         let order_margin: f64 = o.size / o.price / self.position.leverage;
@@ -347,30 +357,29 @@ impl ExchangeFloat {
                 if self.position.size > 0.0 {
                     // check if enough margin is available
                     if order_margin > self.margin.available_balance {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                        return Some(OrderError::NotEnoughAvailableBalance);
                     }
                     None
-
                 } else {
                     if order_margin > self.margin.available_balance + self.position.margin {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                        return Some(OrderError::NotEnoughAvailableBalance);
                     }
                     None
                 }
-            },
+            }
             Side::Sell => {
                 if self.position.size > 0.0 {
                     if order_margin > self.margin.available_balance + self.position.margin {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                        return Some(OrderError::NotEnoughAvailableBalance);
                     }
                     None
                 } else {
                     if order_margin > self.margin.available_balance {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                        return Some(OrderError::NotEnoughAvailableBalance);
                     }
                     None
                 }
-            },
+            }
         };
         order_err
     }
@@ -382,16 +391,22 @@ impl ExchangeFloat {
 
     // returns true if order is valid
     pub fn validate_stop_market_order(&mut self, o: &OrderFloat) -> Option<OrderError> {
-        let order_err =  match o.side {
-            Side::Buy => { if o.price <= self.ask { return Some(OrderError::InvalidTriggerPrice) }
+        let order_err = match o.side {
+            Side::Buy => {
+                if o.price <= self.ask {
+                    return Some(OrderError::InvalidTriggerPrice);
+                }
                 None
-            },
-            Side::Sell => { if o.price >= self.bid { return Some(OrderError::InvalidTriggerPrice) }
+            }
+            Side::Sell => {
+                if o.price >= self.bid {
+                    return Some(OrderError::InvalidTriggerPrice);
+                }
                 None
-            },
+            }
         };
         if order_err.is_some() {
-            return order_err
+            return order_err;
         }
 
         None
@@ -399,13 +414,19 @@ impl ExchangeFloat {
 
     pub fn validate_take_profit_market_order(&self, o: &OrderFloat) -> Option<OrderError> {
         return match o.side {
-            Side::Buy => { if o.price > self.bid { return Some(OrderError::InvalidOrder) }
+            Side::Buy => {
+                if o.price > self.bid {
+                    return Some(OrderError::InvalidOrder);
+                }
                 None
-            },
-            Side::Sell => { if o.price < self.ask { return Some(OrderError::InvalidOrder) }
+            }
+            Side::Sell => {
+                if o.price < self.ask {
+                    return Some(OrderError::InvalidOrder);
+                }
                 None
-            },
-        }
+            }
+        };
     }
 
     pub fn roe(&self) -> f64 {
@@ -413,7 +434,7 @@ impl ExchangeFloat {
             (self.bid - self.position.entry_price) / self.position.entry_price
         } else {
             (self.position.entry_price - self.ask) / self.position.entry_price
-        }
+        };
     }
 
     fn check_liquidation(&mut self) -> bool {
@@ -422,20 +443,19 @@ impl ExchangeFloat {
             // liquidation check for long position
             if self.ask < self.position.liq_price {
                 self.liquidate();
-                return true
+                return true;
             }
             self.position.unrealized_pnl = self.unrealized_pnl();
-
         } else if self.position.size < 0.0 {
             // liquidation check for short position
             if self.bid > self.position.liq_price {
                 self.liquidate();
-                return true
+                return true;
             }
             self.position.unrealized_pnl = self.unrealized_pnl();
         }
 
-        return false
+        return false;
     }
 
     fn deduce_fees(&mut self, t: FeeType, amount_base: f64, price: f64) {
@@ -457,9 +477,11 @@ impl ExchangeFloat {
         };
         self.position.unrealized_pnl = self.unrealized_pnl();
         self.position.value = self.position.size.abs() / price;
-        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
+        self.margin.position_margin =
+            (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
         self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-        self.margin.available_balance = self.margin.wallet_balance - self.margin.position_margin - self.margin.order_margin;
+        self.margin.available_balance =
+            self.margin.wallet_balance - self.margin.position_margin - self.margin.order_margin;
     }
 
     fn execute_market(&mut self, side: Side, amount_base: f64) {
@@ -471,7 +493,7 @@ impl ExchangeFloat {
         self.deduce_fees(FeeType::Taker, amount_base, price);
 
         let old_position_size = self.position.size;
-        let old_entry_price: f64 =  if self.position.size == 0.0 {
+        let old_entry_price: f64 = if self.position.size == 0.0 {
             price
         } else {
             self.position.entry_price
@@ -484,7 +506,8 @@ impl ExchangeFloat {
                 if self.position.size < 0.0 {
                     if amount_base >= self.position.size.abs() {
                         // realize_pnl
-                        let rpnl = self.position.size.abs() * ((1.0 / price) - (1.0 / self.position.entry_price));
+                        let rpnl = self.position.size.abs()
+                            * ((1.0 / price) - (1.0 / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         self.rpnls.push(rpnl);
                         self.acc_tracker.log_rpnl(rpnl);
@@ -493,30 +516,33 @@ impl ExchangeFloat {
                         self.position.size += amount_base;
                         self.position.margin = size_diff / price / self.position.leverage;
                         self.position.entry_price = price;
-
                     } else {
                         // realize pnl
-                        let rpnl = amount_base * ((1.0 / price) - (1.0 / self.position.entry_price));
+                        let rpnl =
+                            amount_base * ((1.0 / price) - (1.0 / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         self.rpnls.push(rpnl);
                         self.acc_tracker.log_rpnl(rpnl);
 
                         self.position.size += amount_base;
-                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.margin =
+                            self.position.size.abs() / old_entry_price / self.position.leverage;
                         self.position.entry_price = old_entry_price;
                     }
                 } else {
                     self.position.size += amount_base;
-                    self.position.margin += amount_base / old_entry_price/ self.position.leverage;
-                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                    self.position.margin += amount_base / old_entry_price / self.position.leverage;
+                    self.position.entry_price = ((price * amount_base)
+                        + self.position.entry_price * old_position_size.abs())
                         / (amount_base + old_position_size.abs());
                 }
-            },
+            }
             Side::Sell => {
                 if self.position.size > 0.0 {
                     if amount_base >= self.position.size.abs() {
                         // realize pnl
-                        let rpnl = self.position.size.abs() * ((1.0 / self.position.entry_price) - (1.0 / price));
+                        let rpnl = self.position.size.abs()
+                            * ((1.0 / self.position.entry_price) - (1.0 / price));
                         self.margin.wallet_balance += rpnl;
                         self.rpnls.push(rpnl);
                         self.acc_tracker.log_rpnl(rpnl);
@@ -525,25 +551,27 @@ impl ExchangeFloat {
                         self.position.size -= amount_base;
                         self.position.margin = size_diff / price / self.position.leverage;
                         self.position.entry_price = price;
-
                     } else {
                         // realize pnl
-                        let rpnl = amount_base * ((1.0 / self.position.entry_price) - (1.0 / price));
+                        let rpnl =
+                            amount_base * ((1.0 / self.position.entry_price) - (1.0 / price));
                         self.margin.wallet_balance += rpnl;
                         self.rpnls.push(rpnl);
                         self.acc_tracker.log_rpnl(rpnl);
 
                         self.position.size -= amount_base;
-                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.margin =
+                            self.position.size.abs() / old_entry_price / self.position.leverage;
                         self.position.entry_price = old_entry_price;
                     }
                 } else {
                     self.position.size -= amount_base;
                     self.position.margin += amount_base / old_entry_price / self.position.leverage;
-                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                    self.position.entry_price = ((price * amount_base)
+                        + self.position.entry_price * old_position_size.abs())
                         / (amount_base + old_position_size.abs());
                 }
-            },
+            }
         }
 
         self.update_position_stats();
@@ -557,7 +585,7 @@ impl ExchangeFloat {
         self.acc_tracker.log_trade(side, amount_base, upnl);
 
         let old_position_size = self.position.size;
-        let old_entry_price: f64 =  if self.position.size == 0.0 {
+        let old_entry_price: f64 = if self.position.size == 0.0 {
             price
         } else {
             self.position.entry_price
@@ -568,7 +596,8 @@ impl ExchangeFloat {
                 if self.position.size < 0.0 {
                     // realize pnl
                     if amount_base > self.position.size.abs() {
-                        let rpnl = self.position.size.abs() * ((1.0 / price) - (1.0 / self.position.entry_price));
+                        let rpnl = self.position.size.abs()
+                            * ((1.0 / price) - (1.0 / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         self.rpnls.push(rpnl);
                         self.acc_tracker.log_rpnl(rpnl);
@@ -578,27 +607,31 @@ impl ExchangeFloat {
                         self.position.margin = size_diff / price / self.position.leverage;
                         self.position.entry_price = price;
                     } else {
-                        let rpnl = amount_base * ((1.0 / price) - (1.0 / self.position.entry_price));
+                        let rpnl =
+                            amount_base * ((1.0 / price) - (1.0 / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         self.rpnls.push(rpnl);
                         self.acc_tracker.log_rpnl(rpnl);
 
                         self.position.size += amount_base;
-                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.margin =
+                            self.position.size.abs() / old_entry_price / self.position.leverage;
                         self.position.entry_price = old_entry_price;
                     }
                 } else {
                     self.position.size += amount_base;
                     self.position.margin += amount_base / price / self.position.leverage;
-                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                    self.position.entry_price = ((price * amount_base)
+                        + self.position.entry_price * old_position_size.abs())
                         / (amount_base + old_position_size.abs());
                 }
-            },
+            }
             Side::Sell => {
                 if self.position.size > 0.0 {
                     // realize pnl
                     if amount_base > self.position.size.abs() {
-                        let rpnl = self.position.size.abs() * ((1.0 / self.position.entry_price) - (1.0 / price));
+                        let rpnl = self.position.size.abs()
+                            * ((1.0 / self.position.entry_price) - (1.0 / price));
                         self.margin.wallet_balance += rpnl;
                         self.rpnls.push(rpnl);
                         self.acc_tracker.log_rpnl(rpnl);
@@ -608,19 +641,22 @@ impl ExchangeFloat {
                         self.position.margin = size_diff / price / self.position.leverage;
                         self.position.entry_price = price;
                     } else {
-                        let rpnl = amount_base * ((1.0 / self.position.entry_price) - (1.0 / price));
+                        let rpnl =
+                            amount_base * ((1.0 / self.position.entry_price) - (1.0 / price));
                         self.margin.wallet_balance += rpnl;
                         self.rpnls.push(rpnl);
                         self.acc_tracker.log_rpnl(rpnl);
 
                         self.position.size -= amount_base;
-                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.margin =
+                            self.position.size.abs() / old_entry_price / self.position.leverage;
                         self.position.entry_price = old_entry_price;
                     }
                 } else {
                     self.position.size += amount_base;
                     self.position.margin += amount_base / price / self.position.leverage;
-                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                    self.position.entry_price = ((price * amount_base)
+                        + self.position.entry_price * old_position_size.abs())
                         / (amount_base + old_position_size.abs());
                 }
             }
@@ -655,7 +691,7 @@ impl ExchangeFloat {
         let mut i: usize = 0;
         loop {
             if i >= self.orders_active.len() {
-                break
+                break;
             }
             if self.orders_active[i].done() {
                 let exec_order = self.orders_active.remove(i);
@@ -668,35 +704,45 @@ impl ExchangeFloat {
     fn handle_stop_market_order(&mut self, order_index: usize) {
         match self.orders_active[order_index].side {
             Side::Buy => {
-                if self.orders_active[order_index].price > self.ask { return }
+                if self.orders_active[order_index].price > self.ask {
+                    return;
+                }
                 self.execute_market(Side::Buy, self.orders_active[order_index].size);
                 self.orders_active[order_index].mark_done();
-            },
+            }
             Side::Sell => {
-                if self.orders_active[order_index].price > self.bid { return }
+                if self.orders_active[order_index].price > self.bid {
+                    return;
+                }
                 self.execute_market(Side::Sell, self.orders_active[order_index].size);
                 self.orders_active[order_index].mark_done();
-            },
+            }
         }
     }
 
     fn handle_take_profit_market_order(&mut self, order_index: usize) {
         match self.orders_active[order_index].side {
-            Side::Buy => { if self.orders_active[order_index].price < self.bid { return }
+            Side::Buy => {
+                if self.orders_active[order_index].price < self.bid {
+                    return;
+                }
                 self.execute_market(Side::Buy, self.orders_active[order_index].size * self.ask);
                 self.orders_active[order_index].mark_done();
-            },
-            Side::Sell => { if self.orders_active[order_index].price > self.ask { return }
+            }
+            Side::Sell => {
+                if self.orders_active[order_index].price > self.ask {
+                    return;
+                }
                 self.execute_market(Side::Sell, self.orders_active[order_index].size * self.bid);
                 self.orders_active[order_index].mark_done();
-            },
+            }
         }
     }
 
     fn handle_market_order(&mut self, order_index: usize) {
         match self.orders_active[order_index].side {
             Side::Buy => self.execute_market(Side::Buy, self.orders_active[order_index].size),
-            Side::Sell => self.execute_market(Side:: Sell, self.orders_active[order_index].size),
+            Side::Sell => self.execute_market(Side::Sell, self.orders_active[order_index].size),
         }
         self.orders_active[order_index].mark_done();
     }
@@ -712,7 +758,7 @@ impl ExchangeFloat {
                             self.execute_limit(o.side, o.price, o.size);
                             self.orders_active[order_index].mark_done();
                         }
-                    },
+                    }
                     false => {
                         // use trade information ( bid / ask ) to specify if order executed
                         if self.bid < o.price {
@@ -722,7 +768,7 @@ impl ExchangeFloat {
                         }
                     }
                 }
-            },
+            }
             Side::Sell => {
                 match self.use_candles {
                     true => {
@@ -731,7 +777,7 @@ impl ExchangeFloat {
                             self.execute_limit(o.side, o.price, o.size);
                             self.orders_active[order_index].mark_done();
                         }
-                    },
+                    }
                     false => {
                         // use trade information ( bid / ask ) to specify if order executed
                         if self.ask > o.price {
@@ -741,7 +787,6 @@ impl ExchangeFloat {
                         }
                     }
                 }
-                
             }
         }
     }
@@ -755,25 +800,25 @@ impl ExchangeFloat {
         if self.position.size == 0.0 {
             self.position.liq_price = 0.0;
         } else if self.position.size > 0.0 {
-            self.position.liq_price = self.position.entry_price - (self.position.entry_price / self.position.leverage);
+            self.position.liq_price =
+                self.position.entry_price - (self.position.entry_price / self.position.leverage);
         } else {
-            self.position.liq_price = self.position.entry_price + (self.position.entry_price / self.position.leverage);
+            self.position.liq_price =
+                self.position.entry_price + (self.position.entry_price / self.position.leverage);
         }
     }
-
 }
 
 pub fn min(val0: f64, val1: f64) -> f64 {
     if val0 < val1 {
-        return val0
+        return val0;
     }
-    return val1
+    return val1;
 }
 
 pub fn max(val0: f64, val1: f64) -> f64 {
     if val0 > val1 {
-        return val0
+        return val0;
     }
     val1
 }
-

@@ -1,6 +1,7 @@
 use crate::welford_online::WelfordOnline;
 use crate::Side;
 
+const DAILY_MS: u64 = 86_400_000;
 
 #[derive(Debug, Clone)]
 pub struct AccTracker {
@@ -9,7 +10,7 @@ pub struct AccTracker {
     num_trades: i64,
     num_buys: i64,
     total_turnover: f64,
-    wb_high: f64,  // wallet balance high
+    wb_high: f64, // wallet balance high
     max_drawdown: f64,
     max_upnl_drawdown: f64,
     welford_returns: WelfordOnline,
@@ -18,12 +19,14 @@ pub struct AccTracker {
     num_submitted_limit_orders: usize,
     num_cancelled_limit_orders: usize,
     num_filled_limit_orders: usize,
+    daily_returns: Vec<f64>,
+    next_trigger_ts: u64,
+    last_rpnl_entry: f64,
 }
-
 
 impl AccTracker {
     pub fn new(starting_wb: f64) -> Self {
-        AccTracker{
+        AccTracker {
             wallet_balance: starting_wb,
             total_rpnl: 0.0,
             num_trades: 0,
@@ -38,12 +41,23 @@ impl AccTracker {
             num_submitted_limit_orders: 0,
             num_cancelled_limit_orders: 0,
             num_filled_limit_orders: 0,
+            daily_returns: vec![],
+            next_trigger_ts: 0,
+            last_rpnl_entry: 0.0,
         }
     }
 
     /// Return the sharpe ration based on individual trade data
     pub fn sharpe(&self) -> f64 {
         self.total_rpnl / self.welford_returns.std_dev()
+    }
+
+    pub fn sharpe_daily_returns(&self) -> f64 {
+        let n: f64 = self.daily_returns.len() as f64;
+        let avg: f64 = self.daily_returns.iter().sum::<f64>() / n;
+        let variance: f64 = (1.0 / n) * self.daily_returns.iter().map(|v| (*v - avg).powi(2)).sum::<f64>();
+        let std_dev: f64 = variance.sqrt();
+        self.total_rpnl / std_dev
     }
 
     /// Return the Sortino ratio based on individual trade data
@@ -111,10 +125,22 @@ impl AccTracker {
         self.num_trades += 1;
         match side {
             Side::Buy => self.num_buys += 1,
-            Side::Sell => {},
+            Side::Sell => {}
         }
         if upnl < self.max_upnl_drawdown {
             self.max_upnl_drawdown = upnl;
+        }
+    }
+
+    /// Update the most recent timestamp which is used for daily rpnl calculation.
+    /// Assumes timestamp in milliseconds
+    pub fn log_timestamp(&mut self, ts: u64) {
+        if ts > self.next_trigger_ts {
+            self.next_trigger_ts = ts + DAILY_MS;
+            // calculate daily rpnl
+            let rpnl: f64 = self.total_rpnl - self.last_rpnl_entry;
+            self.last_rpnl_entry = self.total_rpnl;
+            self.daily_returns.push(rpnl);
         }
     }
 

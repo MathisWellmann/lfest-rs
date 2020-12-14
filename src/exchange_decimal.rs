@@ -1,13 +1,13 @@
-extern crate trade_aggregation;
 extern crate sliding_features;
+extern crate trade_aggregation;
 
-use rust_decimal::Decimal;
-use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
-use trade_aggregation::common::*;
-use crate::orders_decimal::*;
-use crate::config_decimal::*;
 use crate::acc_tracker::AccTracker;
-use crate::{OrderError, Side, OrderType, FeeType};
+use crate::config_decimal::*;
+use crate::orders_decimal::*;
+use crate::{FeeType, OrderError, OrderType, Side};
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use rust_decimal::Decimal;
+use trade_aggregation::common::*;
 
 #[derive(Debug, Clone)]
 pub struct ExchangeDecimal {
@@ -53,7 +53,7 @@ impl ExchangeDecimal {
     pub fn new(config: ConfigDecimal, use_candles: bool) -> ExchangeDecimal {
         return ExchangeDecimal {
             config,
-            position: PositionDecimal{
+            position: PositionDecimal {
                 size: Decimal::new(0, 0),
                 value: Decimal::new(0, 0),
                 entry_price: Decimal::new(0, 0),
@@ -62,7 +62,7 @@ impl ExchangeDecimal {
                 leverage: Decimal::new(1, 0),
                 unrealized_pnl: Decimal::new(0, 0),
             },
-            margin: MarginDecimal{
+            margin: MarginDecimal {
                 wallet_balance: Decimal::new(1, 0),
                 margin_balance: Decimal::new(1, 0),
                 position_margin: Decimal::new(0, 0),
@@ -82,7 +82,7 @@ impl ExchangeDecimal {
             low: Decimal::new(0, 0),
             high: Decimal::new(0, 0),
             use_candles,
-        }
+        };
     }
 
     // sets the new leverage of position
@@ -90,19 +90,21 @@ impl ExchangeDecimal {
     pub fn set_leverage(&mut self, l: f64) -> bool {
         let l = Decimal::from_f64(l).unwrap();
         if l < Decimal::new(1, 0) {
-            return false
+            return false;
         }
 
         let new_position_margin = (self.position.value / l) + self.position.unrealized_pnl;
         if new_position_margin > self.margin.wallet_balance {
-            return false
+            return false;
         }
         self.position.leverage = l;
-        self.margin.position_margin = (self.position.value / self.position.leverage) + self.unrealized_pnl();
-        self.margin.available_balance = self.margin.margin_balance - self.order_margin() - self.margin.position_margin;
+        self.margin.position_margin =
+            (self.position.value / self.position.leverage) + self.unrealized_pnl();
+        self.margin.available_balance =
+            self.margin.margin_balance - self.order_margin() - self.margin.position_margin;
         self.position.margin = self.position.value / self.position.leverage;
 
-        return true
+        return true;
     }
 
     pub fn set_timestamp(&mut self, timestamp: u64) {
@@ -123,15 +125,16 @@ impl ExchangeDecimal {
         } else {
             self.bid = price;
         }
+        self.acc_tracker.log_timestamp(trade.timestamp as u64);
 
         if self.check_liquidation() {
-            return true
+            return true;
         }
 
         self.check_orders();
         self.update_position_stats();
 
-        return false
+        return false;
     }
 
     // consume_candle update the bid and ask price given a candle using its close price
@@ -139,7 +142,7 @@ impl ExchangeDecimal {
     pub fn consume_candle(&mut self, candle: &Candle) -> bool {
         self.bid = Decimal::from_f64(candle.close).unwrap();
         self.ask = Decimal::from_f64(candle.close).unwrap();
-        
+
         let half_spread: Decimal = Decimal::from_f64(candle.avg_spread / 2.0).unwrap();
         self.bid -= half_spread;
         self.ask += half_spread;
@@ -147,14 +150,16 @@ impl ExchangeDecimal {
         self.high = Decimal::from_f64(candle.high).unwrap();
         self.low = Decimal::from_f64(candle.low).unwrap();
 
+        self.acc_tracker.log_timestamp(candle.timestamp as u64);
+
         if self.check_liquidation() {
-            return true
+            return true;
         }
 
         self.check_orders();
         self.update_position_stats();
 
-        return false
+        return false;
     }
 
     // cancels an active order
@@ -183,18 +188,18 @@ impl ExchangeDecimal {
         match order.order_type {
             OrderType::StopMarket => {
                 if self.orders_active.len() >= 10 {
-                    return Err(OrderError::MaxActiveOrders )
+                    return Err(OrderError::MaxActiveOrders);
                 }
-            },
+            }
             _ => {
                 if self.orders_active.len() >= 200 {
-                    return Err(OrderError::MaxActiveOrders)
+                    return Err(OrderError::MaxActiveOrders);
                 }
             }
         }
 
         if order.size <= Decimal::new(0, 0) {
-            return Err(OrderError::InvalidOrderSize)
+            return Err(OrderError::InvalidOrderSize);
         }
         let order_err: Option<OrderError> = match order.order_type {
             OrderType::Market => self.validate_market_order(&order),
@@ -204,7 +209,7 @@ impl ExchangeDecimal {
             OrderType::TakeProfitMarket => self.validate_take_profit_market_order(&order),
         };
         if order_err.is_some() {
-            return Err(order_err.unwrap())
+            return Err(order_err.unwrap());
         }
 
         // assign unique order id
@@ -217,19 +222,20 @@ impl ExchangeDecimal {
             OrderType::Market => {
                 // immediately execute market order
                 self.execute_market(order.side, order.size);
-                return Ok(order)
+                return Ok(order);
             }
             OrderType::Limit => {
                 self.acc_tracker.log_limit_order_submission();
                 self.orders_active.push(order.clone());
-                self.margin.available_balance = self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
-                return Ok(order)
+                self.margin.available_balance =
+                    self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
+                return Ok(order);
             }
-            _ => {},
+            _ => {}
         }
         self.orders_active.push(order.clone());
 
-        return Ok(order)
+        return Ok(order);
     }
 
     // calculates the total order margin
@@ -241,7 +247,7 @@ impl ExchangeDecimal {
             match o.side {
                 Side::Buy => {
                     order_margin_long += o.size / o.price / self.position.leverage;
-                },
+                }
                 Side::Sell => {
                     order_margin_short += o.size / o.price / self.position.leverage;
                 }
@@ -259,14 +265,16 @@ impl ExchangeDecimal {
         return if self.position.size == Decimal::new(0, 0) {
             Decimal::new(0, 0)
         } else if self.position.size > Decimal::new(0, 0) {
-            ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / self.bid)) * self.position.size.abs()
+            ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / self.bid))
+                * self.position.size.abs()
         } else {
-            ((Decimal::new(1, 0) / self.ask) - (Decimal::new(1, 0) / self.position.entry_price)) * self.position.size.abs()
-        }
+            ((Decimal::new(1, 0) / self.ask) - (Decimal::new(1, 0) / self.position.entry_price))
+                * self.position.size.abs()
+        };
     }
 
     pub fn num_active_orders(&self) -> usize {
-        return self.orders_active.len()
+        return self.orders_active.len();
     }
 
     pub fn executed_orders(&mut self) -> Vec<OrderDecimal> {
@@ -277,7 +285,7 @@ impl ExchangeDecimal {
         // }
         // clear executed orders
         self.orders_executed.clear();
-        return exec_orders
+        return exec_orders;
     }
 
     pub fn ammend_order(&mut self, _order_id: u64, _new_order: OrderDecimal) -> Option<OrderError> {
@@ -301,41 +309,45 @@ impl ExchangeDecimal {
             Side::Buy => {
                 if self.position.size > Decimal::new(0, 0) {
                     if order_margin + fee_asset > self.margin.available_balance {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                        return Some(OrderError::NotEnoughAvailableBalance);
                     }
                     None
                 } else {
                     if order_margin > self.margin.position_margin {
                         // check if there is enough available balance for the rest of order_margin
                         let margin_diff = order_margin - self.position.margin;
-                        if margin_diff + fee_asset > self.margin.available_balance + self.position.margin {
-                            return Some(OrderError::NotEnoughAvailableBalance)
+                        if margin_diff + fee_asset
+                            > self.margin.available_balance + self.position.margin
+                        {
+                            return Some(OrderError::NotEnoughAvailableBalance);
                         }
-                        return None
+                        return None;
                     }
                     None
                 }
-            },
+            }
             Side::Sell => {
                 if self.position.size > Decimal::new(0, 0) {
                     if order_margin > self.margin.position_margin {
                         // check if there is enough available balance for the rest of order_margin
                         let margin_diff = order_margin - self.position.margin;
-                        if margin_diff + fee_asset > self.margin.available_balance + self.position.margin {
-                            return Some(OrderError::NotEnoughAvailableBalance)
+                        if margin_diff + fee_asset
+                            > self.margin.available_balance + self.position.margin
+                        {
+                            return Some(OrderError::NotEnoughAvailableBalance);
                         }
-                        return None
+                        return None;
                     }
                     None
                 } else {
                     if order_margin + fee_asset > self.margin.available_balance {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                        return Some(OrderError::NotEnoughAvailableBalance);
                     }
                     None
                 }
             }
         };
-        return order_err
+        return order_err;
     }
 
     pub fn validate_limit_order(&mut self, o: &OrderDecimal) -> Option<OrderError> {
@@ -343,14 +355,14 @@ impl ExchangeDecimal {
         match o.side {
             Side::Buy => {
                 if o.price > self.ask {
-                    return Some(OrderError::InvalidPrice)
+                    return Some(OrderError::InvalidPrice);
                 }
-            },
+            }
             Side::Sell => {
                 if o.price < self.bid {
-                    return Some(OrderError::InvalidPrice)
+                    return Some(OrderError::InvalidPrice);
                 }
-            },
+            }
         }
 
         let order_margin: Decimal = o.size / o.price / self.position.leverage;
@@ -359,30 +371,29 @@ impl ExchangeDecimal {
                 if self.position.size > Decimal::new(0, 0) {
                     // check if enough margin is available
                     if order_margin > self.margin.available_balance {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                        return Some(OrderError::NotEnoughAvailableBalance);
                     }
                     None
-
                 } else {
                     if order_margin > self.margin.available_balance + self.position.margin {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                        return Some(OrderError::NotEnoughAvailableBalance);
                     }
                     None
                 }
-            },
+            }
             Side::Sell => {
                 if self.position.size > Decimal::new(0, 0) {
                     if order_margin > self.margin.available_balance + self.position.margin {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                        return Some(OrderError::NotEnoughAvailableBalance);
                     }
                     None
                 } else {
                     if order_margin > self.margin.available_balance {
-                        return Some(OrderError::NotEnoughAvailableBalance)
+                        return Some(OrderError::NotEnoughAvailableBalance);
                     }
                     None
                 }
-            },
+            }
         };
         order_err
     }
@@ -394,16 +405,22 @@ impl ExchangeDecimal {
 
     // returns true if order is valid
     pub fn validate_stop_market_order(&mut self, o: &OrderDecimal) -> Option<OrderError> {
-        let order_err =  match o.side {
-            Side::Buy => { if o.price <= self.ask { return Some(OrderError::InvalidTriggerPrice) }
+        let order_err = match o.side {
+            Side::Buy => {
+                if o.price <= self.ask {
+                    return Some(OrderError::InvalidTriggerPrice);
+                }
                 None
-            },
-            Side::Sell => { if o.price >= self.bid { return Some(OrderError::InvalidTriggerPrice) }
+            }
+            Side::Sell => {
+                if o.price >= self.bid {
+                    return Some(OrderError::InvalidTriggerPrice);
+                }
                 None
-            },
+            }
         };
         if order_err.is_some() {
-            return order_err
+            return order_err;
         }
 
         None
@@ -411,13 +428,19 @@ impl ExchangeDecimal {
 
     pub fn validate_take_profit_market_order(&self, o: &OrderDecimal) -> Option<OrderError> {
         return match o.side {
-            Side::Buy => { if o.price > self.bid { return Some(OrderError::InvalidOrder) }
+            Side::Buy => {
+                if o.price > self.bid {
+                    return Some(OrderError::InvalidOrder);
+                }
                 None
-            },
-            Side::Sell => { if o.price < self.ask { return Some(OrderError::InvalidOrder) }
+            }
+            Side::Sell => {
+                if o.price < self.ask {
+                    return Some(OrderError::InvalidOrder);
+                }
                 None
-            },
-        }
+            }
+        };
     }
 
     pub fn roe(&self) -> Decimal {
@@ -425,7 +448,7 @@ impl ExchangeDecimal {
             (self.bid - self.position.entry_price) / self.position.entry_price
         } else {
             (self.position.entry_price - self.ask) / self.position.entry_price
-        }
+        };
     }
 
     fn check_liquidation(&mut self) -> bool {
@@ -433,20 +456,19 @@ impl ExchangeDecimal {
             // liquidation check for long position
             if self.ask < self.position.liq_price {
                 self.liquidate();
-                return true
+                return true;
             }
             self.position.unrealized_pnl = self.unrealized_pnl();
-
         } else if self.position.size < Decimal::new(0, 0) {
             // liquidation check for short position
             if self.bid > self.position.liq_price {
                 self.liquidate();
-                return true
+                return true;
             }
             self.position.unrealized_pnl = self.unrealized_pnl();
         }
 
-        return false
+        return false;
     }
 
     fn deduce_fees(&mut self, t: FeeType, amount_base: Decimal, price: Decimal) {
@@ -468,9 +490,11 @@ impl ExchangeDecimal {
         };
         self.position.unrealized_pnl = self.unrealized_pnl();
         self.position.value = self.position.size.abs() / price;
-        self.margin.position_margin = (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
+        self.margin.position_margin =
+            (self.position.value / self.position.leverage) + self.position.unrealized_pnl;
         self.margin.margin_balance = self.margin.wallet_balance + self.position.unrealized_pnl;
-        self.margin.available_balance = self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
+        self.margin.available_balance =
+            self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
     }
 
     fn execute_market(&mut self, side: Side, amount_base: Decimal) {
@@ -482,20 +506,23 @@ impl ExchangeDecimal {
         self.deduce_fees(FeeType::Taker, amount_base, price);
 
         let old_position_size = self.position.size;
-        let old_entry_price: Decimal =  if self.position.size == Decimal::new(0, 0) {
+        let old_entry_price: Decimal = if self.position.size == Decimal::new(0, 0) {
             price
         } else {
             self.position.entry_price
         };
         let upnl: f64 = self.unrealized_pnl().to_f64().unwrap();
-        self.acc_tracker.log_trade(side, amount_base.to_f64().unwrap(), upnl);
+        self.acc_tracker
+            .log_trade(side, amount_base.to_f64().unwrap(), upnl);
 
         match side {
             Side::Buy => {
-                if self.position.size < Decimal::new(0,0) {
+                if self.position.size < Decimal::new(0, 0) {
                     // realize_pnl
                     if amount_base >= self.position.size.abs() {
-                        let rpnl = self.position.size.abs() * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
+                        let rpnl = self.position.size.abs()
+                            * ((Decimal::new(1, 0) / price)
+                                - (Decimal::new(1, 0) / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
                         self.rpnls.push(rpnl_f64);
@@ -505,30 +532,35 @@ impl ExchangeDecimal {
                         self.position.size += amount_base;
                         self.position.margin = size_diff / price / self.position.leverage;
                         self.position.entry_price = price;
-
                     } else {
-                        let rpnl = amount_base * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
+                        let rpnl = amount_base
+                            * ((Decimal::new(1, 0) / price)
+                                - (Decimal::new(1, 0) / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
                         self.rpnls.push(rpnl_f64);
                         self.acc_tracker.log_rpnl(rpnl_f64);
 
                         self.position.size += amount_base;
-                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.margin =
+                            self.position.size.abs() / old_entry_price / self.position.leverage;
                         self.position.entry_price = old_entry_price;
                     }
                 } else {
                     self.position.size += amount_base;
                     self.position.margin += amount_base / price / self.position.leverage;
-                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                    self.position.entry_price = ((price * amount_base)
+                        + self.position.entry_price * old_position_size.abs())
                         / (amount_base + old_position_size.abs());
                 }
-            },
+            }
             Side::Sell => {
                 if self.position.size > Decimal::new(0, 0) {
                     // realize_pnl
                     if amount_base >= self.position.size.abs() {
-                        let rpnl = self.position.size.abs() * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
+                        let rpnl = self.position.size.abs()
+                            * ((Decimal::new(1, 0) / self.position.entry_price)
+                                - (Decimal::new(1, 0) / price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
                         self.rpnls.push(rpnl_f64);
@@ -538,25 +570,28 @@ impl ExchangeDecimal {
                         self.position.size -= amount_base;
                         self.position.margin = size_diff / price / self.position.leverage;
                         self.position.entry_price = price;
-
                     } else {
-                        let rpnl = amount_base * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
+                        let rpnl = amount_base
+                            * ((Decimal::new(1, 0) / self.position.entry_price)
+                                - (Decimal::new(1, 0) / price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
                         self.rpnls.push(rpnl_f64);
                         self.acc_tracker.log_rpnl(rpnl_f64);
 
                         self.position.size -= amount_base;
-                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.margin =
+                            self.position.size.abs() / old_entry_price / self.position.leverage;
                         self.position.entry_price = old_entry_price;
                     }
                 } else {
                     self.position.size -= amount_base;
                     self.position.margin += amount_base / price / self.position.leverage;
-                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                    self.position.entry_price = ((price * amount_base)
+                        + self.position.entry_price * old_position_size.abs())
                         / (amount_base + old_position_size.abs());
                 }
-            },
+            }
         }
 
         self.update_position_stats();
@@ -567,10 +602,11 @@ impl ExchangeDecimal {
         self.acc_tracker.log_limit_order_fill();
         self.deduce_fees(FeeType::Maker, amount_base, price);
         let upnl: f64 = self.unrealized_pnl().to_f64().unwrap();
-        self.acc_tracker.log_trade(side, amount_base.to_f64().unwrap(), upnl);
+        self.acc_tracker
+            .log_trade(side, amount_base.to_f64().unwrap(), upnl);
 
         let old_position_size = self.position.size;
-        let old_entry_price: Decimal =  if self.position.size == Decimal::new(0, 0) {
+        let old_entry_price: Decimal = if self.position.size == Decimal::new(0, 0) {
             price
         } else {
             self.position.entry_price
@@ -581,7 +617,9 @@ impl ExchangeDecimal {
                 if self.position.size < Decimal::new(0, 0) {
                     // realize pnl
                     if amount_base > self.position.size.abs() {
-                        let rpnl = self.position.size.abs() * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
+                        let rpnl = self.position.size.abs()
+                            * ((Decimal::new(1, 0) / price)
+                                - (Decimal::new(1, 0) / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
                         self.rpnls.push(rpnl_f64);
@@ -592,28 +630,34 @@ impl ExchangeDecimal {
                         self.position.margin = size_diff / price / self.position.leverage;
                         self.position.entry_price = price;
                     } else {
-                        let rpnl = amount_base * ((Decimal::new(1, 0) / price) - (Decimal::new(1, 0) / self.position.entry_price));
+                        let rpnl = amount_base
+                            * ((Decimal::new(1, 0) / price)
+                                - (Decimal::new(1, 0) / self.position.entry_price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
                         self.rpnls.push(rpnl_f64);
                         self.acc_tracker.log_rpnl(rpnl_f64);
 
                         self.position.size += amount_base;
-                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.margin =
+                            self.position.size.abs() / old_entry_price / self.position.leverage;
                         self.position.entry_price = old_entry_price;
                     }
                 } else {
                     self.position.size += amount_base;
                     self.position.margin += amount_base / price / self.position.leverage;
-                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                    self.position.entry_price = ((price * amount_base)
+                        + self.position.entry_price * old_position_size.abs())
                         / (amount_base + old_position_size.abs());
                 }
-            },
+            }
             Side::Sell => {
                 if self.position.size > Decimal::new(0, 0) {
                     // realize pnl
                     if amount_base > self.position.size.abs() {
-                        let rpnl = self.position.size.abs() * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
+                        let rpnl = self.position.size.abs()
+                            * ((Decimal::new(1, 0) / self.position.entry_price)
+                                - (Decimal::new(1, 0) / price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
                         self.rpnls.push(rpnl_f64);
@@ -624,20 +668,24 @@ impl ExchangeDecimal {
                         self.position.margin = size_diff / price / self.position.leverage;
                         self.position.entry_price = price;
                     } else {
-                        let rpnl = amount_base * ((Decimal::new(1, 0) / self.position.entry_price) - (Decimal::new(1, 0) / price));
+                        let rpnl = amount_base
+                            * ((Decimal::new(1, 0) / self.position.entry_price)
+                                - (Decimal::new(1, 0) / price));
                         self.margin.wallet_balance += rpnl;
                         let rpnl_f64 = rpnl.to_f64().unwrap();
                         self.rpnls.push(rpnl_f64);
                         self.acc_tracker.log_rpnl(rpnl_f64);
 
                         self.position.size -= amount_base;
-                        self.position.margin = self.position.size.abs() / old_entry_price / self.position.leverage;
+                        self.position.margin =
+                            self.position.size.abs() / old_entry_price / self.position.leverage;
                         self.position.entry_price = old_entry_price;
                     }
                 } else {
                     self.position.size += amount_base;
                     self.position.margin += amount_base / price / self.position.leverage;
-                    self.position.entry_price = ((price * amount_base) + self.position.entry_price * old_position_size.abs())
+                    self.position.entry_price = ((price * amount_base)
+                        + self.position.entry_price * old_position_size.abs())
                         / (amount_base + old_position_size.abs());
                 }
             }
@@ -651,7 +699,6 @@ impl ExchangeDecimal {
         debug!("liquidating");
         if self.position.size > Decimal::new(0, 0) {
             self.execute_market(Side::Sell, self.position.size);
-
         } else {
             self.execute_market(Side::Buy, self.position.size);
         }
@@ -666,14 +713,14 @@ impl ExchangeDecimal {
                 OrderType::StopMarket => self.handle_stop_market_order(i),
                 OrderType::TakeProfitLimit => self.handle_take_profit_limit_order(i),
                 OrderType::TakeProfitMarket => self.handle_take_profit_market_order(i),
-                OrderType::Market => { panic!("market orders should have been executed immediately!") },
+                OrderType::Market => panic!("market orders should have been executed immediately!"),
             }
         }
         // move executed orders from orders_active to orders_done
         let mut i: usize = 0;
         loop {
             if i >= self.orders_active.len() {
-                break
+                break;
             }
             if self.orders_active[i].done() {
                 let exec_order = self.orders_active.remove(i);
@@ -686,28 +733,38 @@ impl ExchangeDecimal {
     fn handle_stop_market_order(&mut self, order_index: usize) {
         match self.orders_active[order_index].side {
             Side::Buy => {
-                if self.orders_active[order_index].price > self.ask { return }
+                if self.orders_active[order_index].price > self.ask {
+                    return;
+                }
                 self.execute_market(Side::Buy, self.orders_active[order_index].size);
                 self.orders_active[order_index].mark_done();
-            },
+            }
             Side::Sell => {
-                if self.orders_active[order_index].price > self.bid { return }
+                if self.orders_active[order_index].price > self.bid {
+                    return;
+                }
                 self.execute_market(Side::Sell, self.orders_active[order_index].size);
                 self.orders_active[order_index].mark_done();
-            },
+            }
         }
     }
 
     fn handle_take_profit_market_order(&mut self, order_index: usize) {
         match self.orders_active[order_index].side {
-            Side::Buy => { if self.orders_active[order_index].price < self.bid { return }
+            Side::Buy => {
+                if self.orders_active[order_index].price < self.bid {
+                    return;
+                }
                 self.execute_market(Side::Buy, self.orders_active[order_index].size * self.ask);
                 self.orders_active[order_index].mark_done();
-            },
-            Side::Sell => { if self.orders_active[order_index].price > self.ask { return }
+            }
+            Side::Sell => {
+                if self.orders_active[order_index].price > self.ask {
+                    return;
+                }
                 self.execute_market(Side::Sell, self.orders_active[order_index].size * self.bid);
                 self.orders_active[order_index].mark_done();
-            },
+            }
         }
     }
 
@@ -724,7 +781,7 @@ impl ExchangeDecimal {
                             self.execute_limit(o.side, o.price, o.size);
                             self.orders_active[order_index].mark_done();
                         }
-                    },
+                    }
                     false => {
                         if self.bid < o.price {
                             // execute
@@ -733,7 +790,7 @@ impl ExchangeDecimal {
                         }
                     }
                 }
-           },
+            }
             Side::Sell => {
                 match self.use_candles {
                     true => {
@@ -741,7 +798,7 @@ impl ExchangeDecimal {
                             self.execute_limit(o.side, o.price, o.size);
                             self.orders_active[order_index].mark_done();
                         }
-                    },
+                    }
                     false => {
                         if self.ask > o.price {
                             // execute
@@ -763,23 +820,25 @@ impl ExchangeDecimal {
         if self.position.size == Decimal::new(0, 0) {
             self.position.liq_price = Decimal::new(0, 0);
         } else if self.position.size > Decimal::new(0, 0) {
-            self.position.liq_price = self.position.entry_price - (self.position.entry_price / self.position.leverage);
+            self.position.liq_price =
+                self.position.entry_price - (self.position.entry_price / self.position.leverage);
         } else {
-            self.position.liq_price = self.position.entry_price + (self.position.entry_price / self.position.leverage);
+            self.position.liq_price =
+                self.position.entry_price + (self.position.entry_price / self.position.leverage);
         }
     }
 }
 
 pub fn min(val0: Decimal, val1: Decimal) -> Decimal {
     if val0 < val1 {
-        return val0
+        return val0;
     }
-    return val1
+    return val1;
 }
 
 pub fn max(val0: Decimal, val1: Decimal) -> Decimal {
     if val0 > val1 {
-        return val0
+        return val0;
     }
     val1
 }
@@ -792,7 +851,7 @@ mod tests {
     fn validate_market_order() {
         let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -860,7 +919,7 @@ mod tests {
             Some(OrderError::NotEnoughAvailableBalance) => panic!("not enough available balance"),
             Some(OrderError::InvalidOrderSize) => panic!("invalid order size"),
             Some(_) => panic!("other order err"),
-            None => {},
+            None => {}
         }
     }
 
@@ -868,7 +927,7 @@ mod tests {
     fn test_validate_limit_order() {
         let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -876,37 +935,43 @@ mod tests {
         exchange.consume_trade(&t);
 
         let price: f64 = 990.0;
-        let size = exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
+        let size =
+            exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
         let o = OrderDecimal::limit(Side::Buy, price, size.to_f64().unwrap());
         let order_err = exchange.validate_limit_order(&o);
         assert!(order_err.is_none());
 
         let price: f64 = 1010.0;
-        let size = exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
+        let size =
+            exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
         let o = OrderDecimal::limit(Side::Buy, price, size.to_f64().unwrap());
         let order_err = exchange.validate_limit_order(&o);
         assert!(order_err.is_some());
 
         let price: f64 = 1010.0;
-        let size = exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
+        let size =
+            exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
         let o = OrderDecimal::limit(Side::Sell, price, size.to_f64().unwrap());
         let order_err = exchange.validate_limit_order(&o);
         assert!(order_err.is_none());
 
         let price: f64 = 990.0;
-        let size = exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
+        let size =
+            exchange.margin.wallet_balance * Decimal::new(8, 1) * Decimal::new(price as i64, 0);
         let o = OrderDecimal::limit(Side::Sell, price, size.to_f64().unwrap());
         let order_err = exchange.validate_limit_order(&o);
         assert!(order_err.is_some());
 
         let price: f64 = 990.0;
-        let size = exchange.margin.wallet_balance * Decimal::new(11, 1) * Decimal::new(price as i64, 0);
+        let size =
+            exchange.margin.wallet_balance * Decimal::new(11, 1) * Decimal::new(price as i64, 0);
         let o = OrderDecimal::limit(Side::Buy, price, size.to_f64().unwrap());
         let order_err = exchange.validate_limit_order(&o);
         assert!(order_err.is_some());
 
         let price: f64 = 1010.0;
-        let size = exchange.margin.wallet_balance * Decimal::new(11, 1) * Decimal::new(price as i64, 0);
+        let size =
+            exchange.margin.wallet_balance * Decimal::new(11, 1) * Decimal::new(price as i64, 0);
         let o = OrderDecimal::limit(Side::Sell, price, size.to_f64().unwrap());
         let order_err = exchange.validate_limit_order(&o);
         assert!(order_err.is_some());
@@ -916,7 +981,7 @@ mod tests {
     fn submit_order_limit() {
         let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -928,7 +993,10 @@ mod tests {
         assert!(order_err.is_ok());
         assert_eq!(exchange.orders_active.len(), 1);
         assert_eq!(exchange.order_margin(), Decimal::new(5, 1));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0) - Decimal::new(5, 1));
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(1, 0) - Decimal::new(5, 1)
+        );
 
         // submit working market order
         let o = OrderDecimal::market(Side::Buy, 450.0);
@@ -940,14 +1008,13 @@ mod tests {
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         assert_eq!(exchange.orders_active.len(), 2);
-
     }
 
     #[test]
     fn test_validate_stop_market_order() {
         let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -983,7 +1050,7 @@ mod tests {
     fn test_validate_take_profit_market_order() {
         let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1021,7 +1088,7 @@ mod tests {
     fn handle_stop_market_order() {
         let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1035,10 +1102,10 @@ mod tests {
 
         assert_eq!(exchange.orders_active.len(), 1);
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 2,
             price: 1010.0,
-            size: 100.0
+            size: 100.0,
         };
         exchange.consume_trade(&t);
 
@@ -1046,15 +1113,14 @@ mod tests {
 
         assert_eq!(exchange.position.size, Decimal::new(100, 0));
         assert_eq!(exchange.position.entry_price, Decimal::new(1010, 0));
-
     }
 
     #[test]
-    fn long_market_win_full()  {
+    fn long_market_win_full() {
         let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1065,7 +1131,7 @@ mod tests {
         let size = exchange.ask * value;
         let o = OrderDecimal::market(Side::Buy, size.to_f64().unwrap());
         let order_err = exchange.submit_order(o);
-       assert!(order_err.is_ok());
+        assert!(order_err.is_ok());
 
         exchange.check_orders();
 
@@ -1077,19 +1143,28 @@ mod tests {
         assert_eq!(exchange.position.value, value);
         assert_eq!(exchange.position.margin, value);
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset1);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset1);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(1, 0) - fee_asset1
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(1, 0) - fee_asset1
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(8, 1));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(2, 1) - fee_asset1);
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(2, 1) - fee_asset1
+        );
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 2000.0,
             size: 100.0,
         };
         exchange.consume_trade(&t);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 2000.0,
             size: -100.0,
@@ -1112,12 +1187,20 @@ mod tests {
         assert_eq!(exchange.position.value, Decimal::new(0, 0));
         assert_eq!(exchange.position.margin, Decimal::new(0, 0));
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(14, 1) - fee_asset1 - fee_asset2);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(14, 1) - fee_asset1 - fee_asset2);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(14, 1) - fee_asset1 - fee_asset2
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(14, 1) - fee_asset1 - fee_asset2
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(14, 1) - fee_asset1 - fee_asset2);
-
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(14, 1) - fee_asset1 - fee_asset2
+        );
     }
 
     #[test]
@@ -1125,7 +1208,7 @@ mod tests {
         let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1139,13 +1222,13 @@ mod tests {
 
         assert_eq!(exchange.position.size, Decimal::new(800, 0));
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 800.0,
             size: 100.0,
         };
         exchange.consume_trade(&t);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 800.0,
             size: -100.0,
@@ -1171,12 +1254,20 @@ mod tests {
         assert_eq!(exchange.position.value, Decimal::new(0, 0));
         assert_eq!(exchange.position.margin, Decimal::new(0, 0));
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(8, 1) - fee_combined);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(8, 1) - fee_combined);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(8, 1) - fee_combined
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(8, 1) - fee_combined
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(8, 1) - fee_combined);
-
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(8, 1) - fee_combined
+        );
     }
 
     #[test]
@@ -1184,7 +1275,7 @@ mod tests {
         let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1198,13 +1289,13 @@ mod tests {
 
         assert_eq!(exchange.position.size, Decimal::new(-800, 0));
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 800.0,
             size: 100.0,
         };
         exchange.consume_trade(&t);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 800.0,
             size: -100.0,
@@ -1230,19 +1321,28 @@ mod tests {
         assert_eq!(exchange.position.value, Decimal::new(0, 0));
         assert_eq!(exchange.position.margin, Decimal::new(0, 0));
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(12, 1) - fee_combined);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(12, 1) - fee_combined);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(12, 1) - fee_combined
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(12, 1) - fee_combined
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(12, 1) - fee_combined);
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(12, 1) - fee_combined
+        );
     }
 
     #[test]
-    fn short_market_loss_full()  {
+    fn short_market_loss_full() {
         let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1262,24 +1362,33 @@ mod tests {
         let fee_base1 = size * fee_taker;
         let fee_asset1 = fee_base1 / exchange.bid;
 
-        assert_eq!(exchange.position.size,  -size);
+        assert_eq!(exchange.position.size, -size);
         assert_eq!(exchange.position.entry_price, Decimal::new(1000, 0));
         assert_eq!(exchange.position.value, value);
         assert_eq!(exchange.position.margin, value);
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset1);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset1);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(1, 0) - fee_asset1
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(1, 0) - fee_asset1
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(4, 1));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(6, 1) - fee_asset1);
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(6, 1) - fee_asset1
+        );
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 2000.0,
             size: 100.0,
         };
         exchange.consume_trade(&t);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 2000.0,
             size: -100.0,
@@ -1302,20 +1411,28 @@ mod tests {
         assert_eq!(exchange.position.value, Decimal::new(0, 0));
         assert_eq!(exchange.position.margin, Decimal::new(0, 0));
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(8, 1) - fee_asset1 - fee_asset2
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(8, 1) - fee_asset1 - fee_asset2
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
-
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(8, 1) - fee_asset1 - fee_asset2
+        );
     }
 
     #[test]
-    fn long_market_win_partial()  {
+    fn long_market_win_partial() {
         let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1338,19 +1455,28 @@ mod tests {
         assert_eq!(exchange.position.value, value);
         assert_eq!(exchange.position.margin, value);
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset1);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset1);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(1, 0) - fee_asset1
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(1, 0) - fee_asset1
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(8, 1));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(2, 1) - fee_asset1);
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(2, 1) - fee_asset1
+        );
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 2000.0,
             size: 100.0,
         };
         exchange.consume_trade(&t);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 2000.0,
             size: -100.0,
@@ -1373,12 +1499,20 @@ mod tests {
         assert_eq!(exchange.position.value, Decimal::new(2, 1));
         assert_eq!(exchange.position.margin, Decimal::new(4, 1));
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(2, 1));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(12, 1) - fee_asset1 - fee_asset2);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(14, 1) - fee_asset1 - fee_asset2);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(12, 1) - fee_asset1 - fee_asset2
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(14, 1) - fee_asset1 - fee_asset2
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(4, 1));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
-
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(8, 1) - fee_asset1 - fee_asset2
+        );
     }
 
     #[test]
@@ -1386,7 +1520,7 @@ mod tests {
         let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1400,13 +1534,13 @@ mod tests {
 
         assert_eq!(exchange.position.size, Decimal::new(800, 0));
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 800.0,
             size: 100.0,
         };
         exchange.consume_trade(&t);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 800.0,
             size: -100.0,
@@ -1432,12 +1566,20 @@ mod tests {
         assert_eq!(exchange.position.value, Decimal::new(5, 1));
         assert_eq!(exchange.position.margin, Decimal::new(4, 1));
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(-1, 1));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(9, 1) - fee_combined);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(8, 1) - fee_combined);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(9, 1) - fee_combined
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(8, 1) - fee_combined
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(4, 1));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1) - fee_combined);
-
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(5, 1) - fee_combined
+        );
     }
 
     #[test]
@@ -1445,7 +1587,7 @@ mod tests {
         let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1459,13 +1601,13 @@ mod tests {
 
         assert_eq!(exchange.position.size, Decimal::new(-800, 0));
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 800.0,
             size: 100.0,
         };
         exchange.consume_trade(&t);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 800.0,
             size: -100.0,
@@ -1491,19 +1633,28 @@ mod tests {
         assert_eq!(exchange.position.value, Decimal::new(5, 1));
         assert_eq!(exchange.position.margin, Decimal::new(4, 1));
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(1, 1));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(11, 1) - fee_combined);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(12, 1) - fee_combined);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(11, 1) - fee_combined
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(12, 1) - fee_combined
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(6, 1));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1) - fee_combined);
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(5, 1) - fee_combined
+        );
     }
 
     #[test]
-    fn short_market_loss_partial()  {
+    fn short_market_loss_partial() {
         let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1523,24 +1674,33 @@ mod tests {
         let fee_base1 = size * fee_taker;
         let fee_asset1 = fee_base1 / exchange.bid;
 
-        assert_eq!(exchange.position.size,  -size);
+        assert_eq!(exchange.position.size, -size);
         assert_eq!(exchange.position.entry_price, Decimal::new(1000, 0));
         assert_eq!(exchange.position.value, value);
         assert_eq!(exchange.position.margin, value);
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - fee_asset1);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - fee_asset1);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(1, 0) - fee_asset1
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(1, 0) - fee_asset1
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(8, 1));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(2, 1) - fee_asset1);
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(2, 1) - fee_asset1
+        );
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 2000.0,
             size: 100.0,
         };
         exchange.consume_trade(&t);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 2000.0,
             size: -100.0,
@@ -1563,12 +1723,20 @@ mod tests {
         assert_eq!(exchange.position.value, Decimal::new(2, 1));
         assert_eq!(exchange.position.margin, Decimal::new(4, 1));
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(-2, 1));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(6, 1) - fee_asset1 - fee_asset2);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(8, 1) - fee_asset1 - fee_asset2
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(6, 1) - fee_asset1 - fee_asset2
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 1));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(8, 1) - fee_asset1 - fee_asset2);
-
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(8, 1) - fee_asset1 - fee_asset2
+        );
     }
 
     #[test]
@@ -1576,7 +1744,7 @@ mod tests {
         let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1602,17 +1770,25 @@ mod tests {
 
         exchange.check_orders();
 
-        assert_eq!(exchange.position.size,  Decimal::new(0, 0));
+        assert_eq!(exchange.position.size, Decimal::new(0, 0));
         assert_eq!(exchange.position.entry_price, Decimal::new(1000, 0));
         assert_eq!(exchange.position.value, Decimal::new(0, 0));
         assert_eq!(exchange.position.margin, Decimal::new(0, 0));
         assert_eq!(exchange.position.unrealized_pnl, Decimal::new(0, 0));
-        assert_eq!(exchange.margin.wallet_balance, Decimal::new(1, 0) - Decimal::new(2, 0) * fee_asset);
-        assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0) - Decimal::new(2, 0) * fee_asset);
+        assert_eq!(
+            exchange.margin.wallet_balance,
+            Decimal::new(1, 0) - Decimal::new(2, 0) * fee_asset
+        );
+        assert_eq!(
+            exchange.margin.margin_balance,
+            Decimal::new(1, 0) - Decimal::new(2, 0) * fee_asset
+        );
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0) - Decimal::new(2, 0) * fee_asset);
-
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(1, 0) - Decimal::new(2, 0) * fee_asset
+        );
 
         let size = 900.0;
         let buy_order = OrderDecimal::market(Side::Buy, size);
@@ -1628,7 +1804,7 @@ mod tests {
 
         exchange.check_orders();
 
-        assert_eq!(exchange.position.size,  Decimal::new(-50, 0));
+        assert_eq!(exchange.position.size, Decimal::new(-50, 0));
         assert_eq!(exchange.position.entry_price, Decimal::new(1000, 0));
         assert_eq!(exchange.position.value, Decimal::new(5, 2));
         assert_eq!(exchange.position.margin, Decimal::new(5, 2));
@@ -1649,7 +1825,7 @@ mod tests {
     fn test_order_ids() {
         let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 100.0,
             size: 10.0,
@@ -1672,7 +1848,7 @@ mod tests {
         let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1703,14 +1879,19 @@ mod tests {
         // should change with different leverage
         assert_eq!(exchange.position.margin, Decimal::new(1, 2));
         assert_eq!(exchange.margin.position_margin, Decimal::new(1, 2));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(99, 2) - fee_asset);
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(99, 2) - fee_asset
+        );
 
         let valid = exchange.set_leverage(5.0);
         assert!(valid);
         assert_eq!(exchange.position.margin, Decimal::new(2, 2));
         assert_eq!(exchange.margin.position_margin, Decimal::new(2, 2));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(98, 2) - fee_asset);
-
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(98, 2) - fee_asset
+        );
 
         let o = OrderDecimal::market(Side::Buy, 4800.0);
         let order_err = exchange.submit_order(o);
@@ -1722,8 +1903,10 @@ mod tests {
 
         assert_eq!(exchange.position.margin, Decimal::new(98, 2));
         assert_eq!(exchange.margin.position_margin, Decimal::new(98, 2));
-        assert_eq!(exchange.margin.available_balance, Decimal::new(2, 2) - (fee_asset + fee_asset2));
-
+        assert_eq!(
+            exchange.margin.available_balance,
+            Decimal::new(2, 2) - (fee_asset + fee_asset2)
+        );
     }
 
     #[test]
@@ -1731,7 +1914,7 @@ mod tests {
         let config = ConfigDecimal::perpetuals();
         // let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1753,7 +1936,7 @@ mod tests {
     fn unrealized_pnl() {
         let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1770,14 +1953,14 @@ mod tests {
         let upnl = exchange.unrealized_pnl();
         assert_eq!(upnl, Decimal::new(0, 0));
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 1,
             price: 1100.0,
             size: 100.0,
         };
         exchange.consume_trade(&t);
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 1,
             price: 1100.0,
             size: -100.0,
@@ -1792,7 +1975,7 @@ mod tests {
     fn roe() {
         let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1806,14 +1989,14 @@ mod tests {
 
         assert_eq!(exchange.position.size, Decimal::new(100, 0));
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 1,
             price: 1100.0,
             size: 100.0,
         };
         exchange.consume_trade(&t);
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 1,
             price: 1100.0,
             size: -100.0,
@@ -1833,7 +2016,7 @@ mod tests {
     fn cancel_order() {
         let config = ConfigDecimal::perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1853,7 +2036,6 @@ mod tests {
         assert_eq!(exchange.margin.margin_balance, Decimal::new(1, 0));
         assert_eq!(exchange.margin.available_balance, Decimal::new(1, 0));
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
-
     }
 
     #[test]
@@ -1861,7 +2043,7 @@ mod tests {
         let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1902,7 +2084,6 @@ mod tests {
         assert!(order_err.is_ok());
         assert_eq!(exchange.position.size, Decimal::new(240, 0));
         assert_eq!(exchange.order_margin(), Decimal::new(51, 2));
-
     }
 
     #[test]
@@ -1910,7 +2091,7 @@ mod tests {
         let config = ConfigDecimal::perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
-        let t = Trade{
+        let t = Trade {
             timestamp: 0,
             price: 1000.0,
             size: 100.0,
@@ -1923,13 +2104,13 @@ mod tests {
         assert_eq!(exchange.orders_active.len(), 1);
         assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1));
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 1,
             price: 750.0,
             size: 100.0,
         };
         exchange.consume_trade(&t);
-        let t = Trade{
+        let t = Trade {
             timestamp: 1,
             price: 750.0,
             size: -100.0,
@@ -1952,20 +2133,19 @@ mod tests {
         // assert_eq!(exchange.margin.position_margin, Decimal::new(5, 1));
         // assert_eq!(exchange.margin.available_balance, Decimal::new(5, 1) + fee_maker);
 
-
         let o: OrderDecimal = OrderDecimal::limit(Side::Sell, 1000.0, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
         assert_eq!(exchange.orders_active.len(), 1);
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
 
-        let t = Trade{
+        let t = Trade {
             timestamp: 1,
             price: 1200.0,
             size: -100.0,
         };
         exchange.consume_trade(&t);
-        let t = Trade{
+        let t = Trade {
             timestamp: 1,
             price: 1200.0,
             size: 100.0,
@@ -1979,13 +2159,10 @@ mod tests {
         assert_eq!(exchange.order_margin(), Decimal::new(0, 0));
         assert_eq!(exchange.margin.position_margin, Decimal::new(0, 0));
         let fee_maker_1: Decimal = Decimal::new(1125, 7);
-        let wb: Decimal = Decimal::new(1, 0)
-            + fee_maker_0 + fee_maker_1 + Decimal::new(5, 2);
+        let wb: Decimal = Decimal::new(1, 0) + fee_maker_0 + fee_maker_1 + Decimal::new(5, 2);
         // Again nearly correct but not quite which is fine though
         // assert_eq!(exchange.margin.wallet_balance, wb);
         // assert_eq!(exchange.margin.available_balance, wb);
         // assert_eq!(exchange.margin.margin_balance, wb);
-
-
     }
 }
