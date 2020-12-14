@@ -1,6 +1,5 @@
 use rust_decimal::Decimal;
 
-
 #[derive(Debug, Clone)]
 pub struct ConfigDecimal {
     pub fee_maker: Decimal,
@@ -9,7 +8,7 @@ pub struct ConfigDecimal {
 
 impl ConfigDecimal {
     pub fn perpetuals() -> Self {
-        Self{
+        Self {
             fee_maker: Decimal::new(-000025, 5),
             fee_taker: Decimal::new(000075, 5),
         }

@@ -1,9 +1,9 @@
-use crate::{Side, OrderType};
+use crate::{OrderType, Side};
 
 #[derive(Debug, Clone)]
 pub struct OrderFloat {
-    pub id: u64,  // id will be filled in using exchange.submit_order()
-    pub timestamp: u64,  // timestamp will be filled in using exchange.submit_order()
+    pub id: u64,        // id will be filled in using exchange.submit_order()
+    pub timestamp: u64, // timestamp will be filled in using exchange.submit_order()
     pub order_type: OrderType,
     pub price: f64,
     pub price_opt: f64,
@@ -23,11 +23,11 @@ impl OrderFloat {
             size,
             side,
             done: false,
-        }
+        };
     }
 
     pub fn market(side: Side, size: f64) -> OrderFloat {
-        return OrderFloat{
+        return OrderFloat {
             id: 0,
             timestamp: 0,
             order_type: OrderType::Market,
@@ -36,11 +36,11 @@ impl OrderFloat {
             size,
             side,
             done: false,
-        }
+        };
     }
 
     pub fn stop_market(side: Side, trigger_price: f64, size: f64) -> OrderFloat {
-        return OrderFloat{
+        return OrderFloat {
             id: 0,
             timestamp: 0,
             order_type: OrderType::StopMarket,
@@ -49,7 +49,7 @@ impl OrderFloat {
             size,
             side,
             done: false,
-        }
+        };
     }
 
     pub fn take_profit_market(side: Side, trigger_price: f64, size: f64) -> OrderFloat {
@@ -62,10 +62,15 @@ impl OrderFloat {
             size,
             side,
             done: false,
-        }
+        };
     }
 
-    pub fn take_profit_limit(side: Side, trigger_price: f64, limit_price: f64, size: f64) -> OrderFloat {
+    pub fn take_profit_limit(
+        side: Side,
+        trigger_price: f64,
+        limit_price: f64,
+        size: f64,
+    ) -> OrderFloat {
         return OrderFloat {
             id: 0,
             timestamp: 0,
@@ -75,7 +80,7 @@ impl OrderFloat {
             size,
             side,
             done: false,
-        }
+        };
     }
 
     pub fn mark_done(&mut self) {
@@ -83,6 +88,6 @@ impl OrderFloat {
     }
 
     pub fn done(&self) -> bool {
-        return self.done
+        return self.done;
     }
 }

@@ -1,8 +1,7 @@
-use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 
-use crate::{Side, OrderError, OrderType};
-
+use crate::{OrderType, Side};
 
 #[derive(Debug, Clone)]
 pub struct OrderDecimal {
@@ -29,7 +28,7 @@ impl OrderDecimal {
             size: Decimal::from_f64(size).unwrap(),
             side,
             done: false,
-        }
+        };
     }
 
     pub fn market(side: Side, size: f64) -> Self {
@@ -42,7 +41,7 @@ impl OrderDecimal {
             size: Decimal::from_f64(size).unwrap(),
             side,
             done: false,
-        }
+        };
     }
 
     pub fn stop_market(side: Side, trigger_price: f64, size: f64) -> Self {
@@ -55,7 +54,7 @@ impl OrderDecimal {
             size: Decimal::from_f64(size).unwrap(),
             side,
             done: false,
-        }
+        };
     }
 
     pub fn take_profit_market(side: Side, trigger_price: f64, size: f64) -> Self {
@@ -68,7 +67,7 @@ impl OrderDecimal {
             size: Decimal::from_f64(size).unwrap(),
             side,
             done: false,
-        }
+        };
     }
 
     pub fn take_profit_limit(side: Side, trigger_price: f64, limit_price: f64, size: f64) -> Self {
@@ -81,7 +80,7 @@ impl OrderDecimal {
             size: Decimal::from_f64(size).unwrap(),
             side,
             done: false,
-        }
+        };
     }
 
     pub fn mark_done(&mut self) {
@@ -89,6 +88,6 @@ impl OrderDecimal {
     }
 
     pub fn done(&self) -> bool {
-        return self.done
+        return self.done;
     }
 }

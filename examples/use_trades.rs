@@ -1,6 +1,6 @@
 mod load_trades;
 
-use lfest::{ExchangeFloat, ConfigFloat, Side, OrderFloat};
+use lfest::{ConfigFloat, ExchangeFloat, OrderFloat, Side};
 use load_trades::load_trades_from_csv;
 use rand::{thread_rng, Rng};
 use std::time::Instant;
@@ -10,7 +10,7 @@ fn main() {
 
     // configure fees. set custom fees in the struct if needed
     let config = ConfigFloat::bitmex_perpetuals();
-    let use_candles: bool = false;  // only set this if you use the consume_candle function instead of consume_trade
+    let use_candles: bool = false; // only set this if you use the consume_candle function instead of consume_trade
     let mut exchange = ExchangeFloat::new(config, use_candles);
 
     exchange.set_leverage(2.0);
@@ -24,8 +24,10 @@ fn main() {
     for t in &trades {
         let liq = exchange.consume_trade(t);
         if liq {
-            println!("position liquidated, \
-            but there could still be enough wallet_balance to open a new position");
+            println!(
+                "position liquidated, \
+            but there could still be enough wallet_balance to open a new position"
+            );
         }
 
         // randomly buy or sell using a market order
@@ -40,14 +42,16 @@ fn main() {
             OrderFloat::market(Side::Buy, order_size)
         } else {
             // Neutral
-            continue
+            continue;
         };
         let _order_err = exchange.submit_order(order);
         // Handle order error here if needed
     }
-    println!("time to simulate 1 million historical trades and {} orders: {}ms",
-             exchange.acc_tracker.num_trades(),
-             t0.elapsed().as_millis());
+    println!(
+        "time to simulate 1 million historical trades and {} orders: {}ms",
+        exchange.acc_tracker.num_trades(),
+        t0.elapsed().as_millis()
+    );
     analyze_results(&exchange);
 }
 
@@ -63,16 +67,18 @@ fn analyze_results(e: &ExchangeFloat) {
     let buy_ratio = e.acc_tracker.buy_ratio();
     let turnover = e.acc_tracker.turnover();
     let win_ratio = e.acc_tracker.win_ratio();
-    println!("rpnl: {:.2}, sharpe: {:.2}, sortino: {:.2}, sr: {:.2}, \
+    println!(
+        "rpnl: {:.2}, sharpe: {:.2}, sortino: {:.2}, sr: {:.2}, \
     dd: {:.2}, upnl_dd: {:.2}, #trades: {}, buy_ratio: {:.2}, turnover: {}, win_ratio: {}",
-             rpnl,
-             sharpe,
-             sortino,
-             sterling_ratio,
-             max_drawdown,
-             max_upnl_drawdown,
-             num_trades,
-             buy_ratio,
-             turnover,
-             win_ratio);
+        rpnl,
+        sharpe,
+        sortino,
+        sterling_ratio,
+        max_drawdown,
+        max_upnl_drawdown,
+        num_trades,
+        buy_ratio,
+        turnover,
+        win_ratio
+    );
 }

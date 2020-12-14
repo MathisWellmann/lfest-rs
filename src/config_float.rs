@@ -6,7 +6,7 @@ pub struct ConfigFloat {
 
 impl ConfigFloat {
     pub fn bitmex_perpetuals() -> Self {
-        Self{
+        Self {
             fee_maker: -0.00025,
             fee_taker: 0.00075,
         }
@@ -20,7 +20,7 @@ impl ConfigFloat {
     }
 
     pub fn deribit_futures() -> Self {
-        Self{
+        Self {
             fee_maker: 0.0,
             fee_taker: 0.0005,
         }

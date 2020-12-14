@@ -9,17 +9,16 @@ impl ContractType {
     pub fn parse(symbol: &str) -> Self {
         let end = &symbol[symbol.len() - 3..];
         if end == "USD" {
-            return ContractType::Perpetual
+            return ContractType::Perpetual;
         }
         let fut = &symbol[symbol.len() - 3..symbol.len() - 2].to_uppercase();
         return if fut == "H" || fut == "M" || fut == "U" || fut == "Z" {
             ContractType::Future
         } else {
             ContractType::Perpetual
-        }
+        };
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -46,6 +45,5 @@ mod tests {
         let f = "XBTH20";
         let ct = ContractType::parse(f);
         assert_eq!(ct, ContractType::Future);
-
     }
 }

@@ -16,7 +16,7 @@ pub fn load_trades_from_csv(filename: &str) -> Result<Vec<Trade>, Box<dyn std::e
         let price = row[1].parse::<f64>()?;
         let size = row[2].parse::<f64>()?;
 
-        let trade = Trade{
+        let trade = Trade {
             timestamp: ts,
             price,
             size,
@@ -26,6 +26,4 @@ pub fn load_trades_from_csv(filename: &str) -> Result<Vec<Trade>, Box<dyn std::e
     Ok(out)
 }
 
-fn main() {
-
-}
+fn main() {}

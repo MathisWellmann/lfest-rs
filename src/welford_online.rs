@@ -16,7 +16,7 @@ impl WelfordOnline {
 
     pub fn variance(&self) -> f64 {
         if self.count > 1 {
-            return self.s / (self.count - 1) as f64
+            return self.s / (self.count - 1) as f64;
         }
         0.0
     }
@@ -25,7 +25,7 @@ impl WelfordOnline {
         self.variance().sqrt()
     }
 
-    pub fn add(&mut self, val: f64)  {
+    pub fn add(&mut self, val: f64) {
         self.count += 1;
         let old_mean = self.mean;
         self.mean += (val - old_mean) / self.count as f64;
