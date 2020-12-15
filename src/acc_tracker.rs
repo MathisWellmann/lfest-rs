@@ -22,6 +22,7 @@ pub struct AccTracker {
     daily_returns: Vec<f64>,
     next_trigger_ts: u64,
     last_rpnl_entry: f64,
+    cumulative_fees: f64,
 }
 
 impl AccTracker {
@@ -44,7 +45,13 @@ impl AccTracker {
             daily_returns: vec![],
             next_trigger_ts: 0,
             last_rpnl_entry: 0.0,
+            cumulative_fees: 0.0,
         }
+    }
+
+    /// Return the cumulative fees paid to the exchange denoted in BASE currency
+    pub fn cumulative_fees(&self) -> f64 {
+        self.cumulative_fees
     }
 
     /// Return the sharpe ration based on individual trade data
@@ -142,6 +149,11 @@ impl AccTracker {
             self.last_rpnl_entry = self.total_rpnl;
             self.daily_returns.push(rpnl);
         }
+    }
+
+    /// Update the cumulative fee amount denoted in BASE currency
+    pub fn log_fee(&mut self, fee_base: f64) {
+        self.cumulative_fees += fee_base
     }
 
     /// Log a limit order submission

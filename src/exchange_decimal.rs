@@ -476,9 +476,10 @@ impl ExchangeDecimal {
             FeeType::Maker => self.config.fee_maker,
             FeeType::Taker => self.config.fee_taker,
         };
-        let fee_base = fee * amount_base;
-        let fee_asset = fee_base / price;
-        self.margin.wallet_balance -= fee_asset;
+        let fee_quote = fee * amount_base;
+        let fee_base = fee_quote / price;
+        self.acc_tracker.log_fee(fee_base.to_f64().unwrap());
+        self.margin.wallet_balance -= fee_base;
         self.update_position_stats();
     }
 
