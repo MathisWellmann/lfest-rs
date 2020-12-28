@@ -26,7 +26,7 @@ pub struct ExchangeFloat {
     use_candles: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MarginFloat {
     pub wallet_balance: f64,
     pub margin_balance: f64,
@@ -35,7 +35,7 @@ pub struct MarginFloat {
     pub available_balance: f64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PositionFloat {
     pub size: f64,
     pub value: f64, // value of positoin in units of quoteCurrency

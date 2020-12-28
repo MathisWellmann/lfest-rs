@@ -29,7 +29,7 @@ pub struct ExchangeDecimal {
     use_candles: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MarginDecimal {
     pub wallet_balance: Decimal,
     pub margin_balance: Decimal,
@@ -38,7 +38,7 @@ pub struct MarginDecimal {
     pub available_balance: Decimal,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PositionDecimal {
     pub size: Decimal,
     pub value: Decimal,
