@@ -113,5 +113,5 @@ as the exchange relies on the Trade and Candle struct.
 If you find a bug or would like to help out, feel free to create a pull-request.
 
 ## License
-This crate is licensed under GNU AGPLv3
+This crate is licensed under GNU GPLv3
 
