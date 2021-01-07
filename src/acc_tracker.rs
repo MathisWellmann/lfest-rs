@@ -62,7 +62,12 @@ impl AccTracker {
     pub fn sharpe_daily_returns(&self) -> f64 {
         let n: f64 = self.daily_returns.len() as f64;
         let avg: f64 = self.daily_returns.iter().sum::<f64>() / n;
-        let variance: f64 = (1.0 / n) * self.daily_returns.iter().map(|v| (*v - avg).powi(2)).sum::<f64>();
+        let variance: f64 = (1.0 / n)
+            * self
+                .daily_returns
+                .iter()
+                .map(|v| (*v - avg).powi(2))
+                .sum::<f64>();
         let std_dev: f64 = variance.sqrt();
         self.total_rpnl / std_dev
     }
