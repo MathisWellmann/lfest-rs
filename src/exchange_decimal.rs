@@ -89,7 +89,7 @@ impl ExchangeDecimal {
     // returns true if successful
     pub fn set_leverage(&mut self, l: f64) -> bool {
         let l = Decimal::from_f64(l).unwrap();
-        if l < Decimal::new(1, 0) {
+        if l < Decimal::new(0, 0) {
             return false;
         }
 

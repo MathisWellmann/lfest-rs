@@ -85,7 +85,7 @@ impl ExchangeFloat {
     // sets the new leverage of position
     // returns true if successful
     pub fn set_leverage(&mut self, l: f64) -> bool {
-        if l < 1.0 {
+        if l < 0.0 {
             return false;
         }
 
