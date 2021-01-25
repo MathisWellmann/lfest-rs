@@ -48,6 +48,7 @@ pub struct PositionFloat {
 
 impl ExchangeFloat {
     pub fn new(config: ConfigFloat, use_candles: bool) -> ExchangeFloat {
+        let initial_balance = config.starting_balance_base;
         return ExchangeFloat {
             config,
             position: PositionFloat {
@@ -60,11 +61,11 @@ impl ExchangeFloat {
                 unrealized_pnl: 0.0,
             },
             margin: MarginFloat {
-                wallet_balance: 1.0,
-                margin_balance: 1.0,
+                wallet_balance: initial_balance,
+                margin_balance: initial_balance,
                 position_margin: 0.0,
                 order_margin: 0.0,
-                available_balance: 1.0,
+                available_balance: initial_balance,
             },
             bid: 0.0,
             ask: 0.0,
@@ -74,7 +75,7 @@ impl ExchangeFloat {
             orders_executed: Vec::new(),
             orders_active: Vec::new(),
             next_order_id: 0,
-            acc_tracker: AccTracker::new(1.0),
+            acc_tracker: AccTracker::new(initial_balance),
             timestamp: 0,
             high: 0.0,
             low: 0.0,

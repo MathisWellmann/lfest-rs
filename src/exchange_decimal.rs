@@ -51,6 +51,7 @@ pub struct PositionDecimal {
 
 impl ExchangeDecimal {
     pub fn new(config: ConfigDecimal, use_candles: bool) -> ExchangeDecimal {
+        let initial_balance = config.starting_balance_base;
         return ExchangeDecimal {
             config,
             position: PositionDecimal {
@@ -63,13 +64,13 @@ impl ExchangeDecimal {
                 unrealized_pnl: Decimal::new(0, 0),
             },
             margin: MarginDecimal {
-                wallet_balance: Decimal::new(1, 0),
-                margin_balance: Decimal::new(1, 0),
+                wallet_balance: initial_balance,
+                margin_balance: initial_balance,
                 position_margin: Decimal::new(0, 0),
                 // order_margin: Decimal::new(0, 0),
-                available_balance: Decimal::new(1, 0),
+                available_balance: initial_balance,
             },
-            acc_tracker: AccTracker::new(1.0),
+            acc_tracker: AccTracker::new(initial_balance),
             bid: Decimal::new(0, 0),
             ask: Decimal::new(0, 0),
             init: true,
