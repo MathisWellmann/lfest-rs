@@ -70,7 +70,7 @@ impl ExchangeDecimal {
                 // order_margin: Decimal::new(0, 0),
                 available_balance: initial_balance,
             },
-            acc_tracker: AccTracker::new(initial_balance),
+            acc_tracker: AccTracker::new(initial_balance.to_f64().unwrap()),
             bid: Decimal::new(0, 0),
             ask: Decimal::new(0, 0),
             init: true,
