@@ -850,7 +850,7 @@ mod tests {
 
     #[test]
     fn validate_market_order() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
             timestamp: 0,
@@ -926,7 +926,7 @@ mod tests {
 
     #[test]
     fn test_validate_limit_order() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
             timestamp: 0,
@@ -980,7 +980,7 @@ mod tests {
 
     #[test]
     fn submit_order_limit() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
             timestamp: 0,
@@ -1013,7 +1013,7 @@ mod tests {
 
     #[test]
     fn test_validate_stop_market_order() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
             timestamp: 0,
@@ -1049,7 +1049,7 @@ mod tests {
 
     #[test]
     fn test_validate_take_profit_market_order() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
             timestamp: 0,
@@ -1087,7 +1087,7 @@ mod tests {
 
     #[test]
     fn handle_stop_market_order() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
             timestamp: 0,
@@ -1118,7 +1118,7 @@ mod tests {
 
     #[test]
     fn long_market_win_full() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
@@ -1206,7 +1206,7 @@ mod tests {
 
     #[test]
     fn long_market_loss_full() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
@@ -1273,7 +1273,7 @@ mod tests {
 
     #[test]
     fn short_market_win_full() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
@@ -1340,7 +1340,7 @@ mod tests {
 
     #[test]
     fn short_market_loss_full() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
@@ -1430,7 +1430,7 @@ mod tests {
 
     #[test]
     fn long_market_win_partial() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
@@ -1518,7 +1518,7 @@ mod tests {
 
     #[test]
     fn long_market_loss_partial() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
@@ -1585,7 +1585,7 @@ mod tests {
 
     #[test]
     fn short_market_win_partial() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
@@ -1652,7 +1652,7 @@ mod tests {
 
     #[test]
     fn short_market_loss_partial() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
@@ -1742,7 +1742,7 @@ mod tests {
 
     #[test]
     fn test_market_roundtrip() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
@@ -1824,7 +1824,7 @@ mod tests {
 
     #[test]
     fn test_order_ids() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
             timestamp: 0,
@@ -1846,7 +1846,7 @@ mod tests {
 
     #[test]
     fn set_leverage() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
@@ -1856,7 +1856,7 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let valid = exchange.set_leverage(0.5);
+        let valid = exchange.set_leverage(-0.1);
         assert!(!valid);
 
         exchange.set_leverage(5.0);
@@ -1912,7 +1912,7 @@ mod tests {
 
     #[test]
     fn liq_price() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         // let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
@@ -1935,7 +1935,7 @@ mod tests {
 
     #[test]
     fn unrealized_pnl() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
             timestamp: 0,
@@ -1974,7 +1974,7 @@ mod tests {
 
     #[test]
     fn roe() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
             timestamp: 0,
@@ -2015,7 +2015,7 @@ mod tests {
 
     #[test]
     fn cancel_order() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
             timestamp: 0,
@@ -2041,7 +2041,7 @@ mod tests {
 
     #[test]
     fn order_margin() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
@@ -2089,7 +2089,7 @@ mod tests {
 
     #[test]
     fn execute_limit() {
-        let config = ConfigDecimal::perpetuals();
+        let config = ConfigDecimal::bitmex_perpetuals();
         let fee_taker = config.fee_taker;
         let mut exchange = ExchangeDecimal::new(config, false);
         let t = Trade {
