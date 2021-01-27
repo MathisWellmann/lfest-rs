@@ -132,15 +132,20 @@ impl AccTracker {
     }
 
     /// Log the trade
-    pub fn log_trade(&mut self, side: Side, size: f64, upnl: f64) {
+    pub fn log_trade(&mut self, side: Side, size: f64) {
         self.total_turnover += size;
         self.num_trades += 1;
         match side {
             Side::Buy => self.num_buys += 1,
             Side::Sell => {}
         }
-        if upnl < self.max_upnl_drawdown {
-            self.max_upnl_drawdown = upnl;
+    }
+
+    /// Log the unrealized profit and loss as each new candle or trade
+    pub fn log_upnl(&mut self, upnl: f64) {
+        let upnl_dd: f64 = upnl.abs();
+        if upnl_dd > self.max_upnl_drawdown {
+            self.max_upnl_drawdown = upnl_dd;
         }
     }
 
@@ -210,7 +215,7 @@ mod tests {
         ];
         let mut acc_tracker = AccTracker::new(1.0);
         for t in trades {
-            acc_tracker.log_trade(t.0, t.1, 0.0);
+            acc_tracker.log_trade(t.0, t.1);
         }
 
         assert_eq!(acc_tracker.turnover(), 4.0);

@@ -123,6 +123,8 @@ impl ExchangeFloat {
         }
 
         self.acc_tracker.log_timestamp(trade.timestamp as u64);
+        let upnl = self.unrealized_pnl();
+        self.acc_tracker.log_upnl(upnl);
 
         if self.check_liquidation() {
             return true;
@@ -142,6 +144,8 @@ impl ExchangeFloat {
         self.low = candle.low;
 
         self.acc_tracker.log_timestamp(candle.timestamp as u64);
+        let upnl = self.unrealized_pnl();
+        self.acc_tracker.log_upnl(upnl);
 
         if self.check_liquidation() {
             return true;
@@ -500,8 +504,7 @@ impl ExchangeFloat {
         } else {
             self.position.entry_price
         };
-        let upnl = self.unrealized_pnl();
-        self.acc_tracker.log_trade(side, amount_base, upnl);
+        self.acc_tracker.log_trade(side, amount_base);
 
         match side {
             Side::Buy => {
@@ -583,8 +586,7 @@ impl ExchangeFloat {
     fn execute_limit(&mut self, side: Side, price: f64, amount_base: f64) {
         self.acc_tracker.log_limit_order_fill();
         self.deduce_fees(FeeType::Maker, amount_base, price);
-        let upnl = self.unrealized_pnl();
-        self.acc_tracker.log_trade(side, amount_base, upnl);
+        self.acc_tracker.log_trade(side, amount_base);
 
         let old_position_size = self.position.size;
         let old_entry_price: f64 = if self.position.size == 0.0 {

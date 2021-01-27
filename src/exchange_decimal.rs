@@ -127,6 +127,8 @@ impl ExchangeDecimal {
             self.bid = price;
         }
         self.acc_tracker.log_timestamp(trade.timestamp as u64);
+        let upnl = self.unrealized_pnl();
+        self.acc_tracker.log_upnl(upnl.to_f64().unwrap());
 
         if self.check_liquidation() {
             return true;
@@ -143,15 +145,12 @@ impl ExchangeDecimal {
     pub fn consume_candle(&mut self, candle: &Candle) -> bool {
         self.bid = Decimal::from_f64(candle.close).unwrap();
         self.ask = Decimal::from_f64(candle.close).unwrap();
-
-        let half_spread: Decimal = Decimal::from_f64(candle.avg_spread / 2.0).unwrap();
-        self.bid -= half_spread;
-        self.ask += half_spread;
-
         self.high = Decimal::from_f64(candle.high).unwrap();
         self.low = Decimal::from_f64(candle.low).unwrap();
 
         self.acc_tracker.log_timestamp(candle.timestamp as u64);
+        let upnl = self.unrealized_pnl();
+        self.acc_tracker.log_upnl(upnl.to_f64().unwrap());
 
         if self.check_liquidation() {
             return true;
@@ -513,9 +512,8 @@ impl ExchangeDecimal {
         } else {
             self.position.entry_price
         };
-        let upnl: f64 = self.unrealized_pnl().to_f64().unwrap();
         self.acc_tracker
-            .log_trade(side, amount_base.to_f64().unwrap(), upnl);
+            .log_trade(side, amount_base.to_f64().unwrap());
 
         match side {
             Side::Buy => {
@@ -603,9 +601,8 @@ impl ExchangeDecimal {
     fn execute_limit(&mut self, side: Side, price: Decimal, amount_base: Decimal) {
         self.acc_tracker.log_limit_order_fill();
         self.deduce_fees(FeeType::Maker, amount_base, price);
-        let upnl: f64 = self.unrealized_pnl().to_f64().unwrap();
         self.acc_tracker
-            .log_trade(side, amount_base.to_f64().unwrap(), upnl);
+            .log_trade(side, amount_base.to_f64().unwrap());
 
         let old_position_size = self.position.size;
         let old_entry_price: Decimal = if self.position.size == Decimal::new(0, 0) {
