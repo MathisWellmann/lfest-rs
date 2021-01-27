@@ -23,6 +23,7 @@ pub struct AccTracker {
     next_trigger_ts: u64,
     last_rpnl_entry: f64,
     cumulative_fees: f64,
+    num_trading_opportunities: usize,
 }
 
 impl AccTracker {
@@ -46,6 +47,7 @@ impl AccTracker {
             next_trigger_ts: 0,
             last_rpnl_entry: 0.0,
             cumulative_fees: 0.0,
+            num_trading_opportunities: 0,
         }
     }
 
@@ -96,6 +98,12 @@ impl AccTracker {
     /// Return the number of trades the account made
     pub fn num_trades(&self) -> i64 {
         self.num_trades
+    }
+
+    /// Return the ratio of executed trades vs total trading opportunities
+    /// Higher values means a more active trading agent
+    pub fn trade_percentage(&self) -> f64 {
+        self.num_trades as f64 / self.num_trading_opportunities as f64
     }
 
     /// Return the ratio of buy trades vs total number of trades
@@ -159,6 +167,7 @@ impl AccTracker {
             self.last_rpnl_entry = self.total_rpnl;
             self.daily_returns.push(rpnl);
         }
+        self.num_trading_opportunities += 1;
     }
 
     /// Update the cumulative fee amount denoted in BASE currency
