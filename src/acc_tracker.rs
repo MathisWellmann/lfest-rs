@@ -82,7 +82,12 @@ impl AccTracker {
     /// metric that penalizes both std_dev as well as drawdown in returns
     /// see paper: https://arxiv.org/pdf/2008.09471.pdf
     pub fn sharpe_sterling_ratio(&self) -> f64 {
-        self.total_rpnl / (self.welford_returns.std_dev() * self.max_drawdown)
+        let mut std_dev = self.welford_returns.std_dev();
+        if std_dev < 0.1 {
+            // limit the std_dev to 0.1 minimum
+            std_dev = 0.1;
+        }
+        self.total_rpnl / (std_dev * self.max_upnl_drawdown)
     }
 
     /// Return the maximum drawdown of the realized profit and loss curve
