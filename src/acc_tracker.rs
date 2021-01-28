@@ -14,7 +14,7 @@ pub struct AccTracker {
     max_drawdown: f64,
     max_upnl_drawdown: f64,
     welford_returns: WelfordOnline,
-    welford_pos_returns: WelfordOnline,
+    welford_neg_returns: WelfordOnline,
     wins: usize,
     num_submitted_limit_orders: usize,
     num_cancelled_limit_orders: usize,
@@ -38,7 +38,7 @@ impl AccTracker {
             max_drawdown: 0.0,
             max_upnl_drawdown: 0.0,
             welford_returns: WelfordOnline::new(),
-            welford_pos_returns: WelfordOnline::new(),
+            welford_neg_returns: WelfordOnline::new(),
             wins: 0,
             num_submitted_limit_orders: 0,
             num_cancelled_limit_orders: 0,
@@ -76,7 +76,17 @@ impl AccTracker {
 
     /// Return the Sortino ratio based on individual trade data
     pub fn sortino(&self) -> f64 {
-        self.total_rpnl / self.welford_pos_returns.std_dev()
+        self.total_rpnl / self.welford_neg_returns.std_dev()
+    }
+
+    /// Return the standard deviation of realized profit and loss returns
+    pub fn std_dev_returns(&self) -> f64 {
+        self.welford_returns.std_dev()
+    }
+
+    /// Return the standard deviation of negative realized profit and loss returns
+    pub fn std_dev_neg_returns(&self) -> f64 {
+        self.welford_neg_returns.std_dev()
     }
 
     /// metric that penalizes both std_dev as well as drawdown in returns
@@ -131,8 +141,9 @@ impl AccTracker {
         self.total_rpnl += rpnl;
         self.wallet_balance += rpnl;
         self.welford_returns.add(rpnl);
-        if rpnl > 0.0 {
-            self.welford_pos_returns.add(rpnl);
+        if rpnl < 0.0 {
+            self.welford_neg_returns.add(rpnl);
+        } else {
             self.wins += 1;
         }
         if self.wallet_balance > self.wb_high {
@@ -249,7 +260,7 @@ mod tests {
         assert_eq!(round(acc_tracker.max_drawdown(), 2), 0.09);
         assert_eq!(round(acc_tracker.total_rpnl(), 1), 0.20);
         assert_eq!(round(acc_tracker.welford_returns.std_dev(), 3), 0.134);
-        assert_eq!(round(acc_tracker.welford_pos_returns.std_dev(), 3), 0.058);
+        assert_eq!(round(acc_tracker.welford_neg_returns.std_dev(), 3), 0.058);
         assert_eq!(round(acc_tracker.sharpe(), 3), 1.491);
         assert_eq!(round(acc_tracker.sortino(), 3), 3.464);
     }
