@@ -6,6 +6,7 @@ const DAILY_MS: u64 = 86_400_000;
 #[derive(Debug, Clone)]
 pub struct AccTracker {
     wallet_balance: f64,
+    starting_wb: f64,
     total_rpnl: f64,
     num_trades: i64,
     num_buys: i64,
@@ -30,6 +31,7 @@ impl AccTracker {
     pub fn new(starting_wb: f64) -> Self {
         AccTracker {
             wallet_balance: starting_wb,
+            starting_wb,
             total_rpnl: 0.0,
             num_trades: 0,
             num_buys: 0,
@@ -97,7 +99,7 @@ impl AccTracker {
             // limit the std_dev to 0.1 minimum
             std_dev = 0.1;
         }
-        self.total_rpnl / (std_dev * self.max_upnl_drawdown)
+        self.total_rpnl / (std_dev * self.max_upnl_drawdown())
     }
 
     /// Return the maximum drawdown of the realized profit and loss curve
@@ -107,7 +109,7 @@ impl AccTracker {
 
     /// Return the maximum drawdown of the unrealized profit and loss curve
     pub fn max_upnl_drawdown(&self) -> f64 {
-        self.max_upnl_drawdown
+        self.max_upnl_drawdown / self.starting_wb
     }
 
     /// Return the number of trades the account made
@@ -165,7 +167,7 @@ impl AccTracker {
         }
     }
 
-    /// Log the unrealized profit and loss as each new candle or trade
+    /// Log the unrealized profit and loss at each new candle or trade
     pub fn log_upnl(&mut self, upnl: f64) {
         let upnl_dd: f64 = upnl.abs();
         if upnl_dd > self.max_upnl_drawdown {
