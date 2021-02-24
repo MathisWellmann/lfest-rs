@@ -4,7 +4,7 @@ use crate::acc_tracker::AccTracker;
 use crate::config_float::*;
 use crate::orders_float::*;
 use crate::{FeeType, OrderError, OrderType, Side};
-use trade_aggregation::common::*;
+use trade_aggregation::*;
 
 #[derive(Debug, Clone)]
 pub struct ExchangeFloat {

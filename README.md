@@ -11,13 +11,16 @@ Both need to have the same code in order to ensure the correctness of the f64 im
 
 Currently, no guarantee of feature completeness is given as it is not of high priority for my personal backtesting.
 
-## Example Usage
-Add to your Cargo.toml
+## How to use
+To use this crate in your project, add the following to your Cargo.toml:
 ```
-lfest = "0.3.0"
+[dependencies]
+lfest = { git = "https://github.com/MathisWellmann/lfest-rs" }
 ```
+
 Then proceed to use it in your code.
 The following example uses a Trade to update the bid and ask price of the exchange.
+
 ```rust
 mod load_trades;
 
@@ -68,6 +71,7 @@ See the examples folder for more code.
 
 ## Resulting Performance metrics
 All performance metrics can be obtained from the AccTracker struct like so, where e is the exchange:
+
 ```rust
 let rpnl = e.acc_tracker.total_rpnl();
 let sharpe = e.acc_tracker.sharpe();
@@ -111,6 +115,16 @@ as the exchange relies on the Trade and Candle struct.
 
 ## Contributions
 If you find a bug or would like to help out, feel free to create a pull-request.
+
+### Donations :moneybag: :money_with_wings:
+I you would like to support the development of this crate, feel free to send over a donation:
+
+Monero (XMR) address:
+```plain
+47xMvxNKsCKMt2owkDuN1Bci2KMiqGrAFCQFSLijWLs49ua67222Wu3LZryyopDVPYgYmAnYkSZSz9ZW2buaDwdyKTWGwwb
+```
+
+![monero](img/monero_donations_qrcode.png)
 
 ## License
 Copyright (C) 2020  <Mathis Wellmann wellmannmathis@gmail.com>

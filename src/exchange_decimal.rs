@@ -7,7 +7,7 @@ use crate::orders_decimal::*;
 use crate::{FeeType, OrderError, OrderType, Side};
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use rust_decimal::Decimal;
-use trade_aggregation::common::*;
+use trade_aggregation::*;
 
 #[derive(Debug, Clone)]
 pub struct ExchangeDecimal {

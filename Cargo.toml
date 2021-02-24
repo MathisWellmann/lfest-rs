@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2018"
 
@@ -11,8 +11,8 @@ rust_decimal = "1.4.1"
 log = "0.4.0"
 pretty_env_logger = "0.4"
 
-trade_aggregation = { git = "https://github.com/MathisWellmann/rust_trade_aggregation" }
-sliding_features = { git = "https://github.com/MathisWellmann/rust_sliding_features" }
+trade_aggregation = "1.0.0"
+sliding_features = "0.5.1"
 
 [dev-dependencies]
 csv = "1.1.4"
