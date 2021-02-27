@@ -1,10 +1,29 @@
 [package]
 name = "lfest"
-version = "0.3.3"
+version = "0.4.0"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license-file = "LICENSE"
+description = "A leveraged futures exchange for simulated trading is a high performance backtesting exchange"
+repository = "https://github.com/MathisWellmann/lfest-rs"
+readme = "README.md"
+keywords = [
+    "exchange",
+    "trading",
+    "simulation",
+    "backest",
+    "leverage",
+    "futures",
+    "crypto",
+]
+categories = [
+    "algorithms",
+]
+exclude = [
+    "/img",
+    "/data",
+    "/.idea",
+]
 
 [dependencies]
 rust_decimal = "1.4.1"
