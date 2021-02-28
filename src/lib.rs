@@ -14,9 +14,9 @@ mod welford_online;
 mod margin;
 mod position;
 
-pub(crate) use margin::Margin;
-pub(crate) use position::Position;
-pub use exchange::{Exchange};
+pub use margin::Margin;
+pub use position::Position;
+pub use exchange::Exchange;
 pub use orders::Order;
 
 #[derive(Debug, Clone, Copy)]
