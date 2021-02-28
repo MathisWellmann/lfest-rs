@@ -2,15 +2,15 @@
 /// Describes the margin information of the account
 pub struct Margin {
     /// The wallet balance of account denoted in BASE currency
-    pub(crate) wallet_balance: f64,
+    pub wallet_balance: f64,
     /// The margin balance of account denoted in BASE currency
-    pub(crate) margin_balance: f64,
+    pub margin_balance: f64,
     /// The position margin of account denoted in BASE currency
-    pub(crate) position_margin: f64,
+    pub position_margin: f64,
     /// The order margin of account denoted in BASE currency
-    pub(crate) order_margin: f64,
+    pub order_margin: f64,
     /// The available balance of account denoted in BASE currency
-    pub(crate) available_balance: f64,
+    pub available_balance: f64,
 }
 
 impl Margin {

@@ -2,19 +2,19 @@
 /// Describes the position information of the account
 pub struct Position {
     /// The position size denoted in QUOTE currency
-    pub(crate) size: f64,
+    pub size: f64,
     /// The value of the position, denoted in BASE currency
-    pub(crate) value: f64,
+    pub value: f64,
     /// The entry price of the position
-    pub(crate) entry_price: f64,
+    pub entry_price: f64,
     /// The liquidation price of the position
-    pub(crate) liq_price: f64,
+    pub liq_price: f64,
     /// The margin used for this position
-    pub(crate) margin: f64,
+    pub margin: f64,
     /// The current position leverage
-    pub(crate) leverage: f64,
+    pub leverage: f64,
     /// The currently unrealized profit and loss, denoted in BASE currency
-    pub(crate) unrealized_pnl: f64,
+    pub unrealized_pnl: f64,
 }
 
 impl Position {
