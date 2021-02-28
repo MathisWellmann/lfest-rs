@@ -13,6 +13,8 @@ The supported order types are:
 
 ### Performance Metrics:
 The following performance metrics are available through AccTracker struct:
+- win_ratio
+- profit_loss_ratio
 - total_rpnl
 - sharpe
 - sharpe_daily_returns
@@ -22,10 +24,9 @@ The following performance metrics are available through AccTracker struct:
 - max_drawdown
 - max_upnl_drawdown
 - num_trades
+- turnover
 - trade_percentage
 - buy_ratio
-- win_ratio
-- turnover
 - limit_order_fill_ratio
 - limit_order_cancellation_ratio
 

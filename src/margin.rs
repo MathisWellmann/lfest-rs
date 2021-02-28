@@ -22,14 +22,14 @@ impl Margin {
             position_margin: 0.0,
             order_margin: 0.0,
             available_balance: init_balance,
-        }    
+        }
     }
 
     /// Reserve some margin for open orders, order_margin denoted in BASE currency
     /// Returns true if successful
     pub fn reserve_order_margin(&mut self, order_margin: f64) -> bool {
         if order_margin > self.available_balance {
-            return false
+            return false;
         }
         self.order_margin += order_margin;
         self.available_balance -= order_margin;
@@ -41,7 +41,7 @@ impl Margin {
     /// Returns true if successful
     pub fn free_order_margin(&mut self, order_margin: f64) -> bool {
         if order_margin > self.order_margin {
-            return false
+            return false;
         }
         self.order_margin -= order_margin;
         self.available_balance += order_margin;
@@ -53,7 +53,7 @@ impl Margin {
     /// Return true if successful
     pub fn add_margin_to_position(&mut self, trade_margin: f64) -> bool {
         if trade_margin > self.available_balance {
-            return false
+            return false;
         }
         self.position_margin += trade_margin;
         self.available_balance -= trade_margin;
@@ -65,7 +65,7 @@ impl Margin {
     /// Return true if successful
     pub fn reduce_position_margin(&mut self, trade_margin: f64) -> bool {
         if trade_margin > self.position_margin {
-            return false
+            return false;
         }
         self.position_margin -= trade_margin;
         self.available_balance += trade_margin;
@@ -78,7 +78,7 @@ impl Margin {
     pub fn change_balance(&mut self, delta: f64) -> bool {
         let new_balance: f64 = self.wallet_balance + delta;
         if new_balance < 0.0 {
-            return false
+            return false;
         }
         self.wallet_balance = new_balance;
         self.margin_balance = new_balance;
@@ -86,27 +86,27 @@ impl Margin {
 
         true
     }
-    
+
     /// Return the wallet balance of account
     pub fn wallet_balance(&self) -> f64 {
         self.wallet_balance
     }
-    
+
     /// Return the margin balance of account
     pub fn margin_balance(&self) -> f64 {
         self.margin_balance
     }
-    
+
     /// Return the position margin of account
     pub fn position_margin(&self) -> f64 {
         self.position_margin
     }
-    
+
     /// Return the used order margin of account
     pub fn order_margin(&self) -> f64 {
         self.order_margin
     }
-    
+
     /// Return the available balance of account
     pub fn available_balance(&self) -> f64 {
         self.available_balance

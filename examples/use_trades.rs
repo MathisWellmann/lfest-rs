@@ -8,12 +8,12 @@ use std::time::Instant;
 fn main() {
     let t0 = Instant::now();
 
-    let config = Config{
+    let config = Config {
         fee_maker: -0.00025,
         fee_taker: 0.001,
         starting_balance_base: 1.0,
         use_candles: false,
-        leverage: 1.0
+        leverage: 1.0,
     };
     let mut exchange = Exchange::new(config);
 

@@ -1,7 +1,7 @@
 extern crate trade_aggregation;
 
 use crate::acc_tracker::AccTracker;
-use crate::{FeeType, OrderError, OrderType, Side, Config, Order, Position, Margin};
+use crate::{Config, FeeType, Margin, Order, OrderError, OrderType, Position, Side};
 use trade_aggregation::*;
 
 #[derive(Debug, Clone)]
@@ -74,7 +74,7 @@ impl Exchange {
     /// Returns true if successful
     pub fn set_position(&mut self, position: Position) -> bool {
         if position.leverage <= 0.0 || position.value() < 0.0 {
-            return false
+            return false;
         }
         self.position = position;
 
@@ -90,7 +90,7 @@ impl Exchange {
     /// Returns true if successful
     pub fn set_margin(&mut self, margin: Margin) -> bool {
         if margin.wallet_balance() < 0.0 {
-            return false
+            return false;
         }
         self.margin = margin;
 
@@ -801,7 +801,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let mut exchange = Exchange::new(config);
         let t = Trade {
@@ -878,7 +878,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let mut exchange = Exchange::new(config);
         let t = Trade {
@@ -932,7 +932,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let mut exchange = Exchange::new(config);
         let t = Trade {
@@ -968,7 +968,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let mut exchange = Exchange::new(config);
         let t = Trade {
@@ -1015,7 +1015,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let mut exchange = Exchange::new(config);
         let t = Trade {
@@ -1052,7 +1052,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
@@ -1106,7 +1106,6 @@ mod tests {
         let fee_base2 = size * fee_taker;
         let fee_asset2 = fee_base2 / 2000.0;
 
-
         let o = Order::market(Side::Sell, size);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
@@ -1140,7 +1139,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
@@ -1213,7 +1212,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
@@ -1277,7 +1276,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
@@ -1362,7 +1361,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
@@ -1450,7 +1449,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
@@ -1523,7 +1522,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
@@ -1573,11 +1572,17 @@ mod tests {
         assert_eq!(exchange.position.value, 0.5);
         assert_eq!(exchange.position.margin, 0.4);
         assert_eq!(exchange.position.unrealized_pnl, 0.1);
-        assert_eq!(round(exchange.margin.wallet_balance, 6), round(1.1 - fee_combined, 6));
+        assert_eq!(
+            round(exchange.margin.wallet_balance, 6),
+            round(1.1 - fee_combined, 6)
+        );
         assert_eq!(exchange.margin.margin_balance, 1.2 - fee_combined);
         assert_eq!(exchange.margin.position_margin, 0.6);
         assert_eq!(exchange.order_margin(), 0.0);
-        assert_eq!(round(exchange.margin.available_balance, 6), round(0.5 - fee_combined, 6));
+        assert_eq!(
+            round(exchange.margin.available_balance, 6),
+            round(0.5 - fee_combined, 6)
+        );
     }
 
     #[test]
@@ -1587,7 +1592,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
@@ -1675,7 +1680,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
@@ -1748,7 +1753,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let mut exchange = Exchange::new(config);
         let t = Trade {
@@ -1776,7 +1781,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let mut exchange = Exchange::new(config);
         let t = Trade {
@@ -1804,7 +1809,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let mut exchange = Exchange::new(config);
         let t = Trade {
@@ -1849,7 +1854,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let mut exchange = Exchange::new(config);
         let t = Trade {
@@ -1896,7 +1901,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let mut exchange = Exchange::new(config);
         let t = Trade {
@@ -1928,7 +1933,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
@@ -1982,7 +1987,7 @@ mod tests {
             fee_taker: 0.00075,
             starting_balance_base: 1.0,
             use_candles: false,
-            leverage: 1.0
+            leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);

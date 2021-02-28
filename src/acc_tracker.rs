@@ -28,6 +28,8 @@ pub struct AccTracker {
     last_rpnl_entry: f64,
     cumulative_fees: f64,
     num_trading_opportunities: usize,
+    total_profit: f64,
+    total_loss: f64,
 }
 
 impl AccTracker {
@@ -53,7 +55,14 @@ impl AccTracker {
             last_rpnl_entry: 0.0,
             cumulative_fees: 0.0,
             num_trading_opportunities: 0,
+            total_profit: 0.0,
+            total_loss: 0.0,
         }
+    }
+
+    /// Return the ratio of average trade profit over average trade loss
+    pub fn profit_loss_ratio(&self) -> f64 {
+        self.total_profit / self.total_loss
     }
 
     /// Return the cumulative fees paid to the exchange denoted in BASE currency
@@ -149,8 +158,10 @@ impl AccTracker {
         self.welford_returns.add(rpnl);
         if rpnl < 0.0 {
             self.welford_neg_returns.add(rpnl);
+            self.total_loss += rpnl;
         } else {
             self.wins += 1;
+            self.total_profit += rpnl;
         }
         if self.wallet_balance > self.wb_high {
             self.wb_high = self.wallet_balance;

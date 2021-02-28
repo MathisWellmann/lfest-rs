@@ -9,15 +9,15 @@ extern crate log;
 
 mod acc_tracker;
 mod exchange;
-mod orders;
-mod welford_online;
 mod margin;
+mod orders;
 mod position;
+mod welford_online;
 
-pub use margin::Margin;
-pub use position::Position;
 pub use exchange::Exchange;
+pub use margin::Margin;
 pub use orders::Order;
+pub use position::Position;
 
 #[derive(Debug, Clone, Copy)]
 /// Side of the order

@@ -27,7 +27,7 @@ impl Position {
             liq_price: 0.0,
             margin: 0.0,
             leverage,
-            unrealized_pnl: 0.0
+            unrealized_pnl: 0.0,
         }
     }
 
