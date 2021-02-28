@@ -50,6 +50,58 @@ impl Exchange {
         };
     }
 
+    /// Return the bid price
+    pub fn bid(&self) -> f64 {
+        self.bid
+    }
+
+    /// Return the ask price
+    pub fn ask(&self) -> f64 {
+        self.ask
+    }
+
+    /// Return the high price of the last candle
+    pub fn high(&self) -> f64 {
+        self.high
+    }
+
+    /// Return the low price of the last candle
+    pub fn low(&self) -> f64 {
+        self.low
+    }
+
+    /// Set a new position manually, be sure that you know what you are doing
+    /// Returns true if successful
+    pub fn set_position(&mut self, position: Position) -> bool {
+        if position.leverage <= 0.0 || position.value() < 0.0 {
+            return false
+        }
+        self.position = position;
+
+        true
+    }
+
+    /// Return a reference to internal position
+    pub fn position(&self) -> &Position {
+        &self.position
+    }
+
+    /// Set a new margin manually, be sure that you know what you are doing when using this method
+    /// Returns true if successful
+    pub fn set_margin(&mut self, margin: Margin) -> bool {
+        if margin.wallet_balance() < 0.0 {
+            return false
+        }
+        self.margin = margin;
+
+        true
+    }
+
+    /// Return a reference to internal margin
+    pub fn margin(&self) -> &Margin {
+        &self.margin
+    }
+
     /// Set a timestamp, used for synchronizing orders
     pub fn set_timestamp(&mut self, timestamp: u64) {
         self.timestamp = timestamp;
@@ -365,16 +417,6 @@ impl Exchange {
         } else {
             (self.position.entry_price() - self.ask) / self.position.entry_price()
         };
-    }
-
-    /// Return a reference to internal margin struct
-    pub fn margin(&self) -> &Margin {
-        &self.margin
-    }
-
-    /// Return a reference to internal position struct
-    pub fn position(&self) -> &Position {
-        &self.position
     }
 
     /// Return a reference to internal acc_tracker struct
