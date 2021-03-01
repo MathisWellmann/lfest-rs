@@ -151,8 +151,23 @@ impl AccTracker {
         self.total_rpnl
     }
 
+    /// Return the ratio of winning trades vs all trades
+    pub fn win_ratio(&self) -> f64 {
+        self.wins as f64 / self.num_trades as f64
+    }
+
+    /// Return the ratio of filled limit orders vs number of submitted limit orders
+    pub fn limit_order_fill_ratio(&self) -> f64 {
+        self.num_filled_limit_orders as f64 / self.num_submitted_limit_orders as f64
+    }
+
+    /// Return the ratio of limit order cancellations vs number of submitted limit orders
+    pub fn limit_order_cancellation_ratio(&self) -> f64 {
+        self.num_cancelled_limit_orders as f64 / self.num_submitted_limit_orders as f64
+    }
+
     /// Log the realized profit and loss of a trade
-    pub fn log_rpnl(&mut self, rpnl: f64) {
+    pub(crate) fn log_rpnl(&mut self, rpnl: f64) {
         self.total_rpnl += rpnl;
         self.wallet_balance += rpnl;
         self.welford_returns.add(rpnl);
@@ -173,7 +188,7 @@ impl AccTracker {
     }
 
     /// Log the trade
-    pub fn log_trade(&mut self, side: Side, size: f64) {
+    pub(crate) fn log_trade(&mut self, side: Side, size: f64) {
         self.total_turnover += size;
         self.num_trades += 1;
         match side {
@@ -183,7 +198,7 @@ impl AccTracker {
     }
 
     /// Log the unrealized profit and loss at each new candle or trade
-    pub fn log_upnl(&mut self, upnl: f64) {
+    pub(crate) fn log_upnl(&mut self, upnl: f64) {
         let upnl_dd: f64 = upnl.abs();
         if upnl_dd > self.max_upnl_drawdown {
             self.max_upnl_drawdown = upnl_dd;
@@ -192,7 +207,7 @@ impl AccTracker {
 
     /// Update the most recent timestamp which is used for daily rpnl calculation.
     /// Assumes timestamp in milliseconds
-    pub fn log_timestamp(&mut self, ts: u64) {
+    pub(crate) fn log_timestamp(&mut self, ts: u64) {
         if ts > self.next_trigger_ts {
             self.next_trigger_ts = ts + DAILY_MS;
             // calculate daily rpnl
@@ -204,38 +219,23 @@ impl AccTracker {
     }
 
     /// Update the cumulative fee amount denoted in BASE currency
-    pub fn log_fee(&mut self, fee_base: f64) {
+    pub(crate) fn log_fee(&mut self, fee_base: f64) {
         self.cumulative_fees += fee_base
     }
 
     /// Log a limit order submission
-    pub fn log_limit_order_submission(&mut self) {
+    pub(crate) fn log_limit_order_submission(&mut self) {
         self.num_submitted_limit_orders += 1;
     }
 
     /// Log a limit order cancellation
-    pub fn log_limit_order_cancellation(&mut self) {
+    pub(crate) fn log_limit_order_cancellation(&mut self) {
         self.num_cancelled_limit_orders += 1;
     }
 
     /// Log a limit order fill
-    pub fn log_limit_order_fill(&mut self) {
+    pub(crate) fn log_limit_order_fill(&mut self) {
         self.num_filled_limit_orders += 1;
-    }
-
-    /// Return the ratio of winning trades vs all trades
-    pub fn win_ratio(&self) -> f64 {
-        self.wins as f64 / self.num_trades as f64
-    }
-
-    /// Return the ratio of filled limit orders vs number of submitted limit orders
-    pub fn limit_order_fill_ratio(&self) -> f64 {
-        self.num_filled_limit_orders as f64 / self.num_submitted_limit_orders as f64
-    }
-
-    /// Return the ratio of limit order cancellations vs number of submitted limit orders
-    pub fn limit_order_cancellation_ratio(&self) -> f64 {
-        self.num_cancelled_limit_orders as f64 / self.num_submitted_limit_orders as f64
     }
 }
 
