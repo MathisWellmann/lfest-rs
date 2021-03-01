@@ -158,7 +158,7 @@ impl AccTracker {
         self.welford_returns.add(rpnl);
         if rpnl < 0.0 {
             self.welford_neg_returns.add(rpnl);
-            self.total_loss += rpnl;
+            self.total_loss += rpnl.abs();
         } else {
             self.wins += 1;
             self.total_profit += rpnl;
