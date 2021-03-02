@@ -282,6 +282,11 @@ impl Exchange {
         return exec_orders;
     }
 
+    /// Return the currently active orders
+    pub fn active_orders(&self) -> &Vec<Order> {
+        &self.orders_active
+    }
+
     /// Check if market order is correct
     pub fn validate_market_order(&mut self, o: &Order) -> Option<OrderError> {
         let price = match o.side {
