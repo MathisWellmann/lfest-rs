@@ -728,22 +728,44 @@ impl Exchange {
 
     /// Handle stop market order trigger and execution
     fn handle_stop_market_order(&mut self, order_index: usize) {
+        // check if stop order has been triggered
         match self.orders_active[order_index].side {
             Side::Buy => {
-                if self.orders_active[order_index].trigger_price > self.ask {
-                    return;
+                match self.config.use_candles {
+                    true => {
+                        if self.orders_active[order_index].trigger_price > self.high {
+                            return
+                        }
+                    },
+                    false => {
+                        if self.orders_active[order_index].trigger_price > self.ask {
+                            return
+                        }
+                    }
                 }
-                self.execute_market(Side::Buy, self.orders_active[order_index].size);
-                self.orders_active[order_index].mark_executed();
             }
             Side::Sell => {
-                if self.orders_active[order_index].trigger_price > self.bid {
-                    return;
+                match self.config.use_candles {
+                    true => {
+                        if self.orders_active[order_index].trigger_price < self.low {
+                            return
+                        }
+                    },
+                    false => {
+                        if self.orders_active[order_index].trigger_price > self.bid {
+                            return
+                        }
+                    }
                 }
-                self.execute_market(Side::Sell, self.orders_active[order_index].size);
-                self.orders_active[order_index].mark_executed();
             }
         }
+        self.execute_market(self.orders_active[order_index].side, self.orders_active[order_index].size);
+        self.orders_active[order_index].mark_executed();
+
+        let order_margin: f64 = self.orders_active[order_index].size
+            / self.orders_active[order_index].trigger_price
+            / self.position().leverage();
+        assert!(self.margin.free_order_margin(order_margin));
     }
 
     /// Handler for executing market orders
@@ -1042,7 +1064,7 @@ mod tests {
     }
 
     #[test]
-    fn handle_stop_market_order() {
+    fn handle_stop_market_order_w_trade() {
         let config = Config {
             fee_maker: -0.00025,
             fee_taker: 0.00075,
@@ -1061,8 +1083,6 @@ mod tests {
         let o = Order::stop_market(Side::Buy, 1010.0, 100.0);
         let valid = exchange.submit_order(o);
         assert!(valid.is_ok());
-        exchange.check_orders();
-
         assert_eq!(exchange.orders_active.len(), 1);
 
         let t = Trade {
@@ -1072,10 +1092,66 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        exchange.check_orders();
-
         assert_eq!(exchange.position.size, 100.0);
         assert_eq!(exchange.position.entry_price, 1010.0);
+    }
+
+    #[test]
+    fn handle_stop_market_order_w_candle() {
+        let config = Config {
+            fee_maker: -0.00025,
+            fee_taker: 0.00075,
+            starting_balance_base: 1.0,
+            use_candles: true,
+            leverage: 1.0,
+        };
+        let mut exchange = Exchange::new(config);
+
+        let c = Candle {
+            timestamp: 0,
+            open: 40_000.0,
+            high: 40_500.0,
+            low: 35_000.0,
+            close: 40_100.0,
+            volume: 0.0,
+            directional_trade_ratio: 0.0,
+            directional_volume_ratio: 0.0,
+            num_trades: 0,
+            arithmetic_mean_price: 0.0,
+            weighted_price: 0.0,
+            std_dev_prices: 0.0,
+            std_dev_sizes: 0.0,
+            time_velocity: 0.0
+        };
+        exchange.consume_candle(&c);
+
+        let o = Order::stop_market(Side::Buy, 40_600.0, 4060.0);
+        let valid = exchange.submit_order(o);
+        assert!(valid.is_ok());
+        assert_eq!(exchange.margin().order_margin(), 0.1);
+
+        let c = Candle {
+            timestamp: 0,
+            open: 40_100.0,
+            high: 40_700.0,
+            low: 36_000.0,
+            close: 40_500.0,
+            volume: 0.0,
+            directional_trade_ratio: 0.0,
+            directional_volume_ratio: 0.0,
+            num_trades: 0,
+            arithmetic_mean_price: 0.0,
+            weighted_price: 0.0,
+            std_dev_prices: 0.0,
+            std_dev_sizes: 0.0,
+            time_velocity: 0.0
+        };
+        exchange.consume_candle(&c);
+
+        assert_eq!(exchange.position().size(), 4060.0);
+        assert_eq!(round(exchange.position().value(), 1), 0.1);
+        assert_eq!(round(exchange.margin().position_margin(), 1), 0.1);
+        assert_eq!(exchange.margin().order_margin(), 0.0);
     }
 
     #[test]
