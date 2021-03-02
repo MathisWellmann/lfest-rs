@@ -160,16 +160,38 @@ impl Exchange {
     }
 
     /// Cancel an active order
-    /// returns true if successful with given order_id
+    /// returns Some order if successful with given order_id
     pub fn cancel_order(&mut self, order_id: u64) -> Option<Order> {
         for (i, o) in self.orders_active.iter().enumerate() {
             if o.id == order_id {
                 let old_order = self.orders_active.remove(i);
-                self.update_position_stats();
+                let order_price: f64 = match old_order.order_type {
+                    OrderType::Limit => old_order.limit_price,
+                    OrderType::StopMarket => old_order.trigger_price,
+                    OrderType::Market => panic!("there should be no market order in orders_active"),
+                };
+                let order_margin = old_order.size / order_price / self.position.leverage();
+                self.margin.free_order_margin(order_margin);
                 return Some(old_order);
             }
         }
         None
+    }
+
+    /// Cancel all active orders
+    pub fn cancel_all_orders(&mut self) {
+        let total_order_margin = self.orders_active
+            .iter()
+            .map(|o| {
+                match o.order_type {
+                    OrderType::Limit => o.size / o.limit_price / self.position.leverage(),
+                    OrderType::StopMarket => o.size / o.trigger_price / self.position.leverage(),
+                    OrderType::Market => panic!("there should be no market order in orders_active!"),
+                }
+            })
+            .sum();
+        self.margin.free_order_margin(total_order_margin);
+        self.orders_active = vec![];
     }
 
     /// Query an active order by order id
@@ -216,27 +238,33 @@ impl Exchange {
 
         order.timestamp = self.timestamp;
 
-        match order.order_type {
+        return match order.order_type {
             OrderType::Market => {
                 // immediately execute market order
                 self.execute_market(order.side, order.size);
-                return Ok(order);
+
+                Ok(order)
             }
             OrderType::Limit => {
                 self.acc_tracker.log_limit_order_submission();
+                let order_margin: f64 = order.size / order.limit_price / self.position.leverage();
+                self.margin.reserve_order_margin(order_margin);
                 self.orders_active.push(order.clone());
-                self.margin.available_balance =
-                    self.margin.wallet_balance - self.margin.position_margin - self.order_margin();
-                return Ok(order);
-            }
-            _ => {}
-        }
-        self.orders_active.push(order.clone());
 
-        return Ok(order);
+                Ok(order)
+            },
+            OrderType::StopMarket => {
+                let order_margin: f64 = order.size / order.trigger_price / self.position.leverage();
+                self.margin.reserve_order_margin(order_margin);
+                self.orders_active.push(order.clone());
+
+                Ok(order)
+            }
+        }
     }
 
     /// Return the order margin used
+    #[deprecated]
     pub fn order_margin(&self) -> f64 {
         let mut order_margin_long: f64 = 0.0;
         let mut order_margin_short: f64 = 0.0;
@@ -1919,19 +1947,70 @@ mod tests {
         let o = Order::limit(Side::Buy, 900.0, 450.0);
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
-
         assert_eq!(exchange.orders_active.len(), 1);
-        assert_eq!(exchange.order_margin(), 0.5);
+        assert_eq!(exchange.margin().wallet_balance(), 1.0);
+        assert_eq!(exchange.margin().margin_balance(), 1.0);
+        assert_eq!(exchange.margin().position_margin(), 0.0);
+        assert_eq!(exchange.margin().order_margin(), 0.5);
+        assert_eq!(exchange.margin().available_balance(), 0.5);
 
-        exchange.cancel_order(0);
+        let _o = exchange.cancel_order(0).unwrap();
         assert_eq!(exchange.orders_active.len(), 0);
-        assert_eq!(exchange.margin.wallet_balance, 1.0);
-        assert_eq!(exchange.margin.margin_balance, 1.0);
-        assert_eq!(exchange.margin.available_balance, 1.0);
-        assert_eq!(exchange.order_margin(), 0.0);
+        assert_eq!(exchange.margin().wallet_balance(), 1.0);
+        assert_eq!(exchange.margin().margin_balance(), 1.0);
+        assert_eq!(exchange.margin().position_margin(), 0.0);
+        assert_eq!(exchange.margin().order_margin(), 0.0);
+        assert_eq!(exchange.margin().available_balance(), 1.0);
     }
 
     #[test]
+    fn cancel_all_orders() {
+        let config = Config {
+            fee_maker: -0.00025,
+            fee_taker: 0.00075,
+            starting_balance_base: 1.0,
+            use_candles: false,
+            leverage: 1.0,
+        };
+        let mut exchange = Exchange::new(config);
+        let t = Trade {
+            timestamp: 0,
+            price: 1000.0,
+            size: 100.0,
+        };
+        exchange.consume_trade(&t);
+
+        let o = Order::limit(Side::Buy, 900.0, 450.0);
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
+        assert_eq!(exchange.orders_active.len(), 1);
+        assert_eq!(exchange.margin().wallet_balance(), 1.0);
+        assert_eq!(exchange.margin().margin_balance(), 1.0);
+        assert_eq!(exchange.margin().position_margin(), 0.0);
+        assert_eq!(exchange.margin().order_margin(), 0.5);
+        assert_eq!(exchange.margin().available_balance(), 0.5);
+
+        let o = Order::limit(Side::Buy, 900.0, 450.0);
+        let order_err = exchange.submit_order(o);
+        assert!(order_err.is_ok());
+        assert_eq!(exchange.orders_active.len(), 2);
+        assert_eq!(exchange.margin().wallet_balance(), 1.0);
+        assert_eq!(exchange.margin().margin_balance(), 1.0);
+        assert_eq!(exchange.margin().position_margin(), 0.0);
+        assert_eq!(exchange.margin().order_margin(), 1.0);
+        assert_eq!(exchange.margin().available_balance(), 0.0);
+
+        exchange.cancel_all_orders();
+        assert_eq!(exchange.orders_active.len(), 0);
+        assert_eq!(exchange.margin().wallet_balance(), 1.0);
+        assert_eq!(exchange.margin().margin_balance(), 1.0);
+        assert_eq!(exchange.margin().position_margin(), 0.0);
+        assert_eq!(exchange.margin().order_margin(), 0.0);
+        assert_eq!(exchange.margin().available_balance(), 1.0);
+    }
+
+    #[test]
+    #[ignore]
     fn order_margin() {
         let config = Config {
             fee_maker: -0.00025,
