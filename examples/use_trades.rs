@@ -6,7 +6,7 @@ mod load_trades;
 #[macro_use]
 extern crate log;
 
-use lfest::{Config, Exchange, Order, Side, OrderError};
+use lfest::{Config, Exchange, Order, OrderError, Side};
 use load_trades::load_trades_from_csv;
 use rand::{thread_rng, Rng};
 use std::time::Instant;
@@ -44,22 +44,25 @@ fn main() {
             // Trade a fraction of the available wallet balance
             let order_size: f64 = exchange.margin().wallet_balance() * 0.1;
             let order: Order = if r > 0.5 {
-                Order::market(Side::Sell, order_size) // Sell using market order
+                Order::market(Side::Sell, order_size).unwrap() // Sell using market order
             } else {
-                Order::market(Side::Buy, order_size) // Buy using market order
+                Order::market(Side::Buy, order_size).unwrap() // Buy using market order
             };
             // Handle order error here if needed
             let response: Result<Order, OrderError> = exchange.submit_order(order);
             match response {
                 Ok(order) => println!("succesfully submitted order: {:?}", order),
                 Err(order_err) => match order_err {
-                    OrderError::MaxActiveOrders => error!("maximum number of active orders reached"),
+                    OrderError::MaxActiveOrders => {
+                        error!("maximum number of active orders reached")
+                    }
                     OrderError::InvalidLimitPrice => error!("invalid limit price of order"),
                     OrderError::InvalidTriggerPrice => error!("invalid trigger price of order"),
                     OrderError::InvalidOrderSize => error!("invalid order size"),
-                    OrderError::NotEnoughAvailableBalance => error!("not enough available balance in account"),
-
-                }
+                    OrderError::NotEnoughAvailableBalance => {
+                        error!("not enough available balance in account")
+                    }
+                },
             }
         }
     }

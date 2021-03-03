@@ -105,7 +105,6 @@ mod tests {
 
     #[test]
     fn position_update_profit_and_loss() {
-        let mut pos = Position::new(1.0);
         // TODO:
     }
 }

@@ -1,4 +1,4 @@
-use crate::{OrderType, Side};
+use crate::{OrderError, OrderType, Side};
 
 #[derive(Debug, Clone)]
 /// Defines an order
@@ -23,8 +23,15 @@ pub struct Order {
 
 impl Order {
     /// Create a new limit order
-    pub fn limit(side: Side, limit_price: f64, size: f64) -> Order {
-        return Order {
+    /// Returns an OrderError if either the limit_price or size is invalid
+    pub fn limit(side: Side, limit_price: f64, size: f64) -> Result<Order, OrderError> {
+        if limit_price <= 0.0 {
+            return Err(OrderError::InvalidLimitPrice);
+        }
+        if size <= 0.0 {
+            return Err(OrderError::InvalidOrderSize);
+        }
+        Ok(Order {
             id: 0,
             timestamp: 0,
             order_type: OrderType::Limit,
@@ -33,12 +40,16 @@ impl Order {
             size,
             side,
             executed: false,
-        };
+        })
     }
 
     /// Create a new market order
-    pub fn market(side: Side, size: f64) -> Order {
-        return Order {
+    /// Returns an OrderError if wrong size provided
+    pub fn market(side: Side, size: f64) -> Result<Order, OrderError> {
+        if size <= 0.0 {
+            return Err(OrderError::InvalidOrderSize);
+        }
+        Ok(Order {
             id: 0,
             timestamp: 0,
             order_type: OrderType::Market,
@@ -47,12 +58,19 @@ impl Order {
             size,
             side,
             executed: false,
-        };
+        })
     }
 
     /// Create a new stop market order
-    pub fn stop_market(side: Side, trigger_price: f64, size: f64) -> Order {
-        return Order {
+    /// Returns an OrderError if either the trigger_price or size is invalid
+    pub fn stop_market(side: Side, trigger_price: f64, size: f64) -> Result<Order, OrderError> {
+        if trigger_price <= 0.0 {
+            return Err(OrderError::InvalidTriggerPrice);
+        }
+        if size <= 0.0 {
+            return Err(OrderError::InvalidOrderSize);
+        }
+        Ok(Order {
             id: 0,
             timestamp: 0,
             order_type: OrderType::StopMarket,
@@ -61,7 +79,7 @@ impl Order {
             size,
             side,
             executed: false,
-        };
+        })
     }
 
     /// Marks the order as executed

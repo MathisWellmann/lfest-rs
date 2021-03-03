@@ -2,6 +2,8 @@
 :warning: This is a personal project, use a your own risk. 
 
 :warning: The results may not represent real trading results on any given exchange. 
+Currently there is no correct implementation of order margining, which is fine for me but may not work for your purposes.
+Also automatic liquidation is terrible.
 
 lfest-rs is a blazingly fast simulated exchange capable of leveraged positions.
 It gets fed external data either as a trade or a candle to update the internal state
@@ -69,7 +71,7 @@ The following performance metrics are available through AccTracker struct:
 To use this crate in your project, add the following to your Cargo.toml:
 ```
 [dependencies]
-lfest = "0.4.8
+lfest = "0.4.9"
 ```
 
 Then proceed to use it in your code.
@@ -192,6 +194,10 @@ is capable of simulating 1 million historical trades and executing ~40k market o
 ### Dependencies
 A non trivial dependency is [trade_aggregation](https://github.com/MathisWellmann/) 
 as the exchange relies on the Trade and Candle struct.
+
+### TODOs:
+- proper order margin mechanism
+- proper liquidations
 
 ### Contributions
 If you find a bug or would like to help out, feel free to create a pull-request.

@@ -5,13 +5,13 @@ mod load_trades;
 #[macro_use]
 extern crate log;
 
-use lfest::{Config, Exchange, Order, Side, OrderError};
+use lfest::{Config, Exchange, Order, OrderError, Side};
 use load_trades::load_trades_from_csv;
 use std::time::Instant;
-use trade_aggregation::{VolumeAggregator, aggregate_all_trades, By};
+use trade_aggregation::{aggregate_all_trades, By, VolumeAggregator};
 
 fn main() {
-    let t0 = Instant::now();  // Used for measuring runtime
+    let t0 = Instant::now(); // Used for measuring runtime
 
     let config = Config {
         fee_maker: -0.00025,        // Bitmex maker fee
@@ -30,7 +30,7 @@ fn main() {
     let candles = aggregate_all_trades(&trades, &mut aggregator);
     println!("aggregated all 1M trades down to {} candles", candles.len());
 
-    for (i, c) in candles.iter().enumerate() {
+    for c in candles.iter() {
         let liq = exchange.consume_candle(c);
         if liq {
             println!("position liquidated");
@@ -41,11 +41,11 @@ fn main() {
 
         // Some arbitrary simple strategy
         let order: Option<Order> = if c.directional_volume_ratio < 0.2 {
-            Some(Order::market(Side::Buy, order_size))
+            Some(Order::market(Side::Buy, order_size).unwrap())
         } else if c.directional_volume_ratio > 0.8 {
-            Some(Order::market(Side::Sell, order_size))
+            Some(Order::market(Side::Sell, order_size).unwrap())
         } else {
-            None  // Do nothing
+            None // Do nothing
         };
 
         match order {
@@ -55,15 +55,18 @@ fn main() {
                 match response {
                     Ok(order) => println!("succesfully submitted order: {:?}", order),
                     Err(order_err) => match order_err {
-                        OrderError::MaxActiveOrders => error!("maximum number of active orders reached"),
+                        OrderError::MaxActiveOrders => {
+                            error!("maximum number of active orders reached")
+                        }
                         OrderError::InvalidLimitPrice => error!("invalid limit price of order"),
                         OrderError::InvalidTriggerPrice => error!("invalid trigger price of order"),
                         OrderError::InvalidOrderSize => error!("invalid order size"),
-                        OrderError::NotEnoughAvailableBalance => error!("not enough available balance in account"),
-
-                    }
+                        OrderError::NotEnoughAvailableBalance => {
+                            error!("not enough available balance in account")
+                        }
+                    },
                 }
-            },
+            }
             None => {}
         }
     }
