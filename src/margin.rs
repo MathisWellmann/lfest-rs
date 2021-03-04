@@ -25,28 +25,13 @@ impl Margin {
         }
     }
 
-    /// Reserve some margin for open orders, order_margin denoted in BASE currency
-    /// Returns true if successful
-    pub fn reserve_order_margin(&mut self, order_margin: f64) -> bool {
-        if order_margin > self.available_balance {
-            return false;
+    /// Set a new order margin
+    pub fn set_order_margin(&mut self, order_margin: f64) {
+        self.order_margin = order_margin;
+        self.available_balance = self.wallet_balance - self.position_margin - self.order_margin;
+        if self.available_balance <= 0.0 {
+            warn!("self.available_balance <= 0.0");
         }
-        self.order_margin += order_margin;
-        self.available_balance -= order_margin;
-
-        true
-    }
-
-    /// Free some reserved order margin for some order value, denoted in BASE currency
-    /// Returns true if successful
-    pub fn free_order_margin(&mut self, order_margin: f64) -> bool {
-        if order_margin > self.order_margin {
-            return false;
-        }
-        self.order_margin -= order_margin;
-        self.available_balance += order_margin;
-
-        true
     }
 
     /// Assign some margin for a trade with given margin value, denoted in BASE currency
@@ -118,33 +103,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn margin_reserve_order_margin() {
+    fn margin_set_order_margin() {
         let mut margin = Margin::new(1.0);
-
-        let success: bool = margin.reserve_order_margin(0.1);
-        assert!(success);
+        margin.set_order_margin(1.0);
         assert_eq!(margin.wallet_balance, 1.0);
         assert_eq!(margin.margin_balance, 1.0);
         assert_eq!(margin.position_margin, 0.0);
-        assert_eq!(margin.order_margin, 0.1);
-        assert_eq!(margin.available_balance, 0.9);
-    }
-
-    #[test]
-    fn margin_free_order_margin() {
-        let mut margin = Margin::new(1.0);
-
-        let order_margin: f64 = 0.1;
-        let success: bool = margin.reserve_order_margin(order_margin);
-        assert!(success);
-
-        let success: bool = margin.free_order_margin(order_margin);
-        assert!(success);
-        assert_eq!(margin.wallet_balance, 1.0);
-        assert_eq!(margin.margin_balance, 1.0);
-        assert_eq!(margin.position_margin, 0.0);
-        assert_eq!(margin.order_margin, 0.0);
-        assert_eq!(margin.available_balance, 1.0);
+        assert_eq!(margin.order_margin, 1.0);
+        assert_eq!(margin.available_balance, 0.0);
     }
 
     #[test]
