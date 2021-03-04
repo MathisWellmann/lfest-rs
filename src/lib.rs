@@ -13,11 +13,14 @@ mod margin;
 mod orders;
 mod position;
 mod welford_online;
+mod utils;
 
 pub use exchange::Exchange;
 pub use margin::Margin;
 pub use orders::Order;
 pub use position::Position;
+
+pub(crate) use utils::{min, max};
 
 #[derive(Debug, Clone, Copy)]
 /// Side of the order

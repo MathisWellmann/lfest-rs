@@ -102,9 +102,4 @@ mod tests {
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(pos.unrealized_pnl, 0.0);
     }
-
-    #[test]
-    fn position_update_profit_and_loss() {
-        // TODO:
-    }
 }
