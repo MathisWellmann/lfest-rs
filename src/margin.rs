@@ -27,6 +27,10 @@ impl Margin {
 
     /// Set a new order margin
     pub fn set_order_margin(&mut self, order_margin: f64) {
+        if order_margin < 0.0 {
+            error!("cannot set order margin < 0.0");
+            return;
+        }
         self.order_margin = order_margin;
         self.available_balance = self.wallet_balance - self.position_margin - self.order_margin;
         if self.available_balance <= 0.0 {

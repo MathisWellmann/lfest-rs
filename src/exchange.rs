@@ -1,7 +1,7 @@
 extern crate trade_aggregation;
 
 use crate::acc_tracker::AccTracker;
-use crate::{Config, FeeType, Margin, Order, OrderError, OrderType, Position, Side, min, max};
+use crate::{max, min, Config, FeeType, Margin, Order, OrderError, OrderType, Position, Side};
 use trade_aggregation::*;
 
 const MAX_NUM_LIMIT_ORDERS: usize = 50;
@@ -31,6 +31,10 @@ pub struct Exchange {
     open_limit_sell_size: f64,
     open_stop_buy_size: f64,
     open_stop_sell_size: f64,
+    min_limit_buy_price: f64,
+    max_limit_sell_price: f64,
+    max_stop_buy_price: f64,
+    min_stop_sell_price: f64,
 }
 
 impl Exchange {
@@ -61,6 +65,10 @@ impl Exchange {
             open_limit_sell_size: 0.0,
             open_stop_buy_size: 0.0,
             open_stop_sell_size: 0.0,
+            min_limit_buy_price: 0.0,
+            max_limit_sell_price: 0.0,
+            max_stop_buy_price: 0.0,
+            min_stop_sell_price: 0.0,
         };
     }
 
@@ -196,6 +204,56 @@ impl Exchange {
                 return Some(old_order);
             }
         }
+        // re compute min and max prices for open orders
+        self.min_limit_buy_price = 0.0;
+        self.max_limit_sell_price = 0.0;
+        for o in self.active_limit_orders.iter() {
+            match o.side {
+                Side::Buy => {
+                    if self.min_limit_buy_price == 0.0 {
+                        self.min_limit_buy_price = o.limit_price;
+                        continue;
+                    }
+                    if o.limit_price < self.min_limit_buy_price {
+                        self.min_limit_buy_price = o.limit_price;
+                    }
+                }
+                Side::Sell => {
+                    if self.max_limit_sell_price == 0.0 {
+                        self.max_limit_sell_price = o.limit_price;
+                        continue;
+                    }
+                    if o.limit_price > self.max_limit_sell_price {
+                        self.max_limit_sell_price = o.limit_price;
+                    }
+                }
+            }
+        }
+
+        self.max_stop_buy_price = 0.0;
+        self.min_stop_sell_price = 0.0;
+        for o in self.active_stop_orders.iter() {
+            match o.side {
+                Side::Buy => {
+                    if self.max_stop_buy_price == 0.0 {
+                        self.max_stop_buy_price = o.trigger_price;
+                        continue;
+                    }
+                    if o.trigger_price > self.max_stop_buy_price {
+                        self.max_stop_buy_price = o.trigger_price;
+                    }
+                }
+                Side::Sell => {
+                    if self.min_stop_sell_price == 0.0 {
+                        self.min_stop_sell_price = o.trigger_price;
+                        continue;
+                    }
+                    if o.trigger_price < self.min_stop_sell_price {
+                        self.min_stop_sell_price = o.trigger_price;
+                    }
+                }
+            }
+        }
         None
     }
 
@@ -206,6 +264,10 @@ impl Exchange {
         self.open_limit_sell_size = 0.0;
         self.open_stop_buy_size = 0.0;
         self.open_stop_sell_size = 0.0;
+        self.min_limit_buy_price = 0.0;
+        self.max_limit_sell_price = 0.0;
+        self.max_stop_buy_price = 0.0;
+        self.min_stop_sell_price = 0.0;
         self.active_limit_orders.clear();
         self.active_stop_orders.clear();
     }
@@ -262,11 +324,27 @@ impl Exchange {
                 Ok(order)
             }
             OrderType::Limit => {
-                // assign order margin
                 match order.side {
-                    Side::Buy => self.open_limit_buy_size += order.size,
-                    Side::Sell => self.open_limit_sell_size += order.size,
+                    Side::Buy => {
+                        self.open_limit_buy_size += order.size;
+                        if self.min_limit_buy_price == 0.0 {
+                            self.min_limit_buy_price = order.limit_price;
+                        }
+                        if order.limit_price < self.min_limit_buy_price {
+                            self.min_limit_buy_price = order.limit_price;
+                        }
+                    }
+                    Side::Sell => {
+                        self.open_limit_sell_size += order.size;
+                        if self.max_limit_sell_price == 0.0 {
+                            self.max_limit_sell_price = order.limit_price;
+                        }
+                        if order.limit_price > self.max_limit_sell_price {
+                            self.max_limit_sell_price = order.limit_price;
+                        }
+                    }
                 }
+                // set order margin
                 let om = self.order_margin();
                 self.margin.set_order_margin(om);
 
@@ -276,11 +354,27 @@ impl Exchange {
                 Ok(order)
             }
             OrderType::StopMarket => {
-                // assign order margin
                 match order.side {
-                    Side::Buy => self.open_stop_buy_size += order.size,
-                    Side::Sell => self.open_stop_sell_size += order.size,
+                    Side::Buy => {
+                        self.open_stop_buy_size += order.size;
+                        if self.max_stop_buy_price == 0.0 {
+                            self.max_stop_buy_price = order.trigger_price;
+                        }
+                        if order.trigger_price > self.max_stop_buy_price {
+                            self.max_stop_buy_price = order.trigger_price;
+                        }
+                    }
+                    Side::Sell => {
+                        self.open_stop_sell_size += order.size;
+                        if self.min_stop_sell_price == 0.0 {
+                            self.min_stop_sell_price = order.trigger_price;
+                        }
+                        if order.trigger_price < self.min_stop_sell_price {
+                            self.min_stop_sell_price = order.trigger_price;
+                        }
+                    }
                 }
+                // set order margin
                 let om = self.order_margin();
                 self.margin.set_order_margin(om);
 
@@ -391,37 +485,11 @@ impl Exchange {
             }
         }
 
-        // TODO: use self.order_cost()
-        let order_margin: f64 = o.size / o.limit_price / self.position.leverage;
-        match o.side {
-            Side::Buy => {
-                if self.position.size > 0.0 {
-                    // check if enough margin is available
-                    if order_margin > self.margin.available_balance() {
-                        return Err(OrderError::NotEnoughAvailableBalance);
-                    }
-                    Ok(())
-                } else {
-                    if order_margin > self.margin.available_balance() + self.position.margin() {
-                        return Err(OrderError::NotEnoughAvailableBalance);
-                    }
-                    Ok(())
-                }
-            }
-            Side::Sell => {
-                if self.position.size > 0.0 {
-                    if order_margin > self.margin.available_balance() + self.position.margin() {
-                        return Err(OrderError::NotEnoughAvailableBalance);
-                    }
-                    Ok(())
-                } else {
-                    if order_margin > self.margin.available_balance() {
-                        return Err(OrderError::NotEnoughAvailableBalance);
-                    }
-                    Ok(())
-                }
-            }
+        let order_cost: f64 = self.order_cost(o);
+        if order_cost > self.margin().available_balance() {
+            return Err(OrderError::NotEnoughAvailableBalance);
         }
+        Ok(())
     }
 
     /// Check if a stop market order is correct
@@ -431,19 +499,18 @@ impl Exchange {
                 if o.trigger_price <= self.ask {
                     return Err(OrderError::InvalidTriggerPrice);
                 }
-                return Ok(())
             }
             Side::Sell => {
                 if o.trigger_price >= self.bid {
                     return Err(OrderError::InvalidTriggerPrice);
                 }
-                return Ok(())
             }
         }
         let order_cost: f64 = self.order_cost(o);
         if order_cost > self.margin().available_balance() {
-            return Err(OrderError::NotEnoughAvailableBalance)
+            return Err(OrderError::NotEnoughAvailableBalance);
         }
+
         Ok(())
     }
 
@@ -482,17 +549,18 @@ impl Exchange {
         }
 
         // direction of dominating open order side
-        let d = match max_idx {
-            0 => 1.0,
-            1 => -1.0,
-            2 => 1.0,
-            3 => -1.0,
-            _ => panic!("any other value should not be possible")
+        let (d, p) = match max_idx {
+            0 => (1.0, self.min_limit_buy_price),
+            1 => (-1.0, self.max_limit_sell_price),
+            2 => (1.0, self.max_stop_buy_price),
+            3 => (-1.0, self.min_stop_sell_price),
+            _ => panic!("any other value should not be possible"),
         };
+        if p == 0.0 {
+            return 0.0;
+        }
 
-        max(0.0, min(m, m + d * ps))
-            / self.bid()
-            / self.position.leverage
+        max(0.0, min(m, m + d * ps)) / p / self.position.leverage
     }
 
     /// Calculate the cost of order
@@ -515,14 +583,9 @@ impl Exchange {
             OrderType::Market => match order.side {
                 Side::Buy => osbs += order.size,
                 Side::Sell => osss += order.size,
-            }
+            },
         }
-        let open_sizes: [f64; 4] = [
-            olbs,
-            olss,
-            osbs,
-            osss,
-        ];
+        let open_sizes: [f64; 4] = [olbs, olss, osbs, osss];
         let mut max_idx: usize = 0;
         let mut m: f64 = self.open_limit_buy_size;
 
@@ -539,20 +602,19 @@ impl Exchange {
             1 => -1.0,
             2 => 1.0,
             3 => -1.0,
-            _ => panic!("any other value should not be possible")
+            _ => panic!("any other value should not be possible"),
         };
 
+        // TODO: use order price of most expensive order not just last order
         let order_price: f64 = match order.order_type {
             OrderType::Market => match order.side {
                 Side::Buy => self.ask(),
                 Side::Sell => self.bid(),
             },
             OrderType::Limit => order.limit_price,
-            OrderType::StopMarket => order.trigger_price
+            OrderType::StopMarket => order.trigger_price,
         };
-        max(0.0, min(m, m + d * ps))
-            / order_price
-            / self.position.leverage
+        max(0.0, min(m, m + d * ps)) / order_price / self.position.leverage
     }
 
     /// Check if a liquidation event should occur
@@ -814,30 +876,6 @@ impl Exchange {
                 _ => panic!("there should only be stop market orders in active_stop_orders"),
             }
         }
-        // move executed orders from orders_active to orders_done
-        let mut i: usize = 0;
-        loop {
-            if i >= self.active_limit_orders.len() {
-                break;
-            }
-            if self.active_limit_orders[i].executed {
-                let exec_order = self.active_limit_orders.remove(i);
-                self.orders_executed.push(exec_order);
-            }
-            i += 1;
-        }
-
-        let mut i: usize = 0;
-        loop {
-            if i >= self.active_stop_orders.len() {
-                break;
-            }
-            if self.active_stop_orders[i].executed {
-                let exec_order = self.active_stop_orders.remove(i);
-                self.orders_executed.push(exec_order);
-            }
-            i += 1;
-        }
     }
 
     /// Handle stop market order trigger and execution
@@ -882,6 +920,9 @@ impl Exchange {
             Side::Sell => self.open_stop_sell_size -= order_size,
         }
         self.margin.set_order_margin(self.order_margin());
+
+        let exec_order = self.active_stop_orders.remove(order_idx);
+        self.orders_executed.push(exec_order);
     }
 
     /// Handle limit order trigger and execution
@@ -895,7 +936,7 @@ impl Exchange {
                         if self.low <= o.limit_price {
                             self.execute_limit(o.side, o.limit_price, o.size);
                         } else {
-                            return
+                            return;
                         }
                     }
                     false => {
@@ -904,7 +945,7 @@ impl Exchange {
                             // execute
                             self.execute_limit(o.side, o.limit_price, o.size);
                         } else {
-                            return
+                            return;
                         }
                     }
                 }
@@ -916,7 +957,7 @@ impl Exchange {
                         if self.high >= o.limit_price {
                             self.execute_limit(o.side, o.limit_price, o.size);
                         } else {
-                            return
+                            return;
                         }
                     }
                     false => {
@@ -925,7 +966,7 @@ impl Exchange {
                             // execute
                             self.execute_limit(o.side, o.limit_price, o.size);
                         } else {
-                            return
+                            return;
                         }
                     }
                 }
@@ -940,6 +981,9 @@ impl Exchange {
             Side::Sell => self.open_limit_sell_size -= order_size,
         }
         self.margin.set_order_margin(self.order_margin());
+
+        let exec_order = self.active_limit_orders.remove(order_idx);
+        self.orders_executed.push(exec_order);
     }
 
     /// Update the account position liquidation price
@@ -1102,21 +1146,17 @@ mod tests {
         };
         exchange.consume_trade(&t);
 
-        let o = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
-        let order_err = exchange.submit_order(o);
-        assert!(order_err.is_ok());
-        assert_eq!(exchange.active_limit_orders.len(), 1);
-        // assert_eq!(exchange.margin.available_balance, 1.0 - 0.5);
-
         // submit working market order
-        let o = Order::market(Side::Buy, 450.0).unwrap();
-        let order_err = exchange.submit_order(o);
-        assert!(order_err.is_ok());
+        let o = Order::market(Side::Buy, 500.0).unwrap();
+        exchange.submit_order(o).unwrap();
+
+        let o = Order::limit(Side::Buy, 900.0, 250.0).unwrap();
+        exchange.submit_order(o).unwrap();
+        assert_eq!(exchange.active_limit_orders.len(), 1);
 
         // submit opposite limit order acting as target order
-        let o = Order::limit(Side::Sell, 1200.0, 450.0).unwrap();
-        let order_err = exchange.submit_order(o);
-        assert!(order_err.is_ok());
+        let o = Order::limit(Side::Sell, 1200.0, 500.0).unwrap();
+        exchange.submit_order(o).unwrap();
         assert_eq!(exchange.active_limit_orders.len(), 2);
     }
 
@@ -2149,22 +2189,29 @@ mod tests {
         assert_eq!(exchange.margin().wallet_balance(), 1.0);
         assert_eq!(exchange.margin().margin_balance(), 1.0);
         assert_eq!(exchange.margin().position_margin(), 0.0);
-        // assert_eq!(exchange.margin().available_balance(), 0.5);
+        assert_eq!(exchange.margin().order_margin(), 0.5);
+        assert_eq!(exchange.order_margin(), 0.5);
+        assert_eq!(exchange.margin().available_balance(), 0.5);
 
-        let o = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
-        let order_err = exchange.submit_order(o);
-        assert!(order_err.is_ok());
-        assert_eq!(exchange.active_limit_orders.len(), 2);
+        let o = Order::stop_market(Side::Buy, 1100.0, 450.0).unwrap();
+        exchange.submit_order(o).unwrap();
+        assert_eq!(exchange.active_limit_orders.len(), 1);
+        assert_eq!(exchange.active_stop_orders.len(), 1);
         assert_eq!(exchange.margin().wallet_balance(), 1.0);
         assert_eq!(exchange.margin().margin_balance(), 1.0);
         assert_eq!(exchange.margin().position_margin(), 0.0);
-        // assert_eq!(exchange.margin().available_balance(), 0.0);
+        assert_eq!(round(exchange.margin().order_margin(), 1), 0.5);
+        assert_eq!(round(exchange.order_margin(), 1), 0.5);
+        assert_eq!(exchange.margin().available_balance(), 0.5);
 
         exchange.cancel_all_orders();
         assert_eq!(exchange.active_limit_orders.len(), 0);
+        assert_eq!(exchange.active_stop_orders.len(), 0);
         assert_eq!(exchange.margin().wallet_balance(), 1.0);
         assert_eq!(exchange.margin().margin_balance(), 1.0);
         assert_eq!(exchange.margin().position_margin(), 0.0);
+        assert_eq!(exchange.margin().order_margin(), 0.0);
+        assert_eq!(exchange.order_margin(), 0.0);
         assert_eq!(exchange.margin().available_balance(), 1.0);
     }
 
@@ -2266,11 +2313,14 @@ mod tests {
         e.consume_trade(&t);
 
         assert_eq!(e.order_margin(), 0.0);
-        e.submit_order(Order::market(Side::Buy, 500.0).unwrap()).unwrap();
+        e.submit_order(Order::market(Side::Buy, 500.0).unwrap())
+            .unwrap();
         assert_eq!(e.order_margin(), 0.0);
-        e.submit_order(Order::limit(Side::Sell, 1100.0, 500.0).unwrap()).unwrap();
+        e.submit_order(Order::limit(Side::Sell, 1100.0, 500.0).unwrap())
+            .unwrap();
         assert_eq!(e.order_margin(), 0.0);
-        e.submit_order(Order::stop_market(Side::Sell, 900.0, 500.0).unwrap()).unwrap();
+        e.submit_order(Order::stop_market(Side::Sell, 900.0, 500.0).unwrap())
+            .unwrap();
         assert_eq!(e.order_margin(), 0.0);
 
         // TODO: fix order_margin to make this work
@@ -2296,31 +2346,65 @@ mod tests {
         };
         e.consume_trade(&t);
 
-
         // test order cost with no position present
         assert_eq!(e.order_cost(&Order::market(Side::Buy, 500.0).unwrap()), 0.5);
-        assert_eq!(e.order_cost(&Order::market(Side::Sell, 500.0).unwrap()), 0.5);
+        assert_eq!(
+            e.order_cost(&Order::market(Side::Sell, 500.0).unwrap()),
+            0.5
+        );
 
-        assert_eq!(e.order_cost(&Order::limit(Side::Buy, 900.0, 450.0).unwrap()), 0.5);
-        assert_eq!(e.order_cost(&Order::limit(Side::Sell, 1200.0, 600.0).unwrap()), 0.5);
+        assert_eq!(
+            e.order_cost(&Order::limit(Side::Buy, 900.0, 450.0).unwrap()),
+            0.5
+        );
+        assert_eq!(
+            e.order_cost(&Order::limit(Side::Sell, 1200.0, 600.0).unwrap()),
+            0.5
+        );
 
-        assert_eq!(e.order_cost(&Order::stop_market(Side::Buy, 1200.0, 600.0).unwrap()), 0.5);
-        assert_eq!(e.order_cost(&Order::stop_market(Side::Sell, 900.0, 450.0).unwrap()), 0.5);
-
+        assert_eq!(
+            e.order_cost(&Order::stop_market(Side::Buy, 1200.0, 600.0).unwrap()),
+            0.5
+        );
+        assert_eq!(
+            e.order_cost(&Order::stop_market(Side::Sell, 900.0, 450.0).unwrap()),
+            0.5
+        );
 
         // test order cost with a long position present
-        e.submit_order(Order::market(Side::Buy, 500.0).unwrap()).unwrap();
+        e.submit_order(Order::market(Side::Buy, 500.0).unwrap())
+            .unwrap();
         assert_eq!(e.position().size(), 500.0);
 
         assert_eq!(e.order_cost(&Order::market(Side::Buy, 500.0).unwrap()), 0.5);
-        assert_eq!(e.order_cost(&Order::market(Side::Sell, 500.0).unwrap()), 0.0);
+        assert_eq!(
+            e.order_cost(&Order::market(Side::Sell, 500.0).unwrap()),
+            0.0
+        );
 
-        assert_eq!(round(e.order_cost(&Order::limit(Side::Buy, 900.0, 500.0).unwrap()), 2), 0.56);
-        assert_eq!(e.order_cost(&Order::limit(Side::Sell, 1100.0, 500.0).unwrap()), 0.0);
+        assert_eq!(
+            round(
+                e.order_cost(&Order::limit(Side::Buy, 900.0, 500.0).unwrap()),
+                2
+            ),
+            0.56
+        );
+        assert_eq!(
+            e.order_cost(&Order::limit(Side::Sell, 1100.0, 500.0).unwrap()),
+            0.0
+        );
 
-        assert_eq!(round(e.order_cost(&Order::stop_market(Side::Buy, 1100.0, 500.0).unwrap()), 2), 0.45);
-        assert_eq!(e.order_cost(&Order::stop_market(Side::Sell, 900.0, 500.0).unwrap()), 0.0);
-
+        assert_eq!(
+            round(
+                e.order_cost(&Order::stop_market(Side::Buy, 1100.0, 500.0).unwrap()),
+                2
+            ),
+            0.45
+        );
+        assert_eq!(
+            e.order_cost(&Order::stop_market(Side::Sell, 900.0, 500.0).unwrap()),
+            0.0
+        );
 
         // test order cost with a short position present
         let mut e = Exchange::new(config);
@@ -2331,19 +2415,40 @@ mod tests {
         };
         e.consume_trade(&t);
 
-        e.submit_order(Order::market(Side::Sell, 500.0).unwrap()).unwrap();
+        e.submit_order(Order::market(Side::Sell, 500.0).unwrap())
+            .unwrap();
         assert_eq!(e.position().size(), -500.0);
 
         assert_eq!(e.order_cost(&Order::market(Side::Buy, 500.0).unwrap()), 0.0);
-        assert_eq!(e.order_cost(&Order::market(Side::Sell, 500.0).unwrap()), 0.5);
+        assert_eq!(
+            e.order_cost(&Order::market(Side::Sell, 500.0).unwrap()),
+            0.5
+        );
 
-        assert_eq!(e.order_cost(&Order::limit(Side::Buy, 900.0, 500.0).unwrap()), 0.0);
-        assert_eq!(round(e.order_cost(&Order::limit(Side::Sell, 1100.0, 500.0).unwrap()), 2), 0.45);
+        assert_eq!(
+            e.order_cost(&Order::limit(Side::Buy, 900.0, 500.0).unwrap()),
+            0.0
+        );
+        assert_eq!(
+            round(
+                e.order_cost(&Order::limit(Side::Sell, 1100.0, 500.0).unwrap()),
+                2
+            ),
+            0.45
+        );
 
-        assert_eq!(e.order_cost(&Order::stop_market(Side::Buy, 1100.0, 500.0).unwrap()), 0.0);
-        assert_eq!(round(e.order_cost(&Order::stop_market(Side::Sell, 900.0, 500.0).unwrap()), 3), 0.556);
+        assert_eq!(
+            e.order_cost(&Order::stop_market(Side::Buy, 1100.0, 500.0).unwrap()),
+            0.0
+        );
+        assert_eq!(
+            round(
+                e.order_cost(&Order::stop_market(Side::Sell, 900.0, 500.0).unwrap()),
+                3
+            ),
+            0.556
+        );
 
         // TODO: test order cost with both a position and outstanding orders as well
-
     }
 }

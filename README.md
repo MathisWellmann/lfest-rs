@@ -71,7 +71,7 @@ The following performance metrics are available through AccTracker struct:
 To use this crate in your project, add the following to your Cargo.toml:
 ```
 [dependencies]
-lfest = "0.5.2"
+lfest = "0.5.3"
 ```
 
 Then proceed to use it in your code.
