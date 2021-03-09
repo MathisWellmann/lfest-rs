@@ -33,8 +33,8 @@ impl Margin {
         }
         self.order_margin = order_margin;
         self.available_balance = self.wallet_balance - self.position_margin - self.order_margin;
-        if self.available_balance <= 0.0 {
-            warn!("self.available_balance <= 0.0");
+        if self.available_balance < 0.0 {
+            warn!("self.available_balance < 0.0");
         }
     }
 
