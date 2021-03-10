@@ -20,6 +20,7 @@ pub struct AccTracker {
     welford_returns: WelfordOnline,
     welford_neg_returns: WelfordOnline,
     wins: usize,
+    losses: usize,
     num_submitted_limit_orders: usize,
     num_cancelled_limit_orders: usize,
     num_filled_limit_orders: usize,
@@ -47,6 +48,7 @@ impl AccTracker {
             welford_returns: WelfordOnline::new(),
             welford_neg_returns: WelfordOnline::new(),
             wins: 0,
+            losses: 0,
             num_submitted_limit_orders: 0,
             num_cancelled_limit_orders: 0,
             num_filled_limit_orders: 0,
@@ -153,7 +155,7 @@ impl AccTracker {
 
     /// Return the ratio of winning trades vs all trades
     pub fn win_ratio(&self) -> f64 {
-        self.wins as f64 / self.num_trades as f64
+        self.wins as f64 / (self.wins + self.losses) as f64
     }
 
     /// Return the ratio of filled limit orders vs number of submitted limit orders
@@ -174,6 +176,7 @@ impl AccTracker {
         if rpnl < 0.0 {
             self.welford_neg_returns.add(rpnl);
             self.total_loss += rpnl.abs();
+            self.losses += 1;
         } else {
             self.wins += 1;
             self.total_profit += rpnl;
