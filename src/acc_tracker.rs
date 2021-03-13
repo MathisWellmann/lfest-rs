@@ -31,6 +31,7 @@ pub struct AccTracker {
     num_trading_opportunities: usize,
     total_profit: f64,
     total_loss: f64,
+    win_history: Vec<bool>, // history of all wins and losses. true is a win, false is a loss
 }
 
 impl AccTracker {
@@ -59,7 +60,13 @@ impl AccTracker {
             num_trading_opportunities: 0,
             total_profit: 0.0,
             total_loss: 0.0,
+            win_history: vec![],
         }
+    }
+
+    /// Return the history of wins and losses, where true is a win, false is a loss
+    pub fn win_history(&self) -> &Vec<bool> {
+        &self.win_history
     }
 
     /// Return the ratio of average trade profit over average trade loss
@@ -177,9 +184,11 @@ impl AccTracker {
             self.welford_neg_returns.add(rpnl);
             self.total_loss += rpnl.abs();
             self.losses += 1;
+            self.win_history.push(false);
         } else {
             self.wins += 1;
             self.total_profit += rpnl;
+            self.win_history.push(true);
         }
         if self.wallet_balance > self.wb_high {
             self.wb_high = self.wallet_balance;
