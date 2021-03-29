@@ -162,7 +162,11 @@ impl AccTracker {
 
     /// Return the ratio of winning trades vs all trades
     pub fn win_ratio(&self) -> f64 {
-        self.wins as f64 / (self.wins + self.losses) as f64
+        if self.wins + self.losses > 0 {
+            self.wins as f64 / (self.wins + self.losses) as f64
+        } else {
+            0.0
+        }
     }
 
     /// Return the ratio of filled limit orders vs number of submitted limit orders
