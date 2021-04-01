@@ -11,6 +11,7 @@ pub struct AccTracker {
     wallet_balance: f64,
     starting_wb: f64,
     total_rpnl: f64,
+    upnl: f64,
     num_trades: i64,
     num_buys: i64,
     total_turnover: f64,
@@ -40,6 +41,7 @@ impl AccTracker {
             wallet_balance: starting_wb,
             starting_wb,
             total_rpnl: 0.0,
+            upnl: 0.0,
             num_trades: 0,
             num_buys: 0,
             total_turnover: 0.0,
@@ -160,6 +162,11 @@ impl AccTracker {
         self.total_rpnl
     }
 
+    /// Return the current unrealized profit and loss
+    pub fn upnl(&self) -> f64 {
+        self.upnl
+    }
+
     /// Return the ratio of winning trades vs all trades
     pub fn win_ratio(&self) -> f64 {
         if self.wins + self.losses > 0 {
@@ -216,6 +223,7 @@ impl AccTracker {
     /// Log the unrealized profit and loss at each new candle or trade
     pub(crate) fn log_upnl(&mut self, upnl: f64) {
         let upnl_dd: f64 = upnl.abs();
+        self.upnl = upnl;
         if upnl_dd > self.max_upnl_drawdown {
             self.max_upnl_drawdown = upnl_dd;
         }
