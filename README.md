@@ -2,13 +2,23 @@
 :warning: This is a personal project, use a your own risk. 
 
 :warning: The results may not represent real trading results on any given exchange. 
-Currently there is no correct implementation of order margining, which is fine for me but may not work for your purposes.
-Also automatic liquidation is terrible.
 
 lfest-rs is a blazingly fast simulated exchange capable of leveraged positions.
-It gets fed external data either as a trade or a candle to update the internal state
- and check for order execution. For simplicity's sake (and performance) the exchange does not use an order book
+ It gets fed external data either as a trade or a candle to update the internal state
+  and check for order execution. For simplicity's sake (and performance) the exchange does not use an order book
+ It also cross-leverages positions so the whole margin balance is used as collateral.
  
+### Bug Bounty :moneybag: 
+Currently there is a bug with limit (and stop) order cost calculation and possibly with limit (and stop) order margin.
+See failing tests for details.
+If you are able to figure out the issue with provable tests and an explanation, 
+feel free to contact me over [Session](https://www.getsettion.org).
+
+Session ID: 05835280a03f61b6ae5988fd1197594b7a71743e0667477784ed83b3ad8c33756f
+
+The current bounty is 0.3 XMR but may not be available any more, so contact me first.
+
+DISCLAIMER: The statements in this section are not legally binding
  
 ### Order Types
 The supported order types are:
@@ -71,7 +81,7 @@ The following performance metrics are available through AccTracker struct:
 To use this crate in your project, add the following to your Cargo.toml:
 ```
 [dependencies]
-lfest = "0.5.3"
+lfest = "0.6.0"
 ```
 
 Then proceed to use it in your code.
@@ -92,7 +102,7 @@ mod load_trades;
 #[macro_use]
 extern crate log;
 
-use lfest::{Config, Exchange, Order, Side, OrderError};
+use lfest::{Config, Exchange, Order, OrderError, Side};
 use load_trades::load_trades_from_csv;
 use rand::{thread_rng, Rng};
 use std::time::Instant;
@@ -116,42 +126,46 @@ fn main() {
     let mut rng = thread_rng();
 
     for (i, t) in trades.iter().enumerate() {
-        let liq = exchange.consume_trade(t);
+        let (exec_orders, liq) = exchange.consume_trade(t);
         if liq {
             println!(
                 "position liquidated, \
             but there could still be enough wallet_balance to open a new position"
             );
         }
+        println!("executed orders: {:?}", exec_orders);
 
         if i % 100 == 0 {
             // randomly buy or sell using a market order
             let r = rng.gen::<f64>();
             // Trade a fraction of the available wallet balance
-            let order_size: f64 = exchange.margin().wallet_balance() * 0.1;
+            let order_size: f64 = exchange.account().margin().wallet_balance() * 0.1;
             let order: Order = if r > 0.5 {
-                Order::market(Side::Sell, order_size) // Sell using market order
+                Order::market(Side::Sell, order_size).unwrap() // Sell using market order
             } else {
-                Order::market(Side::Buy, order_size) // Buy using market order
+                Order::market(Side::Buy, order_size).unwrap() // Buy using market order
             };
             // Handle order error here if needed
             let response: Result<Order, OrderError> = exchange.submit_order(order);
             match response {
                 Ok(order) => println!("succesfully submitted order: {:?}", order),
                 Err(order_err) => match order_err {
-                    OrderError::MaxActiveOrders => error!("maximum number of active orders reached"),
+                    OrderError::MaxActiveOrders => {
+                        error!("maximum number of active orders reached")
+                    }
                     OrderError::InvalidLimitPrice => error!("invalid limit price of order"),
                     OrderError::InvalidTriggerPrice => error!("invalid trigger price of order"),
                     OrderError::InvalidOrderSize => error!("invalid order size"),
-                    OrderError::NotEnoughAvailableBalance => error!("not enough available balance in account"),
-
-                }
+                    OrderError::NotEnoughAvailableBalance => {
+                        error!("not enough available balance in account")
+                    }
+                },
             }
         }
     }
     println!(
         "time to simulate 1 million historical trades and {} orders: {}ms",
-        exchange.acc_tracker().num_trades(),
+        exchange.account().acc_tracker().num_trades(),
         t0.elapsed().as_millis()
     );
     analyze_results(&exchange);
@@ -159,17 +173,17 @@ fn main() {
 
 /// analyze the resulting performance metrics of the traded orders
 fn analyze_results(e: &Exchange) {
-    let win_ratio = e.acc_tracker().win_ratio();
-    let profit_loss_ratio = e.acc_tracker().profit_loss_ratio();
-    let rpnl = e.acc_tracker().total_rpnl();
-    let sharpe = e.acc_tracker().sharpe();
-    let sortino = e.acc_tracker().sortino();
-    let sterling_ratio = e.acc_tracker().sharpe_sterling_ratio();
-    let max_drawdown = e.acc_tracker().max_drawdown();
-    let max_upnl_drawdown = e.acc_tracker().max_upnl_drawdown();
-    let num_trades = e.acc_tracker().num_trades();
-    let turnover = e.acc_tracker().turnover();
-    let buy_ratio = e.acc_tracker().buy_ratio();
+    let win_ratio = e.account().acc_tracker().win_ratio();
+    let profit_loss_ratio = e.account().acc_tracker().profit_loss_ratio();
+    let rpnl = e.account().acc_tracker().total_rpnl();
+    let sharpe = e.account().acc_tracker().sharpe();
+    let sortino = e.account().acc_tracker().sortino();
+    let sterling_ratio = e.account().acc_tracker().sharpe_sterling_ratio();
+    let max_drawdown = e.account().acc_tracker().max_drawdown();
+    let max_upnl_drawdown = e.account().acc_tracker().max_upnl_drawdown();
+    let num_trades = e.account().acc_tracker().num_trades();
+    let turnover = e.account().acc_tracker().turnover();
+    let buy_ratio = e.account().acc_tracker().buy_ratio();
     println!("win_ratio: {:.2}, profit_loss_ratio: {:.2}, rpnl: {:.2}, sharpe: {:.2}, sortino: {:.2}, sr: {:.2}, \
     dd: {:.2}, upnl_dd: {:.2}, #trades: {}, turnover: {}, buy_ratio: {:.2},",
         win_ratio,
@@ -185,11 +199,8 @@ fn analyze_results(e: &Exchange) {
         buy_ratio,
     );
 }
-```
 
-### Benchmark
-See the example use_trades.rs and compile in release mode to see that the Exchange
-is capable of simulating 1 million historical trades and executing ~40k market orders in ~470ms.
+```
 
 ### Dependencies
 A non trivial dependency is [trade_aggregation](https://github.com/MathisWellmann/) 

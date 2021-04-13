@@ -30,19 +30,20 @@ fn main() {
     let mut rng = thread_rng();
 
     for (i, t) in trades.iter().enumerate() {
-        let liq = exchange.consume_trade(t);
+        let (exec_orders, liq) = exchange.consume_trade(t);
         if liq {
             println!(
                 "position liquidated, \
             but there could still be enough wallet_balance to open a new position"
             );
         }
+        println!("executed orders: {:?}", exec_orders);
 
         if i % 100 == 0 {
             // randomly buy or sell using a market order
             let r = rng.gen::<f64>();
             // Trade a fraction of the available wallet balance
-            let order_size: f64 = exchange.margin().wallet_balance() * 0.1;
+            let order_size: f64 = exchange.account().margin().wallet_balance() * 0.1;
             let order: Order = if r > 0.5 {
                 Order::market(Side::Sell, order_size).unwrap() // Sell using market order
             } else {
@@ -68,7 +69,7 @@ fn main() {
     }
     println!(
         "time to simulate 1 million historical trades and {} orders: {}ms",
-        exchange.acc_tracker().num_trades(),
+        exchange.account().acc_tracker().num_trades(),
         t0.elapsed().as_millis()
     );
     analyze_results(&exchange);
@@ -76,17 +77,17 @@ fn main() {
 
 /// analyze the resulting performance metrics of the traded orders
 fn analyze_results(e: &Exchange) {
-    let win_ratio = e.acc_tracker().win_ratio();
-    let profit_loss_ratio = e.acc_tracker().profit_loss_ratio();
-    let rpnl = e.acc_tracker().total_rpnl();
-    let sharpe = e.acc_tracker().sharpe();
-    let sortino = e.acc_tracker().sortino();
-    let sterling_ratio = e.acc_tracker().sharpe_sterling_ratio();
-    let max_drawdown = e.acc_tracker().max_drawdown();
-    let max_upnl_drawdown = e.acc_tracker().max_upnl_drawdown();
-    let num_trades = e.acc_tracker().num_trades();
-    let turnover = e.acc_tracker().turnover();
-    let buy_ratio = e.acc_tracker().buy_ratio();
+    let win_ratio = e.account().acc_tracker().win_ratio();
+    let profit_loss_ratio = e.account().acc_tracker().profit_loss_ratio();
+    let rpnl = e.account().acc_tracker().total_rpnl();
+    let sharpe = e.account().acc_tracker().sharpe();
+    let sortino = e.account().acc_tracker().sortino();
+    let sterling_ratio = e.account().acc_tracker().sharpe_sterling_ratio();
+    let max_drawdown = e.account().acc_tracker().max_drawdown();
+    let max_upnl_drawdown = e.account().acc_tracker().max_upnl_drawdown();
+    let num_trades = e.account().acc_tracker().num_trades();
+    let turnover = e.account().acc_tracker().turnover();
+    let buy_ratio = e.account().acc_tracker().buy_ratio();
     println!("win_ratio: {:.2}, profit_loss_ratio: {:.2}, rpnl: {:.2}, sharpe: {:.2}, sortino: {:.2}, sr: {:.2}, \
     dd: {:.2}, upnl_dd: {:.2}, #trades: {}, turnover: {}, buy_ratio: {:.2},",
         win_ratio,

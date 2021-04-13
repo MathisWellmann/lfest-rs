@@ -8,11 +8,13 @@ extern crate pretty_env_logger;
 extern crate log;
 
 mod acc_tracker;
+mod account;
 mod exchange;
 mod margin;
 mod orders;
 mod position;
 mod utils;
+mod validator;
 mod welford_online;
 
 pub use exchange::Exchange;
@@ -20,9 +22,11 @@ pub use margin::Margin;
 pub use orders::Order;
 pub use position::Position;
 
+pub(crate) use account::Account;
 pub(crate) use utils::{max, min};
+pub(crate) use validator::Validator;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 /// Side of the order
 pub enum Side {
     /// Buy side

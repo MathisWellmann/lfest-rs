@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.5.8"
+version = "0.6.0"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2018"
 license-file = "LICENSE"
@@ -33,3 +33,4 @@ trade_aggregation = "1.0.0"
 [dev-dependencies]
 csv = "1.1.4"
 rand = "0.7.3"
+time_series_generator = "0.2.0"
