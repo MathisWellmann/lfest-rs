@@ -44,8 +44,9 @@ impl Validator {
         let fee_base = self.fee_taker * o.size;
         let fee_quote = fee_base / price;
 
-        let cost: f64 = self.order_cost(o, acc);
-        if cost + fee_quote > acc.margin().available_balance() {
+        let (debit, credit) = self.order_cost(o, acc);
+        debug!("validate_market_order debit: {}, credit: {}", debit, credit);
+        if credit + fee_quote > acc.margin().available_balance() + debit {
             return Err(OrderError::NotEnoughAvailableBalance);
         }
 
@@ -67,9 +68,15 @@ impl Validator {
                 }
             }
         }
+        let price = match o.side {
+            Side::Buy => self.ask,
+            Side::Sell => self.bid,
+        };
+        let fee_base = self.fee_taker * o.size;
+        let fee_quote = fee_base / price;
 
-        let order_cost: f64 = self.order_cost(o, acc);
-        if order_cost > acc.margin().available_balance() {
+        let (debit, credit) = self.order_cost(o, acc);
+        if credit + fee_quote > acc.margin().available_balance() + debit {
             return Err(OrderError::NotEnoughAvailableBalance);
         }
         Ok(())
@@ -89,8 +96,8 @@ impl Validator {
                 }
             }
         }
-        let order_cost: f64 = self.order_cost(o, acc);
-        if order_cost > acc.margin().available_balance() {
+        let (debit, credit) = self.order_cost(o, acc);
+        if credit > acc.margin().available_balance() + debit {
             return Err(OrderError::NotEnoughAvailableBalance);
         }
 
@@ -98,7 +105,9 @@ impl Validator {
     }
 
     /// Calculate the cost of order
-    fn order_cost(&self, order: &Order, acc: &Account) -> f64 {
+    /// # Returns
+    /// debited and credited account balance delta
+    fn order_cost(&self, order: &Order, acc: &Account) -> (f64, f64) {
         match order.order_type {
             OrderType::Market => self.order_cost_market(order, acc),
             OrderType::Limit => self.order_cost_limit(order, acc),
@@ -108,12 +117,15 @@ impl Validator {
 
     /// Compute the order cost of a market order
     /// using hedged volume
-    fn order_cost_market(&self, order: &Order, acc: &Account) -> f64 {
-        let d: f64 = match order.side {
-            Side::Buy => 1.0,
-            Side::Sell => -1.0,
+    /// # Returns
+    /// debited and credited account balance delta
+    fn order_cost_market(&self, order: &Order, acc: &Account) -> (f64, f64) {
+        let hedged_size = match order.side {
+            Side::Buy => max(0.0, min(order.size, -acc.position().size())),
+            Side::Sell => max(0.0, min(order.size, acc.position().size()))
         };
-        let unhedged_size: f64 = max(0.0, min(order.size, order.size + d * acc.position().size()));
+        let unhedged_size = order.size - hedged_size;
+
         let price: f64 = match order.side {
             Side::Buy => self.ask,
             Side::Sell => self.bid,
@@ -127,11 +139,17 @@ impl Validator {
         };
         let fee_base: f64 = fee * order.size / price;
 
-        fee_base + (unhedged_size / price / acc.position().leverage())
+        let debit: f64 = hedged_size / price / acc.position().leverage();
+        let credit: f64 = fee_base + (unhedged_size / price / acc.position().leverage());
+        debug!("order_cost_market: debit: {}, credit: {}", debit, credit);
+
+        (debit, credit)
     }
 
     /// Compute the order cost of a passively sitting order such as limit and stop orders
-    fn order_cost_limit(&self, order: &Order, acc: &Account) -> f64 {
+    /// # Returns
+    /// debited and credited account balance delta
+    fn order_cost_limit(&self, order: &Order, acc: &Account) -> (f64, f64) {
         let mut olbs = acc.open_limit_buy_size;
         let mut olss = acc.open_limit_sell_size;
         let mut osbs = acc.open_stop_buy_size;
@@ -183,15 +201,21 @@ impl Validator {
         };
         let fee_base: f64 = fee * max_size;
 
-        fee_base
+        // TODO: whats the debit for limit orders
+        let debit: f64 = 0.0;
+        let credit: f64 = fee_base
             + max(0.0, min(max_size, max_size + d * acc.position().size()))
             / order_price
-            / acc.position().leverage()
+            / acc.position().leverage();
+
+        (debit, credit)
     }
 
-    fn order_cost_stop(&self, order: &Order, acc: &Account) -> f64 {
+    /// # Returns
+    /// debited and credited account balance delta
+    fn order_cost_stop(&self, order: &Order, acc: &Account) -> (f64, f64) {
         // TODO:
-        0.0
+        (0.0, 0.0)
     }
 }
 
@@ -202,6 +226,8 @@ mod tests {
 
     #[test]
     fn validate_market_order_0() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         // Test Validator with a fresh account
 
         let mut validator = Validator::new(0.0, 0.001);
@@ -230,6 +256,7 @@ mod tests {
 
     #[test]
     fn validate_market_order_1() {
+        if let Err(_) = pretty_env_logger::try_init() {}
         // test Validator with an account that has an open position
 
         let mut validator = Validator::new(0.0, 0.0);
@@ -257,9 +284,9 @@ mod tests {
         let o = Order::market(Side::Sell, 100.0).unwrap();
         validator.validate_market_order(&o, &acc).unwrap();
 
-        // invalid order
+        // valid order
         let o = Order::market(Side::Sell, 110.0).unwrap();
-        assert!(validator.validate_market_order(&o, &acc).is_err());
+        validator.validate_market_order(&o, &acc).unwrap();
 
         // with short position
         let mut acc = Account::new(1.0, 1.0);
@@ -274,11 +301,11 @@ mod tests {
         validator.validate_market_order(&o, &acc).unwrap();
 
         // invalid order
-        let o = Order::market(Side::Buy, 110.0).unwrap();
-        assert!(validator.validate_market_order(&o, &acc).is_err());
+        let o = Order::market(Side::Buy, 60.0).unwrap();
+        validator.validate_market_order(&o, &acc).unwrap();
 
         // valid order
-        let o = Order::market(Side::Buy, 150.0).unwrap();
+        let o = Order::market(Side::Buy, 110.0).unwrap();
         validator.validate_market_order(&o, &acc).unwrap();
 
         // invalid order
@@ -288,6 +315,8 @@ mod tests {
 
     #[test]
     fn validate_market_order_2() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         // test Validator with an account that has open orders
 
         let mut validator = Validator::new(0.0, 0.0);
@@ -338,6 +367,8 @@ mod tests {
 
     #[test]
     fn validate_limit_order_0() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         // test Validator for limit orders with a fresh account
 
         let mut validator = Validator::new(0.0, 0.001);
@@ -372,6 +403,8 @@ mod tests {
 
     #[test]
     fn validate_limit_order_1() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         // test Validator for limit orders with an account that has an open position
 
         let mut validator = Validator::new(0.0, 0.001);
@@ -398,6 +431,8 @@ mod tests {
 
     #[test]
     fn validate_limit_order_2() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         // test Validator for limit orders with an account that has open orders
 
         let mut validator = Validator::new(0.0, 0.001);
@@ -418,6 +453,8 @@ mod tests {
 
     #[test]
     fn validate_stop_market_order_0() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         let mut validator = Validator::new(0.0, 0.0);
         validator.update(100.0, 100.0);
 
@@ -428,6 +465,8 @@ mod tests {
 
     #[test]
     fn validate_stop_market_order_1() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         // test validator for stop market order on account with open position
 
         let mut validator = Validator::new(0.0, 0.0);
@@ -447,6 +486,8 @@ mod tests {
 
     #[test]
     fn validate_stop_market_order_2() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         // test validator for stop market orders on account with open orders
         let mut validator = Validator::new(0.0, 0.0);
         validator.update(100.0, 100.0);
@@ -457,9 +498,10 @@ mod tests {
         // TODO: validate stop market order with open orders
     }
 
-
     #[test]
     fn order_cost_market_no_position() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         // test market order cost with a fresh account
 
         let mut validator = Validator::new(0.0, 0.0);
@@ -468,14 +510,16 @@ mod tests {
         let acc = Account::new(1.0, 1.0);
 
         let o = Order::market(Side::Buy, 100.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_market(&o, &acc), (0.0, 1.0));
 
         let o = Order::market(Side::Sell, 100.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_market(&o, &acc), (0.0, 1.0));
     }
 
     #[test]
     fn order_cost_market_with_position() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         // test order cost with an account with a position
         let mut validator = Validator::new(0.0, 0.0);
         validator.update(100.0, 100.0);
@@ -485,26 +529,28 @@ mod tests {
         acc.change_position(Side::Buy, 100.0, 100.0);
 
         let o = Order::market(Side::Buy, 100.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_market(&o, &acc), (0.0, 1.0));
         let o = Order::market(Side::Sell, 100.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), 0.0);
+        assert_eq!(validator.order_cost_market(&o, &acc), (1.0, 0.0));
         let o = Order::market(Side::Sell, 200.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_market(&o, &acc), (1.0, 1.0));
 
         // test with short position
         let mut acc = Account::new(1.0, 1.0);
         acc.change_position(Side::Sell, 100.0, 100.0);
 
         let o = Order::market(Side::Buy, 100.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), 0.0);
+        assert_eq!(validator.order_cost_market(&o, &acc), (1.0, 0.0));
         let o = Order::market(Side::Sell, 100.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_market(&o, &acc), (0.0, 1.0));
         let o = Order::market(Side::Buy, 200.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_market(&o, &acc), (1.0, 1.0));
     }
 
     #[test]
     fn order_cost_limit_no_position() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         // test market order cost with a fresh account
 
         let mut validator = Validator::new(0.0, 0.0);
@@ -513,25 +559,27 @@ mod tests {
         let acc = Account::new(1.0, 1.0);
 
         let o = Order::limit(Side::Buy, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
         let o = Order::limit(Side::Sell, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
         let o = Order::limit(Side::Buy, 90.0, 90.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
         let o = Order::limit(Side::Sell, 110.0, 110.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
         let o = Order::limit(Side::Buy, 90.0, 180.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 2.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 2.0));
         let o = Order::limit(Side::Sell, 110.0, 220.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 2.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 2.0));
         let o = Order::limit(Side::Buy, 110.0, 55.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 0.5);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.5));
         let o = Order::limit(Side::Sell, 90.0, 45.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 0.5);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.5));
     }
 
     #[test]
     fn order_cost_limit_with_position() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         // test order cost with an account with a position
         let mut validator = Validator::new(0.0, 0.0);
         validator.update(100.0, 100.0);
@@ -541,30 +589,32 @@ mod tests {
         acc.change_position(Side::Buy, 100.0, 100.0);
 
         let o = Order::limit(Side::Buy, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
         let o = Order::limit(Side::Sell, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 0.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.0));
         let o = Order::limit(Side::Buy, 90.0, 45.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 0.5);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.5));
         let o = Order::limit(Side::Sell, 110.0, 55.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 0.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.0));
 
         // test with short position
         let mut acc = Account::new(1.0, 1.0);
         acc.change_position(Side::Sell, 100.0, 100.0);
 
         let o = Order::limit(Side::Buy, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 0.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.0));
         let o = Order::limit(Side::Sell, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
         let o = Order::limit(Side::Buy, 90.0, 45.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 0.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.0));
         let o = Order::limit(Side::Sell, 110.0, 55.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 0.5);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.5));
     }
 
     #[test]
     fn order_cost_limit_w_open_orders() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         let mut validator = Validator::new(0.0, 0.0);
         validator.update(100.0, 100.0);
 
@@ -572,9 +622,9 @@ mod tests {
         acc.append_order(Order::limit(Side::Buy, 100.0, 100.0).unwrap());
 
         let o = Order::limit(Side::Buy, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 1.0);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
         let o = Order::limit(Side::Sell, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), 0.5);
+        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.5));
 
         // TODO: test with short position
     }
@@ -596,6 +646,8 @@ mod tests {
 
     #[test]
     fn order_cost_fee() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
         // Test Validator for proper fee handling
 
         let fee_taker: f64 = 0.001;
@@ -605,9 +657,9 @@ mod tests {
         let acc = Account::new(1.0, 1.0);
 
         let o = Order::market(Side::Buy, 100.0).unwrap();
-        assert_eq!(validator.order_cost(&o, &acc), 1.001);
+        assert_eq!(validator.order_cost(&o, &acc), (0.0, 1.001));
 
         let o = Order::market(Side::Sell, 100.0).unwrap();
-        assert_eq!(validator.order_cost(&o, &acc), 1.001);
+        assert_eq!(validator.order_cost(&o, &acc), (0.0, 1.001));
     }
 }
