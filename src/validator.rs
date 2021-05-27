@@ -235,23 +235,27 @@ mod tests {
         let ask: f64 = 1_000.0;
         validator.update(bid, ask);
 
-        let mut acc = Account::new(1.0, 1.0);
+        for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
+            println!("testing with leverage: {}", leverage);
 
-        // valid order
-        let o = Order::market(Side::Buy, 400.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            let mut acc = Account::new(leverage, 1.0);
 
-        // valid order
-        let o = Order::market(Side::Sell, 400.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // valid order
+            let o = Order::market(Side::Buy, 400.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // invalid order
-        let o = Order::market(Side::Buy, 1050.0).unwrap();
-        assert!(validator.validate_market_order(&o, &acc).is_err());
+            // valid order
+            let o = Order::market(Side::Sell, 400.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // invalid order
-        let o = Order::market(Side::Sell, 1050.0).unwrap();
-        assert!(validator.validate_market_order(&o, &acc).is_err());
+            // invalid order
+            let o = Order::market(Side::Buy, 1050.0 * leverage).unwrap();
+            assert!(validator.validate_market_order(&o, &acc).is_err());
+
+            // invalid order
+            let o = Order::market(Side::Sell, 1050.0 * leverage).unwrap();
+            assert!(validator.validate_market_order(&o, &acc).is_err());
+        }
     }
 
     #[test]
@@ -264,53 +268,55 @@ mod tests {
         let ask: f64 = 100.0;
         validator.update(bid, ask);
 
-        // with long position
-        let mut acc = Account::new(1.0, 1.0);
-        acc.change_position(Side::Buy, 50.0, 100.0);
+        for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
+            // with long position
+            let mut acc = Account::new(leverage, 1.0);
+            acc.change_position(Side::Buy, 50.0 * leverage, 100.0);
 
-        // valid order
-        let o = Order::market(Side::Buy, 50.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // valid order
+            let o = Order::market(Side::Buy, 50.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // valid order
-        let o = Order::market(Side::Sell, 50.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // valid order
+            let o = Order::market(Side::Sell, 50.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // invalid order
-        let o = Order::market(Side::Buy, 60.0).unwrap();
-        assert!(validator.validate_market_order(&o, &acc).is_err());
+            // invalid order
+            let o = Order::market(Side::Buy, 60.0 * leverage).unwrap();
+            assert!(validator.validate_market_order(&o, &acc).is_err());
 
-        // valid order
-        let o = Order::market(Side::Sell, 100.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // valid order
+            let o = Order::market(Side::Sell, 100.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // valid order
-        let o = Order::market(Side::Sell, 110.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // valid order
+            let o = Order::market(Side::Sell, 110.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // with short position
-        let mut acc = Account::new(1.0, 1.0);
-        acc.change_position(Side::Sell, 50.0, 100.0);
+            // with short position
+            let mut acc = Account::new(leverage, 1.0);
+            acc.change_position(Side::Sell, 50.0 * leverage, 100.0);
 
-        // valid order
-        let o = Order::market(Side::Buy, 50.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // valid order
+            let o = Order::market(Side::Buy, 50.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // valid order
-        let o = Order::market(Side::Sell, 50.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // valid order
+            let o = Order::market(Side::Sell, 50.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // invalid order
-        let o = Order::market(Side::Buy, 60.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // invalid order
+            let o = Order::market(Side::Buy, 60.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // valid order
-        let o = Order::market(Side::Buy, 110.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // valid order
+            let o = Order::market(Side::Buy, 110.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // invalid order
-        let o = Order::market(Side::Sell, 60.0).unwrap();
-        assert!(validator.validate_market_order(&o, &acc).is_err());
+            // invalid order
+            let o = Order::market(Side::Sell, 60.0 * leverage).unwrap();
+            assert!(validator.validate_market_order(&o, &acc).is_err());
+        }
     }
 
     #[test]
@@ -324,45 +330,47 @@ mod tests {
         let ask: f64 = 100.0;
         validator.update(bid, ask);
 
-        // with buy limit order
-        let mut acc = Account::new(1.0, 1.0);
-        acc.append_order(Order::limit(Side::Buy, 100.0, 50.0).unwrap());
+        for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
+            // with buy limit order
+            let mut acc = Account::new(1.0, 1.0);
+            acc.append_order(Order::limit(Side::Buy, 100.0, 50.0).unwrap());
 
-        // valid order
-        let o = Order::market(Side::Buy, 50.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // valid order
+            let o = Order::market(Side::Buy, 50.0).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // valid order
-        let o = Order::market(Side::Sell, 50.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // valid order
+            let o = Order::market(Side::Sell, 50.0).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // invalid order
-        let o = Order::market(Side::Buy, 60.0).unwrap();
-        assert!(validator.validate_market_order(&o, &acc).is_err());
+            // invalid order
+            let o = Order::market(Side::Buy, 60.0).unwrap();
+            assert!(validator.validate_market_order(&o, &acc).is_err());
 
-        // invalid order
-        let o = Order::market(Side::Sell, 100.0).unwrap();
-        assert!(validator.validate_market_order(&o, &acc).is_err());
+            // invalid order
+            let o = Order::market(Side::Sell, 100.0).unwrap();
+            assert!(validator.validate_market_order(&o, &acc).is_err());
 
-        // with sell limit order
-        let mut acc = Account::new(1.0, 1.0);
-        acc.append_order(Order::limit(Side::Sell, 100.0, 50.0).unwrap());
+            // with sell limit order
+            let mut acc = Account::new(1.0, 1.0);
+            acc.append_order(Order::limit(Side::Sell, 100.0, 50.0).unwrap());
 
-        // valid order
-        let o = Order::market(Side::Buy, 50.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // valid order
+            let o = Order::market(Side::Buy, 50.0).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // valid order
-        let o = Order::market(Side::Sell, 50.0).unwrap();
-        validator.validate_market_order(&o, &acc).unwrap();
+            // valid order
+            let o = Order::market(Side::Sell, 50.0).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
 
-        // invalid order
-        let o = Order::market(Side::Sell, 60.0).unwrap();
-        assert!(validator.validate_market_order(&o, &acc).is_err());
+            // invalid order
+            let o = Order::market(Side::Sell, 60.0).unwrap();
+            assert!(validator.validate_market_order(&o, &acc).is_err());
 
-        // invalid order
-        let o = Order::market(Side::Buy, 150.0).unwrap();
-        assert!(validator.validate_market_order(&o, &acc).is_err());
+            // invalid order
+            let o = Order::market(Side::Buy, 150.0).unwrap();
+            assert!(validator.validate_market_order(&o, &acc).is_err());
+        }
     }
 
     #[test]
