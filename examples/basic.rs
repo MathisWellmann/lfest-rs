@@ -7,7 +7,7 @@ mod load_trades;
 extern crate log;
 
 use lfest::{Config, Exchange, Order, OrderError, Side};
-use load_trades::load_trades_from_csv;
+use load_trades::load_prices_from_csv;
 use rand::{thread_rng, Rng};
 use std::time::Instant;
 
@@ -24,18 +24,15 @@ fn main() {
     let mut exchange = Exchange::new(config);
 
     // load trades from csv file
-    let trades = load_trades_from_csv("./data/Bitmex_XBTUSD_1M.csv").unwrap();
+    let prices = load_prices_from_csv("./data/Bitmex_XBTUSD_1M.csv").unwrap();
 
     // use random action every 100 trades to buy or sell
     let mut rng = thread_rng();
 
-    for (i, t) in trades.iter().enumerate() {
-        let (exec_orders, liq) = exchange.consume_trade(t);
+    for (i, p) in prices.iter().enumerate() {
+        let (exec_orders, liq) = exchange.update_state(*p, *p, i as u64);
         if liq {
-            println!(
-                "position liquidated, \
-            but there could still be enough wallet_balance to open a new position"
-            );
+            // check liquidation
         }
         println!("executed orders: {:?}", exec_orders);
 

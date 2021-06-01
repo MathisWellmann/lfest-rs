@@ -1,11 +1,8 @@
-extern crate trade_aggregation;
-
 use crate::acc_tracker::AccTracker;
 use crate::{
     max, min, Account, Config, FeeType, Margin, Order, OrderError, OrderType, Position, Side,
     Validator,
 };
-use trade_aggregation::*;
 
 const MAX_NUM_LIMIT_ORDERS: usize = 50;
 const MAX_NUM_STOP_ORDERS: usize = 50;
@@ -18,7 +15,6 @@ pub struct Exchange {
     validator: Validator,
     bid: f64,
     ask: f64,
-    init: bool,
     next_order_id: u64,
     step: u64, // used for synhcronizing orders
     high: f64,
@@ -37,7 +33,6 @@ impl Exchange {
             validator,
             bid: 0.0,
             ask: 0.0,
-            init: true,
             next_order_id: 0,
             step: 0,
             high: 0.0,
@@ -66,24 +61,21 @@ impl Exchange {
     }
 
     /// Update the exchange state with a new trade.
+    /// ### Parameters
+    /// bid: bid price
+    /// ask: ask price
+    /// timestamp: timestamp usually in milliseconds
+    ///
     /// ### Returns
     /// executed orders
     /// true if position has been liquidated
-    pub fn consume_trade(&mut self, trade: &Trade) -> (Vec<Order>, bool) {
-        assert!(!self.config.use_candles);
+    pub fn update_state(&mut self, bid: f64, ask: f64, timestamp: u64) -> (Vec<Order>, bool) {
+        debug_assert!(bid <= ask, "make sure bid <= ask");
 
-        if self.init {
-            self.init = false;
-            self.bid = trade.price;
-            self.ask = trade.price;
-        }
-        if trade.size > 0.0 {
-            self.ask = trade.price;
-        } else {
-            self.bid = trade.price;
-        }
+        self.bid = bid;
+        self.ask = ask;
 
-        self.validator.update(trade.price, trade.price);
+        self.validator.update(bid, ask);
 
         if self.check_liquidation() {
             self.liquidate();
@@ -92,39 +84,11 @@ impl Exchange {
 
         self.check_orders();
 
-        self.account.update(trade.price, trade.timestamp as u64);
+        self.account.update((bid + ask) / 2.0, timestamp);
 
         self.step += 1;
 
-        return (self.account.executed_orders(), false);
-    }
-
-    /// Update the exchange status with a new candle.
-    /// ### Returns
-    /// executed orders
-    /// true if position has been liquidated
-    pub fn consume_candle(&mut self, candle: &Candle) -> (Vec<Order>, bool) {
-        assert!(self.config.use_candles);
-
-        self.bid = candle.close;
-        self.ask = candle.close;
-        self.high = candle.high;
-        self.low = candle.low;
-
-        self.validator.update(candle.close, candle.close);
-
-        if self.check_liquidation() {
-            self.liquidate();
-            return (vec![], true);
-        }
-
-        self.check_orders();
-
-        self.account.update(candle.close, candle.timestamp as u64);
-
-        self.step += 1;
-
-        return (self.account.executed_orders(), false);
+        (self.account.executed_orders(), false)
     }
 
     /// Check if a liquidation event should occur
@@ -328,12 +292,7 @@ mod tests {
             leverage: 1.0,
         };
         let mut exchange = Exchange::new(config);
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1000.0, 1000.0, 0);
 
         // submit working market order
         let o = Order::market(Side::Buy, 500.0).unwrap();
@@ -364,81 +323,16 @@ mod tests {
             leverage: 1.0,
         };
         let mut exchange = Exchange::new(config);
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1000.0, 1000.0, 0);
 
         let o = Order::stop_market(Side::Buy, 1010.0, 100.0).unwrap();
         exchange.submit_order(o).unwrap();
         assert_eq!(exchange.account().active_stop_orders().len(), 1);
 
-        let t = Trade {
-            timestamp: 2,
-            price: 1010.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1010.0, 1010.0, 1);
 
         assert_eq!(exchange.account().position().size(), 100.0);
         assert_eq!(exchange.account().position().entry_price(), 1010.0);
-    }
-
-    #[test]
-    fn handle_stop_market_order_w_candle() {
-        let config = Config {
-            fee_maker: -0.00025,
-            fee_taker: 0.00075,
-            starting_balance_base: 1.0,
-            use_candles: true,
-            leverage: 1.0,
-        };
-        let mut exchange = Exchange::new(config);
-
-        let c = Candle {
-            timestamp: 0,
-            open: 40_000.0,
-            high: 40_500.0,
-            low: 35_000.0,
-            close: 40_100.0,
-            volume: 0.0,
-            directional_trade_ratio: 0.0,
-            directional_volume_ratio: 0.0,
-            num_trades: 0,
-            arithmetic_mean_price: 0.0,
-            weighted_price: 0.0,
-            std_dev_prices: 0.0,
-            std_dev_sizes: 0.0,
-            time_velocity: 0.0,
-        };
-        exchange.consume_candle(&c);
-
-        let o = Order::stop_market(Side::Buy, 40_600.0, 4060.0).unwrap();
-        exchange.submit_order(o).unwrap();
-
-        let c = Candle {
-            timestamp: 0,
-            open: 40_100.0,
-            high: 40_700.0,
-            low: 36_000.0,
-            close: 40_500.0,
-            volume: 0.0,
-            directional_trade_ratio: 0.0,
-            directional_volume_ratio: 0.0,
-            num_trades: 0,
-            arithmetic_mean_price: 0.0,
-            weighted_price: 0.0,
-            std_dev_prices: 0.0,
-            std_dev_sizes: 0.0,
-            time_velocity: 0.0,
-        };
-        exchange.consume_candle(&c);
-
-        assert_eq!(exchange.account().position().size(), 4060.0);
-        assert_eq!(round(exchange.account().position().value(), 1), 0.1);
-        assert_eq!(round(exchange.account().margin().position_margin(), 1), 0.1);
     }
 
     #[test]
@@ -452,12 +346,7 @@ mod tests {
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1000.0, 1000.0, 0);
 
         let value = exchange.account().margin().available_balance() * 0.8;
         let size = exchange.ask * value;
@@ -484,18 +373,7 @@ mod tests {
             round(0.2 - fee_asset1, 4)
         );
 
-        let t = Trade {
-            timestamp: 0,
-            price: 2000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
-        let t = Trade {
-            timestamp: 0,
-            price: 2000.0,
-            size: -100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(2000.0, 2000.0, 1);
         assert_eq!(exchange.account().position().unrealized_pnl(), 0.4);
 
         let size = 800.0;
@@ -533,12 +411,7 @@ mod tests {
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1000.0, 1000.0, 0);
 
         let o = Order::market(Side::Buy, 800.0).unwrap();
         let order_err = exchange.submit_order(o);
@@ -557,19 +430,7 @@ mod tests {
         assert_eq!(exchange.account().margin().order_margin(), 0.0);
         assert_eq!(exchange.account().margin().position_margin(), 0.8);
 
-        let t = Trade {
-            timestamp: 0,
-            price: 800.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
-        let t = Trade {
-            timestamp: 0,
-            price: 800.0,
-            size: -100.0,
-        };
-        exchange.consume_trade(&t);
-
+        exchange.update_state(800.0, 800.0, 1);
         assert_eq!(exchange.account.position().unrealized_pnl(), -0.2);
 
         let o = Order::market(Side::Sell, 800.0).unwrap();
@@ -609,12 +470,7 @@ mod tests {
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1000.0, 1000.0, 0);
 
         let o = Order::market(Side::Sell, 800.0).unwrap();
         let order_err = exchange.submit_order(o);
@@ -623,19 +479,7 @@ mod tests {
 
         assert_eq!(exchange.account().position().size(), -800.0);
 
-        let t = Trade {
-            timestamp: 0,
-            price: 800.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
-        let t = Trade {
-            timestamp: 0,
-            price: 800.0,
-            size: -100.0,
-        };
-        exchange.consume_trade(&t);
-
+        exchange.update_state(800.0, 800.0, 1);
         assert_eq!(exchange.account.position().unrealized_pnl(), 0.2);
 
         let o = Order::market(Side::Buy, 800.0).unwrap();
@@ -676,12 +520,7 @@ mod tests {
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1000.0, 1000.0, 0);
 
         let value = exchange.account.margin().available_balance() * 0.4;
         let size = exchange.ask * value;
@@ -708,18 +547,7 @@ mod tests {
             0.6 - fee_asset1
         );
 
-        let t = Trade {
-            timestamp: 0,
-            price: 2000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
-        let t = Trade {
-            timestamp: 0,
-            price: 2000.0,
-            size: -100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(2000.0, 2000.0, 1);
 
         let size = 400.0;
         let fee_base2 = size * fee_taker;
@@ -758,12 +586,7 @@ mod tests {
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1000.0, 1000.0, 0);
 
         let value = exchange.account.margin().available_balance() * 0.8;
         let size = exchange.ask * value;
@@ -790,18 +613,7 @@ mod tests {
             round(0.2 - fee_asset1, 4)
         );
 
-        let t = Trade {
-            timestamp: 0,
-            price: 2000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
-        let t = Trade {
-            timestamp: 0,
-            price: 2000.0,
-            size: -100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(2000.0, 2000.0, 1);
 
         let size = 400.0;
         let fee_base2 = size * fee_taker;
@@ -841,12 +653,7 @@ mod tests {
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1000.0, 1000.0, 0);
 
         let o = Order::market(Side::Buy, 800.0).unwrap();
         let order_err = exchange.submit_order(o);
@@ -855,19 +662,7 @@ mod tests {
 
         assert_eq!(exchange.account().position().size(), 800.0);
 
-        let t = Trade {
-            timestamp: 0,
-            price: 800.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
-        let t = Trade {
-            timestamp: 0,
-            price: 800.0,
-            size: -100.0,
-        };
-        exchange.consume_trade(&t);
-
+        exchange.update_state(800.0, 800.0, 1);
         assert_eq!(exchange.account.position().unrealized_pnl(), -0.2);
 
         let o = Order::market(Side::Sell, 400.0).unwrap();
@@ -908,12 +703,7 @@ mod tests {
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1000.0, 1000.0, 0);
 
         let o = Order::market(Side::Sell, 800.0).unwrap();
         let order_err = exchange.submit_order(o);
@@ -932,18 +722,7 @@ mod tests {
         assert_eq!(exchange.account().margin().order_margin(), 0.0);
         assert_eq!(exchange.account().margin().position_margin(), 0.8);
 
-        let t = Trade {
-            timestamp: 0,
-            price: 800.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
-        let t = Trade {
-            timestamp: 0,
-            price: 800.0,
-            size: -100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(800.0, 800.0, 1);
 
         assert_eq!(exchange.account.position().unrealized_pnl(), 0.2);
 
@@ -985,12 +764,7 @@ mod tests {
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1000.0, 1000.0, 0);
 
         let value = exchange.account.margin().available_balance() * 0.8;
         let size = exchange.ask * value;
@@ -1016,19 +790,7 @@ mod tests {
             round(exchange.account().margin().available_balance(), 4),
             round(0.2 - fee_asset1, 4)
         );
-
-        let t = Trade {
-            timestamp: 0,
-            price: 2000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
-        let t = Trade {
-            timestamp: 0,
-            price: 2000.0,
-            size: -100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(2000.0, 2000.0, 1);
 
         let size = 400.0;
         let fee_base2 = size * fee_taker;
@@ -1039,19 +801,6 @@ mod tests {
         let o = Order::market(Side::Buy, size).unwrap();
         let order_err = exchange.submit_order(o);
         assert!(order_err.is_ok());
-
-        let t = Trade {
-            timestamp: 0,
-            price: 2000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
-        let t = Trade {
-            timestamp: 0,
-            price: 2000.0,
-            size: -100.0,
-        };
-        exchange.consume_trade(&t);
 
         assert_eq!(exchange.account().position().size(), -400.0);
         assert_eq!(exchange.account().position().value(), 0.2);
@@ -1078,12 +827,7 @@ mod tests {
         };
         let fee_taker = config.fee_taker;
         let mut exchange = Exchange::new(config);
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1000.0, 1000.0, 0);
 
         let value = exchange.account().margin().available_balance() * 0.9;
         let size = exchange.ask * value;
@@ -1159,18 +903,7 @@ mod tests {
             leverage: 1.0,
         };
         let mut exchange = Exchange::new(config.clone());
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
-        let t = Trade {
-            timestamp: 0,
-            price: 1000.0,
-            size: -100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1000.0, 1000.0, 0);
 
         let o: Order = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
         exchange.submit_order(o).unwrap();
@@ -1178,20 +911,7 @@ mod tests {
         assert_eq!(exchange.account().margin().available_balance(), 0.5);
         assert_eq!(exchange.account().margin().order_margin(), 0.5);
 
-        let t = Trade {
-            timestamp: 1,
-            price: 750.0,
-            size: 100.0,
-        };
-        let (exec_orders, liq) = exchange.consume_trade(&t);
-        assert!(!liq);
-        assert_eq!(exec_orders.len(), 0);
-        let t = Trade {
-            timestamp: 1,
-            price: 750.0,
-            size: -100.0,
-        };
-        let (exec_orders, liq) = exchange.consume_trade(&t);
+        let (exec_orders, liq) = exchange.update_state(750.0, 750.0, 1);
         assert!(!liq);
         assert_eq!(exec_orders.len(), 1);
 
@@ -1208,18 +928,7 @@ mod tests {
         assert!(order_err.is_ok());
         assert_eq!(exchange.account().active_limit_orders().len(), 1);
 
-        let t = Trade {
-            timestamp: 1,
-            price: 1200.0,
-            size: -100.0,
-        };
-        exchange.consume_trade(&t);
-        let t = Trade {
-            timestamp: 1,
-            price: 1200.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+        exchange.update_state(1200.0, 1200.0, 1);
 
         assert_eq!(exchange.account().active_limit_orders().len(), 0);
         assert_eq!(exchange.account().position().size(), 0.0);
@@ -1230,12 +939,8 @@ mod tests {
         let o: Order = Order::limit(Side::Sell, 1200.0, 600.0).unwrap();
         exchange.submit_order(o).unwrap();
         assert_eq!(exchange.account().active_limit_orders().len(), 1);
-        let t = Trade {
-            timestamp: 1,
-            price: 1201.0,
-            size: 100.0,
-        };
-        exchange.consume_trade(&t);
+
+        exchange.update_state(1200.0, 1201.0, 2);
         assert_eq!(exchange.account().position().size(), -600.0);
         assert_eq!(round(exchange.account().position().value(), 1), 0.5);
         assert_eq!(round(exchange.account().margin().position_margin(), 1), 0.5);
