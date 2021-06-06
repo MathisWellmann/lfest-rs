@@ -156,6 +156,7 @@ fn analyze_results(e: &Exchange) {
 ### TODOs:
 - proper order margin mechanism
 - proper liquidations
+- add optional order filters such as min_size and size_precision
 
 ### Contributions
 If you find a bug or would like to help out, feel free to create a pull-request.

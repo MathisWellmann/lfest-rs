@@ -1,4 +1,4 @@
-//! Example usage of Exchange using external trade data.
+//! Example usage of InvExchange using external trade data.
 //! A randomly acting agent places market buy / sell orders every 100 candles
 
 mod load_trades;
@@ -6,7 +6,7 @@ mod load_trades;
 #[macro_use]
 extern crate log;
 
-use lfest::{Config, Exchange, Order, OrderError, Side};
+use lfest::{Config, InvExchange, Order, OrderError, Side};
 use load_trades::load_prices_from_csv;
 use rand::{thread_rng, Rng};
 use std::time::Instant;
@@ -21,7 +21,7 @@ fn main() {
         use_candles: false,
         leverage: 1.0,
     };
-    let mut exchange = Exchange::new(config);
+    let mut exchange = InvExchange::new(config);
 
     // load trades from csv file
     let prices = load_prices_from_csv("./data/Bitmex_XBTUSD_1M.csv").unwrap();
@@ -73,7 +73,7 @@ fn main() {
 }
 
 /// analyze the resulting performance metrics of the traded orders
-fn analyze_results(e: &Exchange) {
+fn analyze_results(e: &InvExchange) {
     let win_ratio = e.account().acc_tracker().win_ratio();
     let profit_loss_ratio = e.account().acc_tracker().profit_loss_ratio();
     let rpnl = e.account().acc_tracker().total_rpnl();

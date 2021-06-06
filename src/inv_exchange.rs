@@ -9,7 +9,7 @@ const MAX_NUM_STOP_ORDERS: usize = 50;
 
 #[derive(Debug, Clone)]
 /// The main leveraged futures exchange for simulated trading
-pub struct Exchange {
+pub struct InvExchange {
     config: Config,
     account: Account,
     validator: Validator,
@@ -21,13 +21,13 @@ pub struct Exchange {
     low: f64,
 }
 
-impl Exchange {
-    /// Create a new Exchange with the desired config and whether to use candles as infomation source
-    pub fn new(config: Config) -> Exchange {
+impl InvExchange {
+    /// Create a new InvExchange with the desired config and whether to use candles as infomation source
+    pub fn new(config: Config) -> InvExchange {
         assert!(config.leverage > 0.0);
         let account = Account::new(config.leverage, config.starting_balance_base);
         let validator = Validator::new(config.fee_maker, config.fee_taker);
-        Exchange {
+        InvExchange {
             config,
             account,
             validator,
@@ -291,7 +291,7 @@ mod tests {
             use_candles: false,
             leverage: 1.0,
         };
-        let mut exchange = Exchange::new(config);
+        let mut exchange = InvExchange::new(config);
         exchange.update_state(1000.0, 1000.0, 0);
 
         // submit working market order
@@ -322,7 +322,7 @@ mod tests {
             use_candles: false,
             leverage: 1.0,
         };
-        let mut exchange = Exchange::new(config);
+        let mut exchange = InvExchange::new(config);
         exchange.update_state(1000.0, 1000.0, 0);
 
         let o = Order::stop_market(Side::Buy, 1010.0, 100.0).unwrap();
@@ -345,7 +345,7 @@ mod tests {
             leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
-        let mut exchange = Exchange::new(config);
+        let mut exchange = InvExchange::new(config);
         exchange.update_state(1000.0, 1000.0, 0);
 
         let value = exchange.account().margin().available_balance() * 0.8;
@@ -410,7 +410,7 @@ mod tests {
             leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
-        let mut exchange = Exchange::new(config);
+        let mut exchange = InvExchange::new(config);
         exchange.update_state(1000.0, 1000.0, 0);
 
         let o = Order::market(Side::Buy, 800.0).unwrap();
@@ -469,7 +469,7 @@ mod tests {
             leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
-        let mut exchange = Exchange::new(config);
+        let mut exchange = InvExchange::new(config);
         exchange.update_state(1000.0, 1000.0, 0);
 
         let o = Order::market(Side::Sell, 800.0).unwrap();
@@ -519,7 +519,7 @@ mod tests {
             leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
-        let mut exchange = Exchange::new(config);
+        let mut exchange = InvExchange::new(config);
         exchange.update_state(1000.0, 1000.0, 0);
 
         let value = exchange.account.margin().available_balance() * 0.4;
@@ -585,7 +585,7 @@ mod tests {
             leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
-        let mut exchange = Exchange::new(config);
+        let mut exchange = InvExchange::new(config);
         exchange.update_state(1000.0, 1000.0, 0);
 
         let value = exchange.account.margin().available_balance() * 0.8;
@@ -652,7 +652,7 @@ mod tests {
             leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
-        let mut exchange = Exchange::new(config);
+        let mut exchange = InvExchange::new(config);
         exchange.update_state(1000.0, 1000.0, 0);
 
         let o = Order::market(Side::Buy, 800.0).unwrap();
@@ -702,7 +702,7 @@ mod tests {
             leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
-        let mut exchange = Exchange::new(config);
+        let mut exchange = InvExchange::new(config);
         exchange.update_state(1000.0, 1000.0, 0);
 
         let o = Order::market(Side::Sell, 800.0).unwrap();
@@ -763,7 +763,7 @@ mod tests {
             leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
-        let mut exchange = Exchange::new(config);
+        let mut exchange = InvExchange::new(config);
         exchange.update_state(1000.0, 1000.0, 0);
 
         let value = exchange.account.margin().available_balance() * 0.8;
@@ -826,7 +826,7 @@ mod tests {
             leverage: 1.0,
         };
         let fee_taker = config.fee_taker;
-        let mut exchange = Exchange::new(config);
+        let mut exchange = InvExchange::new(config);
         exchange.update_state(1000.0, 1000.0, 0);
 
         let value = exchange.account().margin().available_balance() * 0.9;
@@ -902,7 +902,7 @@ mod tests {
             use_candles: false,
             leverage: 1.0,
         };
-        let mut exchange = Exchange::new(config.clone());
+        let mut exchange = InvExchange::new(config.clone());
         exchange.update_state(1000.0, 1000.0, 0);
 
         let o: Order = Order::limit(Side::Buy, 900.0, 450.0).unwrap();

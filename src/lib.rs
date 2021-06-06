@@ -9,7 +9,7 @@ extern crate log;
 
 mod acc_tracker;
 mod account;
-mod exchange;
+mod inv_exchange;
 mod margin;
 mod orders;
 mod position;
@@ -17,7 +17,7 @@ mod utils;
 mod validator;
 mod welford_online;
 
-pub use exchange::Exchange;
+pub use inv_exchange::InvExchange;
 pub use margin::Margin;
 pub use orders::Order;
 pub use position::Position;
@@ -79,10 +79,10 @@ pub struct Config {
     pub fee_taker: f64,
     /// The starting balance of accounts margin denoted in BASE currency
     pub starting_balance_base: f64,
-    /// set to true if you use the consume_candle() method to update external price information
-    pub use_candles: bool,
     /// The leverage used for the position
     pub leverage: f64,
+    /// deprecated
+    pub use_candles: bool,
 }
 
 #[cfg(test)]
