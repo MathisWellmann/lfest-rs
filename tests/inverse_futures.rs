@@ -84,7 +84,6 @@ fn inv_long_market_win_full() {
 
     assert_eq!(exchange.account().position().size(), size);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
-    assert_eq!(exchange.account().position().value(), value);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(
         exchange.account().margin().wallet_balance(),
@@ -108,7 +107,6 @@ fn inv_long_market_win_full() {
     assert!(order_err.is_ok());
 
     assert_eq!(exchange.account().position().size(), 0.0);
-    assert_eq!(exchange.account().position().value(), 0.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(
         exchange.account().margin().wallet_balance(),
@@ -143,7 +141,6 @@ fn inv_long_market_loss_full() {
     exchange.update_state(1000.0, 1000.0, 1);
 
     assert_eq!(exchange.account().position().size(), 800.0);
-    assert_eq!(exchange.account().position().value(), 0.8);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(exchange.account().margin().wallet_balance(), 1.0);
@@ -170,7 +167,6 @@ fn inv_long_market_loss_full() {
     let fee_combined = fee_asset0 + fee_asset1;
 
     assert_eq!(exchange.account().position().size(), 0.0);
-    assert_eq!(exchange.account().position().value(), 0.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(
         round(exchange.account().margin().wallet_balance(), 5),
@@ -221,7 +217,6 @@ fn inv_short_market_win_full() {
     let fee_combined = fee_asset0 + fee_asset1;
 
     assert_eq!(exchange.account().position().size(), 0.0);
-    assert_eq!(exchange.account().position().value(), 0.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(
         exchange.account().margin().wallet_balance(),
@@ -261,7 +256,6 @@ fn inv_short_market_loss_full() {
 
     assert_eq!(exchange.account().position().size(), -size);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
-    assert_eq!(exchange.account().position().value(), value);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(
         exchange.account().margin().wallet_balance(),
@@ -288,7 +282,6 @@ fn inv_short_market_loss_full() {
     exchange.update_state(2000.0, 2000.0, 3);
 
     assert_eq!(exchange.account().position().size(), 0.0);
-    assert_eq!(exchange.account().position().value(), 0.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(
         round(exchange.account().margin().wallet_balance(), 5),
@@ -328,7 +321,6 @@ fn inv_long_market_win_partial() {
 
     assert_eq!(exchange.account().position().size(), size);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
-    assert_eq!(exchange.account().position().value(), value);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(
         exchange.account().margin().wallet_balance(),
@@ -355,7 +347,6 @@ fn inv_long_market_win_partial() {
     exchange.update_state(2000.0, 2000.0, 2);
 
     assert_eq!(exchange.account().position().size(), 400.0);
-    assert_eq!(exchange.account().position().value(), 0.2);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.2);
     assert_eq!(
@@ -407,7 +398,6 @@ fn inv_long_market_loss_partial() {
     let fee_combined = fee_asset0 + fee_asset1;
 
     assert_eq!(exchange.account().position().size(), 400.0);
-    assert_eq!(exchange.account().position().value(), 0.5);
     assert_eq!(exchange.account().position().unrealized_pnl(), -0.1);
     assert_eq!(
         round(exchange.account().margin().wallet_balance(), 6),
@@ -440,7 +430,6 @@ fn inv_short_market_win_partial() {
     exchange.update_state(1000.0, 1000.0, 1);
 
     assert_eq!(exchange.account().position().size(), -800.0);
-    assert_eq!(exchange.account().position().value(), 0.8);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(exchange.account().margin().wallet_balance(), 0.9994);
@@ -469,7 +458,6 @@ fn inv_short_market_win_partial() {
     let fee_combined = fee_asset0 + fee_asset1;
 
     assert_eq!(exchange.account().position().size(), -400.0);
-    assert_eq!(exchange.account().position().value(), 0.5);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.1);
     assert_eq!(
         round(exchange.account().margin().wallet_balance(), 6),
@@ -509,7 +497,6 @@ fn inv_short_market_loss_partial() {
 
     assert_eq!(exchange.account().position().size(), -size);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
-    assert_eq!(exchange.account().position().value(), value);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(
         exchange.account().margin().wallet_balance(),
@@ -533,7 +520,6 @@ fn inv_short_market_loss_partial() {
     assert!(order_err.is_ok());
 
     assert_eq!(exchange.account().position().size(), -400.0);
-    assert_eq!(exchange.account().position().value(), 0.2);
     assert_eq!(exchange.account().position().unrealized_pnl(), -0.2);
     assert_eq!(
         round(exchange.account().margin().wallet_balance(), 5),
@@ -579,7 +565,6 @@ fn inv_test_market_roundtrip() {
 
     assert_eq!(exchange.account().position().size(), 0.0);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
-    assert_eq!(exchange.account().position().value(), 0.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(
         exchange.account().margin().wallet_balance(),
@@ -607,7 +592,6 @@ fn inv_test_market_roundtrip() {
 
     assert_eq!(exchange.account().position().size(), -50.0);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
-    assert_eq!(exchange.account().position().value(), 0.05);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert!(exchange.account().margin().wallet_balance() < 1.0);
     assert_eq!(exchange.account().margin().position_margin(), 0.05);
@@ -651,7 +635,6 @@ fn inv_execute_limit() {
     assert_eq!(exchange.ask(), 750.0);
     assert_eq!(exchange.account().active_limit_orders().len(), 0);
     assert_eq!(exchange.account().position().size(), 450.0);
-    assert_eq!(exchange.account().position().value(), 0.6);
     assert_eq!(exchange.account().position().entry_price(), 900.0);
     assert_eq!(exchange.account().margin().wallet_balance(), 1.0);
 
@@ -674,7 +657,6 @@ fn inv_execute_limit() {
 
     exchange.update_state(1200.0, 1201.0, 2);
     assert_eq!(exchange.account().position().size(), -600.0);
-    assert_eq!(round(exchange.account().position().value(), 1), 0.5);
     assert_eq!(round(exchange.account().margin().position_margin(), 1), 0.5);
     assert_eq!(round(exchange.account().margin().wallet_balance(), 2), 1.05);
     assert_eq!(

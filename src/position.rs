@@ -3,8 +3,6 @@
 pub struct Position {
     /// The position size
     size: f64,
-    /// The value of the position
-    value: f64,
     /// The entry price of the position
     entry_price: f64,
     /// The current position leverage
@@ -18,7 +16,6 @@ impl Position {
     pub fn new(leverage: f64) -> Self {
         Position {
             size: 0.0,
-            value: 0.0,
             entry_price: 0.0,
             leverage,
             unrealized_pnl: 0.0,
@@ -29,14 +26,12 @@ impl Position {
     /// NOTE: only for advanced use cases
     pub fn new_all_fields(
         size: f64,
-        value: f64,
         entry_price: f64,
         leverage: f64,
         unrealized_pnl: f64,
     ) -> Self {
         Position {
             size,
-            value,
             entry_price,
             leverage,
             unrealized_pnl,
@@ -72,7 +67,6 @@ impl Position {
 
     /// Update the state to reflect price changes
     pub(crate) fn update_state(&mut self, price: f64) {
-        self.value = self.size.abs() / price;
         self.unrealized_pnl = if self.size != 0.0 {
             self.size * (1.0 / self.entry_price - 1.0 / price)
         } else {
@@ -83,11 +77,6 @@ impl Position {
     /// Return the position size
     pub fn size(&self) -> f64 {
         self.size
-    }
-
-    /// Return the position value
-    pub fn value(&self) -> f64 {
-        self.value
     }
 
     /// Return the entry price of the position
@@ -117,35 +106,30 @@ mod tests {
 
         pos.change_size(100.0, 100.0);
         assert_eq!(pos.size, 100.0);
-        assert_eq!(pos.value, 1.0);
         assert_eq!(pos.entry_price, 100.0);
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(pos.unrealized_pnl, 0.0);
 
         pos.change_size(-50.0, 150.0);
         assert_eq!(pos.size, 50.0);
-        assert_eq!(round(pos.value, 2), 0.33);
         assert_eq!(pos.entry_price, 100.0);
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(round(pos.unrealized_pnl, 2), 0.17);
 
         pos.change_size(50.0, 150.0);
         assert_eq!(pos.size, 100.0);
-        assert_eq!(round(pos.value, 2), 0.67);
         assert_eq!(pos.entry_price, 125.0);
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(round(pos.unrealized_pnl, 2), 0.13);
 
         pos.change_size(-150.0, 150.0);
         assert_eq!(pos.size, -50.0);
-        assert_eq!(round(pos.value, 2), 0.33);
         assert_eq!(pos.entry_price, 150.0);
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(pos.unrealized_pnl, 0.0);
 
         pos.change_size(50.0, 150.0);
         assert_eq!(pos.size, 0.0);
-        assert_eq!(pos.value, 0.0);
         assert_eq!(pos.entry_price, 150.0);
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(pos.unrealized_pnl, 0.0);
@@ -153,10 +137,9 @@ mod tests {
 
     #[test]
     fn position_update_state() {
-        let mut pos = Position::new_all_fields(100.0, 1.0, 100.0, 1.0, 0.0);
+        let mut pos = Position::new_all_fields(100.0, 100.0, 1.0, 0.0);
         pos.update_state(110.0);
 
-        assert_eq!(round(pos.value, 2), 0.91);
         assert_eq!(round(pos.unrealized_pnl, 2), 0.09);
     }
 }

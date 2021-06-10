@@ -585,14 +585,12 @@ mod tests {
         assert_eq!(acc.margin().order_margin(), 0.0);
         assert_eq!(acc.margin().available_balance(), 0.5);
         assert_eq!(acc.position().size(), 100.0);
-        assert_eq!(acc.position().value(), 0.5);
         assert_eq!(acc.position().entry_price(), 200.0);
         assert_eq!(acc.position().leverage(), 1.0);
         assert_eq!(acc.position().unrealized_pnl(), 0.0);
 
         acc.change_position(Side::Sell, 100.0, 200.0, futures_type);
         assert_eq!(acc.position().size(), 0.0);
-        assert_eq!(acc.position().value(), 0.0);
         assert_eq!(acc.position().entry_price(), 200.0);
         assert_eq!(acc.position().leverage(), 1.0);
         assert_eq!(acc.position().unrealized_pnl(), 0.0);
@@ -607,7 +605,6 @@ mod tests {
         assert_eq!(acc.margin().order_margin(), 0.0);
         assert_eq!(acc.margin().available_balance(), 0.5);
         assert_eq!(acc.position().size(), -100.0);
-        assert_eq!(acc.position().value(), 0.5);
         assert_eq!(acc.position().entry_price(), 200.0);
         assert_eq!(acc.position().leverage(), 1.0);
         assert_eq!(acc.position().unrealized_pnl(), 0.0);
@@ -618,7 +615,6 @@ mod tests {
         assert_eq!(acc.margin().order_margin(), 0.0);
         assert_eq!(acc.margin().available_balance(), 0.75);
         assert_eq!(acc.position().size(), 50.0);
-        assert_eq!(acc.position().value(), 0.25);
         assert_eq!(acc.position().entry_price(), 200.0);
         assert_eq!(acc.position().leverage(), 1.0);
         assert_eq!(acc.position().unrealized_pnl(), 0.0);
@@ -629,7 +625,6 @@ mod tests {
         assert_eq!(acc.margin().order_margin(), 0.0);
         assert_eq!(acc.margin().available_balance(), 0.875);
         assert_eq!(acc.position().size(), 25.0);
-        assert_eq!(acc.position().value(), 0.125);
         assert_eq!(acc.position().entry_price(), 200.0);
         assert_eq!(acc.position().leverage(), 1.0);
         assert_eq!(acc.position().unrealized_pnl(), 0.0);

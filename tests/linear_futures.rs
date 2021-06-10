@@ -18,7 +18,9 @@ fn lin_long_market_win_full() {
 
   assert!(exchange.submit_order(Order::market(Side::Buy, 9.0).unwrap()).is_ok());
   exchange.update_state(100.0, 100.0, 0);
-  //assert_eq!(exchange.account().margin());
+
+  assert_eq!(exchange.account().position().size(), 9.0);
+  assert_eq!(exchange.account().position().entry_price(), 100.0);
   
 }
 
