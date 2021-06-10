@@ -10,6 +10,7 @@ extern crate log;
 mod acc_tracker;
 mod account;
 mod exchange;
+mod futures_type;
 mod margin;
 mod orders;
 mod position;
@@ -18,6 +19,7 @@ mod validator;
 mod welford_online;
 
 pub use exchange::Exchange;
+pub use futures_type::FuturesType;
 pub use margin::Margin;
 pub use orders::Order;
 pub use position::Position;
@@ -77,20 +79,25 @@ pub struct Config {
     pub fee_maker: f64,
     /// The taker fee as a fraction. e.g.: 10 basis points -> 0.0010
     pub fee_taker: f64,
-    /// The starting balance of accounts margin denoted in BASE currency
-    pub starting_balance_base: f64,
+    /// The starting balance of account
+    pub starting_balance: f64,
     /// set to true if you use the consume_candle() method to update external price information
     pub use_candles: bool,
     /// The leverage used for the position
     pub leverage: f64,
+    /// The type of futures to simulate
+    pub futures_type: FuturesType,
+}
+
+/// round a value to a given precision of decimal places
+/// used in tests
+pub fn round(val: f64, prec: i32) -> f64 {
+    ((val * 10.0_f64.powi(prec)).round()) / 10.0_f64.powi(prec)
 }
 
 #[cfg(test)]
 mod tests {
-    /// round a value to a given precision of decimal places
-    pub fn round(val: f64, prec: i32) -> f64 {
-        ((val * 10.0_f64.powi(prec)).round()) / 10.0_f64.powi(prec)
-    }
+    use super::*;
 
     #[test]
     fn test_round() {

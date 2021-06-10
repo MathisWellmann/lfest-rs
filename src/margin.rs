@@ -1,18 +1,18 @@
 #[derive(Debug, Clone, Copy)]
 /// Describes the margin information of the account
 pub struct Margin {
-    /// The wallet balance of account denoted in BASE currency
+    /// The wallet balance of account
     wallet_balance: f64,
-    /// The position margin of account denoted in BASE currency
+    /// The position margin of account
     position_margin: f64,
-    /// The order margin of account denoted in BASE currency
+    /// The order margin of account
     order_margin: f64,
-    /// The available balance of account denoted in BASE currency
+    /// The available balance of account
     available_balance: f64,
 }
 
 impl Margin {
-    /// Create a new margin account with an initial balance denoted in BASE currency
+    /// Create a new margin account with an initial balance
     pub fn new_init(init_balance: f64) -> Self {
         Margin {
             wallet_balance: init_balance,

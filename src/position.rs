@@ -1,15 +1,15 @@
 #[derive(Debug, Clone, Default)]
 /// Describes the position information of the account
 pub struct Position {
-    /// The position size denoted in QUOTE currency
+    /// The position size
     size: f64,
-    /// The value of the position, denoted in BASE currency
+    /// The value of the position
     value: f64,
     /// The entry price of the position
     entry_price: f64,
     /// The current position leverage
     leverage: f64,
-    /// The currently unrealized profit and loss, denoted in BASE currency
+    /// The currently unrealized profit and loss
     unrealized_pnl: f64,
 }
 
@@ -43,7 +43,7 @@ impl Position {
         }
     }
 
-    /// Change the position size by a given delta, denoted in QUOTE currency at a given price
+    /// Change the position size by a given delta at a certain price
     pub(crate) fn change_size(&mut self, size_delta: f64, price: f64) {
         if self.size > 0.0 {
             if self.size + size_delta < 0.0 {
@@ -80,12 +80,12 @@ impl Position {
         };
     }
 
-    /// Return the position size denoted in QUOTE currency
+    /// Return the position size
     pub fn size(&self) -> f64 {
         self.size
     }
 
-    /// Return the position value denoted in BASE currency
+    /// Return the position value
     pub fn value(&self) -> f64 {
         self.value
     }
@@ -100,7 +100,7 @@ impl Position {
         self.leverage
     }
 
-    /// Return the positions unrealized profit and loss, denoted in BASE currency
+    /// Return the positions unrealized profit and loss
     pub fn unrealized_pnl(&self) -> f64 {
         self.unrealized_pnl
     }
@@ -109,7 +109,7 @@ impl Position {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::round;
+    use crate::round;
 
     #[test]
     fn position_change_size() {

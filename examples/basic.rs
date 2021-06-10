@@ -6,7 +6,7 @@ mod load_trades;
 #[macro_use]
 extern crate log;
 
-use lfest::{Config, Exchange, Order, OrderError, Side};
+use lfest::{Config, Exchange, FuturesType, Order, OrderError, Side};
 use load_trades::load_prices_from_csv;
 use rand::{thread_rng, Rng};
 use std::time::Instant;
@@ -17,9 +17,10 @@ fn main() {
     let config = Config {
         fee_maker: -0.00025,
         fee_taker: 0.001,
-        starting_balance_base: 1.0,
+        starting_balance: 1.0,
         use_candles: false,
         leverage: 1.0,
+        futures_type: FuturesType::Inverse,
     };
     let mut exchange = Exchange::new(config);
 

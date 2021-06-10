@@ -13,7 +13,7 @@ pub struct Order {
     pub limit_price: f64,
     /// the trigger price
     pub trigger_price: f64,
-    /// order size denoted in QUOTE currency
+    /// order size
     pub size: f64,
     /// order side
     pub side: Side,

@@ -76,7 +76,7 @@ impl AccTracker {
         self.total_profit / self.total_loss
     }
 
-    /// Return the cumulative fees paid to the exchange denoted in BASE currency
+    /// Return the cumulative fees paid to the exchange
     pub fn cumulative_fees(&self) -> f64 {
         self.cumulative_fees
     }
@@ -152,7 +152,7 @@ impl AccTracker {
         self.num_buys as f64 / self.num_trades as f64
     }
 
-    /// Return the cumulative turnover value of the trades, measured in QUOTE currency
+    /// Return the cumulative turnover value of the trades
     pub fn turnover(&self) -> f64 {
         self.total_turnover
     }
@@ -242,9 +242,9 @@ impl AccTracker {
         self.num_trading_opportunities += 1;
     }
 
-    /// Update the cumulative fee amount denoted in BASE currency
-    pub(crate) fn log_fee(&mut self, fee_base: f64) {
-        self.cumulative_fees += fee_base
+    /// Update the cumulative fee amount
+    pub(crate) fn log_fee(&mut self, fee: f64) {
+        self.cumulative_fees += fee
     }
 
     /// Log a limit order submission
@@ -266,7 +266,7 @@ impl AccTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::round;
+    use crate::round;
 
     #[test]
     fn log_trade() {
