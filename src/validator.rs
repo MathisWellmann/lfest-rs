@@ -250,7 +250,7 @@ mod tests {
         for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
             println!("testing with leverage: {}", leverage);
 
-            let mut acc = Account::new(leverage, 1.0);
+            let mut acc = Account::new(leverage, 1.0, FuturesType::Inverse);
 
             // valid order
             let o = Order::market(Side::Buy, 400.0 * leverage).unwrap();
@@ -284,8 +284,8 @@ mod tests {
             println!("testing with leverage: {}", leverage);
 
             // with long position
-            let mut acc = Account::new(leverage, 1.0);
-            acc.change_position(Side::Buy, 50.0 * leverage, 100.0, FuturesType::Inverse);
+            let mut acc = Account::new(leverage, 1.0, FuturesType::Inverse);
+            acc.change_position(Side::Buy, 50.0 * leverage, 100.0);
 
             // valid order
             let o = Order::market(Side::Buy, 50.0 * leverage).unwrap();
@@ -308,8 +308,8 @@ mod tests {
             validator.validate_market_order(&o, &acc).unwrap();
 
             // with short position
-            let mut acc = Account::new(leverage, 1.0);
-            acc.change_position(Side::Sell, 50.0 * leverage, 100.0, FuturesType::Inverse);
+            let mut acc = Account::new(leverage, 1.0, FuturesType::Inverse);
+            acc.change_position(Side::Sell, 50.0 * leverage, 100.0);
 
             // valid order
             let o = Order::market(Side::Buy, 50.0 * leverage).unwrap();
@@ -348,7 +348,7 @@ mod tests {
             println!("testing with leverage: {}", leverage);
 
             // with buy limit order
-            let mut acc = Account::new(leverage, 1.0);
+            let mut acc = Account::new(leverage, 1.0, FuturesType::Inverse);
             acc.append_order(Order::limit(Side::Buy, 100.0, 50.0 * leverage).unwrap());
 
             // valid order
@@ -368,7 +368,7 @@ mod tests {
             assert!(validator.validate_market_order(&o, &acc).is_err());
 
             // with sell limit order
-            let mut acc = Account::new(leverage, 1.0);
+            let mut acc = Account::new(leverage, 1.0, FuturesType::Inverse);
             acc.append_order(Order::limit(Side::Sell, 100.0, 50.0 * leverage).unwrap());
 
             // valid order
@@ -398,7 +398,7 @@ mod tests {
         let mut validator = Validator::new(0.0, 0.001, FuturesType::Inverse);
         validator.update(100.0, 100.0);
 
-        let acc = Account::new(1.0, 1.0);
+        let acc = Account::new(1.0, 1.0, FuturesType::Inverse);
 
         // valid order
         let o = Order::limit(Side::Buy, 100.0, 50.0).unwrap();
@@ -436,8 +436,8 @@ mod tests {
         validator.update(100.0, 100.0);
 
         // with long position
-        let mut acc = Account::new(1.0, 1.0);
-        acc.change_position(Side::Buy, 50.0, 100.0, FuturesType::Inverse);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
+        acc.change_position(Side::Buy, 50.0, 100.0);
 
         // valid order
         let o = Order::limit(Side::Buy, 100.0, 50.0).unwrap();
@@ -464,12 +464,12 @@ mod tests {
         validator.update(100.0, 100.0);
 
         // with long position
-        let mut acc = Account::new(1.0, 1.0);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
         acc.append_order(Order::limit(Side::Buy, 90.0, 45.0).unwrap());
 
         // TODO: validate limit order with long position
 
-        let mut acc = Account::new(1.0, 1.0);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
         acc.append_order(Order::limit(Side::Sell, 110.0, 55.0).unwrap());
 
         // TODO: validate limit order with short position
@@ -482,7 +482,7 @@ mod tests {
         let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
         validator.update(100.0, 100.0);
 
-        let acc = Account::new(1.0, 1.0);
+        let acc = Account::new(1.0, 1.0, FuturesType::Inverse);
 
         // TODO: validate stop market order with a fresh account
     }
@@ -496,13 +496,13 @@ mod tests {
         let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
         validator.update(100.0, 100.0);
 
-        let mut acc = Account::new(1.0, 1.0);
-        acc.change_position(Side::Buy, 50.0, 100.0, FuturesType::Inverse);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
+        acc.change_position(Side::Buy, 50.0, 100.0);
 
         // TODO: validate stop market order with long position
 
-        let mut acc = Account::new(1.0, 1.0);
-        acc.change_position(Side::Sell, 50.0, 100.0, FuturesType::Inverse);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
+        acc.change_position(Side::Sell, 50.0, 100.0);
 
         // TODO: validate stop market order with short position
     }
@@ -515,7 +515,7 @@ mod tests {
         let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
         validator.update(100.0, 100.0);
 
-        let mut acc = Account::new(1.0, 1.0);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
         acc.append_order(Order::limit(Side::Buy, 90.0, 45.0).unwrap());
 
         // TODO: validate stop market order with open orders
@@ -530,7 +530,7 @@ mod tests {
         let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
         validator.update(100.0, 100.0);
 
-        let acc = Account::new(1.0, 1.0);
+        let acc = Account::new(1.0, 1.0, FuturesType::Inverse);
 
         let o = Order::market(Side::Buy, 100.0).unwrap();
         assert_eq!(validator.order_cost_market(&o, &acc), (0.0, 1.0));
@@ -548,8 +548,8 @@ mod tests {
         validator.update(100.0, 100.0);
 
         // test with long position
-        let mut acc = Account::new(1.0, 1.0);
-        acc.change_position(Side::Buy, 100.0, 100.0, FuturesType::Inverse);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
+        acc.change_position(Side::Buy, 100.0, 100.0);
 
         let o = Order::market(Side::Buy, 100.0).unwrap();
         assert_eq!(validator.order_cost_market(&o, &acc), (0.0, 1.0));
@@ -559,8 +559,8 @@ mod tests {
         assert_eq!(validator.order_cost_market(&o, &acc), (1.0, 1.0));
 
         // test with short position
-        let mut acc = Account::new(1.0, 1.0);
-        acc.change_position(Side::Sell, 100.0, 100.0, FuturesType::Inverse);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
+        acc.change_position(Side::Sell, 100.0, 100.0);
 
         let o = Order::market(Side::Buy, 100.0).unwrap();
         assert_eq!(validator.order_cost_market(&o, &acc), (1.0, 0.0));
@@ -579,7 +579,7 @@ mod tests {
         let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
         validator.update(100.0, 100.0);
 
-        let acc = Account::new(1.0, 1.0);
+        let acc = Account::new(1.0, 1.0, FuturesType::Inverse);
 
         let o = Order::limit(Side::Buy, 100.0, 100.0).unwrap();
         assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
@@ -608,8 +608,8 @@ mod tests {
         validator.update(100.0, 100.0);
 
         // test with long position
-        let mut acc = Account::new(1.0, 1.0);
-        acc.change_position(Side::Buy, 100.0, 100.0, FuturesType::Inverse);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
+        acc.change_position(Side::Buy, 100.0, 100.0);
 
         let o = Order::limit(Side::Buy, 100.0, 100.0).unwrap();
         assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
@@ -621,8 +621,8 @@ mod tests {
         assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.0));
 
         // test with short position
-        let mut acc = Account::new(1.0, 1.0);
-        acc.change_position(Side::Sell, 100.0, 100.0, FuturesType::Inverse);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
+        acc.change_position(Side::Sell, 100.0, 100.0);
 
         let o = Order::limit(Side::Buy, 100.0, 100.0).unwrap();
         assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.0));
@@ -642,7 +642,7 @@ mod tests {
         let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
         validator.update(100.0, 100.0);
 
-        let mut acc = Account::new(1.0, 1.0);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
         acc.append_order(Order::limit(Side::Buy, 100.0, 100.0).unwrap());
 
         let o = Order::limit(Side::Buy, 100.0, 100.0).unwrap();
@@ -678,7 +678,7 @@ mod tests {
         let mut validator = Validator::new(0.0, fee_taker, FuturesType::Inverse);
         validator.update(100.0, 100.0);
 
-        let acc = Account::new(1.0, 1.0);
+        let acc = Account::new(1.0, 1.0, FuturesType::Inverse);
 
         let o = Order::market(Side::Buy, 100.0).unwrap();
         assert_eq!(validator.order_cost(&o, &acc), (0.0, 1.001));

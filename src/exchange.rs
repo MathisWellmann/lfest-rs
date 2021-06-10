@@ -21,7 +21,7 @@ impl Exchange {
     /// Create a new Exchange with the desired config and whether to use candles as infomation source
     pub fn new(config: Config) -> Exchange {
         assert!(config.leverage > 0.0);
-        let account = Account::new(config.leverage, config.starting_balance);
+        let account = Account::new(config.leverage, config.starting_balance, config.futures_type);
         let validator = Validator::new(config.fee_maker, config.fee_taker, config.futures_type);
         Exchange {
             config,
@@ -102,6 +102,8 @@ impl Exchange {
 
     /// Execute a market order
     fn execute_market(&mut self, side: Side, amount: f64) {
+      debug!("exchange: execute_market: side: {:?}, amount: {}", side, amount);
+
         let price: f64 = match side {
             Side::Buy => self.ask,
             Side::Sell => self.bid,
@@ -114,7 +116,7 @@ impl Exchange {
         }
         self.account.deduce_fees(fee);
         self.account
-            .change_position(side, amount, price, self.config.futures_type);
+            .change_position(side, amount, price);
     }
 
     /// Execute a limit order, once triggered
@@ -129,7 +131,7 @@ impl Exchange {
         }
         self.account.deduce_fees(fee);
         self.account
-            .change_position(side, amount, price, self.config.futures_type);
+            .change_position(side, amount, price);
     }
 
     /// Perform a liquidation of the account

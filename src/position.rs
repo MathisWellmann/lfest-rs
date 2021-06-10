@@ -1,3 +1,5 @@
+use crate::FuturesType;
+
 #[derive(Debug, Clone, Default)]
 /// Describes the position information of the account
 pub struct Position {
@@ -39,7 +41,7 @@ impl Position {
     }
 
     /// Change the position size by a given delta at a certain price
-    pub(crate) fn change_size(&mut self, size_delta: f64, price: f64) {
+    pub(crate) fn change_size(&mut self, size_delta: f64, price: f64, futures_type: FuturesType) {
         if self.size > 0.0 {
             if self.size + size_delta < 0.0 {
                 // counts as new position as all old position size is sold
@@ -62,13 +64,13 @@ impl Position {
         }
         self.size += size_delta;
 
-        self.update_state(price);
+        self.update_state(price, futures_type);
     }
 
     /// Update the state to reflect price changes
-    pub(crate) fn update_state(&mut self, price: f64) {
+    pub(crate) fn update_state(&mut self, price: f64, futures_type: FuturesType) {
         self.unrealized_pnl = if self.size != 0.0 {
-            self.size * (1.0 / self.entry_price - 1.0 / price)
+          futures_type.pnl(self.entry_price, price, self.size)
         } else {
             0.0
         };
@@ -103,32 +105,33 @@ mod tests {
     #[test]
     fn position_change_size() {
         let mut pos = Position::new(1.0);
+        let futures_type = FuturesType::Inverse;
 
-        pos.change_size(100.0, 100.0);
+        pos.change_size(100.0, 100.0, futures_type);
         assert_eq!(pos.size, 100.0);
         assert_eq!(pos.entry_price, 100.0);
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(pos.unrealized_pnl, 0.0);
 
-        pos.change_size(-50.0, 150.0);
+        pos.change_size(-50.0, 150.0, futures_type);
         assert_eq!(pos.size, 50.0);
         assert_eq!(pos.entry_price, 100.0);
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(round(pos.unrealized_pnl, 2), 0.17);
 
-        pos.change_size(50.0, 150.0);
+        pos.change_size(50.0, 150.0, futures_type);
         assert_eq!(pos.size, 100.0);
         assert_eq!(pos.entry_price, 125.0);
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(round(pos.unrealized_pnl, 2), 0.13);
 
-        pos.change_size(-150.0, 150.0);
+        pos.change_size(-150.0, 150.0, futures_type);
         assert_eq!(pos.size, -50.0);
         assert_eq!(pos.entry_price, 150.0);
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(pos.unrealized_pnl, 0.0);
 
-        pos.change_size(50.0, 150.0);
+        pos.change_size(50.0, 150.0, futures_type);
         assert_eq!(pos.size, 0.0);
         assert_eq!(pos.entry_price, 150.0);
         assert_eq!(pos.leverage, 1.0);
@@ -138,7 +141,7 @@ mod tests {
     #[test]
     fn position_update_state() {
         let mut pos = Position::new_all_fields(100.0, 100.0, 1.0, 0.0);
-        pos.update_state(110.0);
+        pos.update_state(110.0, FuturesType::Inverse);
 
         assert_eq!(round(pos.unrealized_pnl, 2), 0.09);
     }

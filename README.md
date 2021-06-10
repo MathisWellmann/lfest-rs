@@ -159,6 +159,7 @@ fn analyze_results(e: &Exchange) {
 - add order filter configuration such as min_qty and qty_precision
 - add max_num_limit_orders to config
 - add max_num_stop_orders to config
+- impl Display for Side and FuturesType
 
 ### Contributions
 If you find a bug or would like to help out, feel free to create a pull-request.

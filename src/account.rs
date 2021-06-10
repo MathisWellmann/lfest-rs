@@ -4,6 +4,7 @@ use crate::{max, min, FuturesType, Margin, Order, OrderType, Position, Side};
 #[derive(Debug, Clone)]
 /// The users account
 pub struct Account {
+  futures_type: FuturesType,
     margin: Margin,
     position: Position,
     acc_tracker: AccTracker,
@@ -22,11 +23,12 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new(leverage: f64, starting_balance: f64) -> Self {
+    pub fn new(leverage: f64, starting_balance: f64, futures_type: FuturesType) -> Self {
         let position = Position::new(leverage);
         let margin = Margin::new_init(starting_balance);
         let acc_tracker = AccTracker::new(starting_balance);
         Self {
+          futures_type,
             margin,
             position,
             acc_tracker,
@@ -47,10 +49,10 @@ impl Account {
     /// Update the accounts state for the newest price data
     pub fn update(&mut self, price: f64, trade_timestamp: u64) {
         self.acc_tracker.log_timestamp(trade_timestamp);
-        let upnl = self.position.size() * ((1.0 / self.position.entry_price()) - (1.0 / price));
+        let upnl: f64 = self.futures_type.pnl(self.position.entry_price(), price, self.position.size());
         self.acc_tracker.log_upnl(upnl);
 
-        self.position.update_state(price);
+        self.position.update_state(price, self.futures_type);
     }
 
     /// Set a new position manually, be sure that you know what you are doing
@@ -330,6 +332,8 @@ impl Account {
 
     /// Reduce the account equity by a fee amount
     pub(crate) fn deduce_fees(&mut self, fee: f64) {
+      debug!("account: deduce_fees: deducing {} in fees", fee);
+
         self.acc_tracker.log_fee(fee);
         self.margin.change_balance(-fee);
     }
@@ -340,51 +344,59 @@ impl Account {
         side: Side,
         size: f64,
         price: f64,
-        futures_type: FuturesType,
     ) {
-        let pos_size_delta: f64 = match side {
-            Side::Buy => size,
-            Side::Sell => -size,
-        };
-        let rpnl = match side {
-            Side::Buy => {
-                if self.position.size() < 0.0 {
-                    // pnl needs to be realized
-                    if size > self.position.size().abs() {
-                        futures_type.pnl(self.position.entry_price(), price, self.position.size())
-                    } else {
-                        futures_type.pnl(self.position.entry_price(), price, -size)
-                    }
-                } else {
-                    0.0
-                }
-            }
-            Side::Sell => {
-                if self.position.size() > 0.0 {
-                    // pnl needs to be realized
-                    if size > self.position.size() {
-                        futures_type.pnl(self.position.entry_price(), price, self.position.size())
-                    } else {
-                        futures_type.pnl(self.position.entry_price(), price, size)
-                    }
-                } else {
-                    0.0
-                }
-            }
-        };
-        if rpnl != 0.0 {
-            self.margin.change_balance(rpnl);
-            self.acc_tracker.log_rpnl(rpnl);
-        }
+      debug!(
+        "account: change_position(side: {:?}, size: {}, price: {})",
+        side, size, price
+      );
+      let pos_size_delta: f64 = match side {
+          Side::Buy => size,
+          Side::Sell => -size,
+      };
+      let rpnl = match side {
+          Side::Buy => {
+              if self.position.size() < 0.0 {
+                  // pnl needs to be realized
+                  if size > self.position.size().abs() {
+                      self.futures_type.pnl(self.position.entry_price(), price, self.position.size())
+                  } else {
+                      self.futures_type.pnl(self.position.entry_price(), price, -size)
+                  }
+              } else {
+                  0.0
+              }
+          }
+          Side::Sell => {
+              if self.position.size() > 0.0 {
+                  // pnl needs to be realized
+                  if size > self.position.size() {
+                      self.futures_type.pnl(self.position.entry_price(), price, self.position.size())
+                  } else {
+                      self.futures_type.pnl(self.position.entry_price(), price, size)
+                  }
+              } else {
+                  0.0
+              }
+          }
+      };
+      if rpnl != 0.0 {
+          self.margin.change_balance(rpnl);
+          self.acc_tracker.log_rpnl(rpnl);
+      }
 
-        // change position
-        self.position.change_size(pos_size_delta, price);
-        self.margin.set_position_margin(
-            self.position.size().abs() / self.position.entry_price() / self.position.leverage(),
-        );
+      // change position
+      self.position.change_size(pos_size_delta, price, self.futures_type);
 
-        // log change
-        self.acc_tracker.log_trade(side, size);
+      // set position margin
+      let mut pos_margin: f64 = self.position.size().abs() / self.position.leverage();
+      match self.futures_type {
+        FuturesType::Linear => pos_margin *= self.position.entry_price(),
+        FuturesType::Inverse => pos_margin /= self.position.entry_price(), 
+      };
+      self.margin.set_position_margin(pos_margin);
+
+      // log change
+      self.acc_tracker.log_trade(side, size);
     }
 
     /// Calculate the order margin
@@ -431,7 +443,7 @@ mod tests {
 
     #[test]
     fn account_append_limit_order() {
-        let mut account = Account::new(1.0, 1.0);
+        let mut account = Account::new(1.0, 1.0, FuturesType::Inverse);
 
         account.append_limit_order(Order::limit(Side::Buy, 100.0, 25.0).unwrap());
         assert_eq!(account.open_limit_buy_size, 25.0);
@@ -469,7 +481,7 @@ mod tests {
 
     #[test]
     fn account_append_stop_order() {
-        let mut account = Account::new(1.0, 1.0);
+        let mut account = Account::new(1.0, 1.0, FuturesType::Inverse);
 
         account.append_stop_order(Order::stop_market(Side::Buy, 100.0, 25.0).unwrap());
         assert_eq!(account.open_stop_buy_size, 25.0);
@@ -500,7 +512,7 @@ mod tests {
 
     #[test]
     fn account_cancel_order() {
-        let mut account = Account::new(1.0, 1.0);
+        let mut account = Account::new(1.0, 1.0, FuturesType::Inverse);
 
         let o = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
         account.append_order(o);
@@ -516,7 +528,7 @@ mod tests {
 
     #[test]
     fn account_cancel_all_orders() {
-        let mut account = Account::new(1.0, 1.0);
+        let mut account = Account::new(1.0, 1.0, FuturesType::Inverse);
 
         let o = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
         account.append_order(o);
@@ -547,7 +559,7 @@ mod tests {
 
     #[test]
     fn account_order_margin() {
-        let mut account = Account::new(1.0, 1.0);
+        let mut account = Account::new(1.0, 1.0, FuturesType::Inverse);
 
         account.append_order(Order::limit(Side::Buy, 100.0, 50.0).unwrap());
         assert_eq!(account.order_margin(), 0.5);
@@ -576,10 +588,9 @@ mod tests {
 
     #[test]
     fn account_change_position_size_inverse_future() {
-        let mut acc = Account::new(1.0, 1.0);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
 
-        let futures_type = FuturesType::Inverse;
-        acc.change_position(Side::Buy, 100.0, 200.0, futures_type);
+        acc.change_position(Side::Buy, 100.0, 200.0);
         assert_eq!(acc.margin().wallet_balance(), 1.0);
         assert_eq!(acc.margin().position_margin(), 0.5);
         assert_eq!(acc.margin().order_margin(), 0.0);
@@ -589,7 +600,7 @@ mod tests {
         assert_eq!(acc.position().leverage(), 1.0);
         assert_eq!(acc.position().unrealized_pnl(), 0.0);
 
-        acc.change_position(Side::Sell, 100.0, 200.0, futures_type);
+        acc.change_position(Side::Sell, 100.0, 200.0);
         assert_eq!(acc.position().size(), 0.0);
         assert_eq!(acc.position().entry_price(), 200.0);
         assert_eq!(acc.position().leverage(), 1.0);
@@ -599,7 +610,7 @@ mod tests {
         assert_eq!(acc.margin().order_margin(), 0.0);
         assert_eq!(acc.margin().available_balance(), 1.0);
 
-        acc.change_position(Side::Sell, 100.0, 200.0, futures_type);
+        acc.change_position(Side::Sell, 100.0, 200.0);
         assert_eq!(acc.margin().wallet_balance(), 1.0);
         assert_eq!(acc.margin().position_margin(), 0.5);
         assert_eq!(acc.margin().order_margin(), 0.0);
@@ -609,7 +620,7 @@ mod tests {
         assert_eq!(acc.position().leverage(), 1.0);
         assert_eq!(acc.position().unrealized_pnl(), 0.0);
 
-        acc.change_position(Side::Buy, 150.0, 200.0, futures_type);
+        acc.change_position(Side::Buy, 150.0, 200.0);
         assert_eq!(acc.margin().wallet_balance(), 1.0);
         assert_eq!(acc.margin().position_margin(), 0.25);
         assert_eq!(acc.margin().order_margin(), 0.0);
@@ -619,7 +630,7 @@ mod tests {
         assert_eq!(acc.position().leverage(), 1.0);
         assert_eq!(acc.position().unrealized_pnl(), 0.0);
 
-        acc.change_position(Side::Sell, 25.0, 200.0, futures_type);
+        acc.change_position(Side::Sell, 25.0, 200.0);
         assert_eq!(acc.margin().wallet_balance(), 1.0);
         assert_eq!(acc.margin().position_margin(), 0.125);
         assert_eq!(acc.margin().order_margin(), 0.0);
