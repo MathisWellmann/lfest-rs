@@ -20,7 +20,7 @@ impl Default for FuturesType {
 impl FuturesType {
     /// return the profit and loss for a given entry and exit price with a given contract_qty
     /// Note that negative contract_qty will give the pnl for a short position
-    pub(crate) fn pnl(&self, entry_price: f64, exit_price: f64, contract_qty: f64) -> f64 {
+    pub fn pnl(&self, entry_price: f64, exit_price: f64, contract_qty: f64) -> f64 {
         match self {
             Self::Linear => {
                 // contract_qty is denoted in BASE currency
