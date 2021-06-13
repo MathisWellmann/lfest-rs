@@ -16,6 +16,7 @@ pub struct Position {
 impl Position {
     /// Create a new position with a given leverage
     pub fn new(leverage: f64) -> Self {
+      debug_assert!(leverage > 0.0);
         Position {
             size: 0.0,
             entry_price: 0.0,
@@ -32,6 +33,10 @@ impl Position {
         leverage: f64,
         unrealized_pnl: f64,
     ) -> Self {
+      debug_assert!(size.is_finite());
+      debug_assert!(entry_price.is_finite());
+      debug_assert!(leverage.is_finite());
+      debug_assert!(unrealized_pnl.is_finite());
         Position {
             size,
             entry_price,
