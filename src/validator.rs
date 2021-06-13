@@ -128,8 +128,10 @@ impl Validator {
         };
         let mut fee: f64 = fee_bps * order.size;
 
-        let mut debit: f64 = hedged_size / acc.position().leverage();
-        let mut credit: f64 = unhedged_size / acc.position().leverage();
+        let mut debit: f64 = hedged_size * (1.0 / acc.position().leverage());
+        let mut credit: f64 = unhedged_size * (1.0 / acc.position().leverage());
+        debug_assert!(debit.is_finite());
+        debug_assert!(credit.is_finite());
 
         match self.futures_type {
             FuturesType::Linear => {
@@ -209,7 +211,10 @@ impl Validator {
         // TODO: whats the debit for limit orders
         let debit: f64 = 0.0;
         let mut credit: f64 = max(0.0, min(max_size, max_size + d * acc.position().size()))
-            / acc.position().leverage();
+            * (1.0 / acc.position().leverage());
+        debug_assert!(debit.is_finite());
+        debug_assert!(credit.is_finite());
+
         match self.futures_type {
             FuturesType::Linear => {
                 fee *= order_price;
