@@ -1,6 +1,7 @@
 use crate::FuturesType;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 /// Describes the position information of the account
 pub struct Position {
     /// The position size
@@ -16,7 +17,7 @@ pub struct Position {
 impl Position {
     /// Create a new position with a given leverage
     pub fn new(leverage: f64) -> Self {
-      debug_assert!(leverage > 0.0);
+        debug_assert!(leverage > 0.0);
         Position {
             size: 0.0,
             entry_price: 0.0,
@@ -27,16 +28,11 @@ impl Position {
 
     /// Create a new position with all fields custom.
     /// NOTE: only for advanced use cases
-    pub fn new_all_fields(
-        size: f64,
-        entry_price: f64,
-        leverage: f64,
-        unrealized_pnl: f64,
-    ) -> Self {
-      debug_assert!(size.is_finite());
-      debug_assert!(entry_price.is_finite());
-      debug_assert!(leverage.is_finite());
-      debug_assert!(unrealized_pnl.is_finite());
+    pub fn new_all_fields(size: f64, entry_price: f64, leverage: f64, unrealized_pnl: f64) -> Self {
+        debug_assert!(size.is_finite());
+        debug_assert!(entry_price.is_finite());
+        debug_assert!(leverage.is_finite());
+        debug_assert!(unrealized_pnl.is_finite());
         Position {
             size,
             entry_price,
@@ -75,7 +71,7 @@ impl Position {
     /// Update the state to reflect price changes
     pub(crate) fn update_state(&mut self, price: f64, futures_type: FuturesType) {
         self.unrealized_pnl = if self.size != 0.0 {
-          futures_type.pnl(self.entry_price, price, self.size)
+            futures_type.pnl(self.entry_price, price, self.size)
         } else {
             0.0
         };

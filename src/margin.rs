@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Describes the margin information of the account
 pub struct Margin {
     /// The wallet balance of account
@@ -14,7 +16,7 @@ pub struct Margin {
 impl Margin {
     /// Create a new margin account with an initial balance
     pub fn new_init(init_balance: f64) -> Self {
-      debug_assert!(init_balance > 0.0);
+        debug_assert!(init_balance > 0.0);
         Margin {
             wallet_balance: init_balance,
             position_margin: 0.0,
@@ -30,10 +32,10 @@ impl Margin {
         order_margin: f64,
         available_balance: f64,
     ) -> Self {
-      debug_assert!(wallet_balance.is_finite());
-      debug_assert!(position_margin.is_finite());
-      debug_assert!(order_margin.is_finite());
-      debug_assert!(available_balance.is_finite());
+        debug_assert!(wallet_balance.is_finite());
+        debug_assert!(position_margin.is_finite());
+        debug_assert!(order_margin.is_finite());
+        debug_assert!(available_balance.is_finite());
         Margin {
             wallet_balance,
             position_margin,

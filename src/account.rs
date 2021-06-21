@@ -4,7 +4,7 @@ use crate::{max, min, FuturesType, Margin, Order, OrderType, Position, Side};
 #[derive(Debug, Clone)]
 /// The users account
 pub struct Account {
-  futures_type: FuturesType,
+    futures_type: FuturesType,
     margin: Margin,
     position: Position,
     acc_tracker: AccTracker,
@@ -28,7 +28,7 @@ impl Account {
         let margin = Margin::new_init(starting_balance);
         let acc_tracker = AccTracker::new(starting_balance);
         Self {
-          futures_type,
+            futures_type,
             margin,
             position,
             acc_tracker,
@@ -49,7 +49,9 @@ impl Account {
     /// Update the accounts state for the newest price data
     pub fn update(&mut self, price: f64, trade_timestamp: u64) {
         self.acc_tracker.log_timestamp(trade_timestamp);
-        let upnl: f64 = self.futures_type.pnl(self.position.entry_price(), price, self.position.size());
+        let upnl: f64 =
+            self.futures_type
+                .pnl(self.position.entry_price(), price, self.position.size());
         self.acc_tracker.log_upnl(upnl);
 
         self.position.update_state(price, self.futures_type);
@@ -332,71 +334,77 @@ impl Account {
 
     /// Reduce the account equity by a fee amount
     pub(crate) fn deduce_fees(&mut self, fee: f64) {
-      debug!("account: deduce_fees: deducing {} in fees", fee);
+        debug!("account: deduce_fees: deducing {} in fees", fee);
 
         self.acc_tracker.log_fee(fee);
         self.margin.change_balance(-fee);
     }
 
     /// Changes the position by a given delta while changing margin accordingly
-    pub(crate) fn change_position(
-        &mut self,
-        side: Side,
-        size: f64,
-        price: f64,
-    ) {
-      debug!(
-        "account: change_position(side: {:?}, size: {}, price: {})",
-        side, size, price
-      );
-      let pos_size_delta: f64 = match side {
-          Side::Buy => size,
-          Side::Sell => -size,
-      };
-      let rpnl = match side {
-          Side::Buy => {
-              if self.position.size() < 0.0 {
-                  // pnl needs to be realized
-                  if size > self.position.size().abs() {
-                      self.futures_type.pnl(self.position.entry_price(), price, self.position.size())
-                  } else {
-                      self.futures_type.pnl(self.position.entry_price(), price, -size)
-                  }
-              } else {
-                  0.0
-              }
-          }
-          Side::Sell => {
-              if self.position.size() > 0.0 {
-                  // pnl needs to be realized
-                  if size > self.position.size() {
-                      self.futures_type.pnl(self.position.entry_price(), price, self.position.size())
-                  } else {
-                      self.futures_type.pnl(self.position.entry_price(), price, size)
-                  }
-              } else {
-                  0.0
-              }
-          }
-      };
-      if rpnl != 0.0 {
-          self.margin.change_balance(rpnl);
-          self.acc_tracker.log_rpnl(rpnl);
-      }
+    pub(crate) fn change_position(&mut self, side: Side, size: f64, price: f64) {
+        debug!(
+            "account: change_position(side: {:?}, size: {}, price: {})",
+            side, size, price
+        );
+        let pos_size_delta: f64 = match side {
+            Side::Buy => size,
+            Side::Sell => -size,
+        };
+        let rpnl = match side {
+            Side::Buy => {
+                if self.position.size() < 0.0 {
+                    // pnl needs to be realized
+                    if size > self.position.size().abs() {
+                        self.futures_type.pnl(
+                            self.position.entry_price(),
+                            price,
+                            self.position.size(),
+                        )
+                    } else {
+                        self.futures_type
+                            .pnl(self.position.entry_price(), price, -size)
+                    }
+                } else {
+                    0.0
+                }
+            }
+            Side::Sell => {
+                if self.position.size() > 0.0 {
+                    // pnl needs to be realized
+                    if size > self.position.size() {
+                        self.futures_type.pnl(
+                            self.position.entry_price(),
+                            price,
+                            self.position.size(),
+                        )
+                    } else {
+                        self.futures_type
+                            .pnl(self.position.entry_price(), price, size)
+                    }
+                } else {
+                    0.0
+                }
+            }
+        };
+        if rpnl != 0.0 {
+            self.margin.change_balance(rpnl);
+            self.acc_tracker.log_rpnl(rpnl);
+        }
 
-      // change position
-      self.position.change_size(pos_size_delta, price, self.futures_type);
+        // change position
+        self.position
+            .change_size(pos_size_delta, price, self.futures_type);
 
-      // set position margin
-      let mut pos_margin: f64 = self.position.size().abs() / self.position.leverage();
-      match self.futures_type {
-        FuturesType::Linear => pos_margin *= self.position.entry_price(),
-        FuturesType::Inverse => pos_margin /= self.position.entry_price(), 
-      };
-      self.margin.set_position_margin(pos_margin);
+        // set position margin
+        let mut pos_margin: f64 = self.position.size().abs() / self.position.leverage();
+        match self.futures_type {
+            FuturesType::Linear => pos_margin *= self.position.entry_price(),
+            FuturesType::Inverse => pos_margin /= self.position.entry_price(),
+        };
+        self.margin.set_position_margin(pos_margin);
 
-      // log change
-      self.acc_tracker.log_trade(side, size);
+        // log change
+        self.acc_tracker.log_trade(side, size);
     }
 
     /// Calculate the order margin
