@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Enumeration of different futures types
 pub enum FuturesType {
     /// Linear futures with a linear payout

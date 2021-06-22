@@ -6,6 +6,8 @@
 extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate serde;
 
 mod acc_tracker;
 mod account;
@@ -28,7 +30,7 @@ pub(crate) use account::Account;
 pub(crate) use utils::{max, min};
 pub(crate) use validator::Validator;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 /// Side of the order
 pub enum Side {
     /// Buy side
@@ -37,7 +39,7 @@ pub enum Side {
     Sell,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 /// Defines the possible order errors that can occur when submitting a new order
 pub enum OrderError {
     /// Maximum number of active orders reached
@@ -52,7 +54,7 @@ pub enum OrderError {
     NotEnoughAvailableBalance,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// Defines the available order types
 pub enum OrderType {
     /// aggressive market order
@@ -63,7 +65,7 @@ pub enum OrderType {
     StopMarket,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// Defines the two fee types for different types of orders
 pub enum FeeType {
     /// The fee for passive maker orders such as limit order
@@ -72,7 +74,7 @@ pub enum FeeType {
     Taker,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// Define the Exchange configuration
 pub struct Config {
     /// The maker fee as a fraction. e.g.: 2.5 basis points rebate -> -0.00025
