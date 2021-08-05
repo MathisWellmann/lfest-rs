@@ -1,7 +1,7 @@
 use crate::FuturesType;
 use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 /// Describes the position information of the account
 pub struct Position {
     /// The position size
