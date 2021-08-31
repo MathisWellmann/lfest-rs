@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.7.8"
+version = "0.7.9"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2018"
 license-file = "LICENSE"
@@ -24,7 +24,6 @@ exclude = [
 ]
 
 [dependencies]
-rust_decimal = "1.4.1"
 log = { version = "0.4.0", features = ["release_max_level_warn"]}
 pretty_env_logger = "0.4"
 serde = { version = "^1", features = ["derive"] }
