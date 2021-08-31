@@ -1,4 +1,4 @@
-#![deny(missing_docs, missing_crate_level_docs)]
+#![deny(missing_docs, rustdoc::missing_crate_level_docs)]
 
 //! lfest - leveraged futures exchange for simulated trading
 //! aims to be a high performance exchange for backtesting
@@ -83,8 +83,6 @@ pub struct Config {
     pub fee_taker: f64,
     /// The starting balance of account
     pub starting_balance: f64,
-    /// set to true if you use the consume_candle() method to update external price information
-    pub use_candles: bool,
     /// The leverage used for the position
     pub leverage: f64,
     /// The type of futures to simulate

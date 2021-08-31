@@ -18,7 +18,6 @@ fn main() {
         fee_maker: -0.00025,
         fee_taker: 0.001,
         starting_balance: 1.0,
-        use_candles: false,
         leverage: 1.0,
         futures_type: FuturesType::Inverse,
     };
@@ -31,7 +30,7 @@ fn main() {
     let mut rng = thread_rng();
 
     for (i, p) in prices.iter().enumerate() {
-        let (exec_orders, liq) = exchange.update_state(*p, *p, i as u64);
+        let (exec_orders, liq) = exchange.update_state(*p, *p, i as u64, *p, *p);
         if liq {
             // check liquidation
         }

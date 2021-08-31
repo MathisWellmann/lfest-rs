@@ -61,24 +61,30 @@ impl Exchange {
     }
 
     /// Return a mutable reference to Account
-    pub fn account_mut(&mut self) -> &mut Account {
+    fn account_mut(&mut self) -> &mut Account {
         &mut self.account
     }
 
-    /// Update the exchange state with a new trade.
+    /// Update the exchange state with new information
     /// ### Parameters
     /// bid: bid price
     /// ask: ask price
     /// timestamp: timestamp usually in milliseconds
-    ///
+    /// high: highest price over last period, use when feeding in candle info, otherwise set high == ask
+    /// low: lowest price over last period, use when feeding in candle info, otherwise set low == bid
     /// ### Returns
     /// executed orders
     /// true if position has been liquidated
-    pub fn update_state(&mut self, bid: f64, ask: f64, timestamp: u64) -> (Vec<Order>, bool) {
+    pub fn update_state(&mut self, bid: f64, ask: f64, timestamp: u64, high: f64, low: f64) -> (Vec<Order>, bool) {
         debug_assert!(bid <= ask, "make sure bid <= ask");
+        debug_assert!(high >= low, "make sure high >= low");
+        debug_assert!(high >= ask, "make sure high >= ask");
+        debug_assert!(low <= bid, "make sure low <= bid");
 
         self.bid = bid;
         self.ask = ask;
+        self.high = high;
+        self.low = low;
 
         self.validator.update(bid, ask);
 
@@ -171,29 +177,15 @@ impl Exchange {
     fn handle_stop_market_order(&mut self, order_idx: usize) {
         // check if stop order has been triggered
         match self.account().active_stop_orders()[order_idx].side {
-            Side::Buy => match self.config.use_candles {
-                true => {
-                    if self.account().active_stop_orders()[order_idx].trigger_price > self.high {
-                        return;
-                    }
-                }
-                false => {
-                    if self.account().active_stop_orders()[order_idx].trigger_price > self.ask {
-                        return;
-                    }
+            Side::Buy => {
+                if self.account().active_stop_orders()[order_idx].trigger_price > self.high {
+                    return;
                 }
             },
-            Side::Sell => match self.config.use_candles {
-                true => {
+            Side::Sell => {
                     if self.account().active_stop_orders()[order_idx].trigger_price < self.low {
                         return;
                     }
-                }
-                false => {
-                    if self.account().active_stop_orders()[order_idx].trigger_price > self.bid {
-                        return;
-                    }
-                }
             },
         }
         self.execute_market(
@@ -208,45 +200,19 @@ impl Exchange {
         let o: Order = self.account.active_limit_orders()[order_idx];
         match o.side {
             Side::Buy => {
-                match self.config.use_candles {
-                    true => {
-                        // use candle information to specify execution
-                        if self.low <= o.limit_price {
-                            self.execute_limit(o.side, o.limit_price, o.size);
-                        } else {
-                            return;
-                        }
-                    }
-                    false => {
-                        // use trade information ( bid / ask ) to specify if order executed
-                        if self.bid < o.limit_price {
-                            // execute
-                            self.execute_limit(o.side, o.limit_price, o.size);
-                        } else {
-                            return;
-                        }
-                    }
+                // use candle information to specify execution
+                if self.low <= o.limit_price {
+                    self.execute_limit(o.side, o.limit_price, o.size);
+                } else {
+                    return;
                 }
-            }
+            },
             Side::Sell => {
-                match self.config.use_candles {
-                    true => {
-                        // use candle information to specify execution
-                        if self.high >= o.limit_price {
-                            self.execute_limit(o.side, o.limit_price, o.size);
-                        } else {
-                            return;
-                        }
-                    }
-                    false => {
-                        // use trade information ( bid / ask ) to specify if order executed
-                        if self.ask > o.limit_price {
-                            // execute
-                            self.execute_limit(o.side, o.limit_price, o.size);
-                        } else {
-                            return;
-                        }
-                    }
+                // use candle information to specify execution
+                if self.high >= o.limit_price {
+                    self.execute_limit(o.side, o.limit_price, o.size);
+                } else {
+                    return;
                 }
             }
         }
