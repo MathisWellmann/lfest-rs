@@ -229,7 +229,7 @@ impl Account {
         self.margin.set_order_margin(self.order_margin());
 
         self.acc_tracker.log_limit_order_submission();
-        self.active_limit_orders.push(order.clone());
+        self.active_limit_orders.push(order);
     }
 
     /// Append a new stop order as active order
@@ -257,7 +257,7 @@ impl Account {
         // set order margin
         self.margin.set_order_margin(self.order_margin());
 
-        self.active_stop_orders.push(order.clone());
+        self.active_stop_orders.push(order);
     }
 
     /// Finalize an executed limit order
@@ -272,7 +272,7 @@ impl Account {
             Side::Sell => self.open_limit_sell_size -= exec_order.size,
         }
         // re-calculate min and max price
-        self.min_limit_buy_price = if self.active_limit_orders.len() == 0 {
+        self.min_limit_buy_price = if self.active_limit_orders.is_empty() {
             0.0
         } else {
             self.active_limit_orders
@@ -281,7 +281,7 @@ impl Account {
                 .map(|o| o.limit_price)
                 .sum()
         };
-        self.max_limit_sell_price = if self.active_limit_orders.len() == 0 {
+        self.max_limit_sell_price = if self.active_limit_orders.is_empty() {
             0.0
         } else {
             self.active_limit_orders
@@ -308,7 +308,7 @@ impl Account {
             Side::Sell => self.open_stop_sell_size -= exec_order.size,
         }
         // re-calculate min and max price
-        self.min_stop_sell_price = if self.active_stop_orders.len() == 0 {
+        self.min_stop_sell_price = if self.active_stop_orders.is_empty() {
             0.0
         } else {
             self.active_stop_orders
@@ -317,7 +317,7 @@ impl Account {
                 .map(|o| o.trigger_price)
                 .sum()
         };
-        self.max_stop_buy_price = if self.active_stop_orders.len() == 0 {
+        self.max_stop_buy_price = if self.active_stop_orders.is_empty() {
             0.0
         } else {
             self.active_stop_orders

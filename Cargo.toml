@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.7.9"
+version = "0.7.10"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2018"
 license-file = "LICENSE"
@@ -21,6 +21,7 @@ exclude = [
     "/img",
     "/data",
     "/.idea",
+    "/vendor",
 ]
 
 [dependencies]
@@ -30,5 +31,5 @@ serde = { version = "^1", features = ["derive"] }
 
 [dev-dependencies]
 csv = "1.1.4"
-rand = "0.7.3"
+rand = "0.8.4"
 time_series_generator = "0.2.0"

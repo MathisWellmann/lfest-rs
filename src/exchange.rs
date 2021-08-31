@@ -205,7 +205,7 @@ impl Exchange {
 
     /// Handle limit order trigger and execution
     fn handle_limit_order(&mut self, order_idx: usize) {
-        let o: &Order = &self.account.active_limit_orders()[order_idx];
+        let o: Order = self.account.active_limit_orders()[order_idx];
         match o.side {
             Side::Buy => {
                 match self.config.use_candles {
@@ -277,7 +277,7 @@ impl Exchange {
 
         order.timestamp = self.step;
 
-        return match order.order_type {
+        match order.order_type {
             OrderType::Market => {
                 // immediately execute market order
                 self.execute_market(order.side, order.size);
@@ -285,10 +285,10 @@ impl Exchange {
                 Ok(order)
             }
             _ => {
-                self.account.append_order(order.clone());
+                self.account.append_order(order);
 
                 Ok(order)
             }
-        };
+        }
     }
 }
