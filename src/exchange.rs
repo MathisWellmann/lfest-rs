@@ -41,26 +41,31 @@ impl Exchange {
     }
 
     /// Return a reference to current exchange config
+    #[inline(always)]
     pub fn config(&self) -> &Config {
         &self.config
     }
 
     /// Return the bid price
+    #[inline(always)]
     pub fn bid(&self) -> f64 {
         self.bid
     }
 
     /// Return the ask price
+    #[inline(always)]
     pub fn ask(&self) -> f64 {
         self.ask
     }
 
     /// Return a reference to Account
+    #[inline(always)]
     pub fn account(&self) -> &Account {
         &self.account
     }
 
     /// Return a mutable reference to Account
+    #[inline(always)]
     fn account_mut(&mut self) -> &mut Account {
         &mut self.account
     }

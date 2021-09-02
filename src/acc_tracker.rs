@@ -67,25 +67,25 @@ impl AccTracker {
     }
 
     /// Return the history of wins and losses, where true is a win, false is a loss
-    #[inline]
+    #[inline(always)]
     pub fn win_history(&self) -> &Vec<bool> {
         &self.win_history
     }
 
     /// Return the ratio of average trade profit over average trade loss
-    #[inline]
+    #[inline(always)]
     pub fn profit_loss_ratio(&self) -> f64 {
         self.total_profit / self.total_loss
     }
 
     /// Return the cumulative fees paid to the exchange
-    #[inline]
+    #[inline(always)]
     pub fn cumulative_fees(&self) -> f64 {
         self.cumulative_fees
     }
 
     /// Return the sharpe ratio based on individual trade data
-    #[inline]
+    #[inline(always)]
     pub fn sharpe(&self) -> f64 {
         self.total_rpnl / self.welford_returns.std_dev()
     }
@@ -105,19 +105,19 @@ impl AccTracker {
     }
 
     /// Return the Sortino ratio based on individual trade data
-    #[inline]
+    #[inline(always)]
     pub fn sortino(&self) -> f64 {
         self.total_rpnl / self.welford_neg_returns.std_dev()
     }
 
     /// Return the standard deviation of realized profit and loss returns
-    #[inline]
+    #[inline(always)]
     pub fn std_dev_returns(&self) -> f64 {
         self.welford_returns.std_dev()
     }
 
     /// Return the standard deviation of negative realized profit and loss returns
-    #[inline]
+    #[inline(always)]
     pub fn std_dev_neg_returns(&self) -> f64 {
         self.welford_neg_returns.std_dev()
     }
@@ -135,55 +135,56 @@ impl AccTracker {
     }
 
     /// Return the maximum drawdown of the realized profit and loss curve
-    #[inline]
+    #[inline(always)]
     pub fn max_drawdown(&self) -> f64 {
         self.max_drawdown
     }
 
     /// Return the maximum drawdown of the unrealized profit and loss curve
-    #[inline]
+    #[inline(always)]
     pub fn max_upnl_drawdown(&self) -> f64 {
         self.max_upnl_drawdown / self.starting_wb
     }
 
     /// Return the number of trades the account made
-    #[inline]
+    #[inline(always)]
     pub fn num_trades(&self) -> i64 {
         self.num_trades
     }
 
     /// Return the ratio of executed trades vs total trading opportunities
     /// Higher values means a more active trading agent
-    #[inline]
+    #[inline(always)]
     pub fn trade_percentage(&self) -> f64 {
         self.num_trades as f64 / self.num_trading_opportunities as f64
     }
 
     /// Return the ratio of buy trades vs total number of trades
-    #[inline]
+    #[inline(always)]
     pub fn buy_ratio(&self) -> f64 {
         self.num_buys as f64 / self.num_trades as f64
     }
 
     /// Return the cumulative turnover value of the trades
-    #[inline]
+    #[inline(always)]
     pub fn turnover(&self) -> f64 {
         self.total_turnover
     }
 
     /// Return the total realized profit and loss of the account
-    #[inline]
+    #[inline(always)]
     pub fn total_rpnl(&self) -> f64 {
         self.total_rpnl
     }
 
     /// Return the current unrealized profit and loss
-    #[inline]
+    #[inline(always)]
     pub fn upnl(&self) -> f64 {
         self.upnl
     }
 
     /// Return the ratio of winning trades vs all trades
+    #[inline]
     pub fn win_ratio(&self) -> f64 {
         if self.wins + self.losses > 0 {
             self.wins as f64 / (self.wins + self.losses) as f64
@@ -193,11 +194,13 @@ impl AccTracker {
     }
 
     /// Return the ratio of filled limit orders vs number of submitted limit orders
+    #[inline(always)]
     pub fn limit_order_fill_ratio(&self) -> f64 {
         self.num_filled_limit_orders as f64 / self.num_submitted_limit_orders as f64
     }
 
     /// Return the ratio of limit order cancellations vs number of submitted limit orders
+    #[inline(always)]
     pub fn limit_order_cancellation_ratio(&self) -> f64 {
         self.num_cancelled_limit_orders as f64 / self.num_submitted_limit_orders as f64
     }
@@ -259,25 +262,25 @@ impl AccTracker {
     }
 
     /// Update the cumulative fee amount
-    #[inline]
+    #[inline(always)]
     pub(crate) fn log_fee(&mut self, fee: f64) {
         self.cumulative_fees += fee
     }
 
     /// Log a limit order submission
-    #[inline]
+    #[inline(always)]
     pub(crate) fn log_limit_order_submission(&mut self) {
         self.num_submitted_limit_orders += 1;
     }
 
     /// Log a limit order cancellation
-    #[inline]
+    #[inline(always)]
     pub(crate) fn log_limit_order_cancellation(&mut self) {
         self.num_cancelled_limit_orders += 1;
     }
 
     /// Log a limit order fill
-    #[inline]
+    #[inline(always)]
     pub(crate) fn log_limit_order_fill(&mut self) {
         self.num_filled_limit_orders += 1;
     }
