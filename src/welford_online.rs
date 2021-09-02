@@ -17,6 +17,7 @@ impl WelfordOnline {
     }
 
     /// Return the estimated variance
+    #[inline(always)]
     pub fn variance(&self) -> f64 {
         if self.count > 1 {
             return self.s / (self.count - 1) as f64;
@@ -25,11 +26,13 @@ impl WelfordOnline {
     }
 
     /// Return the standard deviation
+    #[inline(always)]
     pub fn std_dev(&self) -> f64 {
         self.variance().sqrt()
     }
 
     /// Add a new value to update the estimates
+    #[inline]
     pub fn add(&mut self, val: f64) {
         self.count += 1;
         let old_mean = self.mean;

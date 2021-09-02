@@ -83,6 +83,7 @@ impl Order {
     }
 
     /// Marks the order as executed
+    #[inline(always)]
     pub(crate) fn mark_executed(&mut self) {
         self.executed = true;
     }

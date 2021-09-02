@@ -1,3 +1,5 @@
+use std::fmt::Formatter;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Enumeration of different futures types
 pub enum FuturesType {
@@ -9,6 +11,12 @@ pub enum FuturesType {
     /// Example would be Bitmex XBTUSD inverse perpetual futures.
     /// profit and loss calculation: position_size * (1.0 / entry_price - 1.0 / exit_price)
     Inverse,
+}
+
+impl std::fmt::Display for FuturesType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl Default for FuturesType {

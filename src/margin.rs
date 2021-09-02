@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Describes the margin information of the account
@@ -54,9 +54,13 @@ impl Margin {
         debug_assert!(self.available_balance >= 0.0);
     }
 
-    /// Change the position margin by a given delta and adjust available balance accordingly
-    pub(crate) fn set_position_margin(&mut self, delta: f64) {
-        self.position_margin = delta;
+    /// Set the position margin by a given delta and adjust available balance accordingly
+    pub(crate) fn set_position_margin(&mut self, val: f64) {
+        trace!("set_position_margin({})", val);
+
+        debug_assert!(val >= 0.0);
+
+        self.position_margin = val;
         self.available_balance = self.wallet_balance - self.order_margin - self.position_margin;
 
         debug_assert!(self.position_margin >= 0.0);

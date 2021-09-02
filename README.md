@@ -160,7 +160,16 @@ fn analyze_results(e: &Exchange) {
 - add max_num_limit_orders to config
 - add max_num_stop_orders to config
 - impl Display for Side and FuturesType
-
+- add optional order filtering such as
+  * PriceFilters:
+    * min_price
+    * max_price
+    * tick_size
+  * SizeFilters:
+    * min_size
+    * max_size
+    * step_size
+ 
 ### Contributions
 If you find a bug or would like to help out, feel free to create a pull-request.
 

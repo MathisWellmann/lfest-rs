@@ -1,4 +1,5 @@
 #![deny(missing_docs, rustdoc::missing_crate_level_docs)]
+#![warn(clippy::all)]
 
 //! lfest - leveraged futures exchange for simulated trading
 //! aims to be a high performance exchange for backtesting
@@ -11,6 +12,7 @@ extern crate serde;
 
 mod acc_tracker;
 mod account;
+mod errors;
 mod exchange;
 mod futures_type;
 mod margin;
@@ -20,6 +22,7 @@ mod utils;
 mod validator;
 mod welford_online;
 
+pub use errors::OrderError;
 pub use exchange::Exchange;
 pub use futures_type::FuturesType;
 pub use margin::Margin;
@@ -37,21 +40,6 @@ pub enum Side {
     Buy,
     /// Sell side
     Sell,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-/// Defines the possible order errors that can occur when submitting a new order
-pub enum OrderError {
-    /// Maximum number of active orders reached
-    MaxActiveOrders,
-    /// Invalid limit price of order
-    InvalidLimitPrice,
-    /// Invalid trigger price for order. e.g.: sell stop market order trigger price > ask
-    InvalidTriggerPrice,
-    /// Invalid order size
-    InvalidOrderSize,
-    /// The account does not have enough available balance to submit the order
-    NotEnoughAvailableBalance,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

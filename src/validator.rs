@@ -400,7 +400,7 @@ mod tests {
 
         // test Validator for limit orders with a fresh account
 
-        let mut validator = Validator::new(0.0, 0.001, FuturesType::Inverse);
+        let mut validator = Validator::new(0.0002, 0.0006, FuturesType::Inverse);
         validator.update(100.0, 100.0);
 
         let acc = Account::new(1.0, 1.0, FuturesType::Inverse);
@@ -431,17 +431,16 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn validate_limit_order_1() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         // test Validator for limit orders with an account that has an open position
 
-        let mut validator = Validator::new(0.0, 0.001, FuturesType::Inverse);
+        let mut validator = Validator::new(0.0002, 0.0006, FuturesType::Linear);
         validator.update(100.0, 100.0);
 
         // with long position
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
+        let mut acc = Account::new(1.0, 1.0, FuturesType::Linear);
         acc.change_position(Side::Buy, 50.0, 100.0);
 
         // valid order

@@ -230,6 +230,7 @@ impl AccTracker {
     }
 
     /// Log the trade
+    #[inline]
     pub(crate) fn log_trade(&mut self, side: Side, size: f64) {
         self.total_turnover += size;
         self.num_trades += 1;
@@ -240,6 +241,7 @@ impl AccTracker {
     }
 
     /// Log the unrealized profit and loss at each new candle or trade
+    #[inline]
     pub(crate) fn log_upnl(&mut self, upnl: f64) {
         let upnl_dd: f64 = upnl.abs();
         self.upnl = upnl;

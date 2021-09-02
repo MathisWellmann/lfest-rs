@@ -16,6 +16,4 @@ fn limit_orders_only() {
     let mut exchange = Exchange::new(config);
 
     exchange.update_state(100.0, 100.1, 0, 100.1, 100.0);
-
-
 }

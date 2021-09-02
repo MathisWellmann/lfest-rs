@@ -1,5 +1,5 @@
 use crate::FuturesType;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 /// Describes the position information of the account
@@ -43,6 +43,10 @@ impl Position {
 
     /// Change the position size by a given delta at a certain price
     pub(crate) fn change_size(&mut self, size_delta: f64, price: f64, futures_type: FuturesType) {
+        trace!("change_size({}, {}, {})", size_delta, price, futures_type);
+
+        debug_assert!(price > 0.0);
+
         if self.size > 0.0 {
             if self.size + size_delta < 0.0 {
                 // counts as new position as all old position size is sold
@@ -78,21 +82,25 @@ impl Position {
     }
 
     /// Return the position size
+    #[inline(always)]
     pub fn size(&self) -> f64 {
         self.size
     }
 
     /// Return the entry price of the position
+    #[inline(always)]
     pub fn entry_price(&self) -> f64 {
         self.entry_price
     }
 
     /// Return the positions leverage
+    #[inline(always)]
     pub fn leverage(&self) -> f64 {
         self.leverage
     }
 
     /// Return the positions unrealized profit and loss
+    #[inline(always)]
     pub fn unrealized_pnl(&self) -> f64 {
         self.unrealized_pnl
     }

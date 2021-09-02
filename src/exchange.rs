@@ -80,7 +80,14 @@ impl Exchange {
     /// ### Returns
     /// executed orders
     /// true if position has been liquidated
-    pub fn update_state(&mut self, bid: f64, ask: f64, timestamp: u64, high: f64, low: f64) -> (Vec<Order>, bool) {
+    pub fn update_state(
+        &mut self,
+        bid: f64,
+        ask: f64,
+        timestamp: u64,
+        high: f64,
+        low: f64,
+    ) -> (Vec<Order>, bool) {
         debug_assert!(bid <= ask, "make sure bid <= ask");
         debug_assert!(high >= low, "make sure high >= low");
         debug_assert!(high >= ask, "make sure high >= ask");
@@ -186,12 +193,12 @@ impl Exchange {
                 if self.account().active_stop_orders()[order_idx].trigger_price > self.high {
                     return;
                 }
-            },
+            }
             Side::Sell => {
-                    if self.account().active_stop_orders()[order_idx].trigger_price < self.low {
-                        return;
-                    }
-            },
+                if self.account().active_stop_orders()[order_idx].trigger_price < self.low {
+                    return;
+                }
+            }
         }
         self.execute_market(
             self.account().active_stop_orders()[order_idx].side,
@@ -211,7 +218,7 @@ impl Exchange {
                 } else {
                     return;
                 }
-            },
+            }
             Side::Sell => {
                 // use candle information to specify execution
                 if self.high >= o.limit_price {

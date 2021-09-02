@@ -59,28 +59,33 @@ impl Account {
 
     /// Set a new position manually, be sure that you know what you are doing
     /// Returns true if successful
+    #[inline(always)]
     pub fn set_position(&mut self, position: Position) {
         self.position = position;
     }
 
     /// Return a reference to position
+    #[inline(always)]
     pub fn position(&self) -> &Position {
         &self.position
     }
 
     /// Set a new margin manually, be sure that you know what you are doing when using this method
     /// Returns true if successful
+    #[inline(always)]
     pub fn set_margin(&mut self, margin: Margin) {
         self.margin = margin;
     }
 
     /// Return a reference to margin
+    #[inline(always)]
     pub fn margin(&self) -> &Margin {
         &self.margin
     }
 
     /// Return recently executed orders
     /// and clear them afterwards
+    #[deprecated]
     pub fn executed_orders(&mut self) -> Vec<Order> {
         let exec_orders = self.executed_orders.clone();
         self.executed_orders.clear();
@@ -89,16 +94,19 @@ impl Account {
     }
 
     /// Return the currently active limit orders
+    #[inline(always)]
     pub fn active_limit_orders(&self) -> &Vec<Order> {
         &self.active_limit_orders
     }
 
     /// Return the currently active stop orders
+    #[inline(always)]
     pub fn active_stop_orders(&self) -> &Vec<Order> {
         &self.active_stop_orders
     }
 
     /// Return a reference to acc_tracker struct
+    #[inline(always)]
     pub fn acc_tracker(&self) -> &AccTracker {
         &self.acc_tracker
     }
@@ -342,9 +350,11 @@ impl Account {
 
     /// Changes the position by a given delta while changing margin accordingly
     pub(crate) fn change_position(&mut self, side: Side, size: f64, price: f64) {
-        debug!(
+        trace!(
             "account: change_position(side: {:?}, size: {}, price: {})",
-            side, size, price
+            side,
+            size,
+            price
         );
         let pos_size_delta: f64 = match side {
             Side::Buy => size,
