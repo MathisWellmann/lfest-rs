@@ -66,7 +66,7 @@ impl Exchange {
 
     /// Return a mutable reference to Account
     #[inline(always)]
-    fn account_mut(&mut self) -> &mut Account {
+    pub fn account_mut(&mut self) -> &mut Account {
         &mut self.account
     }
 
