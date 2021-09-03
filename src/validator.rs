@@ -140,8 +140,6 @@ impl Validator {
     fn order_cost_limit(&self, order: &Order, acc: &Account) -> (f64, f64) {
         let mut olbs = acc.open_limit_buy_size;
         let mut olss = acc.open_limit_sell_size;
-        let mut osbs = acc.open_stop_buy_size;
-        let mut osss = acc.open_stop_sell_size;
         match order.order_type {
             OrderType::Limit => match order.side {
                 Side::Buy => olbs += order.size,
@@ -149,7 +147,7 @@ impl Validator {
             },
             _ => panic!("market order should not be passed into this function!"),
         }
-        let open_sizes: [f64; 4] = [olbs, olss, osbs, osss];
+        let open_sizes: [f64; 2] = [olbs, olss];
         let mut max_idx: usize = 0;
         let mut max_size: f64 = acc.open_limit_buy_size;
         for (i, s) in open_sizes.iter().enumerate() {
@@ -163,8 +161,6 @@ impl Validator {
         let (d, reference_price) = match max_idx {
             0 => (1.0, acc.min_limit_buy_price),
             1 => (-1.0, acc.max_limit_sell_price),
-            2 => (1.0, acc.max_stop_buy_price),
-            3 => (-1.0, acc.min_stop_sell_price),
             _ => panic!("any other value should not be possible"),
         };
 

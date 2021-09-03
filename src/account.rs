@@ -13,12 +13,8 @@ pub struct Account {
     // used for calculating hedged order size for order margin calculation
     pub(crate) open_limit_buy_size: f64,
     pub(crate) open_limit_sell_size: f64,
-    pub(crate) open_stop_buy_size: f64,
-    pub(crate) open_stop_sell_size: f64,
     pub(crate) min_limit_buy_price: f64,
     pub(crate) max_limit_sell_price: f64,
-    pub(crate) max_stop_buy_price: f64,
-    pub(crate) min_stop_sell_price: f64,
 }
 
 impl Account {
@@ -35,12 +31,8 @@ impl Account {
             executed_orders: vec![],
             open_limit_buy_size: 0.0,
             open_limit_sell_size: 0.0,
-            open_stop_buy_size: 0.0,
-            open_stop_sell_size: 0.0,
             min_limit_buy_price: 0.0,
             max_limit_sell_price: 0.0,
-            max_stop_buy_price: 0.0,
-            min_stop_sell_price: 0.0,
         }
     }
 
@@ -150,12 +142,8 @@ impl Account {
         self.margin.set_order_margin(0.0);
         self.open_limit_buy_size = 0.0;
         self.open_limit_sell_size = 0.0;
-        self.open_stop_buy_size = 0.0;
-        self.open_stop_sell_size = 0.0;
         self.min_limit_buy_price = 0.0;
         self.max_limit_sell_price = 0.0;
-        self.max_stop_buy_price = 0.0;
-        self.min_stop_sell_price = 0.0;
         self.active_limit_orders.clear();
     }
 
@@ -313,11 +301,9 @@ impl Account {
     /// TODO: mark it work in all cases
     fn order_margin(&self) -> f64 {
         let ps: f64 = self.position.size();
-        let open_sizes: [f64; 4] = [
+        let open_sizes: [f64; 2] = [
             self.open_limit_buy_size,
             self.open_limit_sell_size,
-            self.open_stop_buy_size,
-            self.open_stop_sell_size,
         ];
         let mut max_idx: usize = 0;
         let mut m: f64 = self.open_limit_buy_size;
@@ -333,8 +319,6 @@ impl Account {
         let (d, p) = match max_idx {
             0 => (1.0, self.min_limit_buy_price),
             1 => (-1.0, self.max_limit_sell_price),
-            2 => (1.0, self.max_stop_buy_price),
-            3 => (-1.0, self.min_stop_sell_price),
             _ => panic!("any other value should not be possible"),
         };
         if p == 0.0 {
@@ -348,7 +332,6 @@ impl Account {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::round;
     use crate::FuturesType;
 
     #[test]
