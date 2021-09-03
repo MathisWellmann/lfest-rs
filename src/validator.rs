@@ -29,6 +29,7 @@ impl Validator {
     }
 
     /// Check if order is valid and passes risk check
+    #[must_use]
     pub(crate) fn validate(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
         match o.order_type {
             OrderType::Market => self.validate_market_order(o, acc),
@@ -38,6 +39,7 @@ impl Validator {
     }
 
     /// Check if market order is correct
+    #[must_use]
     fn validate_market_order(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
         let (debit, credit) = self.order_cost(o, acc);
         debug!("validate_market_order debit: {}, credit: {}", debit, credit);
@@ -49,6 +51,7 @@ impl Validator {
     }
 
     /// Check if a limit order is correct
+    #[must_use]
     fn validate_limit_order(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
         // validate order price
         match o.side {
@@ -72,6 +75,7 @@ impl Validator {
     }
 
     /// Check if a stop market order is correct
+    #[must_use]
     fn validate_stop_market_order(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
         match o.side {
             Side::Buy => {
@@ -96,6 +100,7 @@ impl Validator {
     /// Calculate the cost of order
     /// # Returns
     /// debited and credited account balance delta
+    #[must_use]
     fn order_cost(&self, order: &Order, acc: &Account) -> (f64, f64) {
         match order.order_type {
             OrderType::Market => self.order_cost_market(order, acc),
@@ -108,6 +113,7 @@ impl Validator {
     /// using hedged volume
     /// # Returns
     /// debited and credited account balance delta
+    #[must_use]
     fn order_cost_market(&self, order: &Order, acc: &Account) -> (f64, f64) {
         let hedged_size = match order.side {
             Side::Buy => max(0.0, min(order.size, -acc.position().size())),
@@ -156,6 +162,7 @@ impl Validator {
     /// Compute the order cost of a passively sitting order such as limit and stop orders
     /// # Returns
     /// debited and credited account balance delta
+    #[must_use]
     fn order_cost_limit(&self, order: &Order, acc: &Account) -> (f64, f64) {
         let mut olbs = acc.open_limit_buy_size;
         let mut olss = acc.open_limit_sell_size;
@@ -230,9 +237,10 @@ impl Validator {
 
     /// # Returns
     /// debited and credited account balance delta
+    #[must_use]
     fn order_cost_stop(&self, order: &Order, acc: &Account) -> (f64, f64) {
         // TODO:
-        (0.0, 0.0)
+        todo!("implement order_cost_stop")
     }
 }
 

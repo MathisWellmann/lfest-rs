@@ -36,6 +36,7 @@ pub struct AccTracker {
 }
 
 impl AccTracker {
+    #[must_use]
     pub fn new(starting_wb: f64) -> Self {
         AccTracker {
             wallet_balance: starting_wb,

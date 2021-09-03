@@ -80,6 +80,7 @@ impl Exchange {
     /// ### Returns
     /// executed orders
     /// true if position has been liquidated
+    #[must_use]
     pub fn update_state(
         &mut self,
         bid: f64,
@@ -233,6 +234,7 @@ impl Exchange {
 
     /// Submit a new order to the exchange.
     /// Returns the order with timestamp and id filled in or OrderError
+    #[must_use]
     pub fn submit_order(&mut self, mut order: Order) -> Result<Order, OrderError> {
         match order.order_type {
             OrderType::StopMarket => {

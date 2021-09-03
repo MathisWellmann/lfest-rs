@@ -24,6 +24,7 @@ pub struct Order {
 impl Order {
     /// Create a new limit order
     /// Returns an OrderError if either the limit_price or size is invalid
+    #[must_use]
     pub fn limit(side: Side, limit_price: f64, size: f64) -> Result<Order, OrderError> {
         if limit_price <= 0.0 {
             return Err(OrderError::InvalidLimitPrice);
@@ -45,6 +46,7 @@ impl Order {
 
     /// Create a new market order
     /// Returns an OrderError if wrong size provided
+    #[must_use]
     pub fn market(side: Side, size: f64) -> Result<Order, OrderError> {
         if size <= 0.0 {
             return Err(OrderError::InvalidOrderSize);
@@ -63,6 +65,7 @@ impl Order {
 
     /// Create a new stop market order
     /// Returns an OrderError if either the trigger_price or size is invalid
+    #[must_use]
     pub fn stop_market(side: Side, trigger_price: f64, size: f64) -> Result<Order, OrderError> {
         if trigger_price <= 0.0 {
             return Err(OrderError::InvalidTriggerPrice);
