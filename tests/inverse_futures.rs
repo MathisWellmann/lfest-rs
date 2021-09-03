@@ -12,7 +12,7 @@ fn submit_order_limit() {
         futures_type: FuturesType::Inverse,
     };
     let mut exchange = Exchange::new(config);
-    exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     // submit working market order
     let o = Order::market(Side::Buy, 500.0).unwrap();
@@ -43,13 +43,13 @@ fn handle_stop_market_order_w_trade() {
         futures_type: FuturesType::Inverse,
     };
     let mut exchange = Exchange::new(config);
-    exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::stop_market(Side::Buy, 1010.0, 100.0).unwrap();
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().active_stop_orders().len(), 1);
 
-    exchange.update_state(1010.0, 1010.0, 1, 1010.0, 1010.0);
+    let _ = exchange.update_state(1010.0, 1010.0, 1, 1010.0, 1010.0);
 
     assert_eq!(exchange.account().position().size(), 100.0);
     assert_eq!(exchange.account().position().entry_price(), 1010.0);
@@ -66,7 +66,7 @@ fn inv_long_market_win_full() {
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
-    exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let value = exchange.account().margin().available_balance() * 0.8;
     let size = exchange.ask() * value;
@@ -74,7 +74,7 @@ fn inv_long_market_win_full() {
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
 
-    exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     let fee_base = size * fee_taker;
     let fee_asset1 = fee_base / exchange.bid();
@@ -92,7 +92,7 @@ fn inv_long_market_win_full() {
         round(0.2 - fee_asset1, 4)
     );
 
-    exchange.update_state(2000.0, 2000.0, 1, 2000.0, 2000.0);
+    let _ = exchange.update_state(2000.0, 2000.0, 1, 2000.0, 2000.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.4);
 
     let size = 800.0;
@@ -129,12 +129,12 @@ fn inv_long_market_loss_full() {
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
-    exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::market(Side::Buy, 800.0).unwrap();
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
-    exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     assert_eq!(exchange.account().position().size(), 800.0);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
@@ -147,12 +147,12 @@ fn inv_long_market_loss_full() {
     assert_eq!(exchange.account().margin().order_margin(), 0.0);
     assert_eq!(exchange.account().margin().position_margin(), 0.8);
 
-    exchange.update_state(800.0, 800.0, 2, 800.0, 800.0);
+    let _ = exchange.update_state(800.0, 800.0, 2, 800.0, 800.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), -0.2);
 
     let o = Order::market(Side::Sell, 800.0).unwrap();
     exchange.submit_order(o).unwrap();
-    exchange.update_state(800.0, 800.0, 3, 800.0, 800.0);
+    let _ = exchange.update_state(800.0, 800.0, 3, 800.0, 800.0);
 
     let fee_base0 = fee_taker * 800.0;
     let fee_asset0 = fee_base0 / 1000.0;
@@ -186,22 +186,22 @@ fn inv_short_market_win_full() {
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
-    exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::market(Side::Sell, 800.0).unwrap();
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
-    exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     assert_eq!(exchange.account().position().size(), -800.0);
 
-    exchange.update_state(800.0, 800.0, 1, 800.0, 800.0);
+    let _ = exchange.update_state(800.0, 800.0, 1, 800.0, 800.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.2);
 
     let o = Order::market(Side::Buy, 800.0).unwrap();
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
-    exchange.update_state(800.0, 800.0, 2, 800.0, 800.0);
+    let _ = exchange.update_state(800.0, 800.0, 2, 800.0, 800.0);
 
     let fee_base0 = fee_taker * 800.0;
     let fee_asset0 = fee_base0 / 1000.0;
@@ -235,7 +235,7 @@ fn inv_short_market_loss_full() {
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
-    exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let value = exchange.account().margin().available_balance() * 0.4;
     let size = exchange.ask() * value;
@@ -243,7 +243,7 @@ fn inv_short_market_loss_full() {
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
 
-    exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     let fee_base1 = size * fee_taker;
     let fee_asset1 = fee_base1 / exchange.bid();
@@ -261,7 +261,7 @@ fn inv_short_market_loss_full() {
         0.6 - fee_asset1
     );
 
-    exchange.update_state(2000.0, 2000.0, 2, 2000.0, 2000.0);
+    let _ = exchange.update_state(2000.0, 2000.0, 2, 2000.0, 2000.0);
 
     let size = 400.0;
     let fee_base2 = size * fee_taker;
@@ -273,7 +273,7 @@ fn inv_short_market_loss_full() {
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
 
-    exchange.update_state(2000.0, 2000.0, 3, 2000.0, 2000.0);
+    let _ = exchange.update_state(2000.0, 2000.0, 3, 2000.0, 2000.0);
 
     assert_eq!(exchange.account().position().size(), 0.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
@@ -299,7 +299,7 @@ fn inv_long_market_win_partial() {
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
-    exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let value = exchange.account().margin().available_balance() * 0.8;
     let size = exchange.ask() * value;
@@ -307,7 +307,7 @@ fn inv_long_market_win_partial() {
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
 
-    exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     let fee_base = size * fee_taker;
     let fee_asset1 = fee_base / exchange.bid();
@@ -325,7 +325,7 @@ fn inv_long_market_win_partial() {
         round(0.2 - fee_asset1, 4)
     );
 
-    exchange.update_state(2000.0, 2000.0, 1, 2000.0, 2000.0);
+    let _ = exchange.update_state(2000.0, 2000.0, 1, 2000.0, 2000.0);
 
     let size = 400.0;
     let fee_base2 = size * fee_taker;
@@ -337,7 +337,7 @@ fn inv_long_market_win_partial() {
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
 
-    exchange.update_state(2000.0, 2000.0, 2, 2000.0, 2000.0);
+    let _ = exchange.update_state(2000.0, 2000.0, 2, 2000.0, 2000.0);
 
     assert_eq!(exchange.account().position().size(), 400.0);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
@@ -364,22 +364,22 @@ fn inv_long_market_loss_partial() {
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
-    exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::market(Side::Buy, 800.0).unwrap();
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
-    exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     assert_eq!(exchange.account().position().size(), 800.0);
 
-    exchange.update_state(800.0, 800.0, 1, 800.0, 800.0);
+    let _ = exchange.update_state(800.0, 800.0, 1, 800.0, 800.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), -0.2);
 
     let o = Order::market(Side::Sell, 400.0).unwrap();
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
-    exchange.update_state(800.0, 800.0, 1, 800.0, 800.0);
+    let _ = exchange.update_state(800.0, 800.0, 1, 800.0, 800.0);
 
     let fee_base0 = fee_taker * 800.0;
     let fee_asset0 = fee_base0 / 1000.0;
@@ -413,12 +413,12 @@ fn inv_short_market_win_partial() {
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
-    exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::market(Side::Sell, 800.0).unwrap();
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
-    exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     assert_eq!(exchange.account().position().size(), -800.0);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
@@ -431,14 +431,14 @@ fn inv_short_market_win_partial() {
     assert_eq!(exchange.account().margin().order_margin(), 0.0);
     assert_eq!(exchange.account().margin().position_margin(), 0.8);
 
-    exchange.update_state(800.0, 800.0, 2, 800.0, 800.0);
+    let _ = exchange.update_state(800.0, 800.0, 2, 800.0, 800.0);
 
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.2);
 
     let o = Order::market(Side::Buy, 400.0).unwrap();
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
-    exchange.update_state(800.0, 800.0, 3, 800.0, 800.0);
+    let _ = exchange.update_state(800.0, 800.0, 3, 800.0, 800.0);
 
     let fee_base0 = fee_taker * 800.0;
     let fee_asset0 = fee_base0 / 1000.0;
@@ -472,7 +472,7 @@ fn inv_short_market_loss_partial() {
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
-    exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let value = exchange.account().margin().available_balance() * 0.8;
     let size = exchange.ask() * value;
@@ -480,7 +480,7 @@ fn inv_short_market_loss_partial() {
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
 
-    exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     let fee_base1 = size * fee_taker;
     let fee_asset1 = fee_base1 / exchange.bid();
@@ -497,7 +497,7 @@ fn inv_short_market_loss_partial() {
         round(exchange.account().margin().available_balance(), 4),
         round(0.2 - fee_asset1, 4)
     );
-    exchange.update_state(2000.0, 2000.0, 1, 2000.0, 2000.0);
+    let _ = exchange.update_state(2000.0, 2000.0, 1, 2000.0, 2000.0);
 
     let size = 400.0;
     let fee_base2 = size * fee_taker;
@@ -533,14 +533,14 @@ fn inv_test_market_roundtrip() {
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
-    exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let value = exchange.account().margin().available_balance() * 0.9;
     let size = exchange.ask() * value;
     let buy_order = Order::market(Side::Buy, size).unwrap();
     let order_err = exchange.submit_order(buy_order);
     assert!(order_err.is_ok());
-    exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     let sell_order = Order::market(Side::Sell, size).unwrap();
 
@@ -550,7 +550,7 @@ fn inv_test_market_roundtrip() {
     let fee_base = size * fee_taker;
     let fee_asset = fee_base / exchange.ask();
 
-    exchange.update_state(1000.0, 1000.0, 2, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 2, 1000.0, 1000.0);
 
     assert_eq!(exchange.account().position().size(), 0.0);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
@@ -569,7 +569,7 @@ fn inv_test_market_roundtrip() {
     let buy_order = Order::market(Side::Buy, size).unwrap();
     let order_err = exchange.submit_order(buy_order);
     assert!(order_err.is_ok());
-    exchange.update_state(1000.0, 1000.0, 3, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 3, 1000.0, 1000.0);
 
     let size = 950.0;
     let sell_order = Order::market(Side::Sell, size).unwrap();
@@ -577,7 +577,7 @@ fn inv_test_market_roundtrip() {
     let order_err = exchange.submit_order(sell_order);
     assert!(order_err.is_ok());
 
-    exchange.update_state(1000.0, 1000.0, 4, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 4, 1000.0, 1000.0);
 
     assert_eq!(exchange.account().position().size(), -50.0);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
@@ -607,7 +607,7 @@ fn inv_execute_limit() {
         futures_type: FuturesType::Inverse,
     };
     let mut exchange = Exchange::new(config.clone());
-    exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
+    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o: Order = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
     exchange.submit_order(o).unwrap();
@@ -631,7 +631,7 @@ fn inv_execute_limit() {
     assert!(order_err.is_ok());
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
 
-    exchange.update_state(1200.0, 1200.0, 1, 1200.0, 1200.0);
+    let _ = exchange.update_state(1200.0, 1200.0, 1, 1200.0, 1200.0);
 
     assert_eq!(exchange.account().active_limit_orders().len(), 0);
     assert_eq!(exchange.account().position().size(), 0.0);
@@ -643,7 +643,7 @@ fn inv_execute_limit() {
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
 
-    exchange.update_state(1200.0, 1201.0, 2, 1201.0, 1200.0);
+    let _ = exchange.update_state(1200.0, 1201.0, 2, 1201.0, 1200.0);
     assert_eq!(exchange.account().position().size(), -600.0);
     assert_eq!(round(exchange.account().margin().position_margin(), 1), 0.5);
     assert_eq!(round(exchange.account().margin().wallet_balance(), 2), 1.05);

@@ -51,6 +51,13 @@ impl Margin {
         self.order_margin = order_margin;
         self.available_balance = self.wallet_balance - self.position_margin - self.order_margin;
 
+        debug!(
+            "self.available_balance: {}, self.wallet_balance: {}, self.position_margin: {}, self.order_margin: {}",
+            self.available_balance,
+            self.wallet_balance,
+            self.position_margin,
+            self.order_margin
+        );
         debug_assert!(self.available_balance >= 0.0);
     }
 

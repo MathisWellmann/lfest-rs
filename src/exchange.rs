@@ -115,6 +115,46 @@ impl Exchange {
         (self.account.executed_orders(), false)
     }
 
+    /// Submit a new order to the exchange.
+    /// Returns the order with timestamp and id filled in or OrderError
+    #[must_use]
+    pub fn submit_order(&mut self, mut order: Order) -> Result<Order, OrderError> {
+        match order.order_type {
+            OrderType::StopMarket => {
+                if self.account().active_limit_orders().len() >= MAX_NUM_LIMIT_ORDERS {
+                    return Err(OrderError::MaxActiveOrders);
+                }
+            }
+            _ => {
+                if self.account().active_stop_orders().len() >= MAX_NUM_STOP_ORDERS {
+                    return Err(OrderError::MaxActiveOrders);
+                }
+            }
+        }
+
+        self.validator.validate(&order, &self.account)?;
+
+        // assign unique order id
+        order.id = self.next_order_id;
+        self.next_order_id += 1;
+
+        order.timestamp = self.step;
+
+        match order.order_type {
+            OrderType::Market => {
+                // immediately execute market order
+                self.execute_market(order.side, order.size);
+
+                Ok(order)
+            }
+            _ => {
+                self.account.append_order(order);
+
+                Ok(order)
+            }
+        }
+    }
+
     /// Check if a liquidation event should occur
     fn check_liquidation(&mut self) -> bool {
         // TODO: check_liquidation
@@ -230,45 +270,5 @@ impl Exchange {
             }
         }
         self.account.finalize_limit_order(order_idx);
-    }
-
-    /// Submit a new order to the exchange.
-    /// Returns the order with timestamp and id filled in or OrderError
-    #[must_use]
-    pub fn submit_order(&mut self, mut order: Order) -> Result<Order, OrderError> {
-        match order.order_type {
-            OrderType::StopMarket => {
-                if self.account().active_limit_orders().len() >= MAX_NUM_LIMIT_ORDERS {
-                    return Err(OrderError::MaxActiveOrders);
-                }
-            }
-            _ => {
-                if self.account().active_stop_orders().len() >= MAX_NUM_STOP_ORDERS {
-                    return Err(OrderError::MaxActiveOrders);
-                }
-            }
-        }
-
-        self.validator.validate(&order, &self.account)?;
-
-        // assign unique order id
-        order.id = self.next_order_id;
-        self.next_order_id += 1;
-
-        order.timestamp = self.step;
-
-        match order.order_type {
-            OrderType::Market => {
-                // immediately execute market order
-                self.execute_market(order.side, order.size);
-
-                Ok(order)
-            }
-            _ => {
-                self.account.append_order(order);
-
-                Ok(order)
-            }
-        }
     }
 }

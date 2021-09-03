@@ -85,8 +85,7 @@ impl Account {
 
     /// Return recently executed orders
     /// and clear them afterwards
-    #[deprecated]
-    pub fn executed_orders(&mut self) -> Vec<Order> {
+    pub(crate) fn executed_orders(&mut self) -> Vec<Order> {
         let exec_orders = self.executed_orders.clone();
         self.executed_orders.clear();
 
