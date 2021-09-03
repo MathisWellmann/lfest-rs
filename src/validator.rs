@@ -34,7 +34,6 @@ impl Validator {
         match o.order_type {
             OrderType::Market => self.validate_market_order(o, acc),
             OrderType::Limit => self.validate_limit_order(o, acc),
-            OrderType::StopMarket => self.validate_stop_market_order(o, acc),
         }
     }
 
@@ -74,29 +73,6 @@ impl Validator {
         Ok(())
     }
 
-    /// Check if a stop market order is correct
-    #[must_use]
-    fn validate_stop_market_order(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
-        match o.side {
-            Side::Buy => {
-                if o.trigger_price <= self.ask {
-                    return Err(OrderError::InvalidTriggerPrice);
-                }
-            }
-            Side::Sell => {
-                if o.trigger_price >= self.bid {
-                    return Err(OrderError::InvalidTriggerPrice);
-                }
-            }
-        }
-        let (debit, credit) = self.order_cost(o, acc);
-        if credit > acc.margin().available_balance() + debit {
-            return Err(OrderError::NotEnoughAvailableBalance);
-        }
-
-        Ok(())
-    }
-
     /// Calculate the cost of order
     /// # Returns
     /// debited and credited account balance delta
@@ -105,7 +81,6 @@ impl Validator {
         match order.order_type {
             OrderType::Market => self.order_cost_market(order, acc),
             OrderType::Limit => self.order_cost_limit(order, acc),
-            OrderType::StopMarket => self.order_cost_stop(order, acc),
         }
     }
 
@@ -130,7 +105,6 @@ impl Validator {
         let fee_bps: f64 = match order.order_type {
             OrderType::Market => self.fee_taker,
             OrderType::Limit => self.fee_maker,
-            OrderType::StopMarket => self.fee_taker,
         };
         let mut fee: f64 = fee_bps * order.size;
 
@@ -173,10 +147,6 @@ impl Validator {
                 Side::Buy => olbs += order.size,
                 Side::Sell => olss += order.size,
             },
-            OrderType::StopMarket => match order.side {
-                Side::Buy => osbs += order.size,
-                Side::Sell => osss += order.size,
-            },
             _ => panic!("market order should not be passed into this function!"),
         }
         let open_sizes: [f64; 4] = [olbs, olss, osbs, osss];
@@ -204,14 +174,12 @@ impl Validator {
                 Side::Sell => self.bid,
             },
             OrderType::Limit => order.limit_price,
-            OrderType::StopMarket => order.trigger_price,
         };
 
         // include fee in order cost
         let fee_bps: f64 = match order.order_type {
             OrderType::Market => self.fee_taker,
             OrderType::Limit => self.fee_maker,
-            OrderType::StopMarket => self.fee_taker,
         };
         let mut fee: f64 = fee_bps * max_size;
 
@@ -233,14 +201,6 @@ impl Validator {
             }
         }
         (debit, credit + fee)
-    }
-
-    /// # Returns
-    /// debited and credited account balance delta
-    #[must_use]
-    fn order_cost_stop(&self, order: &Order, acc: &Account) -> (f64, f64) {
-        // TODO:
-        todo!("implement order_cost_stop")
     }
 }
 
@@ -497,40 +457,6 @@ mod tests {
         let acc = Account::new(1.0, 1.0, FuturesType::Inverse);
 
         // TODO: validate stop market order with a fresh account
-    }
-
-    #[test]
-    fn validate_stop_market_order_1() {
-        if let Err(_) = pretty_env_logger::try_init() {}
-
-        // test validator for stop market order on account with open position
-
-        let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
-        validator.update(100.0, 100.0);
-
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-        acc.change_position(Side::Buy, 50.0, 100.0);
-
-        // TODO: validate stop market order with long position
-
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-        acc.change_position(Side::Sell, 50.0, 100.0);
-
-        // TODO: validate stop market order with short position
-    }
-
-    #[test]
-    fn validate_stop_market_order_2() {
-        if let Err(_) = pretty_env_logger::try_init() {}
-
-        // test validator for stop market orders on account with open orders
-        let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
-        validator.update(100.0, 100.0);
-
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-        acc.append_order(Order::limit(Side::Buy, 90.0, 45.0).unwrap());
-
-        // TODO: validate stop market order with open orders
     }
 
     #[test]

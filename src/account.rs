@@ -9,7 +9,6 @@ pub struct Account {
     position: Position,
     acc_tracker: AccTracker,
     active_limit_orders: Vec<Order>,
-    active_stop_orders: Vec<Order>,
     executed_orders: Vec<Order>,
     // used for calculating hedged order size for order margin calculation
     pub(crate) open_limit_buy_size: f64,
@@ -33,7 +32,6 @@ impl Account {
             position,
             acc_tracker,
             active_limit_orders: vec![],
-            active_stop_orders: vec![],
             executed_orders: vec![],
             open_limit_buy_size: 0.0,
             open_limit_sell_size: 0.0,
@@ -98,12 +96,6 @@ impl Account {
         &self.active_limit_orders
     }
 
-    /// Return the currently active stop orders
-    #[inline(always)]
-    pub fn active_stop_orders(&self) -> &Vec<Order> {
-        &self.active_stop_orders
-    }
-
     /// Return a reference to acc_tracker struct
     #[inline(always)]
     pub fn acc_tracker(&self) -> &AccTracker {
@@ -123,16 +115,7 @@ impl Account {
                 return Some(old_order);
             }
         }
-        for (i, o) in self.active_stop_orders.iter().enumerate() {
-            if o.id == order_id {
-                let old_order = self.active_stop_orders.remove(i);
-                match old_order.side {
-                    Side::Buy => self.open_stop_buy_size -= old_order.size,
-                    Side::Sell => self.open_stop_sell_size -= old_order.size,
-                }
-                return Some(old_order);
-            }
-        }
+
         // re compute min and max prices for open orders
         self.min_limit_buy_price = 0.0;
         self.max_limit_sell_price = 0.0;
@@ -159,30 +142,6 @@ impl Account {
             }
         }
 
-        self.max_stop_buy_price = 0.0;
-        self.min_stop_sell_price = 0.0;
-        for o in self.active_stop_orders.iter() {
-            match o.side {
-                Side::Buy => {
-                    if self.max_stop_buy_price == 0.0 {
-                        self.max_stop_buy_price = o.trigger_price;
-                        continue;
-                    }
-                    if o.trigger_price > self.max_stop_buy_price {
-                        self.max_stop_buy_price = o.trigger_price;
-                    }
-                }
-                Side::Sell => {
-                    if self.min_stop_sell_price == 0.0 {
-                        self.min_stop_sell_price = o.trigger_price;
-                        continue;
-                    }
-                    if o.trigger_price < self.min_stop_sell_price {
-                        self.min_stop_sell_price = o.trigger_price;
-                    }
-                }
-            }
-        }
         None
     }
 
@@ -198,14 +157,12 @@ impl Account {
         self.max_stop_buy_price = 0.0;
         self.min_stop_sell_price = 0.0;
         self.active_limit_orders.clear();
-        self.active_stop_orders.clear();
     }
 
     /// append order to active orders and update internal state accordingly
     pub(crate) fn append_order(&mut self, order: Order) {
         match order.order_type {
             OrderType::Limit => self.append_limit_order(order),
-            OrderType::StopMarket => self.append_stop_order(order),
             OrderType::Market => {}
         }
     }
@@ -239,34 +196,6 @@ impl Account {
         self.active_limit_orders.push(order);
     }
 
-    /// Append a new stop order as active order
-    fn append_stop_order(&mut self, order: Order) {
-        match order.side {
-            Side::Buy => {
-                self.open_stop_buy_size += order.size;
-                if self.max_stop_buy_price == 0.0 {
-                    self.max_stop_buy_price = order.trigger_price;
-                }
-                if order.trigger_price > self.max_stop_buy_price {
-                    self.max_stop_buy_price = order.trigger_price;
-                }
-            }
-            Side::Sell => {
-                self.open_stop_sell_size += order.size;
-                if self.min_stop_sell_price == 0.0 {
-                    self.min_stop_sell_price = order.trigger_price;
-                }
-                if order.trigger_price < self.min_stop_sell_price {
-                    self.min_stop_sell_price = order.trigger_price;
-                }
-            }
-        }
-        // set order margin
-        self.margin.set_order_margin(self.order_margin());
-
-        self.active_stop_orders.push(order);
-    }
-
     /// Finalize an executed limit order
     pub(crate) fn finalize_limit_order(&mut self, order_idx: usize) {
         let mut exec_order = self.active_limit_orders.remove(order_idx);
@@ -295,42 +224,6 @@ impl Account {
                 .iter()
                 .filter(|o| o.side == Side::Sell)
                 .map(|o| o.limit_price)
-                .sum()
-        };
-
-        self.margin.set_order_margin(self.order_margin());
-
-        self.executed_orders.push(exec_order);
-    }
-
-    /// Finalize an executed stop order
-    pub(crate) fn finalize_stop_order(&mut self, order_idx: usize) {
-        let mut exec_order = self.active_stop_orders.remove(order_idx);
-
-        exec_order.mark_executed();
-
-        // free order margin
-        match exec_order.side {
-            Side::Buy => self.open_stop_buy_size -= exec_order.size,
-            Side::Sell => self.open_stop_sell_size -= exec_order.size,
-        }
-        // re-calculate min and max price
-        self.min_stop_sell_price = if self.active_stop_orders.is_empty() {
-            0.0
-        } else {
-            self.active_stop_orders
-                .iter()
-                .filter(|o| o.side == Side::Sell)
-                .map(|o| o.trigger_price)
-                .sum()
-        };
-        self.max_stop_buy_price = if self.active_stop_orders.is_empty() {
-            0.0
-        } else {
-            self.active_stop_orders
-                .iter()
-                .filter(|o| o.side == Side::Buy)
-                .map(|o| o.trigger_price)
                 .sum()
         };
 
@@ -497,37 +390,6 @@ mod tests {
     }
 
     #[test]
-    fn account_append_stop_order() {
-        let mut account = Account::new(1.0, 1.0, FuturesType::Inverse);
-
-        account.append_stop_order(Order::stop_market(Side::Buy, 100.0, 25.0).unwrap());
-        assert_eq!(account.open_stop_buy_size, 25.0);
-        assert_eq!(account.open_stop_sell_size, 0.0);
-        assert_eq!(account.max_stop_buy_price, 100.0);
-        assert_eq!(account.min_stop_sell_price, 0.0);
-
-        account.append_stop_order(Order::stop_market(Side::Sell, 100.0, 25.0).unwrap());
-        assert_eq!(account.open_stop_buy_size, 25.0);
-        assert_eq!(account.open_stop_sell_size, 25.0);
-        assert_eq!(account.max_stop_buy_price, 100.0);
-        assert_eq!(account.min_stop_sell_price, 100.0);
-
-        account.append_stop_order(Order::stop_market(Side::Buy, 110.0, 25.0).unwrap());
-        assert_eq!(account.open_stop_buy_size, 50.0);
-        assert_eq!(account.open_stop_sell_size, 25.0);
-        assert_eq!(account.max_stop_buy_price, 110.0);
-        assert_eq!(account.min_stop_sell_price, 100.0);
-
-        account.append_stop_order(Order::stop_market(Side::Sell, 90.0, 25.0).unwrap());
-        assert_eq!(account.open_stop_buy_size, 50.0);
-        assert_eq!(account.open_stop_sell_size, 50.0);
-        assert_eq!(account.max_stop_buy_price, 110.0);
-        assert_eq!(account.min_stop_sell_price, 90.0);
-
-        // TODO: test order_margin
-    }
-
-    #[test]
     fn account_cancel_order() {
         let mut account = Account::new(1.0, 1.0, FuturesType::Inverse);
 
@@ -555,18 +417,8 @@ mod tests {
         assert_eq!(account.margin().order_margin(), 0.5);
         assert_eq!(account.margin().available_balance(), 0.5);
 
-        let o = Order::stop_market(Side::Buy, 1100.0, 450.0).unwrap();
-        account.append_order(o);
-        assert_eq!(account.active_limit_orders().len(), 1);
-        assert_eq!(account.active_stop_orders().len(), 1);
-        assert_eq!(account.margin().wallet_balance(), 1.0);
-        assert_eq!(account.margin().position_margin(), 0.0);
-        assert_eq!(round(account.margin().order_margin(), 1), 0.5);
-        assert_eq!(account.margin().available_balance(), 0.5);
-
         account.cancel_all_orders();
         assert_eq!(account.active_limit_orders().len(), 0);
-        assert_eq!(account.active_stop_orders().len(), 0);
         assert_eq!(account.margin().wallet_balance(), 1.0);
         assert_eq!(account.margin().position_margin(), 0.0);
         assert_eq!(account.margin().order_margin(), 0.0);
@@ -584,22 +436,10 @@ mod tests {
         account.append_order(Order::limit(Side::Sell, 100.0, 50.0).unwrap());
         assert_eq!(account.order_margin(), 0.5);
 
-        account.append_order(Order::stop_market(Side::Sell, 100.0, 50.0).unwrap());
-        assert_eq!(account.order_margin(), 0.5);
-
-        account.append_order(Order::stop_market(Side::Buy, 100.0, 50.0).unwrap());
-        assert_eq!(account.order_margin(), 0.5);
-
         account.append_order(Order::limit(Side::Buy, 100.0, 50.0).unwrap());
         assert_eq!(account.order_margin(), 1.0);
 
         account.append_order(Order::limit(Side::Sell, 100.0, 50.0).unwrap());
-        assert_eq!(account.order_margin(), 1.0);
-
-        account.append_order(Order::stop_market(Side::Sell, 100.0, 50.0).unwrap());
-        assert_eq!(account.order_margin(), 1.0);
-
-        account.append_order(Order::stop_market(Side::Buy, 100.0, 50.0).unwrap());
         assert_eq!(account.order_margin(), 1.0);
     }
 

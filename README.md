@@ -12,7 +12,6 @@ lfest-rs is a blazingly fast simulated exchange capable of leveraged positions.
 The supported order types are:
 - market        - aggressively execute against the best bid / ask
 - limit         - passively place an order into the orderbook
-- stop_market   - A protective but aggressive market order which is triggered at a specific price 
 
 Currently limit and stop_market orders may not work as expected. 
 I advise you to only use market orders or fix limit and stop_order margin calculation and create a pull request.
@@ -42,7 +41,7 @@ Some of these metric may behave differently from what you would expect, so make 
 To use this crate in your project, add the following to your Cargo.toml:
 ```
 [dependencies]
-lfest = "0.8.0"
+lfest = "0.9.0"
 ```
 
 Then proceed to use it in your code.

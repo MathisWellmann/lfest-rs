@@ -1,8 +1,5 @@
 use crate::{Account, Config, FuturesType, Order, OrderError, OrderType, Side, Validator};
 
-const MAX_NUM_LIMIT_ORDERS: usize = 50;
-const MAX_NUM_STOP_ORDERS: usize = 50;
-
 #[derive(Debug, Clone)]
 /// The main leveraged futures exchange for simulated trading
 pub struct Exchange {
@@ -119,19 +116,6 @@ impl Exchange {
     /// Returns the order with timestamp and id filled in or OrderError
     #[must_use]
     pub fn submit_order(&mut self, mut order: Order) -> Result<Order, OrderError> {
-        match order.order_type {
-            OrderType::StopMarket => {
-                if self.account().active_limit_orders().len() >= MAX_NUM_LIMIT_ORDERS {
-                    return Err(OrderError::MaxActiveOrders);
-                }
-            }
-            _ => {
-                if self.account().active_stop_orders().len() >= MAX_NUM_STOP_ORDERS {
-                    return Err(OrderError::MaxActiveOrders);
-                }
-            }
-        }
-
         self.validator.validate(&order, &self.account)?;
 
         // assign unique order id
@@ -218,34 +202,6 @@ impl Exchange {
                 _ => panic!("there should only be limit orders in active_limit_orders"),
             }
         }
-        for i in 0..self.account.active_stop_orders().len() {
-            match self.account.active_stop_orders()[i].order_type {
-                OrderType::StopMarket => self.handle_stop_market_order(i),
-                _ => panic!("there should only be stop market orders in active_stop_orders"),
-            }
-        }
-    }
-
-    /// Handle stop market order trigger and execution
-    fn handle_stop_market_order(&mut self, order_idx: usize) {
-        // check if stop order has been triggered
-        match self.account().active_stop_orders()[order_idx].side {
-            Side::Buy => {
-                if self.account().active_stop_orders()[order_idx].trigger_price > self.high {
-                    return;
-                }
-            }
-            Side::Sell => {
-                if self.account().active_stop_orders()[order_idx].trigger_price < self.low {
-                    return;
-                }
-            }
-        }
-        self.execute_market(
-            self.account().active_stop_orders()[order_idx].side,
-            self.account().active_stop_orders()[order_idx].size,
-        );
-        self.account.finalize_stop_order(order_idx);
     }
 
     /// Handle limit order trigger and execution

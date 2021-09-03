@@ -63,28 +63,6 @@ impl Order {
         })
     }
 
-    /// Create a new stop market order
-    /// Returns an OrderError if either the trigger_price or size is invalid
-    #[must_use]
-    pub fn stop_market(side: Side, trigger_price: f64, size: f64) -> Result<Order, OrderError> {
-        if trigger_price <= 0.0 {
-            return Err(OrderError::InvalidTriggerPrice);
-        }
-        if size <= 0.0 {
-            return Err(OrderError::InvalidOrderSize);
-        }
-        Ok(Order {
-            id: 0,
-            timestamp: 0,
-            order_type: OrderType::StopMarket,
-            limit_price: 0.0,
-            trigger_price,
-            size,
-            side,
-            executed: false,
-        })
-    }
-
     /// Marks the order as executed
     #[inline(always)]
     pub(crate) fn mark_executed(&mut self) {

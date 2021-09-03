@@ -34,28 +34,6 @@ fn test_handle_limit_order() {
 }
 
 #[test]
-fn handle_stop_market_order_w_trade() {
-    let config = Config {
-        fee_maker: -0.00025,
-        fee_taker: 0.00075,
-        starting_balance: 1.0,
-        leverage: 1.0,
-        futures_type: FuturesType::Inverse,
-    };
-    let mut exchange = Exchange::new(config);
-    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
-
-    let o = Order::stop_market(Side::Buy, 1010.0, 100.0).unwrap();
-    exchange.submit_order(o).unwrap();
-    assert_eq!(exchange.account().active_stop_orders().len(), 1);
-
-    let _ = exchange.update_state(1010.0, 1010.0, 1, 1010.0, 1010.0);
-
-    assert_eq!(exchange.account().position().size(), 100.0);
-    assert_eq!(exchange.account().position().entry_price(), 1010.0);
-}
-
-#[test]
 fn inv_long_market_win_full() {
     let config = Config {
         fee_maker: -0.00025,

@@ -49,8 +49,6 @@ pub enum OrderType {
     Market,
     /// passive limit order
     Limit,
-    /// stop market order, will trigger a market order once the trigger price is reached
-    StopMarket,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
