@@ -9,7 +9,7 @@ fn submit_order_limit() {
         fee_taker: 0.00075,
         starting_balance: 1.0,
         leverage: 1.0,
-        futures_type: FuturesType::Inverse,
+        futures_type: FuturesTypes::Inverse,
     };
     let mut exchange = Exchange::new(config);
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
@@ -40,7 +40,7 @@ fn inv_long_market_win_full() {
         fee_taker: 0.00075,
         starting_balance: 1.0,
         leverage: 1.0,
-        futures_type: FuturesType::Inverse,
+        futures_type: FuturesTypes::Inverse,
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
@@ -103,7 +103,7 @@ fn inv_long_market_loss_full() {
         fee_taker: 0.0,
         starting_balance: 1.0,
         leverage: 1.0,
-        futures_type: FuturesType::Inverse,
+        futures_type: FuturesTypes::Inverse,
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
@@ -160,7 +160,7 @@ fn inv_short_market_win_full() {
         fee_taker: 0.00075,
         starting_balance: 1.0,
         leverage: 1.0,
-        futures_type: FuturesType::Inverse,
+        futures_type: FuturesTypes::Inverse,
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
@@ -209,7 +209,7 @@ fn inv_short_market_loss_full() {
         fee_taker: 0.00075,
         starting_balance: 1.0,
         leverage: 1.0,
-        futures_type: FuturesType::Inverse,
+        futures_type: FuturesTypes::Inverse,
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
@@ -273,7 +273,7 @@ fn inv_long_market_win_partial() {
         fee_taker: 0.00075,
         starting_balance: 1.0,
         leverage: 1.0,
-        futures_type: FuturesType::Inverse,
+        futures_type: FuturesTypes::Inverse,
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
@@ -338,7 +338,7 @@ fn inv_long_market_loss_partial() {
         fee_taker: 0.00075,
         starting_balance: 1.0,
         leverage: 1.0,
-        futures_type: FuturesType::Inverse,
+        futures_type: FuturesTypes::Inverse,
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
@@ -387,7 +387,7 @@ fn inv_short_market_win_partial() {
         fee_taker: 0.00075,
         starting_balance: 1.0,
         leverage: 1.0,
-        futures_type: FuturesType::Inverse,
+        futures_type: FuturesTypes::Inverse,
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
@@ -446,7 +446,7 @@ fn inv_short_market_loss_partial() {
         fee_taker: 0.00075,
         starting_balance: 1.0,
         leverage: 1.0,
-        futures_type: FuturesType::Inverse,
+        futures_type: FuturesTypes::Inverse,
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
@@ -507,7 +507,7 @@ fn inv_test_market_roundtrip() {
         fee_taker: 0.00075,
         starting_balance: 1.0,
         leverage: 1.0,
-        futures_type: FuturesType::Inverse,
+        futures_type: FuturesTypes::Inverse,
     };
     let fee_taker = config.fee_taker;
     let mut exchange = Exchange::new(config);
@@ -582,7 +582,7 @@ fn inv_execute_limit() {
         fee_taker: 0.001,
         starting_balance: 1.0,
         leverage: 1.0,
-        futures_type: FuturesType::Inverse,
+        futures_type: FuturesTypes::Inverse,
     };
     let mut exchange = Exchange::new(config.clone());
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);

@@ -11,7 +11,7 @@ fn lin_long_market_win_full() {
         fee_taker: 0.0,
         starting_balance: 1000.0,
         leverage: 1.0,
-        futures_type: FuturesType::Linear,
+        futures_type: FuturesTypes::Linear,
     };
     let mut exchange = Exchange::new(config);
     let _ = exchange.update_state(100.0, 100.0, 0, 100.0, 100.0);

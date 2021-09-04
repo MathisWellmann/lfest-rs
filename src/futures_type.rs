@@ -2,7 +2,7 @@ use std::fmt::Formatter;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Enumeration of different futures types
-pub enum FuturesType {
+pub enum FuturesTypes {
     /// Linear futures with a linear payout
     /// profit and loss calculation: position_size * (exit_price - entry_price)
     Linear,
@@ -13,22 +13,29 @@ pub enum FuturesType {
     Inverse,
 }
 
-impl std::fmt::Display for FuturesType {
+// pub(crate) trait FuturesType {
+//     /// Return the profit and loss for a given entry and exit price with a given contract quantity
+//     /// Note that negative contract_qty will give the pnl for a short position
+//     fn pnl(entry_price: f64, exit_price: f64, contract_qty: f64) -> f64;
+//
+// }
+
+impl std::fmt::Display for FuturesTypes {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl Default for FuturesType {
+impl Default for FuturesTypes {
     fn default() -> Self {
         Self::Linear
     }
 }
 
-impl FuturesType {
+impl FuturesTypes {
     /// return the profit and loss for a given entry and exit price with a given contract_qty
     /// Note that negative contract_qty will give the pnl for a short position
-    pub fn pnl(&self, entry_price: f64, exit_price: f64, contract_qty: f64) -> f64 {
+    pub(crate) fn pnl(&self, entry_price: f64, exit_price: f64, contract_qty: f64) -> f64 {
         match self {
             Self::Linear => {
                 // contract_qty is denoted in BASE currency
@@ -51,14 +58,14 @@ mod test {
 
     #[test]
     fn futures_type_pnl() {
-        let ft = FuturesType::Linear;
+        let ft = FuturesTypes::Linear;
         let entry_price: f64 = 100.0;
         let exit_price: f64 = 110.0;
 
         assert_eq!(ft.pnl(entry_price, exit_price, 10.0), 100.0);
         assert_eq!(ft.pnl(entry_price, exit_price, -10.0), -100.0);
 
-        let ft = FuturesType::Inverse;
+        let ft = FuturesTypes::Inverse;
         let entry_price: f64 = 100.0;
         let exit_price: f64 = 110.0;
 

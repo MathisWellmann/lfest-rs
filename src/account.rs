@@ -1,10 +1,10 @@
 use crate::acc_tracker::AccTracker;
-use crate::{max, min, FuturesType, Margin, Order, OrderType, Position, Side};
+use crate::{max, min, FuturesTypes, Margin, Order, OrderType, Position, Side};
 
 #[derive(Debug, Clone)]
 /// The users account
 pub struct Account {
-    futures_type: FuturesType,
+    futures_type: FuturesTypes,
     margin: Margin,
     position: Position,
     acc_tracker: AccTracker,
@@ -18,7 +18,7 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new(leverage: f64, starting_balance: f64, futures_type: FuturesType) -> Self {
+    pub fn new(leverage: f64, starting_balance: f64, futures_type: FuturesTypes) -> Self {
         let position = Position::new(leverage);
         let margin = Margin::new_init(starting_balance);
         let acc_tracker = AccTracker::new(starting_balance);
@@ -98,11 +98,11 @@ impl Account {
     /// returns Some order if successful with given order_id
     pub fn cancel_order(&mut self, order_id: u64) -> Option<Order> {
         for (i, o) in self.active_limit_orders.iter().enumerate() {
-            if o.id == order_id {
+            if o.id() == order_id {
                 let old_order = self.active_limit_orders.remove(i);
-                match old_order.side {
-                    Side::Buy => self.open_limit_buy_size -= old_order.size,
-                    Side::Sell => self.open_limit_sell_size -= old_order.size,
+                match old_order.side() {
+                    Side::Buy => self.open_limit_buy_size -= old_order.size(),
+                    Side::Sell => self.open_limit_sell_size -= old_order.size(),
                 }
                 return Some(old_order);
             }
@@ -112,23 +112,24 @@ impl Account {
         self.min_limit_buy_price = 0.0;
         self.max_limit_sell_price = 0.0;
         for o in self.active_limit_orders.iter() {
-            match o.side {
+            let limit_price = o.limit_price().unwrap();
+            match o.side() {
                 Side::Buy => {
                     if self.min_limit_buy_price == 0.0 {
-                        self.min_limit_buy_price = o.limit_price;
+                        self.min_limit_buy_price = limit_price;
                         continue;
                     }
-                    if o.limit_price < self.min_limit_buy_price {
-                        self.min_limit_buy_price = o.limit_price;
+                    if limit_price < self.min_limit_buy_price {
+                        self.min_limit_buy_price = limit_price;
                     }
                 }
                 Side::Sell => {
                     if self.max_limit_sell_price == 0.0 {
-                        self.max_limit_sell_price = o.limit_price;
+                        self.max_limit_sell_price = limit_price;
                         continue;
                     }
-                    if o.limit_price > self.max_limit_sell_price {
-                        self.max_limit_sell_price = o.limit_price;
+                    if limit_price > self.max_limit_sell_price {
+                        self.max_limit_sell_price = limit_price;
                     }
                 }
             }
@@ -149,7 +150,7 @@ impl Account {
 
     /// append order to active orders and update internal state accordingly
     pub(crate) fn append_order(&mut self, order: Order) {
-        match order.order_type {
+        match order.order_type() {
             OrderType::Limit => self.append_limit_order(order),
             OrderType::Market => {}
         }
@@ -157,23 +158,24 @@ impl Account {
 
     /// Append a new limit order as active order
     fn append_limit_order(&mut self, order: Order) {
-        match order.side {
+        let limit_price = order.limit_price().unwrap();
+        match order.side() {
             Side::Buy => {
-                self.open_limit_buy_size += order.size;
+                self.open_limit_buy_size += order.size();
                 if self.min_limit_buy_price == 0.0 {
-                    self.min_limit_buy_price = order.limit_price;
+                    self.min_limit_buy_price = limit_price;
                 }
-                if order.limit_price < self.min_limit_buy_price {
-                    self.min_limit_buy_price = order.limit_price;
+                if limit_price < self.min_limit_buy_price {
+                    self.min_limit_buy_price = limit_price;
                 }
             }
             Side::Sell => {
-                self.open_limit_sell_size += order.size;
+                self.open_limit_sell_size += order.size();
                 if self.max_limit_sell_price == 0.0 {
-                    self.max_limit_sell_price = order.limit_price;
+                    self.max_limit_sell_price = limit_price;
                 }
-                if order.limit_price > self.max_limit_sell_price {
-                    self.max_limit_sell_price = order.limit_price;
+                if limit_price > self.max_limit_sell_price {
+                    self.max_limit_sell_price = limit_price;
                 }
             }
         }
@@ -191,9 +193,9 @@ impl Account {
         exec_order.mark_executed();
 
         // free order margin
-        match exec_order.side {
-            Side::Buy => self.open_limit_buy_size -= exec_order.size,
-            Side::Sell => self.open_limit_sell_size -= exec_order.size,
+        match exec_order.side() {
+            Side::Buy => self.open_limit_buy_size -= exec_order.size(),
+            Side::Sell => self.open_limit_sell_size -= exec_order.size(),
         }
         // re-calculate min and max price
         self.min_limit_buy_price = if self.active_limit_orders.is_empty() {
@@ -201,8 +203,8 @@ impl Account {
         } else {
             self.active_limit_orders
                 .iter()
-                .filter(|o| o.side == Side::Buy)
-                .map(|o| o.limit_price)
+                .filter(|o| o.side() == Side::Buy)
+                .map(|o| o.limit_price().unwrap())
                 .sum()
         };
         self.max_limit_sell_price = if self.active_limit_orders.is_empty() {
@@ -210,8 +212,8 @@ impl Account {
         } else {
             self.active_limit_orders
                 .iter()
-                .filter(|o| o.side == Side::Sell)
-                .map(|o| o.limit_price)
+                .filter(|o| o.side() == Side::Sell)
+                .map(|o| o.limit_price().unwrap())
                 .sum()
         };
 
@@ -229,12 +231,12 @@ impl Account {
     }
 
     /// Changes the position by a given delta while changing margin accordingly
-    pub(crate) fn change_position(&mut self, side: Side, size: f64, price: f64) {
+    pub(crate) fn change_position(&mut self, side: Side, size: f64, exec_price: f64) {
         trace!(
-            "account: change_position(side: {:?}, size: {}, price: {})",
+            "account: change_position(side: {:?}, size: {}, exec_price: {})",
             side,
             size,
-            price
+            exec_price
         );
         let pos_size_delta: f64 = match side {
             Side::Buy => size,
@@ -247,12 +249,12 @@ impl Account {
                     if size > self.position.size().abs() {
                         self.futures_type.pnl(
                             self.position.entry_price(),
-                            price,
+                            exec_price,
                             self.position.size(),
                         )
                     } else {
                         self.futures_type
-                            .pnl(self.position.entry_price(), price, -size)
+                            .pnl(self.position.entry_price(), exec_price, -size)
                     }
                 } else {
                     0.0
@@ -264,12 +266,12 @@ impl Account {
                     if size > self.position.size() {
                         self.futures_type.pnl(
                             self.position.entry_price(),
-                            price,
+                            exec_price,
                             self.position.size(),
                         )
                     } else {
                         self.futures_type
-                            .pnl(self.position.entry_price(), price, size)
+                            .pnl(self.position.entry_price(), exec_price, size)
                     }
                 } else {
                     0.0
@@ -283,13 +285,13 @@ impl Account {
 
         // change position
         self.position
-            .change_size(pos_size_delta, price, self.futures_type);
+            .change_size(pos_size_delta, exec_price, self.futures_type);
 
         // set position margin
         let mut pos_margin: f64 = self.position.size().abs() / self.position.leverage();
         match self.futures_type {
-            FuturesType::Linear => pos_margin *= self.position.entry_price(),
-            FuturesType::Inverse => pos_margin /= self.position.entry_price(),
+            FuturesTypes::Linear => pos_margin *= self.position.entry_price(),
+            FuturesTypes::Inverse => pos_margin /= self.position.entry_price(),
         };
         self.margin.set_position_margin(pos_margin);
 
@@ -301,10 +303,7 @@ impl Account {
     /// TODO: mark it work in all cases
     fn order_margin(&self) -> f64 {
         let ps: f64 = self.position.size();
-        let open_sizes: [f64; 2] = [
-            self.open_limit_buy_size,
-            self.open_limit_sell_size,
-        ];
+        let open_sizes: [f64; 2] = [self.open_limit_buy_size, self.open_limit_sell_size];
         let mut max_idx: usize = 0;
         let mut m: f64 = self.open_limit_buy_size;
 
@@ -332,11 +331,11 @@ impl Account {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::FuturesType;
+    use crate::FuturesTypes;
 
     #[test]
     fn account_append_limit_order() {
-        let mut account = Account::new(1.0, 1.0, FuturesType::Inverse);
+        let mut account = Account::new(1.0, 1.0, FuturesTypes::Inverse);
 
         account.append_limit_order(Order::limit(Side::Buy, 100.0, 25.0).unwrap());
         assert_eq!(account.open_limit_buy_size, 25.0);
@@ -374,7 +373,7 @@ mod tests {
 
     #[test]
     fn account_cancel_order() {
-        let mut account = Account::new(1.0, 1.0, FuturesType::Inverse);
+        let mut account = Account::new(1.0, 1.0, FuturesTypes::Inverse);
 
         let o = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
         account.append_order(o);
@@ -390,7 +389,7 @@ mod tests {
 
     #[test]
     fn account_cancel_all_orders() {
-        let mut account = Account::new(1.0, 1.0, FuturesType::Inverse);
+        let mut account = Account::new(1.0, 1.0, FuturesTypes::Inverse);
 
         let o = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
         account.append_order(o);
@@ -411,7 +410,7 @@ mod tests {
 
     #[test]
     fn account_order_margin() {
-        let mut account = Account::new(1.0, 1.0, FuturesType::Inverse);
+        let mut account = Account::new(1.0, 1.0, FuturesTypes::Inverse);
 
         account.append_order(Order::limit(Side::Buy, 100.0, 50.0).unwrap());
         assert_eq!(account.order_margin(), 0.5);
@@ -428,7 +427,7 @@ mod tests {
 
     #[test]
     fn account_change_position_size_inverse_future() {
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
+        let mut acc = Account::new(1.0, 1.0, FuturesTypes::Inverse);
 
         acc.change_position(Side::Buy, 100.0, 200.0);
         assert_eq!(acc.margin().wallet_balance(), 1.0);

@@ -1,4 +1,4 @@
-use crate::{Account, Config, FuturesType, Order, OrderError, OrderType, Side, Validator};
+use crate::{Account, Config, FuturesTypes, Order, OrderError, OrderType, Side, Validator};
 
 #[derive(Debug, Clone)]
 /// The main leveraged futures exchange for simulated trading
@@ -63,8 +63,15 @@ impl Exchange {
 
     /// Return a mutable reference to Account
     #[inline(always)]
+    #[deprecated] // use set_account instead
     pub fn account_mut(&mut self) -> &mut Account {
         &mut self.account
+    }
+
+    /// Set the account, use carefully
+    #[inline(always)]
+    pub fn set_account(&mut self, account: Account) {
+        self.account = account
     }
 
     /// Update the exchange state with new information
@@ -119,15 +126,15 @@ impl Exchange {
         self.validator.validate(&order, &self.account)?;
 
         // assign unique order id
-        order.id = self.next_order_id;
+        order.set_id(self.next_order_id);
         self.next_order_id += 1;
 
-        order.timestamp = self.step;
+        order.set_timestamp(self.step as i64);
 
-        match order.order_type {
+        match order.order_type() {
             OrderType::Market => {
                 // immediately execute market order
-                self.execute_market(order.side, order.size);
+                self.execute_market(order.side(), order.size());
 
                 Ok(order)
             }
@@ -161,8 +168,8 @@ impl Exchange {
 
         let mut fee = self.config.fee_taker * amount;
         match self.config.futures_type {
-            FuturesType::Linear => fee *= price,
-            FuturesType::Inverse => fee /= price,
+            FuturesTypes::Linear => fee *= price,
+            FuturesTypes::Inverse => fee /= price,
         }
         self.account.deduce_fees(fee);
         self.account.change_position(side, amount, price);
@@ -175,8 +182,8 @@ impl Exchange {
 
         let mut fee = self.config.fee_maker * amount;
         match self.config.futures_type {
-            FuturesType::Linear => fee *= price,
-            FuturesType::Inverse => fee /= price,
+            FuturesTypes::Linear => fee *= price,
+            FuturesTypes::Inverse => fee /= price,
         }
         self.account.deduce_fees(fee);
         self.account.change_position(side, amount, price);
@@ -197,7 +204,7 @@ impl Exchange {
     /// method is called after new external data has been consumed
     fn check_orders(&mut self) {
         for i in 0..self.account.active_limit_orders().len() {
-            match self.account.active_limit_orders()[i].order_type {
+            match self.account.active_limit_orders()[i].order_type() {
                 OrderType::Limit => self.handle_limit_order(i),
                 _ => panic!("there should only be limit orders in active_limit_orders"),
             }
@@ -207,19 +214,20 @@ impl Exchange {
     /// Handle limit order trigger and execution
     fn handle_limit_order(&mut self, order_idx: usize) {
         let o: Order = self.account.active_limit_orders()[order_idx];
-        match o.side {
+        let limit_price = o.limit_price().unwrap();
+        match o.side() {
             Side::Buy => {
                 // use candle information to specify execution
-                if self.low <= o.limit_price {
-                    self.execute_limit(o.side, o.limit_price, o.size);
+                if self.low <= limit_price {
+                    self.execute_limit(o.side(), limit_price, o.size());
                 } else {
                     return;
                 }
             }
             Side::Sell => {
                 // use candle information to specify execution
-                if self.high >= o.limit_price {
-                    self.execute_limit(o.side, o.limit_price, o.size);
+                if self.high >= limit_price {
+                    self.execute_limit(o.side(), limit_price, o.size());
                 } else {
                     return;
                 }

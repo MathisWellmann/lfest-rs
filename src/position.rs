@@ -1,10 +1,12 @@
-use crate::FuturesType;
+use crate::FuturesTypes;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 /// Describes the position information of the account
 pub struct Position {
     /// The position size
+    /// denoted in QUOTE when using linear futures
+    /// denoted in BASE when using inverse futures
     size: f64,
     /// The entry price of the position
     entry_price: f64,
@@ -17,7 +19,7 @@ pub struct Position {
 impl Position {
     /// Create a new position with a given leverage
     pub fn new(leverage: f64) -> Self {
-        debug_assert!(leverage > 0.0);
+        debug_assert!(leverage >= 1.0);
         Position {
             size: 0.0,
             entry_price: 0.0,
@@ -42,7 +44,7 @@ impl Position {
     }
 
     /// Change the position size by a given delta at a certain price
-    pub(crate) fn change_size(&mut self, size_delta: f64, price: f64, futures_type: FuturesType) {
+    pub(crate) fn change_size(&mut self, size_delta: f64, price: f64, futures_type: FuturesTypes) {
         trace!("change_size({}, {}, {})", size_delta, price, futures_type);
 
         debug_assert!(price > 0.0);
@@ -73,7 +75,7 @@ impl Position {
     }
 
     /// Update the state to reflect price changes
-    pub(crate) fn update_state(&mut self, price: f64, futures_type: FuturesType) {
+    pub(crate) fn update_state(&mut self, price: f64, futures_type: FuturesTypes) {
         self.unrealized_pnl = if self.size != 0.0 {
             futures_type.pnl(self.entry_price, price, self.size)
         } else {
@@ -81,7 +83,7 @@ impl Position {
         };
     }
 
-    /// Return the position size
+    /// Return the position size denoted in QUOTE currency
     #[inline(always)]
     pub fn size(&self) -> f64 {
         self.size
@@ -114,7 +116,7 @@ mod tests {
     #[test]
     fn position_change_size() {
         let mut pos = Position::new(1.0);
-        let futures_type = FuturesType::Inverse;
+        let futures_type = FuturesTypes::Inverse;
 
         pos.change_size(100.0, 100.0, futures_type);
         assert_eq!(pos.size, 100.0);
@@ -150,7 +152,7 @@ mod tests {
     #[test]
     fn position_update_state() {
         let mut pos = Position::new_all_fields(100.0, 100.0, 1.0, 0.0);
-        pos.update_state(110.0, FuturesType::Inverse);
+        pos.update_state(110.0, FuturesTypes::Inverse);
 
         assert_eq!(round(pos.unrealized_pnl, 2), 0.09);
     }

@@ -12,6 +12,7 @@ extern crate serde;
 
 mod acc_tracker;
 mod account;
+mod config;
 mod errors;
 mod exchange;
 mod futures_type;
@@ -22,9 +23,10 @@ mod utils;
 mod validator;
 mod welford_online;
 
+pub use config::Config;
 pub use errors::OrderError;
 pub use exchange::Exchange;
-pub use futures_type::FuturesType;
+pub use futures_type::FuturesTypes;
 pub use margin::Margin;
 pub use orders::Order;
 pub use position::Position;
@@ -58,21 +60,6 @@ pub enum FeeType {
     Maker,
     /// The fee for aggressive taker orders such as market and stop loss order
     Taker,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-/// Define the Exchange configuration
-pub struct Config {
-    /// The maker fee as a fraction. e.g.: 2.5 basis points rebate -> -0.00025
-    pub fee_maker: f64,
-    /// The taker fee as a fraction. e.g.: 10 basis points -> 0.0010
-    pub fee_taker: f64,
-    /// The starting balance of account
-    pub starting_balance: f64,
-    /// The leverage used for the position
-    pub leverage: f64,
-    /// The type of futures to simulate
-    pub futures_type: FuturesType,
 }
 
 /// round a value to a given precision of decimal places

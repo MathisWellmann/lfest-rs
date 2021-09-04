@@ -1,4 +1,4 @@
-use crate::{max, min, Account, FuturesType, Order, OrderError, OrderType, Side};
+use crate::{max, min, Account, FuturesTypes, Order, OrderError, OrderType, Side};
 
 #[derive(Clone, Debug, Default)]
 /// Used for validating orders
@@ -7,12 +7,13 @@ pub(crate) struct Validator {
     fee_taker: f64,
     bid: f64,
     ask: f64,
-    futures_type: FuturesType,
+    futures_type: FuturesTypes,
 }
 
 impl Validator {
     /// Create a new Validator with a given fee maker and taker
-    pub(crate) fn new(fee_maker: f64, fee_taker: f64, futures_type: FuturesType) -> Self {
+    #[inline]
+    pub(crate) fn new(fee_maker: f64, fee_taker: f64, futures_type: FuturesTypes) -> Self {
         Self {
             fee_maker,
             fee_taker,
@@ -23,6 +24,7 @@ impl Validator {
     }
 
     /// update the state with newest information
+    #[inline]
     pub(crate) fn update(&mut self, bid: f64, ask: f64) {
         self.bid = bid;
         self.ask = ask;
@@ -31,7 +33,7 @@ impl Validator {
     /// Check if order is valid and passes risk check
     #[must_use]
     pub(crate) fn validate(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
-        match o.order_type {
+        match o.order_type() {
             OrderType::Market => self.validate_market_order(o, acc),
             OrderType::Limit => self.validate_limit_order(o, acc),
         }
@@ -40,7 +42,7 @@ impl Validator {
     /// Check if market order is correct
     #[must_use]
     fn validate_market_order(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
-        let (debit, credit) = self.order_cost(o, acc);
+        let (debit, credit) = self.order_cost_market(o, acc);
         debug!("validate_market_order debit: {}, credit: {}", debit, credit);
         if credit > acc.margin().available_balance() + debit {
             return Err(OrderError::NotEnoughAvailableBalance);
@@ -53,35 +55,24 @@ impl Validator {
     #[must_use]
     fn validate_limit_order(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
         // validate order price
-        match o.side {
+        match o.side() {
             Side::Buy => {
-                if o.limit_price > self.ask {
+                if o.limit_price().unwrap() > self.ask {
                     return Err(OrderError::InvalidLimitPrice);
                 }
             }
             Side::Sell => {
-                if o.limit_price < self.bid {
+                if o.limit_price().unwrap() < self.bid {
                     return Err(OrderError::InvalidLimitPrice);
                 }
             }
         }
 
-        let (debit, credit) = self.order_cost(o, acc);
+        let (debit, credit) = self.order_cost_limit(o, acc);
         if credit > acc.margin().available_balance() + debit {
             return Err(OrderError::NotEnoughAvailableBalance);
         }
         Ok(())
-    }
-
-    /// Calculate the cost of order
-    /// # Returns
-    /// debited and credited account balance delta
-    #[must_use]
-    fn order_cost(&self, order: &Order, acc: &Account) -> (f64, f64) {
-        match order.order_type {
-            OrderType::Market => self.order_cost_market(order, acc),
-            OrderType::Limit => self.order_cost_limit(order, acc),
-        }
     }
 
     /// Compute the order cost of a market order
@@ -90,23 +81,23 @@ impl Validator {
     /// debited and credited account balance delta
     #[must_use]
     fn order_cost_market(&self, order: &Order, acc: &Account) -> (f64, f64) {
-        let hedged_size = match order.side {
-            Side::Buy => max(0.0, min(order.size, -acc.position().size())),
-            Side::Sell => max(0.0, min(order.size, acc.position().size())),
+        let hedged_size = match order.side() {
+            Side::Buy => max(0.0, min(order.size(), -acc.position().size())),
+            Side::Sell => max(0.0, min(order.size(), acc.position().size())),
         };
-        let unhedged_size = order.size - hedged_size;
+        let unhedged_size = order.size() - hedged_size;
 
-        let price: f64 = match order.side {
+        let price: f64 = match order.side() {
             Side::Buy => self.ask,
             Side::Sell => self.bid,
         };
 
         // include fee in order cost
-        let fee_bps: f64 = match order.order_type {
+        let fee_bps: f64 = match order.order_type() {
             OrderType::Market => self.fee_taker,
             OrderType::Limit => self.fee_maker,
         };
-        let mut fee: f64 = fee_bps * order.size;
+        let mut fee: f64 = fee_bps * order.size();
 
         let mut debit: f64 = hedged_size * (1.0 / acc.position().leverage());
         let mut credit: f64 = unhedged_size * (1.0 / acc.position().leverage());
@@ -114,12 +105,12 @@ impl Validator {
         debug_assert!(credit.is_finite());
 
         match self.futures_type {
-            FuturesType::Linear => {
+            FuturesTypes::Linear => {
                 fee *= price;
                 debit *= price;
                 credit *= price;
             }
-            FuturesType::Inverse => {
+            FuturesTypes::Inverse => {
                 fee /= price;
                 debit /= price;
                 credit /= price;
@@ -138,486 +129,249 @@ impl Validator {
     /// debited and credited account balance delta
     #[must_use]
     fn order_cost_limit(&self, order: &Order, acc: &Account) -> (f64, f64) {
-        let mut olbs = acc.open_limit_buy_size;
-        let mut olss = acc.open_limit_sell_size;
-        match order.order_type {
-            OrderType::Limit => match order.side {
-                Side::Buy => olbs += order.size,
-                Side::Sell => olss += order.size,
-            },
-            _ => panic!("market order should not be passed into this function!"),
-        }
-        let open_sizes: [f64; 2] = [olbs, olss];
-        let mut max_idx: usize = 0;
-        let mut max_size: f64 = acc.open_limit_buy_size;
-        for (i, s) in open_sizes.iter().enumerate() {
-            if *s > max_size {
-                max_size = *s;
-                max_idx = i;
+        debug!(
+            "order_cost_limit: order: {:?}, acc.position: {:?}",
+            order,
+            acc.position()
+        );
+
+        let fee = self.fee_maker * order.size();
+
+        let pos_size = acc.position().size();
+        if pos_size == 0.0 {
+            (0.0, order.size() + fee)
+        } else if pos_size > 0.0 {
+            match order.side() {
+                Side::Buy => (0.0, order.size() + fee),
+                Side::Sell => {
+                    let debit = min(order.size(), pos_size);
+                    (debit, max(0.0, order.size() - pos_size) + fee)
+                }
+            }
+        } else {
+            match order.side() {
+                Side::Buy => {
+                    let debit = min(order.size(), pos_size.abs());
+                    (debit, max(0.0, pos_size.abs() - order.size()) + fee)
+                }
+                Side::Sell => (0.0, order.size() + fee),
             }
         }
-
-        // direction of dominating open order side
-        let (d, reference_price) = match max_idx {
-            0 => (1.0, acc.min_limit_buy_price),
-            1 => (-1.0, acc.max_limit_sell_price),
-            _ => panic!("any other value should not be possible"),
-        };
-
-        let order_price: f64 = match order.order_type {
-            OrderType::Market => match order.side {
-                Side::Buy => self.ask,
-                Side::Sell => self.bid,
-            },
-            OrderType::Limit => order.limit_price,
-        };
-
-        // include fee in order cost
-        let fee_bps: f64 = match order.order_type {
-            OrderType::Market => self.fee_taker,
-            OrderType::Limit => self.fee_maker,
-        };
-        let mut fee: f64 = fee_bps * max_size;
-
-        // TODO: whats the debit for limit orders
-        let debit: f64 = 0.0;
-        let mut credit: f64 = max(0.0, min(max_size, max_size + d * acc.position().size()))
-            * (1.0 / acc.position().leverage());
-        debug_assert!(debit.is_finite());
-        debug_assert!(credit.is_finite());
-
-        match self.futures_type {
-            FuturesType::Linear => {
-                fee *= order_price;
-                credit *= order_price;
-            }
-            FuturesType::Inverse => {
-                fee /= order_price;
-                credit /= order_price;
-            }
-        }
-        (debit, credit + fee)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::FuturesType;
+    use crate::FuturesTypes;
 
     #[test]
-    fn validate_market_order_0() {
+    fn validate_inverse_market_order_without_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        // Test Validator with a fresh account
-
-        let mut validator = Validator::new(0.0, 0.001, FuturesType::Inverse);
-        let bid: f64 = 1_000.0;
-        let ask: f64 = 1_000.0;
-        validator.update(bid, ask);
+        let futures_type = FuturesTypes::Inverse;
+        let mut validator = Validator::new(0.0002, 0.0006, futures_type);
+        validator.update(100.0, 101.0);
 
         for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
-            println!("testing with leverage: {}", leverage);
+            let mut acc = Account::new(leverage, 1.0, futures_type);
 
-            let mut acc = Account::new(leverage, 1.0, FuturesType::Inverse);
-
-            // valid order
-            let o = Order::market(Side::Buy, 400.0 * leverage).unwrap();
+            let o = Order::market(Side::Buy, 40.0 * leverage).unwrap();
             validator.validate_market_order(&o, &acc).unwrap();
 
-            // valid order
-            let o = Order::market(Side::Sell, 400.0 * leverage).unwrap();
+            let o = Order::market(Side::Sell, 40.0 * leverage).unwrap();
             validator.validate_market_order(&o, &acc).unwrap();
 
-            // invalid order
-            let o = Order::market(Side::Buy, 1050.0 * leverage).unwrap();
+            let o = Order::market(Side::Buy, 105.0 * leverage).unwrap();
             assert!(validator.validate_market_order(&o, &acc).is_err());
 
-            // invalid order
-            let o = Order::market(Side::Sell, 1050.0 * leverage).unwrap();
+            let o = Order::market(Side::Sell, 105.0 * leverage).unwrap();
             assert!(validator.validate_market_order(&o, &acc).is_err());
         }
     }
 
     #[test]
-    fn validate_market_order_1() {
+    fn validate_inverse_futures_market_order_with_long_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
-        // test Validator with an account that has an open position
 
-        let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
-        let bid: f64 = 100.0;
-        let ask: f64 = 100.0;
-        validator.update(bid, ask);
+        let futures_type = FuturesTypes::Inverse;
+        let mut validator = Validator::new(0.0002, 0.0006, futures_type);
+        validator.update(100.0, 101.0);
 
         for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
-            println!("testing with leverage: {}", leverage);
-
             // with long position
-            let mut acc = Account::new(leverage, 1.0, FuturesType::Inverse);
+            let mut acc = Account::new(leverage, 1.0, futures_type);
             acc.change_position(Side::Buy, 50.0 * leverage, 100.0);
 
-            // valid order
-            let o = Order::market(Side::Buy, 50.0 * leverage).unwrap();
+            let o = Order::market(Side::Buy, 49.0 * leverage).unwrap();
             validator.validate_market_order(&o, &acc).unwrap();
 
-            // valid order
-            let o = Order::market(Side::Sell, 50.0 * leverage).unwrap();
-            validator.validate_market_order(&o, &acc).unwrap();
-
-            // invalid order
-            let o = Order::market(Side::Buy, 60.0 * leverage).unwrap();
+            let o = Order::market(Side::Buy, 51.0 * leverage).unwrap();
             assert!(validator.validate_market_order(&o, &acc).is_err());
 
-            // valid order
-            let o = Order::market(Side::Sell, 100.0 * leverage).unwrap();
+            let o = Order::market(Side::Sell, 149.0 * leverage).unwrap();
             validator.validate_market_order(&o, &acc).unwrap();
 
-            // valid order
-            let o = Order::market(Side::Sell, 110.0 * leverage).unwrap();
-            validator.validate_market_order(&o, &acc).unwrap();
-
-            // with short position
-            let mut acc = Account::new(leverage, 1.0, FuturesType::Inverse);
-            acc.change_position(Side::Sell, 50.0 * leverage, 100.0);
-
-            // valid order
-            let o = Order::market(Side::Buy, 50.0 * leverage).unwrap();
-            validator.validate_market_order(&o, &acc).unwrap();
-
-            // valid order
-            let o = Order::market(Side::Sell, 50.0 * leverage).unwrap();
-            validator.validate_market_order(&o, &acc).unwrap();
-
-            // invalid order
-            let o = Order::market(Side::Buy, 60.0 * leverage).unwrap();
-            validator.validate_market_order(&o, &acc).unwrap();
-
-            // valid order
-            let o = Order::market(Side::Buy, 110.0 * leverage).unwrap();
-            validator.validate_market_order(&o, &acc).unwrap();
-
-            // invalid order
-            let o = Order::market(Side::Sell, 60.0 * leverage).unwrap();
+            let o = Order::market(Side::Sell, 151.0 * leverage).unwrap();
             assert!(validator.validate_market_order(&o, &acc).is_err());
         }
     }
 
     #[test]
-    fn validate_market_order_2() {
+    fn validate_inverse_futures_market_order_with_short_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        // test Validator with an account that has open orders
-
-        let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
-        let bid: f64 = 100.0;
-        let ask: f64 = 100.0;
-        validator.update(bid, ask);
+        let futures_type = FuturesTypes::Inverse;
+        let mut validator = Validator::new(0.0002, 0.0006, futures_type);
+        validator.update(100.0, 101.0);
 
         for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
-            println!("testing with leverage: {}", leverage);
+            // with short position
+            let mut acc = Account::new(leverage, 1.0, futures_type);
+            acc.change_position(Side::Sell, 50.0 * leverage, 100.0);
 
-            // with buy limit order
-            let mut acc = Account::new(leverage, 1.0, FuturesType::Inverse);
-            acc.append_order(Order::limit(Side::Buy, 100.0, 50.0 * leverage).unwrap());
-
-            // valid order
-            let o = Order::market(Side::Buy, 50.0 * leverage).unwrap();
+            let o = Order::market(Side::Buy, 149.0 * leverage).unwrap();
             validator.validate_market_order(&o, &acc).unwrap();
 
-            // valid order
-            let o = Order::market(Side::Sell, 50.0 * leverage).unwrap();
-            validator.validate_market_order(&o, &acc).unwrap();
-
-            // invalid order
-            let o = Order::market(Side::Buy, 60.0 * leverage).unwrap();
+            let o = Order::market(Side::Buy, 151.0 * leverage).unwrap();
             assert!(validator.validate_market_order(&o, &acc).is_err());
 
-            // invalid order
-            let o = Order::market(Side::Sell, 100.0 * leverage).unwrap();
+            let o = Order::market(Side::Sell, 49.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
+
+            let o = Order::market(Side::Sell, 51.0 * leverage).unwrap();
+            assert!(validator.validate_market_order(&o, &acc).is_err());
+        }
+    }
+
+    #[test]
+    fn validate_inverse_futures_market_order_with_open_orders() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
+        let futures_type = FuturesTypes::Inverse;
+        let mut validator = Validator::new(0.0002, 0.0006, futures_type);
+        validator.update(100.0, 101.0);
+
+        for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
+            // with buy limit order
+            let mut acc = Account::new(leverage, 1.0, futures_type);
+            acc.append_order(Order::limit(Side::Buy, 100.0, 50.0 * leverage).unwrap());
+
+            let o = Order::market(Side::Buy, 49.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
+
+            let o = Order::market(Side::Buy, 51.0 * leverage).unwrap();
+            assert!(validator.validate_market_order(&o, &acc).is_err());
+
+            let o = Order::market(Side::Sell, 99.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
+
+            let o = Order::market(Side::Sell, 101.0 * leverage).unwrap();
             assert!(validator.validate_market_order(&o, &acc).is_err());
 
             // with sell limit order
-            let mut acc = Account::new(leverage, 1.0, FuturesType::Inverse);
+            let mut acc = Account::new(leverage, 1.0, futures_type);
             acc.append_order(Order::limit(Side::Sell, 100.0, 50.0 * leverage).unwrap());
 
-            // valid order
-            let o = Order::market(Side::Buy, 50.0 * leverage).unwrap();
+            let o = Order::market(Side::Buy, 99.0 * leverage).unwrap();
             validator.validate_market_order(&o, &acc).unwrap();
 
-            // valid order
-            let o = Order::market(Side::Sell, 50.0 * leverage).unwrap();
-            validator.validate_market_order(&o, &acc).unwrap();
-
-            // invalid order
-            let o = Order::market(Side::Sell, 60.0 * leverage).unwrap();
+            let o = Order::market(Side::Buy, 101.0 * leverage).unwrap();
             assert!(validator.validate_market_order(&o, &acc).is_err());
 
-            // invalid order
-            let o = Order::market(Side::Buy, 150.0 * leverage).unwrap();
+            let o = Order::market(Side::Sell, 99.0 * leverage).unwrap();
+            validator.validate_market_order(&o, &acc).unwrap();
+
+            let o = Order::market(Side::Sell, 101.0 * leverage).unwrap();
             assert!(validator.validate_market_order(&o, &acc).is_err());
         }
     }
 
     #[test]
-    fn validate_limit_order_0() {
+    fn validate_inverse_futures_limit_order_without_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        // test Validator for limit orders with a fresh account
+        let futures_type = FuturesTypes::Inverse;
+        let mut validator = Validator::new(0.0002, 0.0006, futures_type);
+        validator.update(100.0, 101.0);
 
-        let mut validator = Validator::new(0.0002, 0.0006, FuturesType::Inverse);
-        validator.update(100.0, 100.0);
+        let acc = Account::new(1.0, 1.0, futures_type);
 
-        let acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-
-        // valid order
-        let o = Order::limit(Side::Buy, 100.0, 50.0).unwrap();
+        let o = Order::limit(Side::Buy, 100.0, 99.0).unwrap();
         validator.validate_limit_order(&o, &acc).unwrap();
 
-        // valid order
-        let o = Order::limit(Side::Sell, 100.0, 50.0).unwrap();
+        let o = Order::limit(Side::Buy, 100.0, 101.0).unwrap();
+        assert!(validator.validate_limit_order(&o, &acc).is_err());
+
+        let o = Order::limit(Side::Sell, 101.0, 99.0).unwrap();
         validator.validate_limit_order(&o, &acc).unwrap();
 
-        // invalid order
-        let o = Order::limit(Side::Buy, 100.0, 110.0).unwrap();
-        assert!(validator.validate_limit_order(&o, &acc).is_err());
-
-        // invalid order
-        let o = Order::limit(Side::Sell, 100.0, 110.0).unwrap();
-        assert!(validator.validate_limit_order(&o, &acc).is_err());
-
-        // invalid order
-        let o = Order::limit(Side::Buy, 110.0, 50.0).unwrap();
-        assert!(validator.validate_limit_order(&o, &acc).is_err());
-
-        // invalid order
-        let o = Order::limit(Side::Sell, 90.0, 50.0).unwrap();
+        let o = Order::limit(Side::Sell, 101.0, 101.0).unwrap();
         assert!(validator.validate_limit_order(&o, &acc).is_err());
     }
 
     #[test]
-    fn validate_limit_order_1() {
+    fn validate_inverse_futures_limit_order_with_long_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        // test Validator for limit orders with an account that has an open position
-
-        let mut validator = Validator::new(0.0002, 0.0006, FuturesType::Linear);
-        validator.update(100.0, 100.0);
+        let futures_type = FuturesTypes::Inverse;
+        let mut validator = Validator::new(0.0002, 0.0006, futures_type);
+        validator.update(100.0, 101.0);
 
         // with long position
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Linear);
-        acc.change_position(Side::Buy, 50.0, 100.0);
+        let mut acc = Account::new(1.0, 1.0, futures_type);
+        acc.change_position(Side::Buy, 50.0, 101.0);
 
-        // valid order
-        let o = Order::limit(Side::Buy, 100.0, 50.0).unwrap();
+        let o = Order::limit(Side::Buy, 100.0, 49.0).unwrap();
         validator.validate_limit_order(&o, &acc).unwrap();
 
-        // valid order
-        let o = Order::limit(Side::Sell, 100.0, 50.0).unwrap();
+        let o = Order::limit(Side::Buy, 100.0, 51.0).unwrap();
+        assert!(validator.validate_limit_order(&o, &acc).is_err());
+
+        let o = Order::limit(Side::Sell, 101.0, 149.0).unwrap();
         validator.validate_limit_order(&o, &acc).unwrap();
 
-        // valid order
-        let o = Order::limit(Side::Sell, 100.0, 150.0).unwrap();
-        validator.validate_limit_order(&o, &acc).unwrap();
-
-        // TODO: with short position
+        let o = Order::limit(Side::Sell, 101.0, 151.0).unwrap();
+        assert!(validator.validate_limit_order(&o, &acc).is_err());
     }
 
     #[test]
-    fn validate_limit_order_2() {
+    fn validate_inverse_futures_limit_order_with_short_position() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
+        let futures_type = FuturesTypes::Inverse;
+        let mut validator = Validator::new(0.0002, 0.0006, futures_type);
+        validator.update(100.0, 101.0);
+
+        // with short position
+        let mut acc = Account::new(1.0, 1.0, futures_type);
+        acc.change_position(Side::Sell, 50.0, 100.0);
+
+        let o = Order::limit(Side::Buy, 100.0, 49.0).unwrap();
+        validator.validate_limit_order(&o, &acc).unwrap();
+
+        let o = Order::limit(Side::Buy, 100.0, 51.0).unwrap();
+        assert!(validator.validate_limit_order(&o, &acc).is_err());
+
+        let o = Order::limit(Side::Sell, 101.0, 149.0).unwrap();
+        validator.validate_limit_order(&o, &acc).unwrap();
+
+        let o = Order::limit(Side::Sell, 101.0, 151.0).unwrap();
+        assert!(validator.validate_limit_order(&o, &acc).is_err());
+    }
+
+    #[test]
+    fn validate_inverse_futures_limit_order_with_open_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         // test Validator for limit orders with an account that has open orders
 
-        let mut validator = Validator::new(0.0, 0.001, FuturesType::Inverse);
-        validator.update(100.0, 100.0);
+        let futures_type = FuturesTypes::Inverse;
+        let mut validator = Validator::new(0.0002, 0.0006, futures_type);
+        validator.update(100.0, 101.0);
 
-        // with long position
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
+        // with open orders
+        let mut acc = Account::new(1.0, 1.0, futures_type);
         acc.append_order(Order::limit(Side::Buy, 90.0, 45.0).unwrap());
-
-        // TODO: validate limit order with long position
-
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-        acc.append_order(Order::limit(Side::Sell, 110.0, 55.0).unwrap());
-
-        // TODO: validate limit order with short position
-    }
-
-    #[test]
-    fn validate_stop_market_order_0() {
-        if let Err(_) = pretty_env_logger::try_init() {}
-
-        let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
-        validator.update(100.0, 100.0);
-
-        let acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-
-        // TODO: validate stop market order with a fresh account
-    }
-
-    #[test]
-    fn order_cost_market_no_position() {
-        if let Err(_) = pretty_env_logger::try_init() {}
-
-        // test market order cost with a fresh account
-
-        let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
-        validator.update(100.0, 100.0);
-
-        let acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-
-        let o = Order::market(Side::Buy, 100.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), (0.0, 1.0));
-
-        let o = Order::market(Side::Sell, 100.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), (0.0, 1.0));
-    }
-
-    #[test]
-    fn order_cost_market_with_position() {
-        if let Err(_) = pretty_env_logger::try_init() {}
-
-        // test order cost with an account with a position
-        let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
-        validator.update(100.0, 100.0);
-
-        // test with long position
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-        acc.change_position(Side::Buy, 100.0, 100.0);
-
-        let o = Order::market(Side::Buy, 100.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), (0.0, 1.0));
-        let o = Order::market(Side::Sell, 100.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), (1.0, 0.0));
-        let o = Order::market(Side::Sell, 200.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), (1.0, 1.0));
-
-        // test with short position
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-        acc.change_position(Side::Sell, 100.0, 100.0);
-
-        let o = Order::market(Side::Buy, 100.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), (1.0, 0.0));
-        let o = Order::market(Side::Sell, 100.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), (0.0, 1.0));
-        let o = Order::market(Side::Buy, 200.0).unwrap();
-        assert_eq!(validator.order_cost_market(&o, &acc), (1.0, 1.0));
-    }
-
-    #[test]
-    fn order_cost_limit_no_position() {
-        if let Err(_) = pretty_env_logger::try_init() {}
-
-        // test market order cost with a fresh account
-
-        let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
-        validator.update(100.0, 100.0);
-
-        let acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-
-        let o = Order::limit(Side::Buy, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
-        let o = Order::limit(Side::Sell, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
-        let o = Order::limit(Side::Buy, 90.0, 90.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
-        let o = Order::limit(Side::Sell, 110.0, 110.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
-        let o = Order::limit(Side::Buy, 90.0, 180.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 2.0));
-        let o = Order::limit(Side::Sell, 110.0, 220.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 2.0));
-        let o = Order::limit(Side::Buy, 110.0, 55.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.5));
-        let o = Order::limit(Side::Sell, 90.0, 45.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.5));
-    }
-
-    #[test]
-    fn order_cost_limit_with_position() {
-        if let Err(_) = pretty_env_logger::try_init() {}
-
-        // test order cost with an account with a position
-        let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
-        validator.update(100.0, 100.0);
-
-        // test with long position
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-        acc.change_position(Side::Buy, 100.0, 100.0);
-
-        let o = Order::limit(Side::Buy, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
-        let o = Order::limit(Side::Sell, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.0));
-        let o = Order::limit(Side::Buy, 90.0, 45.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.5));
-        let o = Order::limit(Side::Sell, 110.0, 55.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.0));
-
-        // test with short position
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-        acc.change_position(Side::Sell, 100.0, 100.0);
-
-        let o = Order::limit(Side::Buy, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.0));
-        let o = Order::limit(Side::Sell, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
-        let o = Order::limit(Side::Buy, 90.0, 45.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.0));
-        let o = Order::limit(Side::Sell, 110.0, 55.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.5));
-    }
-
-    #[test]
-    #[ignore]
-    fn order_cost_limit_w_open_orders() {
-        if let Err(_) = pretty_env_logger::try_init() {}
-
-        let mut validator = Validator::new(0.0, 0.0, FuturesType::Inverse);
-        validator.update(100.0, 100.0);
-
-        let mut acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-        acc.append_order(Order::limit(Side::Buy, 100.0, 100.0).unwrap());
-
-        let o = Order::limit(Side::Buy, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 1.0));
-        let o = Order::limit(Side::Sell, 100.0, 100.0).unwrap();
-        assert_eq!(validator.order_cost_limit(&o, &acc), (0.0, 0.5));
-
-        // TODO: test with short position
-    }
-
-    #[test]
-    fn order_cost_stop_no_position() {
-        // TODO:
-    }
-
-    #[test]
-    fn order_cost_stop_with_position() {
-        // TODO::
-    }
-
-    #[test]
-    fn order_cost_stop_w_open_orders() {
-        // TODO:
-    }
-
-    #[test]
-    fn order_cost_fee() {
-        if let Err(_) = pretty_env_logger::try_init() {}
-
-        // Test Validator for proper fee handling
-
-        let fee_taker: f64 = 0.001;
-        let mut validator = Validator::new(0.0, fee_taker, FuturesType::Inverse);
-        validator.update(100.0, 100.0);
-
-        let acc = Account::new(1.0, 1.0, FuturesType::Inverse);
-
-        let o = Order::market(Side::Buy, 100.0).unwrap();
-        assert_eq!(validator.order_cost(&o, &acc), (0.0, 1.001));
-
-        let o = Order::market(Side::Sell, 100.0).unwrap();
-        assert_eq!(validator.order_cost(&o, &acc), (0.0, 1.001));
     }
 }

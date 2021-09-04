@@ -4,12 +4,14 @@ use serde::{Deserialize, Serialize};
 /// Describes the margin information of the account
 pub struct Margin {
     /// The wallet balance of account
+    /// denoted in QUOTE currency when using linear futures
+    /// denoted in BASE currency when using inverse futures
     wallet_balance: f64,
-    /// The position margin of account
+    /// The position margin of account, same denotation as wallet_balance
     position_margin: f64,
-    /// The order margin of account
+    /// The order margin of account, same denotation as wallet_balance
     order_margin: f64,
-    /// The available balance of account
+    /// The available balance of account, same denotation as wallet_balance
     available_balance: f64,
 }
 
@@ -69,6 +71,14 @@ impl Margin {
 
         self.position_margin = val;
         self.available_balance = self.wallet_balance - self.order_margin - self.position_margin;
+
+        debug!(
+            "self.available_balance: {}, self.wallet_balance: {}, self.position_margin: {}, self.order_margin: {}",
+            self.available_balance,
+            self.wallet_balance,
+            self.position_margin,
+            self.order_margin
+        );
 
         debug_assert!(self.position_margin >= 0.0);
         debug_assert!(self.position_margin <= self.wallet_balance);
