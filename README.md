@@ -167,7 +167,7 @@ fn analyze_results(e: &Exchange) {
     * min_size
     * max_size
     * step_size
-- check if limit order gets executed as market order when limit_price is worse than bid / ask
+- auto convert limit orders to market orders if limit_price is worse than bid / ask
 
 ### Contributions
 If you find a bug or would like to help out, feel free to create a pull-request.
