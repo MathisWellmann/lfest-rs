@@ -14,13 +14,8 @@ use std::time::Instant;
 fn main() {
     let t0 = Instant::now();
 
-    let config = Config {
-        fee_maker: -0.00025,
-        fee_taker: 0.001,
-        starting_balance: 1.0,
-        leverage: 1.0,
-        futures_type: FuturesTypes::Inverse,
-    };
+    let config = Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse).unwrap();
+
     let mut exchange = Exchange::new(config);
 
     // load trades from csv file

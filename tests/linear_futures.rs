@@ -6,13 +6,8 @@ use lfest::*;
 fn lin_long_market_win_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config {
-        fee_maker: 0.0,
-        fee_taker: 0.0,
-        starting_balance: 1000.0,
-        leverage: 1.0,
-        futures_type: FuturesTypes::Linear,
-    };
+    let config = Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Linear).unwrap();
+
     let mut exchange = Exchange::new(config);
     let _ = exchange.update_state(100.0, 100.0, 0, 100.0, 100.0);
 

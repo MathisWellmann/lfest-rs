@@ -17,13 +17,16 @@ pub struct Exchange {
 impl Exchange {
     /// Create a new Exchange with the desired config and whether to use candles as infomation source
     pub fn new(config: Config) -> Exchange {
-        assert!(config.leverage > 0.0);
         let account = Account::new(
-            config.leverage,
-            config.starting_balance,
-            config.futures_type,
+            config.leverage(),
+            config.starting_balance(),
+            config.futures_type(),
         );
-        let validator = Validator::new(config.fee_maker, config.fee_taker, config.futures_type);
+        let validator = Validator::new(
+            config.fee_maker(),
+            config.fee_taker(),
+            config.futures_type(),
+        );
         Exchange {
             config,
             account,
@@ -166,8 +169,8 @@ impl Exchange {
             Side::Sell => self.bid,
         };
 
-        let mut fee = self.config.fee_taker * amount;
-        match self.config.futures_type {
+        let mut fee = self.config.fee_taker() * amount;
+        match self.config.futures_type() {
             FuturesTypes::Linear => fee *= price,
             FuturesTypes::Inverse => fee /= price,
         }
@@ -180,8 +183,8 @@ impl Exchange {
         // TODO: log_limit_order_fill
         //self.account.acc_tracker_mut().log_limit_order_fill();
 
-        let mut fee = self.config.fee_maker * amount;
-        match self.config.futures_type {
+        let mut fee = self.config.fee_maker() * amount;
+        match self.config.futures_type() {
             FuturesTypes::Linear => fee *= price,
             FuturesTypes::Inverse => fee /= price,
         }

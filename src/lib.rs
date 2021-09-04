@@ -24,7 +24,7 @@ mod validator;
 mod welford_online;
 
 pub use config::Config;
-pub use errors::OrderError;
+pub use errors::{Error, OrderError, Result};
 pub use exchange::Exchange;
 pub use futures_type::FuturesTypes;
 pub use margin::Margin;

@@ -12,3 +12,18 @@ pub enum OrderError {
     /// The account does not have enough available balance to submit the order
     NotEnoughAvailableBalance,
 }
+
+/// Describes possible Errors that may occur when calling methods in this crate
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    /// Config::new was provided an invalid leverage value
+    #[error("Wrong leverage provided")]
+    ConfigWrongLeverage,
+
+    /// Config::new was provided an invalid starting balance
+    #[error("Wrong starting balance provided")]
+    ConfigWrongStartingBalance,
+}
+
+/// This is defined as a convenience.
+pub type Result<T> = std::result::Result<T, Error>;
