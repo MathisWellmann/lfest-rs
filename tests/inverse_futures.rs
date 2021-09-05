@@ -38,8 +38,7 @@ fn inv_long_market_win_full() {
     let value = exchange.account().margin().available_balance() * 0.8;
     let size = exchange.ask() * value;
     let o = Order::market(Side::Buy, size).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
 
     let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
@@ -67,19 +66,18 @@ fn inv_long_market_win_full() {
     let fee_asset2 = fee_base2 / 2000.0;
 
     let o = Order::market(Side::Sell, size).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
 
     assert_eq!(exchange.account().position().size(), 0.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(
         exchange.account().margin().wallet_balance(),
-        1.4 - fee_asset1 - fee_asset2
+        round(1.4 - fee_asset1 - fee_asset2, 5)
     );
     assert_eq!(exchange.account().margin().position_margin(), 0.0);
     assert_eq!(
         exchange.account().margin().available_balance(),
-        1.4 - fee_asset1 - fee_asset2
+        round(1.4 - fee_asset1 - fee_asset2, 5)
     );
 }
 
@@ -94,14 +92,13 @@ fn inv_long_market_loss_full() {
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::market(Side::Buy, 800.0).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
     let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     assert_eq!(exchange.account().position().size(), 800.0);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
-    assert_eq!(exchange.account().margin().wallet_balance(), 1.0);
+    assert_eq!(exchange.account().margin().wallet_balance(), 0.99952);
     assert_eq!(
         round(exchange.account().margin().available_balance(), 2),
         0.2
@@ -146,8 +143,7 @@ fn inv_short_market_win_full() {
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::market(Side::Sell, 800.0).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
     let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     assert_eq!(exchange.account().position().size(), -800.0);
@@ -192,8 +188,7 @@ fn inv_short_market_loss_full() {
     let value = exchange.account().margin().available_balance() * 0.4;
     let size = exchange.ask() * value;
     let o = Order::market(Side::Sell, size).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
 
     let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
@@ -222,8 +217,7 @@ fn inv_short_market_loss_full() {
     assert_eq!(exchange.account().position().unrealized_pnl(), -0.2);
 
     let o = Order::market(Side::Buy, size).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
 
     let _ = exchange.update_state(2000.0, 2000.0, 3, 2000.0, 2000.0);
 
@@ -251,8 +245,7 @@ fn inv_long_market_win_partial() {
     let value = exchange.account().margin().available_balance() * 0.8;
     let size = exchange.ask() * value;
     let o = Order::market(Side::Buy, size).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
 
     let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
@@ -281,8 +274,7 @@ fn inv_long_market_win_partial() {
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.4);
 
     let o = Order::market(Side::Sell, size).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
 
     let _ = exchange.update_state(2000.0, 2000.0, 2, 2000.0, 2000.0);
 
@@ -309,8 +301,7 @@ fn inv_long_market_loss_partial() {
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::market(Side::Buy, 800.0).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
     let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     assert_eq!(exchange.account().position().size(), 800.0);
@@ -319,8 +310,7 @@ fn inv_long_market_loss_partial() {
     assert_eq!(exchange.account().position().unrealized_pnl(), -0.2);
 
     let o = Order::market(Side::Sell, 400.0).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
     let _ = exchange.update_state(800.0, 800.0, 1, 800.0, 800.0);
 
     let fee_base0 = fee_taker * 800.0;
@@ -353,17 +343,16 @@ fn inv_short_market_win_partial() {
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::market(Side::Sell, 800.0).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
     let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     assert_eq!(exchange.account().position().size(), -800.0);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
-    assert_eq!(exchange.account().margin().wallet_balance(), 0.9994);
+    assert_eq!(exchange.account().margin().wallet_balance(), 0.99952);
     assert_eq!(
-        round(exchange.account().margin().available_balance(), 3),
-        0.199
+        round(exchange.account().margin().available_balance(), 5),
+        0.19952
     );
     assert_eq!(exchange.account().margin().order_margin(), 0.0);
     assert_eq!(exchange.account().margin().position_margin(), 0.8);
@@ -373,8 +362,7 @@ fn inv_short_market_win_partial() {
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.2);
 
     let o = Order::market(Side::Buy, 400.0).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
     let _ = exchange.update_state(800.0, 800.0, 3, 800.0, 800.0);
 
     let fee_base0 = fee_taker * 800.0;
@@ -409,8 +397,7 @@ fn inv_short_market_loss_partial() {
     let value = exchange.account().margin().available_balance() * 0.8;
     let size = exchange.ask() * value;
     let o = Order::market(Side::Sell, size).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
 
     let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
@@ -438,8 +425,7 @@ fn inv_short_market_loss_partial() {
     assert_eq!(exchange.account().position().unrealized_pnl(), -0.4);
 
     let o = Order::market(Side::Buy, size).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
 
     assert_eq!(exchange.account().position().size(), -400.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), -0.2);
@@ -465,14 +451,12 @@ fn inv_test_market_roundtrip() {
     let value = exchange.account().margin().available_balance() * 0.9;
     let size = exchange.ask() * value;
     let buy_order = Order::market(Side::Buy, size).unwrap();
-    let order_err = exchange.submit_order(buy_order);
-    assert!(order_err.is_ok());
+    exchange.submit_order(buy_order).unwrap();
     let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     let sell_order = Order::market(Side::Sell, size).unwrap();
 
-    let order_err = exchange.submit_order(sell_order);
-    assert!(order_err.is_ok());
+    exchange.submit_order(sell_order).unwrap();
 
     let fee_base = size * fee_taker;
     let fee_asset = fee_base / exchange.ask();
@@ -494,15 +478,13 @@ fn inv_test_market_roundtrip() {
 
     let size = 900.0;
     let buy_order = Order::market(Side::Buy, size).unwrap();
-    let order_err = exchange.submit_order(buy_order);
-    assert!(order_err.is_ok());
+    exchange.submit_order(buy_order).unwrap();
     let _ = exchange.update_state(1000.0, 1000.0, 3, 1000.0, 1000.0);
 
     let size = 950.0;
     let sell_order = Order::market(Side::Sell, size).unwrap();
 
-    let order_err = exchange.submit_order(sell_order);
-    assert!(order_err.is_ok());
+    exchange.submit_order(sell_order).unwrap();
 
     let _ = exchange.update_state(1000.0, 1000.0, 4, 1000.0, 1000.0);
 
@@ -526,6 +508,8 @@ fn test_liquidate() {
 
 #[test]
 fn inv_execute_limit() {
+    if let Err(_) = pretty_env_logger::try_init() {}
+
     let config = Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse).unwrap();
 
     let mut exchange = Exchange::new(config.clone());
@@ -534,8 +518,9 @@ fn inv_execute_limit() {
     let o: Order = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
-    assert_eq!(exchange.account().margin().available_balance(), 0.5);
-    assert_eq!(exchange.account().margin().order_margin(), 0.5);
+    assert_eq!(exchange.account().margin().wallet_balance(), 1.0);
+    assert_eq!(exchange.account().margin().available_balance(), 0.4999);
+    assert_eq!(exchange.account().margin().order_margin(), 0.5001); // this includes the fee too
 
     let (exec_orders, liq) = exchange.update_state(750.0, 750.0, 1, 750.0, 750.0);
     assert!(!liq);
@@ -546,11 +531,10 @@ fn inv_execute_limit() {
     assert_eq!(exchange.account().active_limit_orders().len(), 0);
     assert_eq!(exchange.account().position().size(), 450.0);
     assert_eq!(exchange.account().position().entry_price(), 900.0);
-    assert_eq!(exchange.account().margin().wallet_balance(), 1.0);
+    assert_eq!(exchange.account().margin().wallet_balance(), 0.9999);
 
     let o: Order = Order::limit(Side::Sell, 1000.0, 450.0).unwrap();
-    let order_err = exchange.submit_order(o);
-    assert!(order_err.is_ok());
+    exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
 
     let _ = exchange.update_state(1200.0, 1200.0, 1, 1200.0, 1200.0);

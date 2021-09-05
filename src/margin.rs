@@ -48,13 +48,14 @@ impl Margin {
 
     /// Set a new order margin
     pub(crate) fn set_order_margin(&mut self, order_margin: f64) {
+        debug!("set_order_margin: {}", order_margin);
         debug_assert!(order_margin >= 0.0);
 
         self.order_margin = order_margin;
         self.available_balance = self.wallet_balance - self.position_margin - self.order_margin;
 
         debug!(
-            "self.available_balance: {}, self.wallet_balance: {}, self.position_margin: {}, self.order_margin: {}",
+            "set_order_margin: self.available_balance: {}, self.wallet_balance: {}, self.position_margin: {}, self.order_margin: {}",
             self.available_balance,
             self.wallet_balance,
             self.position_margin,

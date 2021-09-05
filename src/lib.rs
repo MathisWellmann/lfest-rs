@@ -32,6 +32,7 @@ pub use orders::Order;
 pub use position::Position;
 
 pub(crate) use account::Account;
+use std::fmt::Formatter;
 pub(crate) use utils::{max, min};
 pub(crate) use validator::Validator;
 
@@ -42,6 +43,12 @@ pub enum Side {
     Buy,
     /// Sell side
     Sell,
+}
+
+impl std::fmt::Display for Side {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

@@ -35,8 +35,13 @@ impl Validator {
     }
 
     /// Check if order is valid and passes risk check
+    /// # Arguments
+    /// - order to validate
+    /// - account that submitted this order
+    /// # Returns
+    /// Either an OrderError if Order is invalid or (debit, credit) of order
     #[must_use]
-    pub(crate) fn validate(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
+    pub(crate) fn validate(&self, o: &Order, acc: &Account) -> Result<(f64, f64), OrderError> {
         match o.order_type() {
             OrderType::Market => self.validate_market_order(o, acc),
             OrderType::Limit => self.validate_limit_order(o, acc),
@@ -45,7 +50,7 @@ impl Validator {
 
     /// Check if market order is correct
     #[must_use]
-    fn validate_market_order(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
+    fn validate_market_order(&self, o: &Order, acc: &Account) -> Result<(f64, f64), OrderError> {
         let (debit, credit) = self.order_cost_market(o, acc);
         debug!("validate_market_order debit: {}, credit: {}", debit, credit);
 
@@ -53,12 +58,12 @@ impl Validator {
             return Err(OrderError::NotEnoughAvailableBalance);
         }
 
-        Ok(())
+        Ok((debit, credit))
     }
 
     /// Check if a limit order is correct
     #[must_use]
-    fn validate_limit_order(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
+    fn validate_limit_order(&self, o: &Order, acc: &Account) -> Result<(f64, f64), OrderError> {
         // validate order price
         match o.side() {
             Side::Buy => {
@@ -79,11 +84,11 @@ impl Validator {
         if credit > acc.margin().available_balance() + debit {
             return Err(OrderError::NotEnoughAvailableBalance);
         }
-        Ok(())
+
+        Ok((debit, credit))
     }
 
     /// Compute the order cost of a market order
-    /// using hedged volume
     /// # Returns
     /// debited and credited account balance delta
     #[must_use]
@@ -99,12 +104,18 @@ impl Validator {
         let (mut debit, mut credit) = if pos_size == 0.0 {
             match order.side() {
                 Side::Buy => {
+                    // debit will account for possible limit orders taking up margin
+                    let debit =
+                        min(order.size(), acc.open_limit_sell_size) / acc.position().leverage();
                     let credit = order.size() / acc.position().leverage();
-                    (0.0, credit)
+                    (debit, credit)
                 }
                 Side::Sell => {
+                    // debit will account for possible limit orders taking up margin
+                    let debit =
+                        min(order.size(), acc.open_limit_buy_size) / acc.position().leverage();
                     let credit = order.size() / acc.position().leverage();
-                    (0.0, credit)
+                    (debit, credit)
                 }
             }
         } else if pos_size > 0.0 {
@@ -156,23 +167,38 @@ impl Validator {
         (debit, credit + fee)
     }
 
-    /// Compute the order cost of a passively sitting order such as limit order
+    /// Compute the order cost of a limit order
     /// # Returns
     /// debited and credited account balance delta
     #[must_use]
     fn order_cost_limit(&self, order: &Order, acc: &Account) -> (f64, f64) {
         debug!(
-            "order_cost_limit: order: {:?}, acc.position: {:?}",
+            "order_cost_limit: order: {:?}, acc.position: {:?}, olss: {}, osbs: {}",
             order,
-            acc.position()
+            acc.position(),
+            acc.open_limit_sell_size,
+            acc.open_limit_buy_size,
         );
 
         let pos_size = acc.position().size();
         let (mut debit, mut credit) = if pos_size == 0.0 {
-            (0.0, order.size() / acc.position().leverage())
+            let debit = match order.side() {
+                Side::Buy => {
+                    min(order.size(), acc.open_limit_sell_size) / acc.position().leverage()
+                }
+                Side::Sell => {
+                    min(order.size(), acc.open_limit_buy_size) / acc.position().leverage()
+                }
+            };
+            (debit, order.size() / acc.position().leverage())
         } else if pos_size > 0.0 {
             match order.side() {
-                Side::Buy => (0.0, order.size() / acc.position().leverage()),
+                Side::Buy => {
+                    // account for possible open limit sell orders that take up order_margin, which could be freed
+                    let debit =
+                        min(order.size(), acc.open_limit_sell_size) / acc.position().leverage();
+                    (debit, order.size() / acc.position().leverage())
+                }
                 Side::Sell => {
                     let debit = min(order.size(), pos_size) / acc.position().leverage();
                     (
@@ -187,10 +213,17 @@ impl Validator {
                     let debit = min(order.size(), pos_size.abs()) / acc.position().leverage();
                     (
                         debit,
-                        max(0.0, order.size() - pos_size.abs()) / acc.position().leverage(),
+                        max(
+                            0.0,
+                            order.size() - pos_size.abs() + acc.open_limit_sell_size,
+                        ) / acc.position().leverage(),
                     )
                 }
-                Side::Sell => (0.0, order.size() / acc.position().leverage()),
+                Side::Sell => {
+                    let debit =
+                        min(order.size(), acc.open_limit_buy_size) / acc.position().leverage();
+                    (debit, order.size() / acc.position().leverage())
+                }
             }
         };
 
@@ -224,7 +257,7 @@ mod tests {
     use crate::FuturesTypes;
 
     #[test]
-    fn validate_inverse_market_order_without_position() {
+    fn validate_inverse_futures_market_order_without_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
@@ -315,9 +348,13 @@ mod tests {
         validator.update(100.0, 101.0);
 
         for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
+            debug!("leverage: {}", leverage);
+
             // with buy limit order
             let mut acc = Account::new(leverage, 1.0, futures_type);
-            acc.append_order(Order::limit(Side::Buy, 100.0, 50.0 * leverage).unwrap());
+            let o = Order::limit(Side::Buy, 100.0, 50.0 * leverage).unwrap();
+            let (debit, credit) = validator.validate(&o, &acc).unwrap();
+            acc.append_limit_order(o, debit, credit);
 
             let o = Order::market(Side::Buy, 49.0 * leverage).unwrap();
             validator.validate_market_order(&o, &acc).unwrap();
@@ -333,7 +370,9 @@ mod tests {
 
             // with sell limit order
             let mut acc = Account::new(leverage, 1.0, futures_type);
-            acc.append_order(Order::limit(Side::Sell, 100.0, 50.0 * leverage).unwrap());
+            let o = Order::limit(Side::Sell, 100.0, 50.0 * leverage).unwrap();
+            let (debit, credit) = validator.validate(&o, &acc).unwrap();
+            acc.append_limit_order(o, debit, credit);
 
             let o = Order::market(Side::Buy, 99.0 * leverage).unwrap();
             validator.validate_market_order(&o, &acc).unwrap();
@@ -341,10 +380,10 @@ mod tests {
             let o = Order::market(Side::Buy, 101.0 * leverage).unwrap();
             assert!(validator.validate_market_order(&o, &acc).is_err());
 
-            let o = Order::market(Side::Sell, 99.0 * leverage).unwrap();
+            let o = Order::market(Side::Sell, 49.0 * leverage).unwrap();
             validator.validate_market_order(&o, &acc).unwrap();
 
-            let o = Order::market(Side::Sell, 101.0 * leverage).unwrap();
+            let o = Order::market(Side::Sell, 51.0 * leverage).unwrap();
             assert!(validator.validate_market_order(&o, &acc).is_err());
         }
     }
@@ -434,6 +473,8 @@ mod tests {
 
         // with open orders
         let mut acc = Account::new(1.0, 1.0, futures_type);
-        acc.append_order(Order::limit(Side::Buy, 90.0, 45.0).unwrap());
+        let o = Order::limit(Side::Buy, 90.0, 45.0).unwrap();
+        let (debit, credit) = validator.validate(&o, &acc).unwrap();
+        acc.append_limit_order(o, debit, credit);
     }
 }
