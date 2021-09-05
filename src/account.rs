@@ -15,11 +15,11 @@ pub struct Account {
     order_margins: HashMap<u64, f64>,
     executed_orders: Vec<Order>,
     // used for calculating hedged order size for order margin calculation
-    pub(crate) open_limit_buy_size: f64,
-    pub(crate) open_limit_sell_size: f64,
+    open_limit_buy_size: f64,
+    open_limit_sell_size: f64,
     // TODO: remove following two fields
-    pub(crate) min_limit_buy_price: f64,
-    pub(crate) max_limit_sell_price: f64,
+    min_limit_buy_price: f64,
+    max_limit_sell_price: f64,
 }
 
 impl Account {
@@ -313,6 +313,18 @@ impl Account {
         // log change
         self.acc_tracker.log_trade(side, size);
     }
+
+    #[inline(always)]
+    pub(crate) fn open_limit_buy_size(&self) -> f64 { self.open_limit_buy_size }
+
+    #[inline(always)]
+    pub(crate) fn open_limit_sell_size(&self) -> f64 { self.open_limit_sell_size }
+
+    #[inline(always)]
+    pub(crate) fn min_limit_buy_price(&self) -> f64 { self.min_limit_buy_price }
+
+    #[inline(always)]
+    pub(crate) fn max_limit_sell_price(&self) -> f64 { self.max_limit_sell_price }
 
     // /// Calculate the order margin to assign for a given order
     // #[must_use]

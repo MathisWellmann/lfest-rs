@@ -66,7 +66,6 @@ impl Exchange {
 
     /// Return a mutable reference to Account
     #[inline(always)]
-    #[deprecated] // use set_account instead
     pub fn account_mut(&mut self) -> &mut Account {
         &mut self.account
     }
