@@ -102,6 +102,8 @@ impl Position {
     }
 
     /// Return the positions unrealized profit and loss
+    /// denoted in QUOTE when using linear futures
+    //  denoted in BASE when using inverse futures
     #[inline(always)]
     pub fn unrealized_pnl(&self) -> f64 {
         self.unrealized_pnl

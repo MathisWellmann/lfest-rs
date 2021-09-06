@@ -78,8 +78,7 @@ impl Validator {
             }
         }
 
-        let (debit, credit) = self.order_cost_limit(o, acc);
-        debug!("validate_limit_order debit: {}, credit: {}", debit, credit);
+        let (debit, credit) = self.limit_order_margin_cost(o, acc);
 
         if credit > acc.margin().available_balance() + debit {
             return Err(OrderError::NotEnoughAvailableBalance);
@@ -103,44 +102,35 @@ impl Validator {
 
         let (mut debit, mut credit) = if pos_size == 0.0 {
             match order.side() {
-                Side::Buy => {
-                    // debit will account for possible limit orders taking up margin
-                    let debit =
-                        min(order.size(), acc.open_limit_sell_size()) / acc.position().leverage();
-                    let credit = order.size() / acc.position().leverage();
-                    (debit, credit)
-                }
-                Side::Sell => {
-                    // debit will account for possible limit orders taking up margin
-                    let debit =
-                        min(order.size(), acc.open_limit_buy_size()) / acc.position().leverage();
-                    let credit = order.size() / acc.position().leverage();
-                    (debit, credit)
-                }
+                Side::Buy => (
+                    min(order.size(),
+                        acc.open_limit_sell_size()), order.size()
+                ),
+                Side::Sell => (
+                    min(order.size(),acc.open_limit_buy_size()),
+                    order.size()
+                ),
             }
         } else if pos_size > 0.0 {
             match order.side() {
-                Side::Buy => (0.0, order.size() / acc.position().leverage()),
-                Side::Sell => {
-                    let debit =
-                        min(order.size(), acc.position().size()) / acc.position().leverage();
-                    let credit =
-                        max(0.0, order.size() - acc.position().size()) / acc.position().leverage();
-                    (debit, credit)
-                }
+                Side::Buy => (0.0, order.size()),
+                Side::Sell => (
+                    min(order.size(), acc.position().size()),
+                    max(0.0, order.size() - acc.position().size())
+                ),
             }
         } else {
             match order.side() {
-                Side::Buy => {
-                    let debit =
-                        min(order.size(), acc.position().size().abs()) / acc.position().leverage();
-                    let credit = max(0.0, order.size() - acc.position().size().abs())
-                        / acc.position().leverage();
-                    (debit, credit)
-                }
-                Side::Sell => (0.0, order.size() / acc.position().leverage()),
+                Side::Buy => (
+                    min(order.size(), acc.position().size().abs()),
+                    max(0.0, order.size() - acc.position().size().abs())
+                ),
+                Side::Sell => (0.0, order.size()),
             }
         };
+        debit /= acc.position().leverage();
+        credit /= acc.position().leverage();
+
         let mut fee: f64 = order.size() * self.fee_taker;
 
         let price = match order.side() {
@@ -171,61 +161,19 @@ impl Validator {
     /// # Returns
     /// debited and credited account balance delta
     #[must_use]
-    fn order_cost_limit(&self, order: &Order, acc: &Account) -> (f64, f64) {
-        debug!(
-            "order_cost_limit: order: {:?}, acc.position: {:?}, olss: {}, osbs: {}",
-            order,
-            acc.position(),
-            acc.open_limit_sell_size(),
-            acc.open_limit_buy_size(),
-        );
-
-        let pos_size = acc.position().size();
-        let (mut debit, mut credit) = if pos_size == 0.0 {
-            let debit = match order.side() {
-                Side::Buy => {
-                    min(order.size(), acc.open_limit_sell_size()) / acc.position().leverage()
-                }
-                Side::Sell => {
-                    min(order.size(), acc.open_limit_buy_size()) / acc.position().leverage()
-                }
-            };
-            (debit, order.size() / acc.position().leverage())
-        } else if pos_size > 0.0 {
-            match order.side() {
-                Side::Buy => {
-                    // account for possible open limit sell orders that take up order_margin, which could be freed
-                    let debit =
-                        min(order.size(), acc.open_limit_sell_size()) / acc.position().leverage();
-                    (debit, order.size() / acc.position().leverage())
-                }
-                Side::Sell => {
-                    let debit = min(order.size(), pos_size) / acc.position().leverage();
-                    (
-                        debit,
-                        max(0.0, order.size() - pos_size) / acc.position().leverage(),
-                    )
-                }
-            }
-        } else {
-            match order.side() {
-                Side::Buy => {
-                    let debit = min(order.size(), pos_size.abs()) / acc.position().leverage();
-                    (
-                        debit,
-                        max(
-                            0.0,
-                            order.size() - pos_size.abs() + acc.open_limit_sell_size(),
-                        ) / acc.position().leverage(),
-                    )
-                }
-                Side::Sell => {
-                    let debit =
-                        min(order.size(), acc.open_limit_buy_size()) / acc.position().leverage();
-                    (debit, order.size() / acc.position().leverage())
-                }
-            }
+    fn limit_order_margin_cost(&self, order: &Order, acc: &Account) -> (f64, f64) {
+        let (mut debit, mut credit) = match order.side() {
+            Side::Buy => (
+                min(order.size() - acc.open_limit_sell_size(), acc.open_limit_sell_size() + min(acc.position().size(), 0.0).abs()),
+                max(0.0, order.size() - acc.open_limit_sell_size() - min(acc.position().size(), 0.0).abs())
+            ),
+            Side::Sell => (
+                min(order.size() - acc.open_limit_buy_size(), acc.open_limit_buy_size() + max(acc.position().size(), 0.0)),
+                max(0.0, order.size() - acc.open_limit_buy_size() - max(acc.position().size(), 0.0))
+            ),
         };
+        debit /= acc.position().leverage();
+        credit /= acc.position().leverage();
 
         let mut fee = self.fee_maker * order.size();
 
@@ -246,6 +194,16 @@ impl Validator {
                 credit /= price;
             }
         }
+
+        debug!(
+            "limit_order_margin_cost: order: {:?}, acc.position: {:?}, olss: {}, osbs: {}, debit: {}, credit: {}",
+            order,
+            acc.position(),
+            acc.open_limit_sell_size(),
+            acc.open_limit_buy_size(),
+            debit,
+            credit,
+        );
 
         (debit, credit + fee)
     }

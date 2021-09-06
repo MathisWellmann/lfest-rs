@@ -3,31 +3,6 @@
 use lfest::*;
 
 #[test]
-fn submit_order_limit() {
-    let config = Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse).unwrap();
-    let mut exchange = Exchange::new(config);
-    let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
-
-    // submit working market order
-    let o = Order::market(Side::Buy, 500.0).unwrap();
-    exchange.submit_order(o).unwrap();
-
-    let o = Order::limit(Side::Buy, 900.0, 250.0).unwrap();
-    exchange.submit_order(o).unwrap();
-    assert_eq!(exchange.account().active_limit_orders().len(), 1);
-
-    // submit opposite limit order acting as target order
-    let o = Order::limit(Side::Sell, 1200.0, 500.0).unwrap();
-    exchange.submit_order(o).unwrap();
-    assert_eq!(exchange.account().active_limit_orders().len(), 2);
-}
-
-#[test]
-fn test_handle_limit_order() {
-    // TODO:
-}
-
-#[test]
 fn inv_long_market_win_full() {
     let config = Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse).unwrap();
 
@@ -497,16 +472,6 @@ fn inv_test_market_roundtrip() {
 }
 
 #[test]
-fn check_liquidation() {
-    // TODO:
-}
-
-#[test]
-fn test_liquidate() {
-    // TODO:
-}
-
-#[test]
 fn inv_execute_limit() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
@@ -520,6 +485,7 @@ fn inv_execute_limit() {
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
     assert_eq!(exchange.account().margin().wallet_balance(), 1.0);
     assert_eq!(exchange.account().margin().available_balance(), 0.4999);
+    assert_eq!(exchange.account().margin().position_margin(), 0.0);
     assert_eq!(exchange.account().margin().order_margin(), 0.5001); // this includes the fee too
 
     let (exec_orders, liq) = exchange.update_state(750.0, 750.0, 1, 750.0, 750.0);
@@ -532,6 +498,9 @@ fn inv_execute_limit() {
     assert_eq!(exchange.account().position().size(), 450.0);
     assert_eq!(exchange.account().position().entry_price(), 900.0);
     assert_eq!(exchange.account().margin().wallet_balance(), 0.9999);
+    assert_eq!(exchange.account().margin().available_balance(), 0.4999);
+    assert_eq!(exchange.account().margin().position_margin(), 0.5);
+    assert_eq!(exchange.account().margin().order_margin(), 0.0);
 
     let o: Order = Order::limit(Side::Sell, 1000.0, 450.0).unwrap();
     exchange.submit_order(o).unwrap();
@@ -542,8 +511,8 @@ fn inv_execute_limit() {
     assert_eq!(exchange.account().active_limit_orders().len(), 0);
     assert_eq!(exchange.account().position().size(), 0.0);
     assert_eq!(exchange.account().margin().position_margin(), 0.0);
-    assert_eq!(exchange.account().margin().wallet_balance(), 1.05);
-    assert_eq!(exchange.account().margin().available_balance(), 1.05);
+    assert_eq!(exchange.account().margin().wallet_balance(), 1.04981);
+    assert_eq!(exchange.account().margin().available_balance(), 1.04981);
 
     let o: Order = Order::limit(Side::Sell, 1200.0, 600.0).unwrap();
     exchange.submit_order(o).unwrap();

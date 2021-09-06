@@ -183,8 +183,10 @@ impl Account {
             }
         }
         // assign order margin
-        let om = credit - debit;
+        let om = credit; // - debit;
         debug_assert!(om >= 0.0);
+        // assigning order margin and closing out position are two different things
+
         self.order_margins.insert(order.id(), om);
         let new_om = self.margin.order_margin() + om;
         self.margin.set_order_margin(new_om);
@@ -325,39 +327,6 @@ impl Account {
 
     #[inline(always)]
     pub(crate) fn max_limit_sell_price(&self) -> f64 { self.max_limit_sell_price }
-
-    // /// Calculate the order margin to assign for a given order
-    // #[must_use]
-    // fn order_margin(&self, o: &Order) -> f64 {
-    //     match o.side() {
-    //         Side::Buy => {}
-    //         Side::Sell => {}
-    //     }
-    //
-    //     // let ps: f64 = self.position.size();
-    //     // let open_sizes: [f64; 2] = [self.open_limit_buy_size, self.open_limit_sell_size];
-    //     // let mut max_idx: usize = 0;
-    //     // let mut m: f64 = self.open_limit_buy_size;
-    //     //
-    //     // for (i, s) in open_sizes.iter().enumerate() {
-    //     //     if *s > m {
-    //     //         m = *s;
-    //     //         max_idx = i;
-    //     //     }
-    //     // }
-    //     //
-    //     // // direction of dominating open order side
-    //     // let (d, p) = match max_idx {
-    //     //     0 => (1.0, self.min_limit_buy_price),
-    //     //     1 => (-1.0, self.max_limit_sell_price),
-    //     //     _ => panic!("any other value should not be possible"),
-    //     // };
-    //     // if p == 0.0 {
-    //     //     return 0.0;
-    //     // }
-    //     //
-    //     // max(0.0, min(m, m + d * ps)) / p / self.position.leverage()
-    // }
 }
 
 #[cfg(test)]
