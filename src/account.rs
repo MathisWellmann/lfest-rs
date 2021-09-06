@@ -251,9 +251,7 @@ impl Account {
     pub(crate) fn change_position(&mut self, side: Side, size: f64, exec_price: f64) {
         debug!(
             "account: change_position(side: {:?}, size: {}, exec_price: {})",
-            side,
-            size,
-            exec_price
+            side, size, exec_price
         );
         let pos_size_delta: f64 = match side {
             Side::Buy => size,
@@ -296,6 +294,15 @@ impl Account {
             }
         };
         if rpnl != 0.0 {
+            // first free up existing position margin if any
+            let mut new_pos_margin: f64 =
+                (self.position().size() + pos_size_delta).abs() / self.position().leverage();
+            match self.futures_type {
+                FuturesTypes::Linear => new_pos_margin *= self.position.entry_price(),
+                FuturesTypes::Inverse => new_pos_margin /= self.position.entry_price(),
+            };
+            self.margin.set_position_margin(new_pos_margin);
+
             self.margin.change_balance(rpnl);
             self.acc_tracker.log_rpnl(rpnl);
         }

@@ -46,12 +46,12 @@ fn inv_long_market_win_full() {
     assert_eq!(exchange.account().position().size(), 0.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
     assert_eq!(
-        exchange.account().margin().wallet_balance(),
+        round(exchange.account().margin().wallet_balance(), 5),
         round(1.4 - fee_asset1 - fee_asset2, 5)
     );
     assert_eq!(exchange.account().margin().position_margin(), 0.0);
     assert_eq!(
-        exchange.account().margin().available_balance(),
+        round(exchange.account().margin().available_balance(), 5),
         round(1.4 - fee_asset1 - fee_asset2, 5)
     );
 }
@@ -68,7 +68,6 @@ fn inv_long_market_loss_full() {
 
     let o = Order::market(Side::Buy, 800.0).unwrap();
     exchange.submit_order(o).unwrap();
-    let _ = exchange.update_state(1000.0, 1000.0, 1, 1000.0, 1000.0);
 
     assert_eq!(exchange.account().position().size(), 800.0);
     assert_eq!(exchange.account().position().entry_price(), 1000.0);
@@ -86,7 +85,6 @@ fn inv_long_market_loss_full() {
 
     let o = Order::market(Side::Sell, 800.0).unwrap();
     exchange.submit_order(o).unwrap();
-    let _ = exchange.update_state(800.0, 800.0, 3, 800.0, 800.0);
 
     let fee_base0 = fee_taker * 800.0;
     let fee_asset0 = fee_base0 / 1000.0;

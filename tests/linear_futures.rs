@@ -36,7 +36,13 @@ fn lin_long_market_win_full() {
     assert_eq!(exchange.account().position().size(), 0.0);
     assert_eq!(exchange.account().position().entry_price(), 100.0);
     assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
-    assert_eq!(exchange.account().margin().wallet_balance(), 1499.1);
+    assert_eq!(
+        round(exchange.account().margin().wallet_balance(), 1),
+        1499.1
+    );
     assert_eq!(exchange.account().margin().position_margin(), 0.0);
-    assert_eq!(exchange.account().margin().available_balance(), 1499.1);
+    assert_eq!(
+        round(exchange.account().margin().available_balance(), 1),
+        1499.1
+    );
 }

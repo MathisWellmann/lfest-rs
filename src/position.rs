@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Describes the position information of the account
 pub struct Position {
     /// The position size
-    /// denoted in BASE currency if using linear futures
+    /// denoted in BASE currency if using linear futures,
     /// denoted in QUOTE currency if using inverse futures
     size: f64,
     /// The entry price of the position
@@ -56,8 +56,8 @@ impl Position {
     }
 
     /// Return the position size
-    /// denoted in BASE currency if using linear futures
-    //  denoted in QUOTE currency if using inverse futures
+    /// denoted in BASE currency if using linear futures,
+    /// denoted in QUOTE currency if using inverse futures
     #[inline(always)]
     pub fn size(&self) -> f64 {
         self.size
@@ -76,8 +76,8 @@ impl Position {
     }
 
     /// Return the positions unrealized profit and loss
-    /// denoted in QUOTE when using linear futures
-    ///  denoted in BASE when using inverse futures
+    /// denoted in QUOTE when using linear futures,
+    /// denoted in BASE when using inverse futures
     #[inline(always)]
     pub fn unrealized_pnl(&self) -> f64 {
         self.unrealized_pnl

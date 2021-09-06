@@ -66,7 +66,7 @@ impl Margin {
 
     /// Return the wallet balance of account
     /// denoted in QUOTE currency when using linear futures
-    //  denoted in BASE currency when using inverse futures
+    /// denoted in BASE currency when using inverse futures
     #[inline(always)]
     pub fn wallet_balance(&self) -> f64 {
         self.wallet_balance
@@ -127,6 +127,8 @@ impl Margin {
 
         self.wallet_balance += delta;
         self.available_balance += delta;
+
+        debug!("change_balance: self: {:?}", self);
 
         debug_assert!(self.wallet_balance >= 0.0);
         debug_assert!(self.available_balance >= 0.0);

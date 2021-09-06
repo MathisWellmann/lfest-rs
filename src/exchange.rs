@@ -173,8 +173,8 @@ impl Exchange {
             FuturesTypes::Linear => fee *= price,
             FuturesTypes::Inverse => fee /= price,
         }
-        self.account.deduce_fees(fee);
         self.account.change_position(side, amount, price);
+        self.account.deduce_fees(fee);
     }
 
     /// Execute a limit order, once triggered

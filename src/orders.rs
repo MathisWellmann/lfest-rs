@@ -12,7 +12,7 @@ pub struct Order {
     /// the limit order price
     limit_price: Option<f64>,
     /// order size
-    /// denoted in BASE currency if using linear futures
+    /// denoted in BASE currency if using linear futures,
     /// denoted in QUOTE currency if using inverse futures
     size: f64,
     /// order side
@@ -26,8 +26,8 @@ impl Order {
     /// # Arguments
     /// - side: either buy or sell
     /// - limit_price: price to execute at or better
-    /// - size: denoted in BASE currency when using linear futures
-    //          denoted in QUOTE currency when using inverse futures
+    /// - size: denoted in BASE currency when using linear futures,
+    //  denoted in QUOTE currency when using inverse futures
     /// # Returns
     /// Either a successfully created order or an OrderError
     #[must_use]
@@ -52,8 +52,8 @@ impl Order {
     /// Create a new market order
     /// # Arguments
     /// - side: either buy or sell
-    /// - size: denoted in BASE currency when using linear futures
-    ///         denoted in QUOTE currency when using inverse futures
+    /// - size: denoted in BASE currency when using linear futures,
+    /// denoted in QUOTE currency when using inverse futures
     /// # Returns
     /// Either a successfully created order or an OrderError
     #[must_use]
@@ -97,7 +97,7 @@ impl Order {
     }
 
     /// Size of Order
-    /// denoted in BASE currency if using linear futures
+    /// denoted in BASE currency if using linear futures,
     /// denoted in QUOTE currency if using inverse futures
     #[inline(always)]
     pub fn size(&self) -> f64 {
