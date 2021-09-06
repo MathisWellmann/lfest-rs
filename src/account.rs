@@ -183,7 +183,7 @@ impl Account {
             }
         }
         // assign order margin
-        let om = credit; // - debit;
+        let om = credit - debit;
         debug_assert!(om >= 0.0);
         // assigning order margin and closing out position are two different things
 

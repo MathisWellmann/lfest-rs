@@ -160,24 +160,23 @@ impl Validator {
         let (mut debit, mut credit) = match order.side() {
             Side::Buy => (
                 min(
-                    order.size() - acc.open_limit_sell_size(),
+                    order.size(), // - acc.open_limit_sell_size(),
                     acc.open_limit_sell_size() + min(acc.position().size(), 0.0).abs(),
                 ),
                 max(
                     0.0,
                     order.size()
-                        - acc.open_limit_sell_size()
                         - min(acc.position().size(), 0.0).abs(),
                 ),
             ),
             Side::Sell => (
                 min(
-                    order.size() - acc.open_limit_buy_size(),
+                    order.size(), // - acc.open_limit_buy_size(),
                     acc.open_limit_buy_size() + max(acc.position().size(), 0.0),
                 ),
                 max(
                     0.0,
-                    order.size() - acc.open_limit_buy_size() - max(acc.position().size(), 0.0),
+                    order.size() - max(acc.position().size(), 0.0),
                 ),
             ),
         };
@@ -221,7 +220,7 @@ impl Validator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::FuturesTypes;
+    use crate::{FuturesTypes, round};
 
     #[test]
     fn validate_inverse_futures_market_order_without_position() {
@@ -515,6 +514,8 @@ mod tests {
             let o = Order::limit(Side::Sell, 101.0, 50.0 * l).unwrap();
             let (debit, credit) = validator.validate(&o, &acc).unwrap();
             acc.append_limit_order(o, debit, credit);
+            let fee = (0.0002 * 50.0 * l / 100.0) + (0.0002 * 50.0 * l / 100.0);
+            assert_eq!(round(acc.margin().order_margin(), 4), 0.5 + fee);
 
             let o = Order::limit(Side::Buy, 100.0, 49.0 * l).unwrap();
             validator.validate(&o, &acc).unwrap();
@@ -528,5 +529,28 @@ mod tests {
             let o = Order::limit(Side::Sell, 101.0, 51.0 * l).unwrap();
             assert!(validator.validate(&o, &acc).is_err());
         }
+    }
+
+    #[test]
+    #[should_panic]
+    // basically you should not be able to endlessly add both buy and sell orders
+    fn validate_inverse_futures_limit_order_with_open_orders_mixed_panic() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
+        let futures_type = FuturesTypes::Inverse;
+        let mut validator = Validator::new(0.0002, 0.0006, futures_type);
+        validator.update(100.0, 101.0);
+        let mut acc = Account::new(1.0, 1.0, futures_type);
+
+        for i in 0..100 {
+            // with mixed limit orders
+            let o = Order::limit(Side::Buy, 100.0, 50.0).unwrap();
+            let (debit, credit) = validator.validate(&o, &acc).unwrap();
+            acc.append_limit_order(o, debit, credit);
+            let o = Order::limit(Side::Sell, 101.0, 50.0).unwrap();
+            let (debit, credit) = validator.validate(&o, &acc).unwrap();
+            acc.append_limit_order(o, debit, credit);
+        }
+        debug!("final account olbs: {}, olss: {:?}", acc.open_limit_buy_size(), acc.open_limit_sell_size());
     }
 }
