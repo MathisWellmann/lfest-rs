@@ -6,15 +6,11 @@
 lfest-rs is a blazingly fast simulated exchange capable of leveraged positions.
  It gets fed external data either as a trade or a candle to update the internal state
   and check for order execution. For simplicity's sake (and performance) the exchange does not use an order book
- It also cross-leverages positions so the whole margin balance is used as collateral.
- 
+
 ### Order Types
 The supported order types are:
 - market        - aggressively execute against the best bid / ask
 - limit         - passively place an order into the orderbook
-
-Currently limit and stop_market orders may not work as expected. 
-I advise you to only use market orders or fix limit and stop_order margin calculation and create a pull request.
 
 ### Performance Metrics:
 The following performance metrics are available through AccTracker struct:
