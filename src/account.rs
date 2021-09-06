@@ -317,16 +317,24 @@ impl Account {
     }
 
     #[inline(always)]
-    pub(crate) fn open_limit_buy_size(&self) -> f64 { self.open_limit_buy_size }
+    pub(crate) fn open_limit_buy_size(&self) -> f64 {
+        self.open_limit_buy_size
+    }
 
     #[inline(always)]
-    pub(crate) fn open_limit_sell_size(&self) -> f64 { self.open_limit_sell_size }
+    pub(crate) fn open_limit_sell_size(&self) -> f64 {
+        self.open_limit_sell_size
+    }
 
     #[inline(always)]
-    pub(crate) fn min_limit_buy_price(&self) -> f64 { self.min_limit_buy_price }
+    pub(crate) fn min_limit_buy_price(&self) -> f64 {
+        self.min_limit_buy_price
+    }
 
     #[inline(always)]
-    pub(crate) fn max_limit_sell_price(&self) -> f64 { self.max_limit_sell_price }
+    pub(crate) fn max_limit_sell_price(&self) -> f64 {
+        self.max_limit_sell_price
+    }
 }
 
 #[cfg(test)]
