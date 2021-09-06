@@ -105,7 +105,7 @@ impl Margin {
 
     /// Set the position margin by a given delta and adjust available balance accordingly
     pub(crate) fn set_position_margin(&mut self, val: f64) {
-        trace!("set_position_margin({})", val);
+        debug!("set_position_margin({})", val);
 
         debug_assert!(val.is_finite());
         debug_assert!(val >= 0.0);

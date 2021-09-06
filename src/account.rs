@@ -24,7 +24,7 @@ pub struct Account {
 
 impl Account {
     pub fn new(leverage: f64, starting_balance: f64, futures_type: FuturesTypes) -> Self {
-        let position = Position::new(leverage);
+        let position = Position::new_init(leverage);
         let margin = Margin::new_init(starting_balance);
         let acc_tracker = AccTracker::new(starting_balance);
         Self {
@@ -249,7 +249,7 @@ impl Account {
 
     /// Changes the position by a given delta while changing margin accordingly
     pub(crate) fn change_position(&mut self, side: Side, size: f64, exec_price: f64) {
-        trace!(
+        debug!(
             "account: change_position(side: {:?}, size: {}, exec_price: {})",
             side,
             size,
