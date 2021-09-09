@@ -125,8 +125,6 @@ impl Exchange {
     /// Returns the order with timestamp and id filled in or OrderError
     #[must_use]
     pub fn submit_order(&mut self, mut order: Order) -> Result<Order, OrderError> {
-        let (debit, credit) = self.validator.validate(&order, &self.account)?;
-
         // assign unique order id
         order.set_id(self.next_order_id);
         self.next_order_id += 1;
@@ -136,12 +134,16 @@ impl Exchange {
         match order.order_type() {
             OrderType::Market => {
                 // immediately execute market order
+                let (debit, credit) = self
+                    .validator
+                    .validate_market_order(&order, &self.account)?;
                 self.execute_market(order.side(), order.size());
 
                 Ok(order)
             }
             _ => {
-                self.account.append_limit_order(order, debit, credit);
+                let order_margin = self.validator.validate_limit_order(&order, &self.account)?;
+                self.account.append_limit_order(order, order_margin);
 
                 Ok(order)
             }

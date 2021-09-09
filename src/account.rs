@@ -155,10 +155,10 @@ impl Account {
     }
 
     /// Append a new limit order as active order
-    pub(crate) fn append_limit_order(&mut self, order: Order, debit: f64, credit: f64) {
+    pub(crate) fn append_limit_order(&mut self, order: Order, order_margin: f64) {
         debug!(
-            "append_limit_order: order: {:?}, debit: {}, credit: {}",
-            order, debit, credit
+            "append_limit_order: order: {:?}, order_margin: {}",
+            order, order_margin
         );
 
         let limit_price = order.limit_price().unwrap();
@@ -182,13 +182,10 @@ impl Account {
                 }
             }
         }
-        // assign order margin
-        let om = credit - debit;
-        debug_assert!(om >= 0.0);
         // assigning order margin and closing out position are two different things
 
-        self.order_margins.insert(order.id(), om);
-        let new_om = self.margin.order_margin() + om;
+        self.order_margins.insert(order.id(), order_margin);
+        let new_om = self.margin.order_margin() + order_margin;
         self.margin.set_order_margin(new_om);
 
         self.acc_tracker.log_limit_order_submission();
@@ -359,8 +356,8 @@ mod tests {
         validator.update(100.0, 101.0);
 
         let o = Order::limit(Side::Buy, 100.0, 25.0).unwrap();
-        let (debit, credit) = validator.validate(&o, &acc).unwrap();
-        acc.append_limit_order(o, debit, credit);
+        let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
+        acc.append_limit_order(o, order_margin);
         assert_eq!(acc.open_limit_buy_size, 25.0);
         assert_eq!(acc.open_limit_sell_size, 0.0);
         assert_eq!(acc.min_limit_buy_price, 100.0);
@@ -369,8 +366,8 @@ mod tests {
         assert_eq!(acc.margin().available_balance(), 0.75);
 
         let o = Order::limit(Side::Sell, 100.0, 25.0).unwrap();
-        let (debit, credit) = validator.validate(&o, &acc).unwrap();
-        acc.append_limit_order(o, debit, credit);
+        let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
+        acc.append_limit_order(o, order_margin);
         assert_eq!(acc.open_limit_buy_size, 25.0);
         assert_eq!(acc.open_limit_sell_size, 25.0);
         assert_eq!(acc.min_limit_buy_price, 100.0);
@@ -379,8 +376,8 @@ mod tests {
         assert_eq!(acc.margin().available_balance(), 0.75);
 
         let o = Order::limit(Side::Buy, 90.0, 25.0).unwrap();
-        let (debit, credit) = validator.validate(&o, &acc).unwrap();
-        acc.append_limit_order(o, debit, credit);
+        let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
+        acc.append_limit_order(o, order_margin);
         assert_eq!(acc.open_limit_buy_size, 50.0);
         assert_eq!(acc.open_limit_sell_size, 25.0);
         assert_eq!(acc.min_limit_buy_price, 90.0);
@@ -390,8 +387,8 @@ mod tests {
         // assert_eq!(account.margin().available_balance(), 0.75);
 
         let o = Order::limit(Side::Sell, 110.0, 25.0).unwrap();
-        let (debit, credit) = validator.validate(&o, &acc).unwrap();
-        acc.append_limit_order(o, debit, credit);
+        let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
+        acc.append_limit_order(o, order_margin);
         assert_eq!(acc.open_limit_buy_size, 50.0);
         assert_eq!(acc.open_limit_sell_size, 50.0);
         assert_eq!(acc.min_limit_buy_price, 90.0);
@@ -408,8 +405,8 @@ mod tests {
         validator.update(900.0, 901.0);
 
         let o = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
-        let (debit, credit) = validator.validate(&o, &account).unwrap();
-        account.append_limit_order(o, debit, credit);
+        let order_margin = validator.validate_limit_order(&o, &account).unwrap();
+        account.append_limit_order(o, order_margin);
         assert_eq!(account.active_limit_orders().len(), 1);
         assert_eq!(account.margin().wallet_balance(), 1.0);
         assert_eq!(account.margin().position_margin(), 0.0);
@@ -428,8 +425,8 @@ mod tests {
         validator.update(900.0, 901.0);
 
         let o = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
-        let (debit, credit) = validator.validate(&o, &account).unwrap();
-        account.append_limit_order(o, debit, credit);
+        let order_margin = validator.validate_limit_order(&o, &account).unwrap();
+        account.append_limit_order(o, order_margin);
         assert_eq!(account.active_limit_orders().len(), 1);
         assert_eq!(account.margin().wallet_balance(), 1.0);
         assert_eq!(account.margin().position_margin(), 0.0);
@@ -445,7 +442,7 @@ mod tests {
     }
 
     #[test]
-    fn account_change_position_size_inverse_future() {
+    fn account_change_position_inverse_future() {
         let mut acc = Account::new(1.0, 1.0, FuturesTypes::Inverse);
 
         acc.change_position(Side::Buy, 100.0, 200.0);
@@ -497,5 +494,10 @@ mod tests {
         assert_eq!(acc.position().entry_price(), 200.0);
         assert_eq!(acc.position().leverage(), 1.0);
         assert_eq!(acc.position().unrealized_pnl(), 0.0);
+    }
+
+    #[test]
+    fn account_change_position_linear_futures() {
+        // TODO:
     }
 }

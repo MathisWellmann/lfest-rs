@@ -18,7 +18,10 @@ fn limit_orders_only() {
     let o = Order::limit(Side::Buy, 100.0, 9.9).unwrap();
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().margin().order_margin(), 990.198);
-    assert_eq!(round(exchange.account().margin().available_balance(), 3), 9.802);
+    assert_eq!(
+        round(exchange.account().margin().available_balance(), 3),
+        9.802
+    );
 
     let (exec_orders, liq) = exchange.update_state(100.0, 100.0, 1, 100.0, 100.0);
     assert!(!liq);
@@ -32,7 +35,8 @@ fn limit_orders_only() {
     assert_eq!(exchange.account().margin().wallet_balance(), 999.802);
     assert_eq!(exchange.account().margin().position_margin(), 990.0);
     assert_eq!(exchange.account().margin().order_margin(), 0.0);
-    assert_eq!(round(exchange.account().margin().available_balance(), 3), 9.802);
-
-
+    assert_eq!(
+        round(exchange.account().margin().available_balance(), 3),
+        9.802
+    );
 }
