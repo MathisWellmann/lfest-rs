@@ -9,7 +9,7 @@ pub struct Exchange {
     bid: f64,
     ask: f64,
     next_order_id: u64,
-    step: u64, // used for synhcronizing orders
+    step: u64, // used for synchronizing orders
     high: f64,
     low: f64,
 }
@@ -56,6 +56,12 @@ impl Exchange {
     #[inline(always)]
     pub fn ask(&self) -> f64 {
         self.ask
+    }
+
+    /// Return the current time step
+    #[inline(always)]
+    pub fn current_step(&self) -> u64 {
+        self.step
     }
 
     /// Return a reference to Account
