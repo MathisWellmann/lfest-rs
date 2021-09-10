@@ -1,5 +1,5 @@
 use crate::acc_tracker::AccTracker;
-use crate::{FuturesTypes, Margin, Order, Position, Side};
+use crate::{FuturesTypes, Margin, Order, Position, Side, Validator};
 use hashbrown::HashMap;
 
 #[derive(Debug, Clone)]
@@ -9,10 +9,7 @@ pub struct Account {
     margin: Margin,
     position: Position,
     acc_tracker: AccTracker,
-    // TODO: merge this field with order_margins into active_limit_orders of Type HashMap<u64, (Order, f64)>
-    active_limit_orders: Vec<Order>,
-    // maps the order id to reserved margin
-    order_margins: HashMap<u64, f64>,
+    active_limit_orders: HashMap<u64, Order>,
     executed_orders: Vec<Order>,
     // used for calculating hedged order size for order margin calculation
     open_limit_buy_size: f64,
@@ -32,8 +29,7 @@ impl Account {
             margin,
             position,
             acc_tracker,
-            active_limit_orders: vec![],
-            order_margins: HashMap::new(),
+            active_limit_orders: HashMap::new(),
             executed_orders: vec![],
             open_limit_buy_size: 0.0,
             open_limit_sell_size: 0.0,
@@ -90,7 +86,7 @@ impl Account {
 
     /// Return the currently active limit orders
     #[inline(always)]
-    pub fn active_limit_orders(&self) -> &Vec<Order> {
+    pub fn active_limit_orders(&self) -> &HashMap<u64, Order> {
         &self.active_limit_orders
     }
 
@@ -103,21 +99,15 @@ impl Account {
     /// Cancel an active order
     /// returns Some order if successful with given order_id
     pub fn cancel_order(&mut self, order_id: u64) -> Option<Order> {
-        for (i, o) in self.active_limit_orders.iter().enumerate() {
-            if o.id() == order_id {
-                let old_order = self.active_limit_orders.remove(i);
-                match old_order.side() {
-                    Side::Buy => self.open_limit_buy_size -= old_order.size(),
-                    Side::Sell => self.open_limit_sell_size -= old_order.size(),
-                }
-                return Some(old_order);
-            }
-        }
+        let removed_order = match self.active_limit_orders.remove(&order_id) {
+            None => return None,
+            Some(o) => o,
+        };
 
         // re compute min and max prices for open orders
         self.min_limit_buy_price = 0.0;
         self.max_limit_sell_price = 0.0;
-        for o in self.active_limit_orders.iter() {
+        for (_, o) in self.active_limit_orders.iter() {
             let limit_price = o.limit_price().unwrap();
             match o.side() {
                 Side::Buy => {
@@ -182,55 +172,72 @@ impl Account {
                 }
             }
         }
-        // assigning order margin and closing out position are two different things
 
-        self.order_margins.insert(order.id(), order_margin);
         let new_om = self.margin.order_margin() + order_margin;
         self.margin.set_order_margin(new_om);
 
         self.acc_tracker.log_limit_order_submission();
-        self.active_limit_orders.push(order);
+        self.active_limit_orders.insert(order.id(), order);
     }
 
     /// Remove the assigned order margin for a given order
-    pub(crate) fn free_order_margin(&mut self, order_id: u64) {
-        debug!("free_order_margin: {}", order_id);
-
-        let om: f64 = *self.order_margins.get(&order_id).unwrap();
-        let new_om = self.margin.order_margin() - om;
-        self.margin.set_order_margin(new_om);
-    }
-
-    /// Finalize an executed limit order
-    pub(crate) fn finalize_limit_order(&mut self, order_idx: usize) {
-        let mut exec_order = self.active_limit_orders.remove(order_idx);
-
-        exec_order.mark_executed();
-
-        // free order margin
+    #[inline]
+    pub(crate) fn remove_executed_order_from_order_margin_calculation(
+        &mut self,
+        exec_order: &Order,
+        fee_maker: f64,
+    ) {
         match exec_order.side() {
             Side::Buy => self.open_limit_buy_size -= exec_order.size(),
             Side::Sell => self.open_limit_sell_size -= exec_order.size(),
         }
+        debug_assert!(self.open_limit_buy_size >= 0.0);
+        debug_assert!(self.open_limit_sell_size >= 0.0);
+
         // re-calculate min and max price
         self.min_limit_buy_price = if self.active_limit_orders.is_empty() {
             0.0
         } else {
             self.active_limit_orders
                 .iter()
-                .filter(|o| o.side() == Side::Buy)
-                .map(|o| o.limit_price().unwrap())
-                .sum()
+                .filter(|(_, o)| o.side() == Side::Buy)
+                .map(|(_, o)| o.limit_price().unwrap())
+                .fold(f64::NAN, f64::min)
         };
         self.max_limit_sell_price = if self.active_limit_orders.is_empty() {
             0.0
         } else {
             self.active_limit_orders
                 .iter()
-                .filter(|o| o.side() == Side::Sell)
-                .map(|o| o.limit_price().unwrap())
-                .sum()
+                .filter(|(_, o)| o.side() == Side::Sell)
+                .map(|(_, o)| o.limit_price().unwrap())
+                .fold(f64::NAN, f64::max)
         };
+
+        self.active_limit_orders.remove(&exec_order.id());
+
+        let mut new_om: f64 = 0.0;
+        let mut mock_acc = self.clone();
+        let mut validator = Validator::new(fee_maker, 0.0, self.futures_type);
+        let price = exec_order
+            .limit_price()
+            .expect("Only limit orders should be passed into this method");
+        // rough assumption which may be wrong
+        validator.update(price, price);
+        for (_, o) in self.active_limit_orders.iter() {
+            let order_margin = validator
+                .validate_limit_order(o, &mock_acc)
+                .expect("Already submitter limit orders have to be valid");
+            mock_acc.append_limit_order(*o, order_margin);
+            new_om += order_margin;
+        }
+
+        self.margin.set_order_margin(new_om);
+    }
+
+    /// Finalize an executed limit order
+    pub(crate) fn finalize_limit_order(&mut self, mut exec_order: Order) {
+        exec_order.mark_executed();
 
         self.acc_tracker.log_limit_order_fill();
         self.executed_orders.push(exec_order);

@@ -91,28 +91,29 @@ impl Margin {
     }
 
     /// Set a new order margin
-    pub(crate) fn set_order_margin(&mut self, order_margin: f64) {
-        debug_assert!(order_margin >= 0.0);
+    #[inline]
+    pub(crate) fn set_order_margin(&mut self, om: f64) {
+        debug_assert!(om >= 0.0);
+        debug_assert!(om.is_finite());
 
-        self.order_margin = order_margin;
+        debug!("set_order_margin: om: {}, self: {:?}", om, self);
+
+        self.order_margin = om;
         self.available_balance = self.wallet_balance - self.position_margin - self.order_margin;
-
-        debug!("set_order_margin: self: {:?}", self);
 
         debug_assert!(self.available_balance >= 0.0);
     }
 
     /// Set the position margin by a given delta and adjust available balance accordingly
+    #[inline]
     pub(crate) fn set_position_margin(&mut self, val: f64) {
-        debug!("set_position_margin({})", val);
+        debug!("set_position_margin({}), self: {:?}", val, self);
 
         debug_assert!(val.is_finite());
         debug_assert!(val >= 0.0);
 
         self.position_margin = val;
         self.available_balance = self.wallet_balance - self.order_margin - self.position_margin;
-
-        debug!("set_position_margin: self: {:?}", self);
 
         debug_assert!(self.position_margin >= 0.0);
         debug_assert!(self.position_margin <= self.wallet_balance);
@@ -121,13 +122,14 @@ impl Margin {
     }
 
     /// Change the balance by a given delta e.g. from realizing profit or loss
+    #[inline]
     pub(crate) fn change_balance(&mut self, delta: f64) {
         debug_assert!(delta.is_finite());
 
+        debug!("change_balance: delta: {}, self: {:?}", delta, self);
+
         self.wallet_balance += delta;
         self.available_balance += delta;
-
-        debug!("change_balance: self: {:?}", self);
 
         debug_assert!(self.wallet_balance >= 0.0);
         debug_assert!(self.available_balance >= 0.0);

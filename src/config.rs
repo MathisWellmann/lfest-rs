@@ -21,6 +21,7 @@ impl Config {
     /// # Returns
     /// Either a valid Config or an Error
     #[must_use]
+    #[inline]
     pub fn new(
         fee_maker: f64,
         fee_taker: f64,

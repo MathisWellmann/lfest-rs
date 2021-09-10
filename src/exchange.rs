@@ -191,8 +191,8 @@ impl Exchange {
 
         let price = o.limit_price().unwrap();
 
-        // free up the associated order margin first
-        self.account.free_order_margin(o.id());
+        self.account
+            .remove_executed_order_from_order_margin_calculation(&o, self.config.fee_maker());
 
         let mut fee = self.config.fee_maker() * o.size();
         match self.config.futures_type() {
@@ -201,6 +201,8 @@ impl Exchange {
         }
         self.account.deduce_fees(fee);
         self.account.change_position(o.side(), o.size(), price);
+
+        self.account.finalize_limit_order(o);
     }
 
     /// Perform a liquidation of the account
@@ -217,24 +219,31 @@ impl Exchange {
     /// Check if any active orders have been triggered by the most recent price action
     /// method is called after new external data has been consumed
     fn check_orders(&mut self) {
-        for i in 0..self.account.active_limit_orders().len() {
-            match self.account.active_limit_orders()[i].order_type() {
-                OrderType::Limit => self.handle_limit_order(i),
-                _ => panic!("there should only be limit orders in active_limit_orders"),
-            }
+        let keys: Vec<u64> = self
+            .account
+            .active_limit_orders()
+            .iter()
+            .map(|(i, _)| *i)
+            .collect();
+        for i in keys {
+            self.handle_limit_order(i);
         }
     }
 
     /// Handle limit order trigger and execution
-    fn handle_limit_order(&mut self, order_idx: usize) {
-        let o: Order = self.account.active_limit_orders()[order_idx];
+    fn handle_limit_order(&mut self, order_id: u64) {
+        let o = self
+            .account
+            .active_limit_orders()
+            .get(&order_id)
+            .expect("This order should be in HashMap for active limit orders");
         debug!("handle_limit_order: o: {:?}", o);
         let limit_price = o.limit_price().unwrap();
         match o.side() {
             Side::Buy => {
                 // use candle information to specify execution
                 if self.low <= limit_price {
-                    self.execute_limit(o);
+                    self.execute_limit(*o)
                 } else {
                     return;
                 }
@@ -242,12 +251,11 @@ impl Exchange {
             Side::Sell => {
                 // use candle information to specify execution
                 if self.high >= limit_price {
-                    self.execute_limit(o);
+                    self.execute_limit(*o)
                 } else {
                     return;
                 }
             }
         }
-        self.account.finalize_limit_order(order_idx);
     }
 }
