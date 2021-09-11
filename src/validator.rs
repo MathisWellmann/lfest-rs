@@ -1,3 +1,4 @@
+use crate::limit_order_margin::order_margin;
 use crate::{max, min, Account, FuturesTypes, Order, OrderError, OrderType, Side};
 
 #[derive(Clone, Debug, Default)]
@@ -155,49 +156,73 @@ impl Validator {
     /// debited and credited account balance delta
     #[must_use]
     fn limit_order_margin_cost(&self, order: &Order, acc: &Account) -> f64 {
-        let b = acc.open_limit_buy_size();
-        let s = acc.open_limit_sell_size();
-        let p = acc.position().size();
-        let mut order_margin = match order.side() {
-            Side::Buy => max(
-                min(
-                    order.size() - min(s - b - p, s) - max(min(p, 0.0).abs() - b, 0.0),
-                    order.size(),
-                ),
-                0.0,
-            ),
-            Side::Sell => max(0.0, min(order.size(), order.size() + s - b - p)),
-        };
-        order_margin /= acc.position().leverage();
-
-        let mut fee = self.fee_maker * order.size();
-
-        let price = order.limit_price().unwrap();
-        match self.futures_type {
-            FuturesTypes::Linear => {
-                // the values have to be converted from denoted in BASE currency
-                // to being denoted in QUOTE currency
-                fee *= price;
-                order_margin *= price;
-            }
-            FuturesTypes::Inverse => {
-                // the values have to be converted from denoted in QUOTE currency
-                // to being denoted in BASE currency
-                fee /= price;
-                order_margin /= price;
-            }
-        }
-
-        debug!(
-            "limit_order_margin_cost: order: {:?}, acc.position: {:?}, olss: {}, osbs: {}, order_margin: {}",
-            order,
-            acc.position(),
-            acc.open_limit_sell_size(),
-            acc.open_limit_buy_size(),
-            order_margin,
+        let mut orders = acc.active_limit_orders().clone();
+        debug!("active_limit_orders: {:?}", orders);
+        orders.insert(order.id(), *order);
+        debug!("orders: {:?}", orders);
+        let needed_order_margin = order_margin(
+            orders.values(),
+            acc.position().size(),
+            acc.position().entry_price(),
+            self.futures_type,
+            acc.position().leverage(),
+            self.fee_maker,
         );
 
-        order_margin + fee
+        // get the additional needed difference
+        let diff = needed_order_margin - acc.margin().order_margin();
+        debug!(
+            "needed_order_margin: {}, acc_om: {}, diff: {}",
+            needed_order_margin,
+            acc.margin().order_margin(),
+            diff
+        );
+
+        diff
+
+        // let b = acc.open_limit_buy_size();
+        // let s = acc.open_limit_sell_size();
+        // let p = acc.position().size();
+        // let mut order_margin = match order.side() {
+        //     Side::Buy => max(
+        //         min(
+        //             order.size() - min(s - b - p, s) - max(min(p, 0.0).abs() - b, 0.0),
+        //             order.size(),
+        //         ),
+        //         0.0,
+        //     ),
+        //     Side::Sell => max(0.0, min(order.size(), order.size() + s - b - p)),
+        // };
+        // order_margin /= acc.position().leverage();
+        //
+        // let mut fee = self.fee_maker * order.size();
+        //
+        // let price = order.limit_price().unwrap();
+        // match self.futures_type {
+        //     FuturesTypes::Linear => {
+        //         // the values have to be converted from denoted in BASE currency
+        //         // to being denoted in QUOTE currency
+        //         fee *= price;
+        //         order_margin *= price;
+        //     }
+        //     FuturesTypes::Inverse => {
+        //         // the values have to be converted from denoted in QUOTE currency
+        //         // to being denoted in BASE currency
+        //         fee /= price;
+        //         order_margin /= price;
+        //     }
+        // }
+        //
+        // debug!(
+        //     "limit_order_margin_cost: order: {:?}, acc.position: {:?}, olss: {}, osbs: {}, order_margin: {}",
+        //     order,
+        //     acc.position(),
+        //     acc.open_limit_sell_size(),
+        //     acc.open_limit_buy_size(),
+        //     order_margin,
+        // );
+        //
+        // order_margin + fee
     }
 }
 
@@ -302,7 +327,8 @@ mod tests {
 
             // with buy limit order
             let mut acc = Account::new(leverage, 1.0, futures_type);
-            let o = Order::limit(Side::Buy, 100.0, 50.0 * leverage).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 50.0 * leverage).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -320,7 +346,8 @@ mod tests {
 
             // with sell limit order
             let mut acc = Account::new(leverage, 1.0, futures_type);
-            let o = Order::limit(Side::Sell, 100.0, 50.0 * leverage).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 50.0 * leverage).unwrap();
+            o.set_id(2); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -431,7 +458,8 @@ mod tests {
 
             // with open buy order
             let mut acc = Account::new(l, 1.0, futures_type);
-            let o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -462,7 +490,8 @@ mod tests {
 
             // with open sell order
             let mut acc = Account::new(l, 1.0, futures_type);
-            let o = Order::limit(Side::Sell, 101.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 101.0, 50.0 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -493,14 +522,17 @@ mod tests {
 
             // with mixed limit orders
             let mut acc = Account::new(l, 1.0, futures_type);
-            let o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
-            let o = Order::limit(Side::Sell, 101.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 101.0, 50.0 * l).unwrap();
+            o.set_id(2); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
-            let fee = (0.0002 * 50.0 * l / 100.0) + (0.0002 * 50.0 * l / 100.0);
-            assert_eq!(round(acc.margin().order_margin(), 4), 0.5 + fee);
+            // not sure if the fees of both orders should be included in order_margin
+            //let fee = (0.0002 * 50.0 * l / 100.0) + (0.0002 * 50.0 * l / 101.0);
+            //assert_eq!(round(acc.margin().order_margin(), 4), round(0.5 + fee, 4));
 
             let o = Order::limit(Side::Buy, 100.0, 49.0 * l).unwrap();
             validator.validate_limit_order(&o, &acc).unwrap();
@@ -527,12 +559,14 @@ mod tests {
         validator.update(100.0, 101.0);
         let mut acc = Account::new(1.0, 1.0, futures_type);
 
-        for i in 0..100 {
+        for i in (0..100).step_by(2) {
             // with mixed limit orders
-            let o = Order::limit(Side::Buy, 100.0, 50.0).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 50.0).unwrap();
+            o.set_id(i); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
-            let o = Order::limit(Side::Sell, 101.0, 50.0).unwrap();
+            let mut o = Order::limit(Side::Sell, 101.0, 50.0).unwrap();
+            o.set_id(i + 1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
         }
@@ -632,7 +666,8 @@ mod tests {
             debug!("leverage: {}", l);
 
             let mut acc = Account::new(l, 100.0, futures_type);
-            let o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -660,7 +695,8 @@ mod tests {
             debug!("leverage: {}", l);
 
             let mut acc = Account::new(l, 100.0, futures_type);
-            let o = Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -688,10 +724,12 @@ mod tests {
             debug!("leverage: {}", l);
 
             let mut acc = Account::new(l, 100.0, futures_type);
-            let o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
-            let o = Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap();
+            o.set_id(2); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -720,7 +758,8 @@ mod tests {
 
             let mut acc = Account::new(l, 100.0, futures_type);
             acc.change_position(Side::Buy, 0.5 * l, 100.0);
-            let o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -749,7 +788,8 @@ mod tests {
 
             let mut acc = Account::new(l, 100.0, futures_type);
             acc.change_position(Side::Buy, 0.5 * l, 100.0);
-            let o = Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -778,10 +818,12 @@ mod tests {
 
             let mut acc = Account::new(l, 100.0, futures_type);
             acc.change_position(Side::Buy, 0.5 * l, 100.0);
-            let o = Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
-            let o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
+            o.set_id(2); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -810,7 +852,8 @@ mod tests {
 
             let mut acc = Account::new(l, 100.0, futures_type);
             acc.change_position(Side::Sell, 0.5 * l, 100.0);
-            let o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -839,7 +882,8 @@ mod tests {
 
             let mut acc = Account::new(l, 100.0, futures_type);
             acc.change_position(Side::Sell, 0.5 * l, 100.0);
-            let o = Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -868,10 +912,12 @@ mod tests {
 
             let mut acc = Account::new(l, 100.0, futures_type);
             acc.change_position(Side::Sell, 0.5 * l, 100.0);
-            let o = Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
-            let o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
+            o.set_id(2); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -976,7 +1022,8 @@ mod tests {
             debug!("leverage: {}", l);
 
             let mut acc = Account::new(l, 1.0, futures_type);
-            let o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -1004,7 +1051,8 @@ mod tests {
             debug!("leverage: {}", l);
 
             let mut acc = Account::new(l, 1.0, futures_type);
-            let o = Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -1032,10 +1080,12 @@ mod tests {
             debug!("leverage: {}", l);
 
             let mut acc = Account::new(l, 1.0, futures_type);
-            let o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
-            let o = Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap();
+            o.set_id(2); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -1064,7 +1114,8 @@ mod tests {
 
             let mut acc = Account::new(l, 1.0, futures_type);
             acc.change_position(Side::Buy, 50.0 * l, 100.0);
-            let o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -1093,7 +1144,8 @@ mod tests {
 
             let mut acc = Account::new(l, 1.0, futures_type);
             acc.change_position(Side::Buy, 50.0 * l, 100.0);
-            let o = Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -1122,10 +1174,12 @@ mod tests {
 
             let mut acc = Account::new(l, 1.0, futures_type);
             acc.change_position(Side::Buy, 50.0 * l, 100.0);
-            let o = Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
-            let o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            o.set_id(2); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -1154,7 +1208,8 @@ mod tests {
 
             let mut acc = Account::new(l, 1.0, futures_type);
             acc.change_position(Side::Sell, 50.0 * l, 100.0);
-            let o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -1183,7 +1238,8 @@ mod tests {
 
             let mut acc = Account::new(l, 1.0, futures_type);
             acc.change_position(Side::Sell, 50.0 * l, 100.0);
-            let o = Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 
@@ -1212,10 +1268,12 @@ mod tests {
 
             let mut acc = Account::new(l, 1.0, futures_type);
             acc.change_position(Side::Sell, 50.0 * l, 100.0);
-            let o = Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap();
+            o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
-            let o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            let mut o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
+            o.set_id(2); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
             acc.append_limit_order(o, order_margin);
 

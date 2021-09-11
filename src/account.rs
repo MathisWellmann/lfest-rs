@@ -17,6 +17,7 @@ pub struct Account {
     // TODO: remove following two fields
     min_limit_buy_price: f64,
     max_limit_sell_price: f64,
+    starting_balance: f64,
 }
 
 impl Account {
@@ -35,6 +36,7 @@ impl Account {
             open_limit_sell_size: 0.0,
             min_limit_buy_price: 0.0,
             max_limit_sell_price: 0.0,
+            starting_balance,
         }
     }
 
@@ -77,6 +79,7 @@ impl Account {
 
     /// Return recently executed orders
     /// and clear them afterwards
+    #[inline(always)]
     pub(crate) fn executed_orders(&mut self) -> Vec<Order> {
         let exec_orders = self.executed_orders.clone();
         self.executed_orders.clear();
@@ -177,11 +180,16 @@ impl Account {
         self.margin.set_order_margin(new_om);
 
         self.acc_tracker.log_limit_order_submission();
-        self.active_limit_orders.insert(order.id(), order);
+        match self.active_limit_orders.insert(order.id(), order) {
+            None => {}
+            Some(_) => error!(
+                "there already was an order with this id in active_limit_orders. \
+            This should not happen as order id should be incrementing"
+            ),
+        };
     }
 
     /// Remove the assigned order margin for a given order
-    #[inline]
     pub(crate) fn remove_executed_order_from_order_margin_calculation(
         &mut self,
         exec_order: &Order,
@@ -193,6 +201,8 @@ impl Account {
         }
         debug_assert!(self.open_limit_buy_size >= 0.0);
         debug_assert!(self.open_limit_sell_size >= 0.0);
+
+        self.active_limit_orders.remove(&exec_order.id()).unwrap();
 
         // re-calculate min and max price
         self.min_limit_buy_price = if self.active_limit_orders.is_empty() {
@@ -213,24 +223,7 @@ impl Account {
                 .map(|(_, o)| o.limit_price().unwrap())
                 .fold(f64::NAN, f64::max)
         };
-
-        self.active_limit_orders.remove(&exec_order.id());
-
         let mut new_om: f64 = 0.0;
-        let mut mock_acc = self.clone();
-        let mut validator = Validator::new(fee_maker, 0.0, self.futures_type);
-        let price = exec_order
-            .limit_price()
-            .expect("Only limit orders should be passed into this method");
-        // rough assumption which may be wrong
-        validator.update(price, price);
-        for (_, o) in self.active_limit_orders.iter() {
-            let order_margin = validator
-                .validate_limit_order(o, &mock_acc)
-                .expect("Already submitter limit orders have to be valid");
-            mock_acc.append_limit_order(*o, order_margin);
-            new_om += order_margin;
-        }
 
         self.margin.set_order_margin(new_om);
     }

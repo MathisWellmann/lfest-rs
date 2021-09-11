@@ -39,4 +39,42 @@ fn limit_orders_only() {
         round(exchange.account().margin().available_balance(), 3),
         9.802
     );
+
+    let o = Order::limit(Side::Sell, 105.1, 9.9).unwrap();
+    exchange.submit_order(o).unwrap();
+    assert_eq!(
+        round(exchange.account().margin().order_margin(), 6),
+        0.208098
+    );
+
+    let (exec_orders, liq) = exchange.update_state(106.0, 106.1, 2, 106.1, 106.0);
+    assert!(!liq);
+    assert!(!exec_orders.is_empty());
+
+    assert_eq!(exchange.account().position().size(), 0.0);
+    assert_eq!(exchange.account().margin().position_margin(), 0.0);
+    assert_eq!(exchange.account().margin().order_margin(), 0.0);
+}
+
+#[test]
+fn limit_orders_2() {
+    if let Err(_) = pretty_env_logger::try_init() {}
+
+    let config = Config::new(0.0002, 0.0006, 100.0, 1.0, FuturesTypes::Linear).unwrap();
+
+    let mut exchange = Exchange::new(config);
+
+    let (exec_orders, liq) = exchange.update_state(100.0, 100.1, 0, 100.1, 100.0);
+    assert!(!liq);
+    assert!(exec_orders.is_empty());
+
+    let o = Order::limit(Side::Sell, 100.1, 0.75).unwrap();
+    exchange.submit_order(o).unwrap();
+
+    let o = Order::limit(Side::Buy, 100.0, 0.5).unwrap();
+    exchange.submit_order(o).unwrap();
+
+    let (exec_orders, liq) = exchange.update_state(99.0, 99.1, 0, 99.1, 99.0);
+    assert!(!liq);
+    assert_eq!(exec_orders.len(), 1);
 }

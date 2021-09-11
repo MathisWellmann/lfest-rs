@@ -16,6 +16,7 @@ mod config;
 mod errors;
 mod exchange;
 mod futures_type;
+mod limit_order_margin;
 mod margin;
 mod orders;
 mod position;
