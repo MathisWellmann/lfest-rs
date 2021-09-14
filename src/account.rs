@@ -102,8 +102,12 @@ impl Account {
     /// Cancel an active order
     /// returns Some order if successful with given order_id
     pub fn cancel_order(&mut self, order_id: u64) -> Option<Order> {
+        debug!("cancel_order: {}", order_id);
         let removed_order = match self.active_limit_orders.remove(&order_id) {
-            None => return None,
+            None => {
+                debug!("order with id {} not found in active limit orders", order_id);
+                return None
+            },
             Some(o) => o,
         };
 
@@ -139,6 +143,8 @@ impl Account {
 
     /// Cancel all active orders
     pub fn cancel_all_orders(&mut self) {
+        debug!("cancel_all_orders");
+
         self.margin.set_order_margin(0.0);
         self.open_limit_buy_size = 0.0;
         self.open_limit_sell_size = 0.0;

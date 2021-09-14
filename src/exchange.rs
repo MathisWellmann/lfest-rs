@@ -131,6 +131,8 @@ impl Exchange {
     /// Returns the order with timestamp and id filled in or OrderError
     #[must_use]
     pub fn submit_order(&mut self, mut order: Order) -> Result<Order, OrderError> {
+        debug!("submit_order: {:?}", order);
+
         // assign unique order id
         order.set_id(self.next_order_id);
         self.next_order_id += 1;

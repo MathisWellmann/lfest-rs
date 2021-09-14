@@ -20,6 +20,7 @@ impl Margin {
     /// # Panics
     //  In debug mode, if the input values don't make sense
     #[must_use]
+    #[inline]
     pub fn new_init(init_balance: f64) -> Self {
         debug_assert!(init_balance > 0.0);
         debug_assert!(init_balance.is_finite());
@@ -36,6 +37,7 @@ impl Margin {
     /// # Panics
     /// In debug mode, if the input values don't make sense
     #[must_use]
+    #[inline]
     pub fn new(
         wallet_balance: f64,
         position_margin: f64,

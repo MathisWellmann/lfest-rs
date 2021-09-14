@@ -45,7 +45,7 @@ impl Position {
         debug_assert!(unrealized_pnl.is_finite());
 
         debug_assert!(leverage >= 1.0);
-        debug_assert!(entry_price > 0.0);
+        debug_assert!(entry_price >= 0.0);
 
         Position {
             size,

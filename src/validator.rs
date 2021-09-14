@@ -157,9 +157,8 @@ impl Validator {
     #[must_use]
     fn limit_order_margin_cost(&self, order: &Order, acc: &Account) -> f64 {
         let mut orders = acc.active_limit_orders().clone();
-        debug!("active_limit_orders: {:?}", orders);
+        debug!("limit_order_margin_cost: order: {:?}, active_limit_orders: {:?}", order, orders);
         orders.insert(order.id(), *order);
-        debug!("orders: {:?}", orders);
         let needed_order_margin = order_margin(
             orders.values(),
             acc.position().size(),
@@ -179,50 +178,6 @@ impl Validator {
         );
 
         diff
-
-        // let b = acc.open_limit_buy_size();
-        // let s = acc.open_limit_sell_size();
-        // let p = acc.position().size();
-        // let mut order_margin = match order.side() {
-        //     Side::Buy => max(
-        //         min(
-        //             order.size() - min(s - b - p, s) - max(min(p, 0.0).abs() - b, 0.0),
-        //             order.size(),
-        //         ),
-        //         0.0,
-        //     ),
-        //     Side::Sell => max(0.0, min(order.size(), order.size() + s - b - p)),
-        // };
-        // order_margin /= acc.position().leverage();
-        //
-        // let mut fee = self.fee_maker * order.size();
-        //
-        // let price = order.limit_price().unwrap();
-        // match self.futures_type {
-        //     FuturesTypes::Linear => {
-        //         // the values have to be converted from denoted in BASE currency
-        //         // to being denoted in QUOTE currency
-        //         fee *= price;
-        //         order_margin *= price;
-        //     }
-        //     FuturesTypes::Inverse => {
-        //         // the values have to be converted from denoted in QUOTE currency
-        //         // to being denoted in BASE currency
-        //         fee /= price;
-        //         order_margin /= price;
-        //     }
-        // }
-        //
-        // debug!(
-        //     "limit_order_margin_cost: order: {:?}, acc.position: {:?}, olss: {}, osbs: {}, order_margin: {}",
-        //     order,
-        //     acc.position(),
-        //     acc.open_limit_sell_size(),
-        //     acc.open_limit_buy_size(),
-        //     order_margin,
-        // );
-        //
-        // order_margin + fee
     }
 }
 
