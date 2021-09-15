@@ -1,5 +1,5 @@
 use crate::acc_tracker::AccTracker;
-use crate::{FuturesTypes, Margin, Order, Position, Side, Validator};
+use crate::{FuturesTypes, Margin, Order, Position, Side, Validator, round};
 use hashbrown::HashMap;
 
 #[derive(Debug, Clone)]
@@ -148,6 +148,7 @@ impl Account {
 
     /// Cancel an active order based on the user_order_id of an Order
     pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Option<Order> {
+        debug!("cancel_order_by_user_id: user_order_id: {}", user_order_id);
         let id = match self.lookup_id_from_user_order_id.get(&user_order_id) {
             None => return None,
             Some(id) => id,
@@ -240,8 +241,13 @@ impl Account {
             Side::Buy => self.open_limit_buy_size -= exec_order.size(),
             Side::Sell => self.open_limit_sell_size -= exec_order.size(),
         }
-        debug_assert!(self.open_limit_buy_size >= 0.0);
-        debug_assert!(self.open_limit_sell_size >= 0.0);
+        debug!(
+            "remove_executed_order_from_order_margin_calculation: olbs {}, olss: {}",
+            self.open_limit_buy_size,
+            self.open_limit_sell_size
+        );
+        debug_assert!(round(self.open_limit_buy_size, 4) >= 0.0);
+        debug_assert!(round(self.open_limit_sell_size, 4) >= 0.0);
 
         self.active_limit_orders.remove(&exec_order.id()).unwrap();
 

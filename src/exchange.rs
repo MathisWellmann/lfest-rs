@@ -134,8 +134,7 @@ impl Exchange {
         debug!("submit_order: {:?}", order);
 
         // assign unique order id
-        order.set_id(self.next_order_id);
-        self.next_order_id += 1;
+        order.set_id(self.next_order_id());
 
         order.set_timestamp(self.step as i64);
 
@@ -259,5 +258,11 @@ impl Exchange {
                 }
             }
         }
+    }
+
+    #[inline(always)]
+    fn next_order_id(&mut self) -> u64 {
+        self.next_order_id += 1;
+        self.next_order_id - 1
     }
 }
