@@ -157,7 +157,10 @@ impl Validator {
     #[must_use]
     fn limit_order_margin_cost(&self, order: &Order, acc: &Account) -> f64 {
         let mut orders = acc.active_limit_orders().clone();
-        debug!("limit_order_margin_cost: order: {:?}, active_limit_orders: {:?}", order, orders);
+        debug!(
+            "limit_order_margin_cost: order: {:?}, active_limit_orders: {:?}",
+            order, orders
+        );
         orders.insert(order.id(), *order);
         let needed_order_margin = order_margin(
             orders.values(),

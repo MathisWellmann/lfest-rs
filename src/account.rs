@@ -10,6 +10,7 @@ pub struct Account {
     position: Position,
     acc_tracker: AccTracker,
     active_limit_orders: HashMap<u64, Order>,
+    lookup_id_from_user_order_id: HashMap<u64, u64>,
     executed_orders: Vec<Order>,
     // used for calculating hedged order size for order margin calculation
     open_limit_buy_size: f64,
@@ -31,6 +32,7 @@ impl Account {
             position,
             acc_tracker,
             active_limit_orders: HashMap::new(),
+            lookup_id_from_user_order_id: HashMap::new(),
             executed_orders: vec![],
             open_limit_buy_size: 0.0,
             open_limit_sell_size: 0.0,
@@ -105,9 +107,12 @@ impl Account {
         debug!("cancel_order: {}", order_id);
         let removed_order = match self.active_limit_orders.remove(&order_id) {
             None => {
-                debug!("order with id {} not found in active limit orders", order_id);
-                return None
-            },
+                debug!(
+                    "order with id {} not found in active limit orders",
+                    order_id
+                );
+                return None;
+            }
             Some(o) => o,
         };
 
@@ -138,7 +143,16 @@ impl Account {
             }
         }
 
-        None
+        Some(removed_order)
+    }
+
+    /// Cancel an active order based on the user_order_id of an Order
+    pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Option<Order> {
+        let id = match self.lookup_id_from_user_order_id.get(&user_order_id) {
+            None => return None,
+            Some(id) => id,
+        };
+        self.cancel_order(*id)
     }
 
     /// Cancel all active orders
@@ -186,12 +200,20 @@ impl Account {
         self.margin.set_order_margin(new_om);
 
         self.acc_tracker.log_limit_order_submission();
-        match self.active_limit_orders.insert(order.id(), order) {
+        let order_id = order.id();
+        match self.active_limit_orders.insert(order_id, order) {
             None => {}
-            Some(_) => error!(
+            Some(_) => warn!(
                 "there already was an order with this id in active_limit_orders. \
             This should not happen as order id should be incrementing"
             ),
+        };
+        match order.user_order_id() {
+            None => {}
+            Some(user_order_id) => {
+                self.lookup_id_from_user_order_id
+                    .insert(*user_order_id, order_id);
+            }
         };
     }
 
@@ -421,6 +443,25 @@ mod tests {
         assert_eq!(account.active_limit_orders().len(), 0);
         assert_eq!(account.margin().wallet_balance(), 1.0);
         assert_eq!(account.margin().position_margin(), 0.0);
+    }
+
+    #[test]
+    fn account_cancel_order_by_user_id() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
+        let futures_type = FuturesTypes::Inverse;
+        let mut account = Account::new(1.0, 1.0, futures_type);
+        let mut validator = Validator::new(0.0, 0.0, futures_type);
+        validator.update(100.0, 100.1);
+
+        let mut o = Order::limit(Side::Buy, 100.0, 50.0).unwrap();
+        o.set_user_order_id(1000);
+        let order_margin = validator.validate_limit_order(&o, &account).unwrap();
+        account.append_limit_order(o, order_margin);
+        assert!(!account.active_limit_orders().is_empty());
+
+        account.cancel_order_by_user_id(1000).unwrap();
+        assert!(account.active_limit_orders.is_empty());
     }
 
     #[test]

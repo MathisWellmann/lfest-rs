@@ -5,6 +5,8 @@ use crate::{OrderError, OrderType, Side};
 pub struct Order {
     /// id will be filled in using exchange.submit_order()
     id: u64,
+    /// Order Id provided by user
+    user_order_id: Option<u64>,
     /// timestamp will be filled in using exchange.submit_order()
     timestamp: i64,
     /// order type
@@ -31,6 +33,7 @@ impl Order {
     /// # Returns
     /// Either a successfully created order or an OrderError
     #[must_use]
+    #[inline]
     pub fn limit(side: Side, limit_price: f64, size: f64) -> Result<Order, OrderError> {
         if limit_price <= 0.0 {
             return Err(OrderError::InvalidLimitPrice);
@@ -40,6 +43,7 @@ impl Order {
         }
         Ok(Order {
             id: 0,
+            user_order_id: None,
             timestamp: 0,
             order_type: OrderType::Limit,
             limit_price: Some(limit_price),
@@ -57,12 +61,14 @@ impl Order {
     /// # Returns
     /// Either a successfully created order or an OrderError
     #[must_use]
+    #[inline]
     pub fn market(side: Side, size: f64) -> Result<Order, OrderError> {
         if size <= 0.0 {
             return Err(OrderError::InvalidOrderSize);
         }
         Ok(Order {
             id: 0,
+            user_order_id: None,
             timestamp: 0,
             order_type: OrderType::Market,
             limit_price: None,
@@ -76,6 +82,18 @@ impl Order {
     #[inline(always)]
     pub fn id(&self) -> u64 {
         self.id
+    }
+
+    /// User id of Order
+    #[inline(always)]
+    pub fn user_order_id(&self) -> &Option<u64> {
+        &self.user_order_id
+    }
+
+    /// Set the user id of Order
+    #[inline(always)]
+    pub fn set_user_order_id(&mut self, id: u64) {
+        self.user_order_id = Some(id)
     }
 
     /// Timestamp of Order
