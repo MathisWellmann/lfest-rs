@@ -167,6 +167,19 @@ impl Account {
         self.active_limit_orders.clear();
     }
 
+    /// Cumulative open limit order size of buy orders
+    #[inline(always)]
+    pub fn open_limit_buy_size(&self) -> f64 {
+        self.open_limit_buy_size
+    }
+
+    /// Cumulative
+    #[inline(always)]
+    pub fn open_limit_sell_size(&self) -> f64 {
+        self.open_limit_sell_size
+    }
+
+
     /// Append a new limit order as active order
     pub(crate) fn append_limit_order(&mut self, order: Order, order_margin: f64) {
         debug!(
@@ -346,16 +359,6 @@ impl Account {
 
         // log change
         self.acc_tracker.log_trade(side, size);
-    }
-
-    #[inline(always)]
-    pub(crate) fn open_limit_buy_size(&self) -> f64 {
-        self.open_limit_buy_size
-    }
-
-    #[inline(always)]
-    pub(crate) fn open_limit_sell_size(&self) -> f64 {
-        self.open_limit_sell_size
     }
 
     #[inline(always)]
@@ -541,6 +544,58 @@ mod tests {
         assert_eq!(acc.position().entry_price(), 200.0);
         assert_eq!(acc.position().leverage(), 1.0);
         assert_eq!(acc.position().unrealized_pnl(), 0.0);
+    }
+
+    #[test]
+    fn account_open_limit_buy_size() {
+        let futures_type = FuturesTypes::Linear;
+        let mut acc = Account::new(1.0, 100.0, futures_type);
+        let mut validator = Validator::new(0.0, 0.0, futures_type);
+        validator.update(100.0, 100.1);
+
+        let o = Order::limit(Side::Buy, 100.0, 0.5).unwrap();
+        let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
+        acc.append_limit_order(o, order_margin);
+        assert_eq!(acc.open_limit_buy_size(), 0.5);
+
+        let mut o = Order::limit(Side::Buy, 100.0, 0.5).unwrap();
+        o.set_id(1);
+        let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
+        acc.append_limit_order(o, order_margin);
+        assert_eq!(acc.open_limit_buy_size(), 1.0);
+
+        let mut o = Order::limit(Side::Sell, 100.0, 0.5).unwrap();
+        o.set_id(2);
+        let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
+        acc.append_limit_order(o, order_margin);
+        assert_eq!(acc.open_limit_buy_size(), 1.0);
+
+        acc.cancel_order(0);
+        assert_eq!(acc.open_limit_buy_size(), 1.0);
+    }
+
+    #[test]
+    fn account_open_limit_sell_size() {
+        let futures_type = FuturesTypes::Linear;
+        let mut acc = Account::new(1.0, 100.0, futures_type);
+        let mut validator = Validator::new(0.0, 0.0, futures_type);
+        validator.update(100.0, 100.1);
+
+        let o = Order::limit(Side::Sell, 100.0, 0.5).unwrap();
+        let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
+        acc.append_limit_order(o, order_margin);
+        assert_eq!(acc.open_limit_sell_size(), 0.5);
+
+        let mut o = Order::limit(Side::Sell, 100.0, 0.5).unwrap();
+        o.set_id(1);
+        let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
+        acc.append_limit_order(o, order_margin);
+        assert_eq!(acc.open_limit_sell_size(), 1.0);
+
+        let o = Order::limit(Side::Buy, 100.0, 0.5).unwrap();
+        let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
+        acc.append_limit_order(o, order_margin);
+        assert_eq!(acc.open_limit_sell_size(), 1.0);
     }
 
     #[test]
