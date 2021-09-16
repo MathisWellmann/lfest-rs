@@ -87,5 +87,7 @@ impl Config {
 
     /// Return the exchange identification
     #[inline(always)]
-    pub fn identification(&self) ->  &str { &self.identification }
+    pub fn identification(&self) -> &str {
+        &self.identification
+    }
 }

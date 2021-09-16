@@ -1,5 +1,5 @@
 use crate::acc_tracker::AccTracker;
-use crate::{FuturesTypes, Margin, Order, Position, Side, Validator, round};
+use crate::{round, FuturesTypes, Margin, Order, Position, Side, Validator};
 use hashbrown::HashMap;
 
 #[derive(Debug, Clone)]
@@ -180,7 +180,6 @@ impl Account {
         self.open_limit_sell_size
     }
 
-
     /// Append a new limit order as active order
     pub(crate) fn append_limit_order(&mut self, order: Order, order_margin: f64) {
         debug!(
@@ -243,8 +242,7 @@ impl Account {
         }
         debug!(
             "remove_executed_order_from_order_margin_calculation: olbs {}, olss: {}",
-            self.open_limit_buy_size,
-            self.open_limit_sell_size
+            self.open_limit_buy_size, self.open_limit_sell_size
         );
         debug_assert!(round(self.open_limit_buy_size, 4) >= 0.0);
         debug_assert!(round(self.open_limit_sell_size, 4) >= 0.0);

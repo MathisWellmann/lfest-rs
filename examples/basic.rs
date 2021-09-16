@@ -14,7 +14,15 @@ use std::time::Instant;
 fn main() {
     let t0 = Instant::now();
 
-    let config = Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new()).unwrap();
+    let config = Config::new(
+        0.0002,
+        0.0006,
+        1.0,
+        1.0,
+        FuturesTypes::Inverse,
+        String::new(),
+    )
+    .unwrap();
 
     let mut exchange = Exchange::new(config);
 

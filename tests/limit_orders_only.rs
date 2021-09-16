@@ -7,7 +7,15 @@ use log::*;
 fn limit_orders_only() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(0.0002, 0.0006, 1000.0, 1.0, FuturesTypes::Linear, String::new()).unwrap();
+    let config = Config::new(
+        0.0002,
+        0.0006,
+        1000.0,
+        1.0,
+        FuturesTypes::Linear,
+        String::new(),
+    )
+    .unwrap();
 
     let mut exchange = Exchange::new(config);
 
@@ -60,7 +68,15 @@ fn limit_orders_only() {
 fn limit_orders_2() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(0.0002, 0.0006, 100.0, 1.0, FuturesTypes::Linear, String::new()).unwrap();
+    let config = Config::new(
+        0.0002,
+        0.0006,
+        100.0,
+        1.0,
+        FuturesTypes::Linear,
+        String::new(),
+    )
+    .unwrap();
 
     let mut exchange = Exchange::new(config);
 
