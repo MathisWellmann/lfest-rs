@@ -6,7 +6,7 @@ use lfest::*;
 fn lin_long_market_win_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(0.0002, 0.0006, 1000.0, 1.0, FuturesTypes::Linear).unwrap();
+    let config = Config::new(0.0002, 0.0006, 1000.0, 1.0, FuturesTypes::Linear, String::new()).unwrap();
 
     let mut exchange = Exchange::new(config);
     let _ = exchange.update_state(100.0, 100.0, 0, 100.0, 100.0);

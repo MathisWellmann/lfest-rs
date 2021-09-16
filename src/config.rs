@@ -1,7 +1,7 @@
 use crate::FuturesTypes;
 use crate::{Error, Result};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// Define the Exchange configuration
 pub struct Config {
     /// The maker fee as a fraction. e.g.: 2.5 basis points rebate -> -0.00025
@@ -14,10 +14,19 @@ pub struct Config {
     leverage: f64,
     /// The type of futures to simulate
     futures_type: FuturesTypes,
+    /// To identify an exchange by a code
+    identification: String,
 }
 
 impl Config {
     /// Create a new Config
+    /// # Arguments
+    /// fee_maker: The maker fee as fraction, e.g 6bp -> 0.0006
+    /// fee_taker: The taker fee as fraction
+    /// starting_balance: Initial Wallet Balance, denoted in QUOTE if using linear futures, denoted in BASE for inverse futures
+    /// leverage: The positions leverage
+    /// futures_type: The type of futures contract to simulate
+    /// identification: A way to identify an exchange
     /// # Returns
     /// Either a valid Config or an Error
     #[must_use]
@@ -28,6 +37,7 @@ impl Config {
         starting_balance: f64,
         leverage: f64,
         futures_type: FuturesTypes,
+        identification: String,
     ) -> Result<Config> {
         if leverage < 1.0 {
             return Err(Error::ConfigWrongLeverage);
@@ -41,6 +51,7 @@ impl Config {
             starting_balance,
             leverage,
             futures_type,
+            identification,
         })
     }
 
@@ -73,4 +84,8 @@ impl Config {
     pub fn futures_type(&self) -> FuturesTypes {
         self.futures_type
     }
+
+    /// Return the exchange identification
+    #[inline(always)]
+    pub fn identification(&self) ->  &str { &self.identification }
 }

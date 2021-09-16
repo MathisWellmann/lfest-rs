@@ -13,13 +13,6 @@ pub enum FuturesTypes {
     Inverse,
 }
 
-// pub(crate) trait FuturesType {
-//     /// Return the profit and loss for a given entry and exit price with a given contract quantity
-//     /// Note that negative contract_qty will give the pnl for a short position
-//     fn pnl(entry_price: f64, exit_price: f64, contract_qty: f64) -> f64;
-//
-// }
-
 impl std::fmt::Display for FuturesTypes {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
