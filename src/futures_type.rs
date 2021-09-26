@@ -1,3 +1,4 @@
+use crate::errors::{Error, Result};
 use std::fmt::Formatter;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -28,6 +29,7 @@ impl Default for FuturesTypes {
 impl FuturesTypes {
     /// return the profit and loss for a given entry and exit price with a given contract_qty
     /// Note that negative contract_qty will give the pnl for a short position
+    #[inline]
     pub fn pnl(&self, entry_price: f64, exit_price: f64, contract_qty: f64) -> f64 {
         match self {
             Self::Linear => {
@@ -40,6 +42,18 @@ impl FuturesTypes {
                 contract_qty * (1.0 / entry_price - 1.0 / exit_price)
                 // resulting pnl denoted in BASE currency
             }
+        }
+    }
+
+    /// Parse the FuturesType from a string
+    #[inline]
+    pub fn from_str(s: &str) -> Result<Self> {
+        if s.to_lowercase() == "linear" {
+            Ok(Self::Linear)
+        } else if s.to_lowercase() == "inverse" {
+            Ok(Self::Inverse)
+        } else {
+            Err(Error::ParseError)
         }
     }
 }

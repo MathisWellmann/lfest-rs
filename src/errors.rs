@@ -23,6 +23,10 @@ pub enum Error {
     /// Config::new was provided an invalid starting balance
     #[error("Wrong starting balance provided")]
     ConfigWrongStartingBalance,
+
+    /// When data could not be parsed
+    #[error("could not parse from string")]
+    ParseError,
 }
 
 /// This is defined as a convenience.
