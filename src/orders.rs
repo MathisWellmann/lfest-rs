@@ -1,6 +1,7 @@
 use crate::{OrderError, OrderType, Side};
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Defines an order
 pub struct Order {
     /// id will be filled in using exchange.submit_order()
