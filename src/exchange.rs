@@ -12,6 +12,7 @@ pub struct Exchange {
     step: u64, // used for synchronizing orders
     high: f64,
     low: f64,
+    current_ts: i64,
 }
 
 impl Exchange {
@@ -37,6 +38,7 @@ impl Exchange {
             step: 0,
             high: 0.0,
             low: 0.0,
+            current_ts: 0,
         }
     }
 
@@ -110,6 +112,7 @@ impl Exchange {
         self.ask = ask;
         self.high = high;
         self.low = low;
+        self.current_ts = timestamp as i64;
 
         self.validator.update(bid, ask);
 
@@ -136,7 +139,7 @@ impl Exchange {
         // assign unique order id
         order.set_id(self.next_order_id());
 
-        order.set_timestamp(self.step as i64);
+        order.set_timestamp(self.current_ts);
 
         match order.order_type() {
             OrderType::Market => {

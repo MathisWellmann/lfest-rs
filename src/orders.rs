@@ -1,5 +1,5 @@
 use crate::{OrderError, OrderType, Side};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Defines an order
