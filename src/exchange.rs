@@ -196,7 +196,7 @@ impl Exchange {
         let price = o.limit_price().unwrap();
 
         self.account
-            .remove_executed_order_from_order_margin_calculation(&o, self.config.fee_maker());
+            .remove_executed_order_from_order_margin_calculation(&o);
 
         let mut fee = self.config.fee_maker() * o.size();
         match self.config.futures_type() {
@@ -206,7 +206,8 @@ impl Exchange {
         self.account.deduce_fees(fee);
         self.account.change_position(o.side(), o.size(), price);
 
-        self.account.finalize_limit_order(o);
+        self.account
+            .finalize_limit_order(o, self.config.fee_maker());
     }
 
     /// Perform a liquidation of the account

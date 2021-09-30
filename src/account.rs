@@ -1,4 +1,5 @@
 use crate::acc_tracker::AccTracker;
+use crate::limit_order_margin::order_margin;
 use crate::{round, FuturesTypes, Margin, Order, Position, Side, Validator};
 use hashbrown::HashMap;
 
@@ -147,6 +148,8 @@ impl Account {
     }
 
     /// Cancel an active order based on the user_order_id of an Order
+    #[inline]
+    #[must_use]
     pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Option<Order> {
         debug!("cancel_order_by_user_id: user_order_id: {}", user_order_id);
         let id = match self.lookup_id_from_user_order_id.get(&user_order_id) {
@@ -157,6 +160,7 @@ impl Account {
     }
 
     /// Cancel all active orders
+    #[inline]
     pub fn cancel_all_orders(&mut self) {
         debug!("cancel_all_orders");
 
@@ -234,7 +238,6 @@ impl Account {
     pub(crate) fn remove_executed_order_from_order_margin_calculation(
         &mut self,
         exec_order: &Order,
-        fee_maker: f64,
     ) {
         match exec_order.side() {
             Side::Buy => self.open_limit_buy_size -= exec_order.size(),
@@ -268,17 +271,27 @@ impl Account {
                 .map(|(_, o)| o.limit_price().unwrap())
                 .fold(f64::NAN, f64::max)
         };
-        let mut new_om: f64 = 0.0;
 
-        self.margin.set_order_margin(new_om);
+        // set this to 0.0 temporarily and it will be properly assigned at the end of limit order execution
+        self.margin.set_order_margin(0.0);
     }
 
     /// Finalize an executed limit order
-    pub(crate) fn finalize_limit_order(&mut self, mut exec_order: Order) {
+    pub(crate) fn finalize_limit_order(&mut self, mut exec_order: Order, fee_maker: f64) {
         exec_order.mark_executed();
 
         self.acc_tracker.log_limit_order_fill();
         self.executed_orders.push(exec_order);
+
+        let new_om: f64 = order_margin(
+            self.active_limit_orders.values(),
+            self.position.size(),
+            self.position.entry_price(),
+            self.futures_type,
+            self.position.leverage(),
+            fee_maker,
+        );
+        self.margin.set_order_margin(new_om);
     }
 
     /// Reduce the account equity by a fee amount
