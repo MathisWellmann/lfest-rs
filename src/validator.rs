@@ -165,7 +165,6 @@ impl Validator {
         let needed_order_margin = order_margin(
             orders.values(),
             acc.position().size(),
-            acc.position().entry_price(),
             self.futures_type,
             acc.position().leverage(),
             self.fee_maker,

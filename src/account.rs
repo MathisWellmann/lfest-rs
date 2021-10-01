@@ -286,7 +286,6 @@ impl Account {
         let new_om: f64 = order_margin(
             self.active_limit_orders.values(),
             self.position.size(),
-            self.position.entry_price(),
             self.futures_type,
             self.position.leverage(),
             fee_maker,
@@ -564,6 +563,21 @@ mod tests {
     }
 
     #[test]
+    fn account_change_position_linear_futures() {
+        let mut acc = Account::new(1.0, 1000.0, FuturesTypes::Linear);
+
+        acc.change_position(Side::Buy, 0.5, 100.0);
+        assert_eq!(acc.margin().wallet_balance(), 1000.0);
+        assert_eq!(acc.margin().position_margin(), 50.0);
+        assert_eq!(acc.margin().order_margin(), 0.0);
+        assert_eq!(acc.margin().available_balance(), 950.0);
+        assert_eq!(acc.position().size(), 0.5);
+        assert_eq!(acc.position().entry_price(), 100.0);
+        assert_eq!(acc.position().leverage(), 1.0);
+        assert_eq!(acc.position().unrealized_pnl(), 0.0);
+    }
+
+    #[test]
     fn account_open_limit_buy_size() {
         let futures_type = FuturesTypes::Linear;
         let mut acc = Account::new(1.0, 100.0, futures_type);
@@ -613,10 +627,5 @@ mod tests {
         let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
         acc.append_limit_order(o, order_margin);
         assert_eq!(acc.open_limit_sell_size(), 1.0);
-    }
-
-    #[test]
-    fn account_change_position_linear_futures() {
-        // TODO:
     }
 }
