@@ -1,7 +1,7 @@
 use crate::welford_online::WelfordOnline;
 use crate::Side;
 
-const DAILY_MS: u64 = 86_400_000;
+const DAILY_NS: u64 = 86_400_000_000_000;
 
 // TODO: maybe rename this to Stats?
 
@@ -37,6 +37,7 @@ pub struct AccTracker {
 
 impl AccTracker {
     #[must_use]
+    #[inline]
     pub fn new(starting_wb: f64) -> Self {
         AccTracker {
             wallet_balance: starting_wb,
@@ -255,7 +256,7 @@ impl AccTracker {
     /// Assumes timestamp in milliseconds
     pub(crate) fn log_timestamp(&mut self, ts: u64) {
         if ts > self.next_trigger_ts {
-            self.next_trigger_ts = ts + DAILY_MS;
+            self.next_trigger_ts = ts + DAILY_NS;
             // calculate daily rpnl
             let rpnl: f64 = self.total_rpnl - self.last_rpnl_entry;
             self.last_rpnl_entry = self.total_rpnl;
