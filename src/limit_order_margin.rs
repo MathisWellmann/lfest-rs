@@ -10,8 +10,10 @@ pub(crate) fn order_margin<'a>(
 ) -> f64 {
     let mut buy_size: f64 = 0.0;
     let mut sell_size: f64 = 0.0;
-    let mut max_buy_price: f64 = 0.0;
-    let mut min_sell_price: f64 = 0.0;
+    let mut buy_price_sum: f64 = 0.0;
+    let mut sell_price_sum: f64 = 0.0;
+    let mut num_buy_orders: f64 = 0.0;
+    let mut num_sell_orders: f64 = 0.0;
     let mut cumulative_fees: f64 = 0.0;
     for o in orders {
         let price = o.limit_price().unwrap();
@@ -19,24 +21,16 @@ pub(crate) fn order_margin<'a>(
             FuturesTypes::Linear => price,
             FuturesTypes::Inverse => 1.0 / price,
         };
-        if max_buy_price == 0.0 {
-            max_buy_price = price;
-        }
-        if min_sell_price == 0.0 {
-            min_sell_price = price;
-        }
         match o.side() {
             Side::Buy => {
                 buy_size += o.size();
-                if price > max_buy_price {
-                    max_buy_price = price;
-                }
+                buy_price_sum += o.limit_price().unwrap();
+                num_buy_orders += 1.0;
             }
             Side::Sell => {
                 sell_size += o.size();
-                if price < min_sell_price {
-                    min_sell_price = price;
-                }
+                sell_price_sum += o.limit_price().unwrap();
+                num_sell_orders += 1.0;
             }
         }
         cumulative_fees += o.size() * price_mult * fee_maker;
@@ -46,22 +40,24 @@ pub(crate) fn order_margin<'a>(
     let ssd = sell_size - max(pos_size, 0.0);
     let order_margin: f64 = if buy_size == 0.0 && sell_size == 0.0 {
         0.0
+    } else if bsd == 0.0 && ssd == 0.0 {
+        0.0
     } else if ssd > bsd {
         let price_mult = match futures_type {
-            FuturesTypes::Linear => min_sell_price,
-            FuturesTypes::Inverse => 1.0 / min_sell_price,
+            FuturesTypes::Linear => (sell_price_sum / max(num_sell_orders, 1.0)),
+            FuturesTypes::Inverse => 1.0 / (sell_price_sum / max(num_sell_orders, 1.0)),
         };
         ssd * price_mult
     } else {
         let price_mult = match futures_type {
-            FuturesTypes::Linear => max_buy_price,
-            FuturesTypes::Inverse => 1.0 / max_buy_price,
+            FuturesTypes::Linear => (buy_price_sum / max(num_buy_orders, 1.0)),
+            FuturesTypes::Inverse => 1.0 / (buy_price_sum / max(num_buy_orders, 1.0)),
         };
         bsd * price_mult
     };
     debug!(
-        "bsd: {}, ssd: {}, max_buy_price: {}, min_sell_price: {}, om: {}, fees: {}",
-        bsd, ssd, max_buy_price, min_sell_price, order_margin, cumulative_fees,
+        "bsd: {}, ssd: {}, buy_price_sum: {}, sell_price_sum: {}, om: {}, fees: {}",
+        bsd, ssd, buy_price_sum, sell_price_sum, order_margin, cumulative_fees,
     );
 
     // TODO: not sure if this method of including the fees is correct, but its about right xD
