@@ -1,6 +1,6 @@
 use crate::acc_tracker::AccTracker;
 use crate::limit_order_margin::order_margin;
-use crate::{round, FuturesTypes, Margin, Order, Position, Side, Validator};
+use crate::{round, FuturesTypes, Margin, Order, Position, Side};
 use hashbrown::HashMap;
 
 #[derive(Debug, Clone)]
@@ -26,7 +26,7 @@ impl Account {
     pub fn new(leverage: f64, starting_balance: f64, futures_type: FuturesTypes) -> Self {
         let position = Position::new_init(leverage);
         let margin = Margin::new_init(starting_balance);
-        let acc_tracker = AccTracker::new(starting_balance);
+        let acc_tracker = AccTracker::new(starting_balance, futures_type);
         Self {
             futures_type,
             margin,
@@ -104,6 +104,7 @@ impl Account {
 
     /// Cancel an active order
     /// returns Some order if successful with given order_id
+    #[must_use]
     pub fn cancel_order(&mut self, order_id: u64) -> Option<Order> {
         debug!("cancel_order: {}", order_id);
         let removed_order = match self.active_limit_orders.remove(&order_id) {
@@ -143,6 +144,7 @@ impl Account {
                 }
             }
         }
+        self.acc_tracker.log_limit_order_cancellation();
 
         Some(removed_order)
     }
@@ -152,11 +154,11 @@ impl Account {
     #[must_use]
     pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Option<Order> {
         debug!("cancel_order_by_user_id: user_order_id: {}", user_order_id);
-        let id = match self.lookup_id_from_user_order_id.get(&user_order_id) {
+        let id: u64 = match self.lookup_id_from_user_order_id.get(&user_order_id) {
             None => return None,
-            Some(id) => id,
+            Some(id) => *id,
         };
-        self.cancel_order(*id)
+        self.cancel_order(id)
     }
 
     /// Cancel all active orders
@@ -374,17 +376,7 @@ impl Account {
         self.margin.set_position_margin(pos_margin);
 
         // log change
-        self.acc_tracker.log_trade(side, size);
-    }
-
-    #[inline(always)]
-    pub(crate) fn min_limit_buy_price(&self) -> f64 {
-        self.min_limit_buy_price
-    }
-
-    #[inline(always)]
-    pub(crate) fn max_limit_sell_price(&self) -> f64 {
-        self.max_limit_sell_price
+        self.acc_tracker.log_trade(side, size, exec_price);
     }
 }
 
@@ -458,7 +450,7 @@ mod tests {
         assert_eq!(account.margin().wallet_balance(), 1.0);
         assert_eq!(account.margin().position_margin(), 0.0);
 
-        account.cancel_order(0);
+        account.cancel_order(0).unwrap();
         assert_eq!(account.active_limit_orders().len(), 0);
         assert_eq!(account.margin().wallet_balance(), 1.0);
         assert_eq!(account.margin().position_margin(), 0.0);
@@ -601,7 +593,7 @@ mod tests {
         acc.append_limit_order(o, order_margin);
         assert_eq!(acc.open_limit_buy_size(), 1.0);
 
-        acc.cancel_order(0);
+        acc.cancel_order(0).unwrap();
         assert_eq!(acc.open_limit_buy_size(), 1.0);
     }
 

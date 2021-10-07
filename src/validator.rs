@@ -1,5 +1,5 @@
 use crate::limit_order_margin::order_margin;
-use crate::{max, min, Account, FuturesTypes, Order, OrderError, OrderType, Side};
+use crate::{max, min, Account, FuturesTypes, Order, OrderError, Side};
 
 #[derive(Clone, Debug, Default)]
 /// Used for validating orders
@@ -39,11 +39,7 @@ impl Validator {
     /// # Returns
     /// debited and credited account balance deltas, if order valid, OrderError otherwise
     #[must_use]
-    pub(crate) fn validate_market_order(
-        &self,
-        o: &Order,
-        acc: &Account,
-    ) -> Result<(f64, f64), OrderError> {
+    pub(crate) fn validate_market_order(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
         let (debit, credit) = self.order_cost_market(o, acc);
         debug!("validate_market_order debit: {}, credit: {}", debit, credit);
 
@@ -51,7 +47,7 @@ impl Validator {
             return Err(OrderError::NotEnoughAvailableBalance);
         }
 
-        Ok((debit, credit))
+        Ok(())
     }
 
     /// Check if a limit order is correct
@@ -186,7 +182,7 @@ impl Validator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{round, FuturesTypes};
+    use crate::FuturesTypes;
 
     #[test]
     fn validate_inverse_futures_market_order_without_position() {
@@ -197,7 +193,7 @@ mod tests {
         validator.update(100.0, 101.0);
 
         for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
-            let mut acc = Account::new(leverage, 1.0, futures_type);
+            let acc = Account::new(leverage, 1.0, futures_type);
 
             let o = Order::market(Side::Buy, 40.0 * leverage).unwrap();
             validator.validate_market_order(&o, &acc).unwrap();
@@ -545,7 +541,7 @@ mod tests {
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(l, 100.0, futures_type);
+            let acc = Account::new(l, 100.0, futures_type);
 
             let o = Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap();
             assert_eq!(validator.limit_order_margin_cost(&o, &acc), 50.0);
@@ -901,7 +897,7 @@ mod tests {
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(l, 1.0, futures_type);
+            let acc = Account::new(l, 1.0, futures_type);
 
             let o = Order::limit(Side::Buy, 100.0, 50.0 * l).unwrap();
             assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);

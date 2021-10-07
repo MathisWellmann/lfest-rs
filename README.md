@@ -37,7 +37,7 @@ Some of these metric may behave differently from what you would expect, so make 
 To use this crate in your project, add the following to your Cargo.toml:
 ```
 [dependencies]
-lfest = "0.9.0"
+lfest = "0.17.9"
 ```
 
 Then proceed to use it in your code.

@@ -1,5 +1,5 @@
 use crate::welford_online::WelfordOnline;
-use crate::Side;
+use crate::{FuturesTypes, Side};
 
 const DAILY_NS: u64 = 86_400_000_000_000;
 
@@ -9,6 +9,7 @@ const DAILY_NS: u64 = 86_400_000_000_000;
 /// Used for keeping track of account statistics
 pub struct AccTracker {
     wallet_balance: f64,
+    futures_type: FuturesTypes,
     starting_wb: f64,
     total_rpnl: f64,
     upnl: f64,
@@ -38,9 +39,10 @@ pub struct AccTracker {
 impl AccTracker {
     #[must_use]
     #[inline]
-    pub fn new(starting_wb: f64) -> Self {
+    pub fn new(starting_wb: f64, futures_type: FuturesTypes) -> Self {
         AccTracker {
             wallet_balance: starting_wb,
+            futures_type,
             starting_wb,
             total_rpnl: 0.0,
             upnl: 0.0,
@@ -167,7 +169,7 @@ impl AccTracker {
         self.num_buys as f64 / self.num_trades as f64
     }
 
-    /// Return the cumulative turnover value of the trades
+    /// Return the cumulative turnover denoted in margin currency
     #[inline(always)]
     pub fn turnover(&self) -> f64 {
         self.total_turnover
@@ -233,8 +235,11 @@ impl AccTracker {
 
     /// Log the trade
     #[inline]
-    pub(crate) fn log_trade(&mut self, side: Side, size: f64) {
-        self.total_turnover += size;
+    pub(crate) fn log_trade(&mut self, side: Side, size: f64, price: f64) {
+        self.total_turnover += match self.futures_type {
+            FuturesTypes::Linear => size * price,
+            FuturesTypes::Inverse => size / price,
+        };
         self.num_trades += 1;
         match side {
             Side::Buy => self.num_buys += 1,
@@ -296,28 +301,9 @@ mod tests {
     use crate::round;
 
     #[test]
-    fn log_trade() {
-        let trades: Vec<(Side, f64)> = vec![
-            (Side::Buy, 1.0),
-            (Side::Sell, 1.0),
-            (Side::Buy, 1.0),
-            (Side::Sell, 1.0),
-        ];
-        let mut acc_tracker = AccTracker::new(1.0);
-        for t in trades {
-            acc_tracker.log_trade(t.0, t.1);
-        }
-
-        assert_eq!(acc_tracker.turnover(), 4.0);
-        assert_eq!(acc_tracker.num_trades(), 4);
-        assert_eq!(acc_tracker.num_buys, 2);
-        assert_eq!(acc_tracker.buy_ratio(), 0.5);
-    }
-
-    #[test]
     fn log_rpnl() {
         let rpnls: Vec<f64> = vec![0.1, -0.1, 0.1, 0.2, -0.1];
-        let mut acc_tracker = AccTracker::new(1.0);
+        let mut acc_tracker = AccTracker::new(1.0, FuturesTypes::Linear);
         for r in rpnls {
             acc_tracker.log_rpnl(r);
         }

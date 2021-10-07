@@ -144,8 +144,7 @@ impl Exchange {
         match order.order_type() {
             OrderType::Market => {
                 // immediately execute market order
-                let (debit, credit) = self
-                    .validator
+                self.validator
                     .validate_market_order(&order, &self.account)?;
                 self.execute_market(order.side(), order.size());
 
@@ -237,7 +236,7 @@ impl Exchange {
 
     /// Handle limit order trigger and execution
     fn handle_limit_order(&mut self, order_id: u64) {
-        let o = self
+        let o: Order = *self
             .account
             .active_limit_orders()
             .get(&order_id)
@@ -249,7 +248,7 @@ impl Exchange {
                 // use candle information to specify execution
                 if self.low < limit_price {
                     // this would be a guaranteed fill no matter the queue position in orderbook
-                    self.execute_limit(*o)
+                    self.execute_limit(o)
                 } else {
                     return;
                 }
@@ -258,7 +257,7 @@ impl Exchange {
                 // use candle information to specify execution
                 if self.high > limit_price {
                     // this would be a guaranteed fill no matter the queue position in orderbook
-                    self.execute_limit(*o)
+                    self.execute_limit(o)
                 } else {
                     return;
                 }
