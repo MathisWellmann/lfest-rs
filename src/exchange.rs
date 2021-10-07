@@ -247,7 +247,8 @@ impl Exchange {
         match o.side() {
             Side::Buy => {
                 // use candle information to specify execution
-                if self.low <= limit_price {
+                if self.low < limit_price {
+                    // this would be a guaranteed fill no matter the queue position in orderbook
                     self.execute_limit(*o)
                 } else {
                     return;
@@ -255,7 +256,8 @@ impl Exchange {
             }
             Side::Sell => {
                 // use candle information to specify execution
-                if self.high >= limit_price {
+                if self.high > limit_price {
+                    // this would be a guaranteed fill no matter the queue position in orderbook
                     self.execute_limit(*o)
                 } else {
                     return;
