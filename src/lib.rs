@@ -46,6 +46,27 @@ pub enum Side {
     Sell,
 }
 
+impl Side {
+    #[inline(always)]
+    /// Return the integer representation of this enum
+    pub fn as_integer(&self) -> u64 {
+        match self {
+            Side::Buy => 0,
+            Side::Sell => 1,
+        }
+    }
+
+    #[inline(always)]
+    /// Parse the Side from an integer value
+    pub fn from_integer(val: u64) -> Result<Self> {
+        match val {
+            0 => Ok(Side::Buy),
+            1 => Ok(Side::Sell),
+            _ => Err(Error::ParseError)
+        }
+    }
+}
+
 impl std::fmt::Display for Side {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
@@ -59,6 +80,27 @@ pub enum OrderType {
     Market,
     /// passive limit order
     Limit,
+}
+
+impl OrderType {
+    #[inline(always)]
+    /// Return the integer representation of this enum
+    pub fn as_integer(&self) -> u64 {
+        match self {
+            OrderType::Market => 0,
+            OrderType::Limit => 1,
+        }
+    }
+
+    #[inline(always)]
+    /// Parse the OrderType from integer value
+    pub fn from_integer(val: u64) -> Result<Self> {
+        match val {
+            0 => Ok(Self::Market),
+            1 => Ok(Self::Limit),
+            _ => Err(Error::ParseError)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

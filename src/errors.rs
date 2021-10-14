@@ -25,7 +25,7 @@ pub enum Error {
     ConfigWrongStartingBalance,
 
     /// When data could not be parsed
-    #[error("could not parse from string")]
+    #[error("could not parse")]
     ParseError,
 }
 
