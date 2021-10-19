@@ -176,8 +176,8 @@ impl AccTracker {
     #[inline]
     pub fn historical_value_at_risk_daily_returns(&self, percentile: f64) -> f64 {
         let mut rets = self.returns_daily_account.clone();
-        rets.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let idx = (rets.len() as f64 * (1.0 - percentile)) as usize;
+        quickersort::sort_floats(&mut rets);
+        let idx = (rets.len() as f64 * percentile) as usize;
         rets[idx]
     }
 
@@ -189,8 +189,8 @@ impl AccTracker {
     #[inline]
     pub fn historical_value_at_risk_trade_returns(&self, percentile: f64) -> f64 {
         let mut rets = self.trade_returns.clone();
-        rets.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let idx = (rets.len() as f64 * (1.0 - percentile)) as usize;
+        quickersort::sort_floats(&mut rets);
+        let idx = (rets.len() as f64 * percentile) as usize;
         rets[idx]
     }
 
@@ -220,6 +220,11 @@ impl AccTracker {
     /// It it time-insensitive
     /// from: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3927058
     pub fn d_ratio(&self) -> f64 {
+        info!(
+            "returns_daily_bnh: {:?}, returns_daily_account: {:?}",
+            self.returns_daily_bnh, self.returns_daily_account
+        );
+
         let (_, cf_var_bnh, _) =
             cornish_fisher_value_at_risk(&self.returns_daily_bnh, self.last_price, 0.01);
         let (_, cf_var_acc, _) =
@@ -227,17 +232,27 @@ impl AccTracker {
 
         // compute annualized return of account and buy_and_hold strategy
         let num_trading_days = self.num_trading_days() as f64;
-        let mean_return_acc = self.returns_daily_account.iter().sum::<f64>()
-            / self.returns_daily_account.len() as f64
-            * 365.0
-            / num_trading_days;
-        let mean_return_bnh = self.returns_daily_bnh.iter().sum::<f64>()
-            / self.returns_daily_bnh.len() as f64
-            * 365.0
-            / num_trading_days;
+        let mean_daily_return_acc = self.returns_daily_account.iter().sum::<f64>()
+            / self.returns_daily_account.len() as f64;
+        let roi_acc = (1.0 + mean_daily_return_acc) * 365.0 / num_trading_days;
 
-        (1.0 + mean_return_acc - mean_return_bnh) / (mean_return_bnh).abs()
-            * (cf_var_bnh / cf_var_acc)
+        let mean_daily_return_bnh =
+            self.returns_daily_bnh.iter().sum::<f64>() / self.returns_daily_bnh.len() as f64;
+        let roi_bnh = (1.0 + mean_daily_return_bnh) * (365.0 / num_trading_days);
+
+        info!(
+            "mean_return_acc: {}, mean_return_bnh: {}, roi_acc: {}, roi_bnh: {}, cf_var_bnh: {}, cf_var_acc: {}",
+            mean_daily_return_acc,
+            mean_daily_return_bnh,
+            roi_acc,
+            roi_bnh,
+            cf_var_bnh,
+            cf_var_acc,
+        );
+        let rtv_acc = roi_acc / cf_var_acc;
+        let rtv_bnh = roi_bnh / cf_var_bnh;
+
+        1.0 + (rtv_acc - rtv_bnh) / rtv_bnh.abs()
     }
 
     /// Return the standard deviation of realized profit and loss returns
@@ -394,7 +409,10 @@ impl AccTracker {
         if ts > self.next_trigger_ts {
             self.next_trigger_ts = ts + DAILY_NS;
             // calculate daily log return of account
-            let rpnl: f64 = (self.total_rpnl / self.last_rpnl_entry).ln();
+            let mut rpnl: f64 = (self.total_rpnl / self.last_rpnl_entry).ln();
+            if !rpnl.is_finite() {
+                rpnl = 0.0;
+            }
             self.last_rpnl_entry = self.total_rpnl;
             self.returns_daily_account.push(rpnl);
 
@@ -482,7 +500,7 @@ mod tests {
         acc_tracker.returns_daily_account = daily_returns;
 
         assert_eq!(
-            acc_tracker.historical_value_at_risk_daily_returns(0.85),
+            acc_tracker.historical_value_at_risk_daily_returns(0.15),
             -2.0
         );
     }
