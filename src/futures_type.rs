@@ -64,19 +64,18 @@ mod test {
     use crate::round;
 
     #[test]
-    fn futures_type_pnl() {
+    fn futures_type_pnl_linear() {
         let ft = FuturesTypes::Linear;
-        let entry_price: f64 = 100.0;
-        let exit_price: f64 = 110.0;
 
-        assert_eq!(ft.pnl(entry_price, exit_price, 10.0), 100.0);
-        assert_eq!(ft.pnl(entry_price, exit_price, -10.0), -100.0);
+        assert_eq!(ft.pnl(100.0, 110.0, 10.0), 100.0);
+        assert_eq!(ft.pnl(100.0, 110.0, -10.0), -100.0);
+    }
 
+    #[test]
+    fn futures_type_pnl_inverse() {
         let ft = FuturesTypes::Inverse;
-        let entry_price: f64 = 100.0;
-        let exit_price: f64 = 110.0;
 
-        assert_eq!(round(ft.pnl(entry_price, exit_price, 10.0), 5), 0.00909);
-        assert_eq!(round(ft.pnl(entry_price, exit_price, -10.0), 5), -0.00909);
+        assert_eq!(round(ft.pnl(100.0, 110.0, 1000.0), 3), 0.909);
+        assert_eq!(round(ft.pnl(100.0, 110.0, -1000.0), 3), -0.909);
     }
 }

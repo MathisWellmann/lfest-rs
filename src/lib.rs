@@ -62,7 +62,7 @@ impl Side {
         match val {
             0 => Ok(Side::Buy),
             1 => Ok(Side::Sell),
-            _ => Err(Error::ParseError)
+            _ => Err(Error::ParseError),
         }
     }
 }
@@ -98,7 +98,7 @@ impl OrderType {
         match val {
             0 => Ok(Self::Market),
             1 => Ok(Self::Limit),
-            _ => Err(Error::ParseError)
+            _ => Err(Error::ParseError),
         }
     }
 }

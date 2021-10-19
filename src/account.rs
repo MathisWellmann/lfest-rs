@@ -45,7 +45,7 @@ impl Account {
 
     /// Update the accounts state for the newest price data
     pub fn update(&mut self, price: f64, trade_timestamp: u64) {
-        self.acc_tracker.log_timestamp(trade_timestamp);
+        self.acc_tracker.update(trade_timestamp, price);
         let upnl: f64 =
             self.futures_type
                 .pnl(self.position.entry_price(), price, self.position.size());

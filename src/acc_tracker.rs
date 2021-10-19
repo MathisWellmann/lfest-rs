@@ -34,6 +34,8 @@ pub struct AccTracker {
     total_profit: f64,
     total_loss: f64,
     win_history: Vec<bool>, // history of all wins and losses. true is a win, false is a loss
+    first_price: f64,
+    last_price: f64,
 }
 
 impl AccTracker {
@@ -67,6 +69,8 @@ impl AccTracker {
             total_profit: 0.0,
             total_loss: 0.0,
             win_history: vec![],
+            first_price: 0.0,
+            last_price: 0.0,
         }
     }
 
@@ -88,13 +92,33 @@ impl AccTracker {
         self.cumulative_fees
     }
 
+    #[inline(always)]
+    pub fn buy_and_hold_return(&self) -> f64 {
+        self.futures_type.pnl(
+            self.first_price,
+            self.last_price,
+            self.starting_wb / self.first_price,
+        )
+    }
+
+    #[inline(always)]
+    pub fn sell_and_hold_return(&self) -> f64 {
+        self.futures_type.pnl(
+            self.first_price,
+            self.last_price,
+            -self.starting_wb / self.first_price,
+        )
+    }
+
     /// Return the sharpe ratio based on individual trade data
+    /// risk adjusted return is the excess return over buy and hold
     #[inline(always)]
     pub fn sharpe(&self) -> f64 {
-        self.total_rpnl / self.welford_returns.std_dev()
+        (self.total_rpnl - self.buy_and_hold_return()) / self.welford_returns.std_dev()
     }
 
     /// Return the sharpe ratio based on daily returns
+    /// risk adjusted return is the excess return over buy and hold
     pub fn sharpe_daily_returns(&self) -> f64 {
         let n: f64 = self.daily_returns.len() as f64;
         let avg: f64 = self.daily_returns.iter().sum::<f64>() / n;
@@ -105,13 +129,30 @@ impl AccTracker {
                 .map(|v| (*v - avg).powi(2))
                 .sum::<f64>();
         let std_dev: f64 = variance.sqrt();
-        self.total_rpnl / std_dev
+        (self.total_rpnl - self.buy_and_hold_return()) / std_dev
     }
 
     /// Return the Sortino ratio based on individual trade data
+    /// risk adjusted reutrn is the excess return over buy and hold
     #[inline(always)]
     pub fn sortino(&self) -> f64 {
-        self.total_rpnl / self.welford_neg_returns.std_dev()
+        (self.total_rpnl - self.buy_and_hold_return()) / self.welford_neg_returns.std_dev()
+    }
+
+    /// Return the Sortino ratio based on daily returns data
+    /// risk adjusted reutrn is the excess return over buy and hold
+    pub fn sortino_daily_returns(&self) -> f64 {
+        let n: f64 = self.daily_returns.len() as f64;
+        let avg: f64 = self.daily_returns.iter().sum::<f64>() / n;
+        let variance: f64 = (1.0 / n)
+            * self
+                .daily_returns
+                .iter()
+                .map(|v| (*v - avg).powi(2))
+                .filter(|v| *v < 0.0)
+                .sum::<f64>();
+        let std_dev: f64 = variance.sqrt();
+        (self.total_rpnl - self.buy_and_hold_return()) / std_dev
     }
 
     /// Return the standard deviation of realized profit and loss returns
@@ -233,7 +274,7 @@ impl AccTracker {
         }
     }
 
-    /// Log the trade
+    /// Log a user trade
     #[inline]
     pub(crate) fn log_trade(&mut self, side: Side, size: f64, price: f64) {
         self.total_turnover += match self.futures_type {
@@ -258,8 +299,8 @@ impl AccTracker {
     }
 
     /// Update the most recent timestamp which is used for daily rpnl calculation.
-    /// Assumes timestamp in milliseconds
-    pub(crate) fn log_timestamp(&mut self, ts: u64) {
+    /// Assumes timestamp in nanoseconds
+    pub(crate) fn update(&mut self, ts: u64, price: f64) {
         if ts > self.next_trigger_ts {
             self.next_trigger_ts = ts + DAILY_NS;
             // calculate daily rpnl
@@ -268,6 +309,10 @@ impl AccTracker {
             self.daily_returns.push(rpnl);
         }
         self.num_trading_opportunities += 1;
+        if self.first_price == 0.0 {
+            self.first_price = price;
+        }
+        self.last_price = price;
     }
 
     /// Update the cumulative fee amount
@@ -301,7 +346,7 @@ mod tests {
     use crate::round;
 
     #[test]
-    fn log_rpnl() {
+    fn acc_tracker_log_rpnl() {
         let rpnls: Vec<f64> = vec![0.1, -0.1, 0.1, 0.2, -0.1];
         let mut acc_tracker = AccTracker::new(1.0, FuturesTypes::Linear);
         for r in rpnls {
@@ -312,7 +357,21 @@ mod tests {
         assert_eq!(round(acc_tracker.total_rpnl(), 1), 0.20);
         assert_eq!(round(acc_tracker.welford_returns.std_dev(), 3), 0.134);
         assert_eq!(round(acc_tracker.welford_neg_returns.std_dev(), 3), 0.0);
-        assert_eq!(round(acc_tracker.sharpe(), 3), 1.491);
-        // assert_eq!(round(acc_tracker.sortino(), 3), 3.464);
+    }
+
+    #[test]
+    fn acc_tracker_buy_and_hold() {
+        let mut acc_tracker = AccTracker::new(100.0, FuturesTypes::Linear);
+        acc_tracker.update(0, 100.0);
+        acc_tracker.update(0, 200.0);
+        assert_eq!(acc_tracker.buy_and_hold_return(), 100.0);
+    }
+
+    #[test]
+    fn acc_tracker_sell_and_hold() {
+        let mut acc_tracker = AccTracker::new(100.0, FuturesTypes::Linear);
+        acc_tracker.update(0, 100.0);
+        acc_tracker.update(0, 200.0);
+        assert_eq!(acc_tracker.sell_and_hold_return(), -100.0);
     }
 }

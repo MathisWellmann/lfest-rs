@@ -40,7 +40,7 @@ pub(crate) fn order_margin<'a>(
         0.0
     } else if ssd > bsd {
         if ssd == 0.0 {
-            return cumulative_fees
+            return cumulative_fees;
         }
         let price_mult = match futures_type {
             FuturesTypes::Linear => (sell_price_weight / sell_size),
@@ -49,7 +49,7 @@ pub(crate) fn order_margin<'a>(
         ssd * price_mult
     } else {
         if bsd == 0.0 {
-            return cumulative_fees
+            return cumulative_fees;
         }
         let price_mult = match futures_type {
             FuturesTypes::Linear => (buy_price_weight / buy_size),

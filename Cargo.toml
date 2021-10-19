@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.17.11"
+version = "0.17.12"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2018"
 license-file = "LICENSE"
