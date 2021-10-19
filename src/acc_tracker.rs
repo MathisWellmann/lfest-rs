@@ -27,6 +27,7 @@ pub struct AccTracker {
     num_cancelled_limit_orders: usize,
     num_filled_limit_orders: usize,
     daily_returns: Vec<f64>,
+    trade_returns: Vec<f64>,
     next_trigger_ts: u64,
     last_rpnl_entry: f64,
     cumulative_fees: f64,
@@ -62,6 +63,7 @@ impl AccTracker {
             num_cancelled_limit_orders: 0,
             num_filled_limit_orders: 0,
             daily_returns: vec![],
+            trade_returns: vec![],
             next_trigger_ts: 0,
             last_rpnl_entry: 0.0,
             cumulative_fees: 0.0,
@@ -153,6 +155,32 @@ impl AccTracker {
                 .sum::<f64>();
         let std_dev: f64 = variance.sqrt();
         (self.total_rpnl - self.buy_and_hold_return()) / std_dev
+    }
+
+    /// Calculate the value at risk using the percentile method on daily returns.
+    /// The time horizon N is assumed to be 1
+    /// The literature says if you want a larger N, just multiply by N.sqrt(), which assumes standard normal distribution
+    /// # Arguments
+    /// percentile: value between [0.0, 1.0]
+    #[inline]
+    pub fn value_at_risk_percentile_daily_returns(&self, percentile: f64) -> f64 {
+        let mut rets = self.daily_returns.clone();
+        rets.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let idx = (rets.len() as f64 * (1.0 - percentile)) as usize;
+        rets[idx]
+    }
+
+    /// Calculate the value at risk using the percentile method on a trade by trade basis
+    /// The time horizon N is assumed to be 1
+    /// The literature says if you want a larger N, just multiply by N.sqrt(), which assumes standard normal distribution
+    /// # Arguments
+    /// percentile: value between [0.0, 1.0]
+    #[inline]
+    pub fn value_at_risk_percentile_trade_returns(&self, percentile: f64) -> f64 {
+        let mut rets = self.trade_returns.clone();
+        rets.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let idx = (rets.len() as f64 * (1.0 - percentile)) as usize;
+        rets[idx]
     }
 
     /// Return the standard deviation of realized profit and loss returns
@@ -272,6 +300,7 @@ impl AccTracker {
         if dd > self.max_drawdown {
             self.max_drawdown = dd;
         }
+        self.trade_returns.push(rpnl);
     }
 
     /// Log a user trade
@@ -373,5 +402,19 @@ mod tests {
         acc_tracker.update(0, 100.0);
         acc_tracker.update(0, 200.0);
         assert_eq!(acc_tracker.sell_and_hold_return(), -100.0);
+    }
+
+    #[test]
+    fn acc_tracker_value_at_risk_percentile() {
+        if let Err(_e) = pretty_env_logger::try_init() {}
+
+        let mut acc_tracker = AccTracker::new(100.0, FuturesTypes::Linear);
+        let daily_returns = vec![1.0, 2.0, -3.0, -1.0, 3.0, 2.0, 2.0, 1.0, -2.0, -1.0];
+        acc_tracker.daily_returns = daily_returns;
+
+        assert_eq!(
+            acc_tracker.value_at_risk_percentile_daily_returns(0.85),
+            -2.0
+        );
     }
 }
