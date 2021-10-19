@@ -13,6 +13,7 @@ extern crate serde;
 mod acc_tracker;
 mod account;
 mod config;
+mod cornish_fisher;
 mod errors;
 mod exchange;
 mod futures_type;

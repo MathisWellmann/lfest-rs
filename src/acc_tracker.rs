@@ -1,3 +1,4 @@
+use crate::cornish_fisher::cornish_fisher_value_at_risk;
 use crate::welford_online::WelfordOnline;
 use crate::{FuturesTypes, Side};
 
@@ -26,7 +27,10 @@ pub struct AccTracker {
     num_submitted_limit_orders: usize,
     num_cancelled_limit_orders: usize,
     num_filled_limit_orders: usize,
-    daily_returns: Vec<f64>,
+    // log returns of daily account balance
+    returns_daily_account: Vec<f64>,
+    // log returns of daily buy and hold strategy
+    returns_daily_bnh: Vec<f64>,
     trade_returns: Vec<f64>,
     next_trigger_ts: u64,
     last_rpnl_entry: f64,
@@ -37,6 +41,9 @@ pub struct AccTracker {
     win_history: Vec<bool>, // history of all wins and losses. true is a win, false is a loss
     first_price: f64,
     last_price: f64,
+    price_a_day_ago: f64,
+    first_ts: u64,
+    last_ts: u64,
 }
 
 impl AccTracker {
@@ -62,7 +69,8 @@ impl AccTracker {
             num_submitted_limit_orders: 0,
             num_cancelled_limit_orders: 0,
             num_filled_limit_orders: 0,
-            daily_returns: vec![],
+            returns_daily_account: vec![],
+            returns_daily_bnh: vec![],
             trade_returns: vec![],
             next_trigger_ts: 0,
             last_rpnl_entry: 0.0,
@@ -73,6 +81,9 @@ impl AccTracker {
             win_history: vec![],
             first_price: 0.0,
             last_price: 0.0,
+            price_a_day_ago: 0.0,
+            first_ts: 0,
+            last_ts: 0,
         }
     }
 
@@ -122,11 +133,11 @@ impl AccTracker {
     /// Return the sharpe ratio based on daily returns
     /// risk adjusted return is the excess return over buy and hold
     pub fn sharpe_daily_returns(&self) -> f64 {
-        let n: f64 = self.daily_returns.len() as f64;
-        let avg: f64 = self.daily_returns.iter().sum::<f64>() / n;
+        let n: f64 = self.returns_daily_account.len() as f64;
+        let avg: f64 = self.returns_daily_account.iter().sum::<f64>() / n;
         let variance: f64 = (1.0 / n)
             * self
-                .daily_returns
+                .returns_daily_account
                 .iter()
                 .map(|v| (*v - avg).powi(2))
                 .sum::<f64>();
@@ -144,11 +155,11 @@ impl AccTracker {
     /// Return the Sortino ratio based on daily returns data
     /// risk adjusted reutrn is the excess return over buy and hold
     pub fn sortino_daily_returns(&self) -> f64 {
-        let n: f64 = self.daily_returns.len() as f64;
-        let avg: f64 = self.daily_returns.iter().sum::<f64>() / n;
+        let n: f64 = self.returns_daily_account.len() as f64;
+        let avg: f64 = self.returns_daily_account.iter().sum::<f64>() / n;
         let variance: f64 = (1.0 / n)
             * self
-                .daily_returns
+                .returns_daily_account
                 .iter()
                 .map(|v| (*v - avg).powi(2))
                 .filter(|v| *v < 0.0)
@@ -163,8 +174,8 @@ impl AccTracker {
     /// # Arguments
     /// percentile: value between [0.0, 1.0]
     #[inline]
-    pub fn value_at_risk_percentile_daily_returns(&self, percentile: f64) -> f64 {
-        let mut rets = self.daily_returns.clone();
+    pub fn historical_value_at_risk_daily_returns(&self, percentile: f64) -> f64 {
+        let mut rets = self.returns_daily_account.clone();
         rets.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let idx = (rets.len() as f64 * (1.0 - percentile)) as usize;
         rets[idx]
@@ -176,11 +187,57 @@ impl AccTracker {
     /// # Arguments
     /// percentile: value between [0.0, 1.0]
     #[inline]
-    pub fn value_at_risk_percentile_trade_returns(&self, percentile: f64) -> f64 {
+    pub fn historical_value_at_risk_trade_returns(&self, percentile: f64) -> f64 {
         let mut rets = self.trade_returns.clone();
         rets.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let idx = (rets.len() as f64 * (1.0 - percentile)) as usize;
         rets[idx]
+    }
+
+    /// Calculate the cornish fisher value at risk based on daily returns of the account
+    /// # Arguments
+    /// percentile: in range [0.0, 1.0], usually something like 0.01 or 0.05
+    pub fn cornish_fisher_value_at_risk_daily_returns(&self, percentile: f64) -> f64 {
+        cornish_fisher_value_at_risk(&self.returns_daily_account, self.last_price, percentile).1
+    }
+
+    /// Calculate the cornish fisher value at risk based on returns of the accounts trades
+    /// # Arguments
+    /// percentile: in range [0.0, 1.0], usually something like 0.01 or 0.05
+    pub fn cornish_fisher_value_at_risk_trade_returns(&self, percentile: f64) -> f64 {
+        cornish_fisher_value_at_risk(&self.trade_returns, self.last_price, percentile).1
+    }
+
+    /// Return the number of trading days
+    #[inline(always)]
+    pub fn num_trading_days(&self) -> u64 {
+        (self.first_ts - self.last_ts) / DAILY_NS
+    }
+
+    /// Also called discriminant-ratio, which focuses on the added value of the algorithm
+    /// It uses the Cornish-Fish Value at Risk (CF-VaR)
+    /// It better captures the risk of the asset as it is not limited by the assumption of a gaussian distribution
+    /// It it time-insensitive
+    /// from: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3927058
+    pub fn d_ratio(&self) -> f64 {
+        let (_, cf_var_bnh, _) =
+            cornish_fisher_value_at_risk(&self.returns_daily_bnh, self.last_price, 0.01);
+        let (_, cf_var_acc, _) =
+            cornish_fisher_value_at_risk(&self.returns_daily_account, self.last_price, 0.01);
+
+        // compute annualized return of account and buy_and_hold strategy
+        let num_trading_days = self.num_trading_days() as f64;
+        let mean_return_acc = self.returns_daily_account.iter().sum::<f64>()
+            / self.returns_daily_account.len() as f64
+            * 365.0
+            / num_trading_days;
+        let mean_return_bnh = self.returns_daily_bnh.iter().sum::<f64>()
+            / self.returns_daily_bnh.len() as f64
+            * 365.0
+            / num_trading_days;
+
+        (1.0 + mean_return_acc - mean_return_bnh) / (mean_return_bnh).abs()
+            * (cf_var_bnh / cf_var_acc)
     }
 
     /// Return the standard deviation of realized profit and loss returns
@@ -330,18 +387,30 @@ impl AccTracker {
     /// Update the most recent timestamp which is used for daily rpnl calculation.
     /// Assumes timestamp in nanoseconds
     pub(crate) fn update(&mut self, ts: u64, price: f64) {
+        self.last_price = price;
+        if self.price_a_day_ago == 0.0 {
+            self.price_a_day_ago = price;
+        }
         if ts > self.next_trigger_ts {
             self.next_trigger_ts = ts + DAILY_NS;
-            // calculate daily rpnl
-            let rpnl: f64 = self.total_rpnl - self.last_rpnl_entry;
+            // calculate daily log return of account
+            let rpnl: f64 = (self.total_rpnl / self.last_rpnl_entry).ln();
             self.last_rpnl_entry = self.total_rpnl;
-            self.daily_returns.push(rpnl);
+            self.returns_daily_account.push(rpnl);
+
+            // calculate daily log return of buy and hold strategy
+            let bnh_return: f64 = (self.last_price / self.price_a_day_ago).ln();
+            self.returns_daily_bnh.push(bnh_return);
+            self.price_a_day_ago = price;
         }
         self.num_trading_opportunities += 1;
         if self.first_price == 0.0 {
             self.first_price = price;
         }
-        self.last_price = price;
+        if self.first_ts == 0 {
+            self.first_ts = ts;
+        }
+        self.last_ts = ts;
     }
 
     /// Update the cumulative fee amount
@@ -410,10 +479,10 @@ mod tests {
 
         let mut acc_tracker = AccTracker::new(100.0, FuturesTypes::Linear);
         let daily_returns = vec![1.0, 2.0, -3.0, -1.0, 3.0, 2.0, 2.0, 1.0, -2.0, -1.0];
-        acc_tracker.daily_returns = daily_returns;
+        acc_tracker.returns_daily_account = daily_returns;
 
         assert_eq!(
-            acc_tracker.value_at_risk_percentile_daily_returns(0.85),
+            acc_tracker.historical_value_at_risk_daily_returns(0.85),
             -2.0
         );
     }
