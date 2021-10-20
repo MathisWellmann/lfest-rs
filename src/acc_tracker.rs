@@ -168,30 +168,36 @@ impl AccTracker {
         (self.total_rpnl - self.buy_and_hold_return()) / std_dev
     }
 
-    /// Calculate the value at risk using the percentile method on daily returns.
+    /// Calculate the value at risk using the percentile method on daily returns multiplied by starting wallet balance
     /// The time horizon N is assumed to be 1
     /// The literature says if you want a larger N, just multiply by N.sqrt(), which assumes standard normal distribution
     /// # Arguments
-    /// percentile: value between [0.0, 1.0]
+    /// percentile: value between [0.0, 1.0], smaller value will return more worst case results
     #[inline]
     pub fn historical_value_at_risk_daily_returns(&self, percentile: f64) -> f64 {
         let mut rets = self.returns_daily_account.clone();
         quickersort::sort_floats(&mut rets);
         let idx = (rets.len() as f64 * percentile) as usize;
-        rets[idx]
+        match rets.get(idx) {
+            Some(r) => self.starting_wb * (1.0 - r.exp()),
+            None => 0.0,
+        }
     }
 
-    /// Calculate the value at risk using the percentile method on a trade by trade basis
+    /// Calculate the value at risk using the percentile method on a trade by trade basis multiplied by starting wallet balance
     /// The time horizon N is assumed to be 1
     /// The literature says if you want a larger N, just multiply by N.sqrt(), which assumes standard normal distribution
     /// # Arguments
-    /// percentile: value between [0.0, 1.0]
+    /// percentile: value between [0.0, 1.0], smaller value will return more worst case results
     #[inline]
     pub fn historical_value_at_risk_trade_returns(&self, percentile: f64) -> f64 {
         let mut rets = self.trade_returns.clone();
         quickersort::sort_floats(&mut rets);
         let idx = (rets.len() as f64 * percentile) as usize;
-        rets[idx]
+        match rets.get(idx) {
+            Some(r) => self.starting_wb * (1.0 - r.exp()),
+            None => 0.0,
+        }
     }
 
     /// Calculate the cornish fisher value at risk based on daily returns of the account
@@ -211,7 +217,7 @@ impl AccTracker {
     /// Return the number of trading days
     #[inline(always)]
     pub fn num_trading_days(&self) -> u64 {
-        (self.first_ts - self.last_ts) / DAILY_NS
+        (self.last_ts - self.first_ts) / DAILY_NS
     }
 
     /// Also called discriminant-ratio, which focuses on the added value of the algorithm
