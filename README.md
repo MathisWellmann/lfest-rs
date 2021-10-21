@@ -163,7 +163,7 @@ fn analyze_results(e: &Exchange) {
     * min_size
     * max_size
     * step_size
-- auto convert limit orders to market orders if limit_price is worse than bid / ask
+- add config option to disable acc_tracker, which will save a bunch of RAM
 
 ### Contributions
 If you find a bug or would like to help out, feel free to create a pull-request.

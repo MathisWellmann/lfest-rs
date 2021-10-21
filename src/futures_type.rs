@@ -69,6 +69,8 @@ mod test {
 
         assert_eq!(ft.pnl(100.0, 110.0, 10.0), 100.0);
         assert_eq!(ft.pnl(100.0, 110.0, -10.0), -100.0);
+        assert_eq!(ft.pnl(100.0, 90.0, 10.0), -100.0);
+        assert_eq!(ft.pnl(100.0, 90.0, -10.0), 100.0);
     }
 
     #[test]
@@ -77,5 +79,7 @@ mod test {
 
         assert_eq!(round(ft.pnl(100.0, 110.0, 1000.0), 3), 0.909);
         assert_eq!(round(ft.pnl(100.0, 110.0, -1000.0), 3), -0.909);
+        assert_eq!(round(ft.pnl(100.0, 90.0, 1000.0), 3), -1.111);
+        assert_eq!(round(ft.pnl(100.0, 90.0, -1000.0), 3), 1.111);
     }
 }

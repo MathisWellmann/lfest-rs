@@ -1,223 +1,320 @@
 use crate::cornish_fisher::cornish_fisher_value_at_risk;
-use crate::welford_online::WelfordOnline;
 use crate::{FuturesTypes, Side};
 
 const DAILY_NS: u64 = 86_400_000_000_000;
+const HOURLY_NS: u64 = 3_600_000_000_000;
 
 // TODO: maybe rename this to Stats?
+
+/// Defines the possible sources of returns to use
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ReturnsSource {
+    /// Daily sampled returns
+    Daily,
+    /// Hourly sampled returns
+    Hourly,
+    /// Tick-by-tick sampled returns
+    TickByTick,
+}
 
 #[derive(Debug, Clone)]
 /// Used for keeping track of account statistics
 pub struct AccTracker {
-    wallet_balance: f64,
+    wallet_balance_last: f64,  // last wallet balance recording
+    wallet_balance_start: f64, // wallet balance at start
+    wallet_balance_high: f64,  // maximum wallet balance observed
+    total_balance_high: f64,   // wallet_balance + upnl high
     futures_type: FuturesTypes,
-    starting_wb: f64,
     total_rpnl: f64,
     upnl: f64,
     num_trades: i64,
     num_buys: i64,
-    total_turnover: f64,
-    wb_high: f64, // wallet balance high
-    max_drawdown: f64,
-    max_upnl_drawdown: f64,
-    welford_returns: WelfordOnline,
-    welford_neg_returns: WelfordOnline,
-    wins: usize,
-    losses: usize,
+    num_wins: usize,
+    num_losses: usize,
     num_submitted_limit_orders: usize,
     num_cancelled_limit_orders: usize,
     num_filled_limit_orders: usize,
-    // log returns of daily account balance
-    returns_daily_account: Vec<f64>,
-    // log returns of daily buy and hold strategy
-    returns_daily_bnh: Vec<f64>,
-    trade_returns: Vec<f64>,
-    next_trigger_ts: u64,
-    last_rpnl_entry: f64,
-    cumulative_fees: f64,
     num_trading_opportunities: usize,
+    total_turnover: f64,
+    max_drawdown_wallet_balance: f64,
+    max_drawdown_total: f64,
+    // historical daily absolute returns
+    hist_returns_daily_acc: Vec<f64>,
+    hist_returns_daily_bnh: Vec<f64>,
+    // historical hourly absolute returns
+    hist_returns_hourly_acc: Vec<f64>,
+    hist_returns_hourly_bnh: Vec<f64>,
+    // historical tick by tick absolute returns
+    // TODO: if these tick-by-tick returns vectors get too large, disable it in live mode
+    hist_returns_tick_acc: Vec<f64>,
+    hist_returns_tick_bnh: Vec<f64>,
+    // historical daily logarithmic returns
+    hist_ln_returns_daily_acc: Vec<f64>,
+    hist_ln_returns_daily_bnh: Vec<f64>,
+    // historical hourly logarithmic returns
+    hist_ln_returns_hourly_acc: Vec<f64>,
+    hist_ln_returns_hourly_bnh: Vec<f64>,
+    // historical tick by tick logarithmic returns
+    hist_ln_returns_tick_acc: Vec<f64>,
+    hist_ln_returns_tick_bnh: Vec<f64>,
+    // timestamps for when to trigger the next pnl snapshots
+    next_daily_trigger_ts: u64,
+    next_hourly_trigger_ts: u64,
+    last_daily_pnl: f64,
+    last_hourly_pnl: f64,
+    last_tick_pnl: f64,
+    cumulative_fees: f64,
     total_profit: f64,
     total_loss: f64,
-    win_history: Vec<bool>, // history of all wins and losses. true is a win, false is a loss
-    first_price: f64,
-    last_price: f64,
+    price_first: f64,
+    price_last: f64,
     price_a_day_ago: f64,
-    first_ts: u64,
-    last_ts: u64,
+    price_an_hour_ago: f64,
+    price_a_tick_ago: f64,
+    ts_first: u64,
+    ts_last: u64,
 }
 
 impl AccTracker {
     #[must_use]
     #[inline]
-    pub fn new(starting_wb: f64, futures_type: FuturesTypes) -> Self {
+    /// Create a new AccTracker struct
+    pub(crate) fn new(starting_wb: f64, futures_type: FuturesTypes) -> Self {
         AccTracker {
-            wallet_balance: starting_wb,
+            wallet_balance_last: starting_wb,
+            wallet_balance_start: starting_wb,
+            wallet_balance_high: starting_wb,
+            total_balance_high: starting_wb,
             futures_type,
-            starting_wb,
             total_rpnl: 0.0,
             upnl: 0.0,
             num_trades: 0,
             num_buys: 0,
-            total_turnover: 0.0,
-            wb_high: starting_wb,
-            max_drawdown: 0.0,
-            max_upnl_drawdown: 0.0,
-            welford_returns: WelfordOnline::new(),
-            welford_neg_returns: WelfordOnline::new(),
-            wins: 0,
-            losses: 0,
+            num_wins: 0,
+            num_losses: 0,
             num_submitted_limit_orders: 0,
             num_cancelled_limit_orders: 0,
             num_filled_limit_orders: 0,
-            returns_daily_account: vec![],
-            returns_daily_bnh: vec![],
-            trade_returns: vec![],
-            next_trigger_ts: 0,
-            last_rpnl_entry: 0.0,
-            cumulative_fees: 0.0,
             num_trading_opportunities: 0,
+            total_turnover: 0.0,
+            max_drawdown_wallet_balance: 0.0,
+            max_drawdown_total: 0.0,
+            hist_returns_daily_acc: vec![],
+            hist_returns_daily_bnh: vec![],
+            hist_returns_hourly_acc: vec![],
+            hist_returns_hourly_bnh: vec![],
+            hist_returns_tick_acc: vec![],
+            hist_returns_tick_bnh: vec![],
+            hist_ln_returns_daily_acc: vec![],
+            hist_ln_returns_daily_bnh: vec![],
+            hist_ln_returns_hourly_acc: vec![],
+            hist_ln_returns_hourly_bnh: vec![],
+            hist_ln_returns_tick_acc: vec![],
+            hist_ln_returns_tick_bnh: vec![],
+            next_daily_trigger_ts: 0,
+            next_hourly_trigger_ts: 0,
+            last_daily_pnl: 0.0,
+            last_hourly_pnl: 0.0,
+            last_tick_pnl: 0.0,
+            cumulative_fees: 0.0,
             total_profit: 0.0,
             total_loss: 0.0,
-            win_history: vec![],
-            first_price: 0.0,
-            last_price: 0.0,
+            price_first: 0.0,
+            price_last: 0.0,
             price_a_day_ago: 0.0,
-            first_ts: 0,
-            last_ts: 0,
+            price_an_hour_ago: 0.0,
+            price_a_tick_ago: 0.0,
+            ts_first: 0,
+            ts_last: 0,
         }
     }
 
-    /// Return the history of wins and losses, where true is a win, false is a loss
+    /// Vector of absolute returns the account has generated, including unrealized pnl
+    /// # Parameters
+    /// source: the sampling interval of pnl snapshots
     #[inline(always)]
-    pub fn win_history(&self) -> &Vec<bool> {
-        &self.win_history
+    pub fn absolute_returns(&self, source: &ReturnsSource) -> &Vec<f64> {
+        match source {
+            ReturnsSource::Daily => &self.hist_returns_daily_acc,
+            ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
+            ReturnsSource::TickByTick => &self.hist_returns_tick_acc,
+        }
     }
 
-    /// Return the ratio of average trade profit over average trade loss
+    /// Vector of natural logarithmic returns the account has generated, including unrealized pnl
+    /// # Parameters
+    /// source: the sampling interval of pnl snapshots
+    #[inline(always)]
+    pub fn ln_returns(&self, source: &ReturnsSource) -> &Vec<f64> {
+        match source {
+            ReturnsSource::Daily => &self.hist_ln_returns_daily_acc,
+            ReturnsSource::Hourly => &self.hist_ln_returns_hourly_acc,
+            ReturnsSource::TickByTick => &self.hist_ln_returns_tick_acc,
+        }
+    }
+
+    /// Ratio of cumulative trade profit over cumulative trade loss
     #[inline(always)]
     pub fn profit_loss_ratio(&self) -> f64 {
         self.total_profit / self.total_loss
     }
 
-    /// Return the cumulative fees paid to the exchange
+    /// Cumulative fees paid to the exchange
     #[inline(always)]
     pub fn cumulative_fees(&self) -> f64 {
         self.cumulative_fees
     }
 
+    /// Would be return of buy and hold strategy
     #[inline(always)]
     pub fn buy_and_hold_return(&self) -> f64 {
-        self.futures_type.pnl(
-            self.first_price,
-            self.last_price,
-            self.starting_wb / self.first_price,
-        )
+        let qty = match self.futures_type {
+            FuturesTypes::Linear => self.wallet_balance_start / self.price_first,
+            FuturesTypes::Inverse => self.wallet_balance_start * self.price_first,
+        };
+        self.futures_type
+            .pnl(self.price_first, self.price_last, qty)
     }
 
+    /// Would be return of sell and hold strategy
     #[inline(always)]
     pub fn sell_and_hold_return(&self) -> f64 {
-        self.futures_type.pnl(
-            self.first_price,
-            self.last_price,
-            -self.starting_wb / self.first_price,
-        )
+        let qty = match self.futures_type {
+            FuturesTypes::Linear => self.wallet_balance_start / self.price_first,
+            FuturesTypes::Inverse => self.wallet_balance_start * self.price_first,
+        };
+        self.futures_type
+            .pnl(self.price_first, self.price_last, -qty)
     }
 
-    /// Return the sharpe ratio based on individual trade data
-    /// risk adjusted return is the excess return over buy and hold
-    #[inline(always)]
-    pub fn sharpe(&self) -> f64 {
-        (self.total_rpnl - self.buy_and_hold_return()) / self.welford_returns.std_dev()
-    }
-
-    /// Return the sharpe ratio based on daily returns
-    /// risk adjusted return is the excess return over buy and hold
-    pub fn sharpe_daily_returns(&self) -> f64 {
-        let n: f64 = self.returns_daily_account.len() as f64;
-        let avg: f64 = self.returns_daily_account.iter().sum::<f64>() / n;
-        let variance: f64 = (1.0 / n)
-            * self
-                .returns_daily_account
+    /// Return the sharpe ratio using the selected returns as source
+    /// # Parameters:
+    /// returns_source: the sampling interval of pnl snapshots
+    /// risk_free_is_buy_and_hold: if true, it will use the market returns as the risk-free comparison
+    ///     else risk-free rate is zero
+    pub fn sharpe(&self, returns_source: &ReturnsSource, risk_free_is_buy_and_hold: bool) -> f64 {
+        let rets_acc = match returns_source {
+            ReturnsSource::Daily => &self.hist_returns_daily_acc,
+            ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
+            ReturnsSource::TickByTick => &self.hist_returns_tick_acc,
+        };
+        if risk_free_is_buy_and_hold {
+            let rets_bnh = match returns_source {
+                ReturnsSource::Daily => &self.hist_returns_daily_bnh,
+                ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
+                ReturnsSource::TickByTick => &self.hist_returns_tick_bnh,
+            };
+            let n: f64 = rets_acc.len() as f64;
+            // compute the difference of returns of account and market
+            let diff_returns: Vec<f64> = rets_acc
                 .iter()
-                .map(|v| (*v - avg).powi(2))
-                .sum::<f64>();
-        let std_dev: f64 = variance.sqrt();
-        (self.total_rpnl - self.buy_and_hold_return()) / std_dev
-    }
+                .zip(rets_bnh)
+                .map(|(a, b)| *a - *b)
+                .collect();
+            let avg = diff_returns.iter().sum::<f64>() / n;
+            let variance = diff_returns.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
+            let std_dev = variance.sqrt();
 
-    /// Return the Sortino ratio based on individual trade data
-    /// risk adjusted reutrn is the excess return over buy and hold
-    #[inline(always)]
-    pub fn sortino(&self) -> f64 {
-        (self.total_rpnl - self.buy_and_hold_return()) / self.welford_neg_returns.std_dev()
+            (self.total_rpnl - self.buy_and_hold_return()) / std_dev
+        } else {
+            let n = rets_acc.len() as f64;
+            let avg = rets_acc.iter().sum::<f64>() / n;
+            let var = rets_acc.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
+            let std_dev = var.sqrt();
+
+            self.total_rpnl / std_dev
+        }
     }
 
     /// Return the Sortino ratio based on daily returns data
-    /// risk adjusted reutrn is the excess return over buy and hold
-    pub fn sortino_daily_returns(&self) -> f64 {
-        let n: f64 = self.returns_daily_account.len() as f64;
-        let avg: f64 = self.returns_daily_account.iter().sum::<f64>() / n;
-        let variance: f64 = (1.0 / n)
-            * self
-                .returns_daily_account
+    /// # Parameters:
+    /// returns_source: the sampling interval of pnl snapshots
+    /// risk_free_is_buy_and_hold: if true, it will use the market returns as the risk-free comparison
+    ///     else risk-free rate is zero
+    pub fn sortino(&self, returns_source: &ReturnsSource, risk_free_is_buy_and_hold: bool) -> f64 {
+        let rets_acc = match returns_source {
+            ReturnsSource::Daily => &self.hist_returns_daily_acc,
+            ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
+            ReturnsSource::TickByTick => &self.hist_returns_tick_acc,
+        };
+        if risk_free_is_buy_and_hold {
+            let rets_bnh = match returns_source {
+                ReturnsSource::Daily => &self.hist_returns_daily_bnh,
+                ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
+                ReturnsSource::TickByTick => &self.hist_returns_tick_bnh,
+            };
+            // compute the difference of returns of account and market
+            let diff_returns: Vec<f64> = rets_acc
+                .iter()
+                .zip(rets_bnh)
+                .map(|(a, b)| *a - *b)
+                .filter(|v| *v < 0.0)
+                .collect();
+            let n: f64 = diff_returns.len() as f64;
+            let avg = diff_returns.iter().sum::<f64>() / n;
+            let variance = diff_returns.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
+            let std_dev = variance.sqrt();
+
+            (self.total_rpnl - self.buy_and_hold_return()) / std_dev
+        } else {
+            let downside_rets: Vec<f64> =
+                rets_acc.iter().map(|v| *v).filter(|v| *v < 0.0).collect();
+            let n = downside_rets.len() as f64;
+            let avg = downside_rets.iter().sum::<f64>() / n;
+            let var = downside_rets
                 .iter()
                 .map(|v| (*v - avg).powi(2))
-                .filter(|v| *v < 0.0)
-                .sum::<f64>();
-        let std_dev: f64 = variance.sqrt();
-        (self.total_rpnl - self.buy_and_hold_return()) / std_dev
+                .sum::<f64>()
+                / n;
+            let std_dev = var.sqrt();
+
+            self.total_rpnl / std_dev
+        }
     }
 
     /// Calculate the value at risk using the percentile method on daily returns multiplied by starting wallet balance
     /// The time horizon N is assumed to be 1
     /// The literature says if you want a larger N, just multiply by N.sqrt(), which assumes standard normal distribution
     /// # Arguments
+    /// returns_source: the sampling interval of pnl snapshots
     /// percentile: value between [0.0, 1.0], smaller value will return more worst case results
     #[inline]
-    pub fn historical_value_at_risk_daily_returns(&self, percentile: f64) -> f64 {
-        let mut rets = self.returns_daily_account.clone();
+    pub fn historical_value_at_risk(&self, returns_source: &ReturnsSource, percentile: f64) -> f64 {
+        let mut rets = match returns_source {
+            ReturnsSource::Daily => self.hist_ln_returns_daily_acc.clone(),
+            ReturnsSource::Hourly => self.hist_ln_returns_hourly_acc.clone(),
+            ReturnsSource::TickByTick => self.hist_ln_returns_tick_acc.clone(),
+        };
         quickersort::sort_floats(&mut rets);
         let idx = (rets.len() as f64 * percentile) as usize;
         match rets.get(idx) {
-            Some(r) => self.starting_wb * (1.0 - r.exp()),
-            None => 0.0,
-        }
-    }
-
-    /// Calculate the value at risk using the percentile method on a trade by trade basis multiplied by starting wallet balance
-    /// The time horizon N is assumed to be 1
-    /// The literature says if you want a larger N, just multiply by N.sqrt(), which assumes standard normal distribution
-    /// # Arguments
-    /// percentile: value between [0.0, 1.0], smaller value will return more worst case results
-    #[inline]
-    pub fn historical_value_at_risk_trade_returns(&self, percentile: f64) -> f64 {
-        let mut rets = self.trade_returns.clone();
-        quickersort::sort_floats(&mut rets);
-        let idx = (rets.len() as f64 * percentile) as usize;
-        match rets.get(idx) {
-            Some(r) => self.starting_wb * (1.0 - r.exp()),
+            Some(r) => self.wallet_balance_start - (self.wallet_balance_start * r.exp()),
             None => 0.0,
         }
     }
 
     /// Calculate the cornish fisher value at risk based on daily returns of the account
     /// # Arguments
+    /// returns_source: the sampling interval of pnl snapshots
     /// percentile: in range [0.0, 1.0], usually something like 0.01 or 0.05
-    pub fn cornish_fisher_value_at_risk_daily_returns(&self, percentile: f64) -> f64 {
-        cornish_fisher_value_at_risk(&self.returns_daily_account, self.last_price, percentile).1
-    }
-
-    /// Calculate the cornish fisher value at risk based on returns of the accounts trades
-    /// # Arguments
-    /// percentile: in range [0.0, 1.0], usually something like 0.01 or 0.05
-    pub fn cornish_fisher_value_at_risk_trade_returns(&self, percentile: f64) -> f64 {
-        cornish_fisher_value_at_risk(&self.trade_returns, self.last_price, percentile).1
+    #[inline]
+    pub fn cornish_fisher_value_at_risk(
+        &self,
+        returns_source: &ReturnsSource,
+        percentile: f64,
+    ) -> f64 {
+        let rets = match returns_source {
+            ReturnsSource::Daily => &self.hist_ln_returns_daily_acc,
+            ReturnsSource::Hourly => &self.hist_ln_returns_hourly_acc,
+            ReturnsSource::TickByTick => &self.hist_ln_returns_tick_acc,
+        };
+        cornish_fisher_value_at_risk(&rets, self.wallet_balance_start, percentile).2
     }
 
     /// Return the number of trading days
     #[inline(always)]
     pub fn num_trading_days(&self) -> u64 {
-        (self.last_ts - self.first_ts) / DAILY_NS
+        (self.ts_last - self.ts_first) / DAILY_NS
     }
 
     /// Also called discriminant-ratio, which focuses on the added value of the algorithm
@@ -225,76 +322,61 @@ impl AccTracker {
     /// It better captures the risk of the asset as it is not limited by the assumption of a gaussian distribution
     /// It it time-insensitive
     /// from: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3927058
-    pub fn d_ratio(&self) -> f64 {
-        info!(
-            "returns_daily_bnh: {:?}, returns_daily_account: {:?}",
-            self.returns_daily_bnh, self.returns_daily_account
-        );
+    /// # Parameters
+    /// returns_source: the sampling interval of pnl snapshots
+    pub fn d_ratio(&self, returns_source: &ReturnsSource) -> f64 {
+        let rets_acc = match returns_source {
+            ReturnsSource::Daily => &self.hist_ln_returns_daily_acc,
+            ReturnsSource::Hourly => &self.hist_ln_returns_hourly_acc,
+            ReturnsSource::TickByTick => &self.hist_ln_returns_tick_acc,
+        };
+        let rets_bnh = match returns_source {
+            ReturnsSource::Daily => &self.hist_ln_returns_daily_bnh,
+            ReturnsSource::Hourly => &self.hist_ln_returns_hourly_bnh,
+            ReturnsSource::TickByTick => &self.hist_ln_returns_tick_bnh,
+        };
 
-        let (_, cf_var_bnh, _) =
-            cornish_fisher_value_at_risk(&self.returns_daily_bnh, self.last_price, 0.01);
-        let (_, cf_var_acc, _) =
-            cornish_fisher_value_at_risk(&self.returns_daily_account, self.last_price, 0.01);
+        let cf_var_bnh = cornish_fisher_value_at_risk(rets_bnh, self.wallet_balance_start, 0.01).1;
+        let cf_var_acc = cornish_fisher_value_at_risk(rets_acc, self.wallet_balance_start, 0.01).1;
 
-        // compute annualized return of account and buy_and_hold strategy
         let num_trading_days = self.num_trading_days() as f64;
-        let mean_daily_return_acc = self.returns_daily_account.iter().sum::<f64>()
-            / self.returns_daily_account.len() as f64;
-        let roi_acc = (1.0 + mean_daily_return_acc) * 365.0 / num_trading_days;
 
-        let mean_daily_return_bnh =
-            self.returns_daily_bnh.iter().sum::<f64>() / self.returns_daily_bnh.len() as f64;
-        let roi_bnh = (1.0 + mean_daily_return_bnh) * (365.0 / num_trading_days);
+        // compute annualized returns
+        let roi_acc = rets_acc
+            .iter()
+            .fold(1.0, |acc, x| acc * x.exp())
+            .powf(365.0 / num_trading_days);
+        let roi_bnh = rets_bnh
+            .iter()
+            .fold(1.0, |acc, x| acc * x.exp())
+            .powf(365.0 / num_trading_days);
 
-        info!(
-            "mean_return_acc: {}, mean_return_bnh: {}, roi_acc: {}, roi_bnh: {}, cf_var_bnh: {}, cf_var_acc: {}",
-            mean_daily_return_acc,
-            mean_daily_return_bnh,
-            roi_acc,
-            roi_bnh,
-            cf_var_bnh,
-            cf_var_acc,
-        );
         let rtv_acc = roi_acc / cf_var_acc;
         let rtv_bnh = roi_bnh / cf_var_bnh;
+        info!(
+            "roi_acc: {:.2}, roi_bnh: {:.2}, cf_var_bnh: {:.8}, cf_var_acc: {:.8}, rtv_acc: {}, rtv_bnh: {}",
+            roi_acc, roi_bnh, cf_var_bnh, cf_var_acc, rtv_acc, rtv_bnh,
+        );
 
-        1.0 + (rtv_acc - rtv_bnh) / rtv_bnh.abs()
+        (1.0 + (roi_acc - roi_bnh) / roi_bnh.abs()) * (cf_var_bnh / cf_var_acc)
     }
 
-    /// Return the standard deviation of realized profit and loss returns
+    /// Annualized return on investment as a factor, e.g.: 100% -> 2x
+    pub fn annualized_roi(&self) -> f64 {
+        (1.0 + (self.total_rpnl / self.wallet_balance_start))
+            .powf(365.0 / self.num_trading_days() as f64)
+    }
+
+    /// Maximum drawdown of the wallet balance
     #[inline(always)]
-    pub fn std_dev_returns(&self) -> f64 {
-        self.welford_returns.std_dev()
+    pub fn max_drawdown_wallet_balance(&self) -> f64 {
+        self.max_drawdown_wallet_balance
     }
 
-    /// Return the standard deviation of negative realized profit and loss returns
+    /// Maximum drawdown of the wallet balance including unrealized profit and loss
     #[inline(always)]
-    pub fn std_dev_neg_returns(&self) -> f64 {
-        self.welford_neg_returns.std_dev()
-    }
-
-    /// metric that penalizes both std_dev as well as drawdown in returns
-    /// see paper: https://arxiv.org/pdf/2008.09471.pdf
-    #[inline]
-    pub fn sharpe_sterling_ratio(&self) -> f64 {
-        let mut std_dev = self.welford_returns.std_dev();
-        if std_dev < 0.1 {
-            // limit the std_dev to 0.1 minimum
-            std_dev = 0.1;
-        }
-        self.total_rpnl / (std_dev * self.max_upnl_drawdown())
-    }
-
-    /// Return the maximum drawdown of the realized profit and loss curve
-    #[inline(always)]
-    pub fn max_drawdown(&self) -> f64 {
-        self.max_drawdown
-    }
-
-    /// Return the maximum drawdown of the unrealized profit and loss curve
-    #[inline(always)]
-    pub fn max_upnl_drawdown(&self) -> f64 {
-        self.max_upnl_drawdown / self.starting_wb
+    pub fn max_drawdown_total(&self) -> f64 {
+        self.max_drawdown_total
     }
 
     /// Return the number of trades the account made
@@ -337,8 +419,8 @@ impl AccTracker {
     /// Return the ratio of winning trades vs all trades
     #[inline]
     pub fn win_ratio(&self) -> f64 {
-        if self.wins + self.losses > 0 {
-            self.wins as f64 / (self.wins + self.losses) as f64
+        if self.num_wins + self.num_losses > 0 {
+            self.num_wins as f64 / (self.num_wins + self.num_losses) as f64
         } else {
             0.0
         }
@@ -359,26 +441,21 @@ impl AccTracker {
     /// Log the realized profit and loss of a trade
     pub(crate) fn log_rpnl(&mut self, rpnl: f64) {
         self.total_rpnl += rpnl;
-        self.wallet_balance += rpnl;
-        self.welford_returns.add(rpnl);
+        self.wallet_balance_last += rpnl;
         if rpnl < 0.0 {
-            self.welford_neg_returns.add(rpnl);
             self.total_loss += rpnl.abs();
-            self.losses += 1;
-            self.win_history.push(false);
+            self.num_losses += 1;
         } else {
-            self.wins += 1;
+            self.num_wins += 1;
             self.total_profit += rpnl;
-            self.win_history.push(true);
         }
-        if self.wallet_balance > self.wb_high {
-            self.wb_high = self.wallet_balance;
+        if self.wallet_balance_last > self.wallet_balance_high {
+            self.wallet_balance_high = self.wallet_balance_last;
         }
-        let dd = (self.wb_high - self.wallet_balance) / self.wb_high;
-        if dd > self.max_drawdown {
-            self.max_drawdown = dd;
+        let dd = (self.wallet_balance_high - self.wallet_balance_last) / self.wallet_balance_high;
+        if dd > self.max_drawdown_wallet_balance {
+            self.max_drawdown_wallet_balance = dd;
         }
-        self.trade_returns.push(rpnl);
     }
 
     /// Log a user trade
@@ -395,46 +472,104 @@ impl AccTracker {
         }
     }
 
-    /// Log the unrealized profit and loss at each new candle or trade
-    #[inline]
-    pub(crate) fn log_upnl(&mut self, upnl: f64) {
-        let upnl_dd: f64 = upnl.abs();
-        self.upnl = upnl;
-        if upnl_dd > self.max_upnl_drawdown {
-            self.max_upnl_drawdown = upnl_dd;
-        }
-    }
-
     /// Update the most recent timestamp which is used for daily rpnl calculation.
     /// Assumes timestamp in nanoseconds
-    pub(crate) fn update(&mut self, ts: u64, price: f64) {
-        self.last_price = price;
+    pub(crate) fn update(&mut self, ts: u64, price: f64, upnl: f64) {
+        self.price_last = price;
         if self.price_a_day_ago == 0.0 {
             self.price_a_day_ago = price;
         }
-        if ts > self.next_trigger_ts {
-            self.next_trigger_ts = ts + DAILY_NS;
-            // calculate daily log return of account
-            let mut rpnl: f64 = (self.total_rpnl / self.last_rpnl_entry).ln();
-            if !rpnl.is_finite() {
-                rpnl = 0.0;
-            }
-            self.last_rpnl_entry = self.total_rpnl;
-            self.returns_daily_account.push(rpnl);
-
-            // calculate daily log return of buy and hold strategy
-            let bnh_return: f64 = (self.last_price / self.price_a_day_ago).ln();
-            self.returns_daily_bnh.push(bnh_return);
-            self.price_a_day_ago = price;
+        if self.price_an_hour_ago == 0.0 {
+            self.price_an_hour_ago = price;
+        }
+        if self.price_a_tick_ago == 0.0 {
+            self.price_a_tick_ago = price;
+        }
+        if self.price_first == 0.0 {
+            self.price_first = price;
         }
         self.num_trading_opportunities += 1;
-        if self.first_price == 0.0 {
-            self.first_price = price;
+        if self.ts_first == 0 {
+            self.ts_first = ts;
         }
-        if self.first_ts == 0 {
-            self.first_ts = ts;
+        self.ts_last = ts;
+        if ts > self.next_daily_trigger_ts {
+            self.next_daily_trigger_ts = ts + DAILY_NS;
+
+            // calculate daily return of account
+            let pnl: f64 = (self.total_rpnl + upnl) - self.last_daily_pnl;
+            self.hist_returns_daily_acc.push(pnl);
+
+            // calculate daily log return of account
+            let ln_ret: f64 = ((self.wallet_balance_last + upnl)
+                / (self.wallet_balance_start + self.last_daily_pnl))
+                .ln();
+            self.hist_ln_returns_daily_acc.push(ln_ret);
+
+            // calculate daily return of buy_and_hold
+            let bnh_qty = self.wallet_balance_start / self.price_first;
+            let pnl_bnh = self.futures_type.pnl(self.price_a_day_ago, price, bnh_qty);
+            self.hist_returns_daily_bnh.push(pnl_bnh);
+
+            // calculate daily log return of market
+            let ln_ret: f64 = (price / self.price_a_day_ago).ln();
+            self.hist_ln_returns_daily_bnh.push(ln_ret);
+
+            self.last_daily_pnl = self.total_rpnl + upnl;
+            self.price_a_day_ago = price;
         }
-        self.last_ts = ts;
+        if ts > self.next_hourly_trigger_ts {
+            self.next_hourly_trigger_ts = ts + HOURLY_NS;
+
+            // calculate hourly return of account
+            let pnl: f64 = (self.total_rpnl + upnl) - self.last_hourly_pnl;
+            self.hist_returns_hourly_acc.push(pnl);
+
+            // calculate hourly logarithmic return of account
+            let ln_ret: f64 = ((self.wallet_balance_last + upnl)
+                / (self.wallet_balance_start + self.last_hourly_pnl))
+                .ln();
+            self.hist_ln_returns_hourly_acc.push(ln_ret);
+
+            // calculate hourly return of buy_and_hold
+            let bnh_qty = self.wallet_balance_start / self.price_first;
+            let pnl_bnh = self
+                .futures_type
+                .pnl(self.price_an_hour_ago, price, bnh_qty);
+            self.hist_returns_hourly_bnh.push(pnl_bnh);
+
+            // calculate hourly logarithmic return of buy_and_hold
+            let ln_ret: f64 = (price / self.price_an_hour_ago).ln();
+            self.hist_ln_returns_hourly_bnh.push(ln_ret);
+
+            self.last_hourly_pnl = self.total_rpnl + upnl;
+            self.price_an_hour_ago = price;
+        }
+        // compute tick-by-tick return statistics
+        let pnl: f64 = (self.total_rpnl + upnl) - self.last_tick_pnl;
+        self.hist_returns_tick_acc.push(pnl);
+
+        let ln_ret: f64 = ((self.wallet_balance_last + upnl)
+            / (self.wallet_balance_start + self.last_tick_pnl))
+            .ln();
+        self.hist_ln_returns_tick_acc.push(ln_ret);
+
+        let bnh_qty = self.wallet_balance_start / self.price_first;
+        let pnl_bnh: f64 = self.futures_type.pnl(self.price_a_tick_ago, price, bnh_qty);
+        self.hist_returns_tick_bnh.push(pnl_bnh);
+
+        let ln_ret = (price / self.price_a_tick_ago).ln();
+        self.hist_ln_returns_tick_bnh.push(ln_ret);
+
+        self.last_tick_pnl = self.total_rpnl + upnl;
+        self.price_a_tick_ago = price;
+
+        // update max_drawdown_total
+        let curr_dd = (self.wallet_balance_high - (self.wallet_balance_last + upnl))
+            / self.wallet_balance_high;
+        if curr_dd > self.max_drawdown_total {
+            self.max_drawdown_total = curr_dd;
+        }
     }
 
     /// Update the cumulative fee amount
@@ -468,6 +603,38 @@ mod tests {
     use crate::round;
 
     #[test]
+    fn acc_tracker_profit_loss_ratio() {
+        let mut at = AccTracker::new(100.0, FuturesTypes::Linear);
+        at.total_profit = 50.0;
+        at.total_loss = 25.0;
+        assert_eq!(at.profit_loss_ratio(), 2.0);
+    }
+
+    #[test]
+    fn acc_tracker_cumulative_fees() {
+        let mut at = AccTracker::new(100.0, FuturesTypes::Linear);
+        at.log_fee(0.1);
+        at.log_fee(0.2);
+        assert_eq!(round(at.cumulative_fees(), 1), 0.3);
+    }
+
+    #[test]
+    fn acc_tracker_buy_and_hold_return() {
+        let mut at = AccTracker::new(100.0, FuturesTypes::Linear);
+        at.update(0, 100.0, 0.0);
+        at.update(0, 200.0, 0.0);
+        assert_eq!(at.buy_and_hold_return(), 100.0);
+    }
+
+    #[test]
+    fn acc_tracker_sell_and_hold_return() {
+        let mut at = AccTracker::new(100.0, FuturesTypes::Linear);
+        at.update(0, 100.0, 0.0);
+        at.update(0, 50.0, 0.0);
+        assert_eq!(at.sell_and_hold_return(), 50.0);
+    }
+
+    #[test]
     fn acc_tracker_log_rpnl() {
         let rpnls: Vec<f64> = vec![0.1, -0.1, 0.1, 0.2, -0.1];
         let mut acc_tracker = AccTracker::new(1.0, FuturesTypes::Linear);
@@ -475,25 +642,23 @@ mod tests {
             acc_tracker.log_rpnl(r);
         }
 
-        assert_eq!(round(acc_tracker.max_drawdown(), 2), 0.09);
+        assert_eq!(round(acc_tracker.max_drawdown_wallet_balance(), 2), 0.09);
         assert_eq!(round(acc_tracker.total_rpnl(), 1), 0.20);
-        assert_eq!(round(acc_tracker.welford_returns.std_dev(), 3), 0.134);
-        assert_eq!(round(acc_tracker.welford_neg_returns.std_dev(), 3), 0.0);
     }
 
     #[test]
     fn acc_tracker_buy_and_hold() {
         let mut acc_tracker = AccTracker::new(100.0, FuturesTypes::Linear);
-        acc_tracker.update(0, 100.0);
-        acc_tracker.update(0, 200.0);
+        acc_tracker.update(0, 100.0, 0.0);
+        acc_tracker.update(0, 200.0, 0.0);
         assert_eq!(acc_tracker.buy_and_hold_return(), 100.0);
     }
 
     #[test]
     fn acc_tracker_sell_and_hold() {
         let mut acc_tracker = AccTracker::new(100.0, FuturesTypes::Linear);
-        acc_tracker.update(0, 100.0);
-        acc_tracker.update(0, 200.0);
+        acc_tracker.update(0, 100.0, 0.0);
+        acc_tracker.update(0, 200.0, 0.0);
         assert_eq!(acc_tracker.sell_and_hold_return(), -100.0);
     }
 
@@ -502,12 +667,15 @@ mod tests {
         if let Err(_e) = pretty_env_logger::try_init() {}
 
         let mut acc_tracker = AccTracker::new(100.0, FuturesTypes::Linear);
-        let daily_returns = vec![1.0, 2.0, -3.0, -1.0, 3.0, 2.0, 2.0, 1.0, -2.0, -1.0];
-        acc_tracker.returns_daily_account = daily_returns;
+        let daily_returns = vec![0.05, -0.05, 0.0, 0.1, -0.1, -0.025, 0.25, 0.03, -0.03, 0.0];
+        acc_tracker.hist_ln_returns_daily_acc = daily_returns;
 
         assert_eq!(
-            acc_tracker.historical_value_at_risk_daily_returns(0.15),
-            -2.0
+            round(
+                acc_tracker.historical_value_at_risk(&ReturnsSource::Daily, 0.05),
+                3
+            ),
+            9.516
         );
     }
 }

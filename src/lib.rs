@@ -25,6 +25,8 @@ mod utils;
 mod validator;
 mod welford_online;
 
+pub use acc_tracker::AccTracker;
+pub use acc_tracker::ReturnsSource;
 pub use config::Config;
 pub use errors::{Error, OrderError, Result};
 pub use exchange::Exchange;

@@ -137,13 +137,15 @@ pub(crate) fn cornish_fisher_value_at_risk(
     confidence_interval: f64,
 ) -> (f64, f64, f64) {
     let (mean, std_dev, skew, kurtosis) = statistical_moments(log_returns);
+
     let quantile = percent_point_function(confidence_interval);
     let cf_exp = quantile
         + (quantile.powi(2) - 1.0) * skew / 6.0
-        + (quantile.powi(3) - 3.0 * quantile) * (kurtosis - 2.0) / 24.0
-        - (2.0 * quantile.powi(3) - 5.0 * quantile) * (skew.powi(2)) / 36.0;
+        + (quantile.powi(3) - 3.0 * quantile) * (kurtosis - 3.0) / 24.0
+        - (2.0 * quantile.powi(3) - 5.0 * quantile) * skew.powi(2) / 36.0;
     let cf_var = mean + std_dev * cf_exp;
-    let cf_asset_value = asset_value * (1.0 + cf_var);
+    //let cf_asset_value = asset_value * (1.0 + cf_var); // like in the paper, but wrong as the underlying returns are logarithmic
+    let cf_asset_value = asset_value - (asset_value * cf_var.exp());
 
     (cf_exp, cf_var, cf_asset_value)
 }

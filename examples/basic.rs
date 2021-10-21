@@ -6,7 +6,7 @@ mod load_trades;
 #[macro_use]
 extern crate log;
 
-use lfest::{Config, Exchange, FuturesTypes, Order, OrderError, Side};
+use lfest::{Config, Exchange, FuturesTypes, Order, OrderError, ReturnsSource, Side};
 use load_trades::load_prices_from_csv;
 use rand::{thread_rng, Rng};
 use std::time::Instant;
@@ -80,22 +80,27 @@ fn analyze_results(e: &Exchange) {
     let win_ratio = e.account().acc_tracker().win_ratio();
     let profit_loss_ratio = e.account().acc_tracker().profit_loss_ratio();
     let rpnl = e.account().acc_tracker().total_rpnl();
-    let sharpe = e.account().acc_tracker().sharpe();
-    let sortino = e.account().acc_tracker().sortino();
-    let sterling_ratio = e.account().acc_tracker().sharpe_sterling_ratio();
-    let max_drawdown = e.account().acc_tracker().max_drawdown();
-    let max_upnl_drawdown = e.account().acc_tracker().max_upnl_drawdown();
+    let sharpe = e
+        .account()
+        .acc_tracker()
+        .sharpe(&ReturnsSource::TickByTick, false);
+    let sortino = e
+        .account()
+        .acc_tracker()
+        .sortino(&ReturnsSource::TickByTick, false);
+    let max_drawdown = e.account().acc_tracker().max_drawdown_wallet_balance();
+    let max_upnl_drawdown = e.account().acc_tracker().max_drawdown_total();
     let num_trades = e.account().acc_tracker().num_trades();
     let turnover = e.account().acc_tracker().turnover();
     let buy_ratio = e.account().acc_tracker().buy_ratio();
-    println!("win_ratio: {:.2}, profit_loss_ratio: {:.2}, rpnl: {:.2}, sharpe: {:.2}, sortino: {:.2}, sr: {:.2}, \
+    println!(
+        "win_ratio: {:.2}, profit_loss_ratio: {:.2}, rpnl: {:.2}, sharpe: {:.2}, sortino: {:.2}, \
     dd: {:.2}, upnl_dd: {:.2}, #trades: {}, turnover: {}, buy_ratio: {:.2},",
         win_ratio,
         profit_loss_ratio,
         rpnl,
         sharpe,
         sortino,
-        sterling_ratio,
         max_drawdown,
         max_upnl_drawdown,
         num_trades,
