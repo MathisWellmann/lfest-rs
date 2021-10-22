@@ -141,7 +141,7 @@ pub(crate) fn cornish_fisher_value_at_risk(
     let quantile = percent_point_function(confidence_interval);
     let cf_exp = quantile
         + (quantile.powi(2) - 1.0) * skew / 6.0
-        + (quantile.powi(3) - 3.0 * quantile) * (kurtosis - 3.0) / 24.0
+        + (quantile.powi(3) - 3.0 * quantile) * kurtosis / 24.0
         - (2.0 * quantile.powi(3) - 5.0 * quantile) * skew.powi(2) / 36.0;
     let cf_var = mean + std_dev * cf_exp;
     //let cf_asset_value = asset_value * (1.0 + cf_var); // like in the paper, but wrong as the underlying returns are logarithmic
@@ -181,9 +181,9 @@ mod tests {
 
     #[test]
     fn test_cornish_fisher_value_at_risk() {
-        let returns = vec![];
-
-        let (cf_exp, cf_var, cf_asset_price) = cornish_fisher_value_at_risk(&returns, 100.0, 0.01);
-        println!("{}, {}, {}", cf_exp, cf_var, cf_asset_price);
+        let mut rng = thread_rng();
+        let vals: Vec<f64> = (0..10_000).map(|_| rng.sample(StandardNormal)).collect();
+        let cf_var = cornish_fisher_value_at_risk(&vals, 100.0, 0.95).1;
+        assert_eq!(cf_var, 1.644);
     }
 }
