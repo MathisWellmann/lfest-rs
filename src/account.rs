@@ -23,7 +23,7 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new(leverage: f64, starting_balance: f64, futures_type: FuturesTypes) -> Self {
+    pub(crate) fn new(leverage: f64, starting_balance: f64, futures_type: FuturesTypes) -> Self {
         let position = Position::new_init(leverage);
         let margin = Margin::new_init(starting_balance);
         let acc_tracker = AccTracker::new(starting_balance, futures_type);
@@ -44,7 +44,7 @@ impl Account {
     }
 
     /// Update the accounts state for the newest price data
-    pub fn update(&mut self, price: f64, trade_timestamp: u64) {
+    pub(crate) fn update(&mut self, price: f64, trade_timestamp: u64) {
         let upnl: f64 =
             self.futures_type
                 .pnl(self.position.entry_price(), price, self.position.size());

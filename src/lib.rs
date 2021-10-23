@@ -27,6 +27,7 @@ mod welford_online;
 
 pub use acc_tracker::AccTracker;
 pub use acc_tracker::ReturnsSource;
+pub use account::Account;
 pub use config::Config;
 pub use errors::{Error, OrderError, Result};
 pub use exchange::Exchange;
@@ -35,7 +36,6 @@ pub use margin::Margin;
 pub use orders::Order;
 pub use position::Position;
 
-pub(crate) use account::Account;
 use std::fmt::Formatter;
 pub(crate) use utils::{max, min};
 pub(crate) use validator::Validator;

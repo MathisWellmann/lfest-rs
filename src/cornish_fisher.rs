@@ -178,12 +178,4 @@ mod tests {
         assert_eq!(round(percent_point_function(0.95), 2), 1.64);
         assert_eq!(round(percent_point_function(0.99), 2), 2.33);
     }
-
-    #[test]
-    fn test_cornish_fisher_value_at_risk() {
-        let mut rng = thread_rng();
-        let vals: Vec<f64> = (0..10_000).map(|_| rng.sample(StandardNormal)).collect();
-        let cf_var = cornish_fisher_value_at_risk(&vals, 100.0, 0.95).1;
-        assert_eq!(cf_var, 1.644);
-    }
 }
