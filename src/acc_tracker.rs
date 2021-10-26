@@ -302,6 +302,10 @@ impl AccTracker {
     /// percentile: value between [0.0, 1.0], smaller value will return more worst case results
     pub fn historical_value_at_risk_from_n_hourly_returns(&self, n: usize, percentile: f64) -> f64 {
         let rets = &self.hist_ln_returns_hourly_acc;
+        if rets.len() < n {
+            debug!("not enough hourly returns to compute VaR for n={}", n);
+            return 0.0
+        }
         let mut ret_streaks = Vec::with_capacity(rets.len() - n);
         for i in n..rets.len() {
             let mut r = 1.0;
@@ -350,6 +354,10 @@ impl AccTracker {
         percentile: f64,
     ) -> f64 {
         let rets = &self.hist_ln_returns_hourly_acc;
+        if rets.len() < n {
+            debug!("not enough hourly returns to compute CF-VaR for n={}", n);
+            return 0.0
+        }
         let mut ret_streaks = Vec::with_capacity(rets.len() - n);
         for i in n..rets.len() {
             let mut r = 1.0;
