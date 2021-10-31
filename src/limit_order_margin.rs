@@ -12,63 +12,89 @@ pub(crate) fn order_margin<'a>(
     let mut sell_size: f64 = 0.0;
     let mut buy_price_weight: f64 = 0.0;
     let mut sell_price_weight: f64 = 0.0;
-    let mut cumulative_fees: f64 = 0.0;
+    let mut buy_side_fees: f64 = 0.0;
+    let mut sell_side_fees: f64 = 0.0;
     for o in orders {
         let price = o.limit_price().unwrap();
         let price_mult = match futures_type {
             FuturesTypes::Linear => price,
             FuturesTypes::Inverse => 1.0 / price,
         };
+        let fee = o.size() * price_mult * fee_maker;
         match o.side() {
             Side::Buy => {
                 buy_size += o.size();
                 buy_price_weight += o.limit_price().unwrap() * o.size();
+                buy_side_fees += fee;
             }
             Side::Sell => {
                 sell_size += o.size();
                 sell_price_weight += o.limit_price().unwrap() * o.size();
+                sell_side_fees += fee;
             }
         }
-        cumulative_fees += o.size() * price_mult * fee_maker;
     }
 
     let bsd = buy_size - min(pos_size, 0.0).abs();
     let ssd = sell_size - max(pos_size, 0.0);
+    let mut fees = 0.0;
     let order_margin: f64 = if buy_size == 0.0 && sell_size == 0.0 {
         0.0
     } else if bsd == 0.0 && ssd == 0.0 {
         0.0
     } else if ssd > bsd {
         if ssd == 0.0 {
-            return cumulative_fees;
+            return 0.0;
         }
         let price_mult = match futures_type {
             FuturesTypes::Linear => (sell_price_weight / sell_size),
             FuturesTypes::Inverse => 1.0 / (sell_price_weight / sell_size),
         };
+        fees = sell_side_fees;
         ssd * price_mult
     } else {
         if bsd == 0.0 {
-            return cumulative_fees;
+            return 0.0;
         }
         let price_mult = match futures_type {
             FuturesTypes::Linear => (buy_price_weight / buy_size),
             FuturesTypes::Inverse => 1.0 / (buy_price_weight / buy_size),
         };
+        fees = buy_side_fees;
         bsd * price_mult
     };
     debug!(
-        "pos_size: {}, bsd: {}, ssd: {}, buy_price_weight {}, sell_price_weight {}, buy_size: {}, sell_size: {}, om: {}, fees: {}",
-        pos_size, bsd, ssd, buy_price_weight, sell_price_weight, buy_size, sell_size, order_margin, cumulative_fees,
+        "pos_size: {}, bsd: {}, ssd: {}, buy_price_weight {}, sell_price_weight {}, buy_size: {}, sell_size: {}, om: {}, buy_side_fees: {}, sell_side_fees: {}",
+        pos_size, bsd, ssd, buy_price_weight, sell_price_weight, buy_size, sell_size, order_margin, buy_side_fees, sell_side_fees,
     );
 
     // TODO: not sure if this method of including the fees is correct, but its about right xD
-    (order_margin / leverage) + cumulative_fees
+    (order_margin / leverage) + fees
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn order_margin_linear_futures_with_fees() {
+        if let Err(_) = pretty_env_logger::try_init() {}
+
+        let f_m = 0.0002;
+        let ft = FuturesTypes::Linear;
+
+        let p = 0.0;
+        let orders = vec![Order::limit(Side::Buy, 1.0, 1000.0).unwrap()];
+        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), 1000.2);
+        let orders = vec![Order::limit(Side::Sell, 1.0, 1000.0).unwrap()];
+        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), 1000.2);
+
+        let p = 1000.0;
+        let orders = vec![Order::limit(Side::Sell, 1.0, 1000.0).unwrap()];
+        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), 0.0);
+        let orders = vec![Order::limit(Side::Buy, 1.0, 1000.0).unwrap()];
+        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), 1000.2);
+    }
 
     #[test]
     fn order_margin_linear_futures_without_position() {
