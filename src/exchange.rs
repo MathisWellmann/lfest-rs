@@ -197,13 +197,14 @@ impl Exchange {
         self.account
             .remove_executed_order_from_order_margin_calculation(&o);
 
+        self.account.change_position(o.side(), o.size(), price);
+
         let mut fee = self.config.fee_maker() * o.size();
         match self.config.futures_type() {
             FuturesTypes::Linear => fee *= price,
             FuturesTypes::Inverse => fee /= price,
         }
         self.account.deduce_fees(fee);
-        self.account.change_position(o.side(), o.size(), price);
 
         self.account
             .finalize_limit_order(o, self.config.fee_maker());
