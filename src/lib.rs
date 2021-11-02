@@ -23,7 +23,6 @@ mod orders;
 mod position;
 mod utils;
 mod validator;
-mod welford_online;
 
 pub use acc_tracker::AccTracker;
 pub use acc_tracker::ReturnsSource;

@@ -1,6 +1,7 @@
 use crate::acc_tracker::AccTracker;
 use crate::limit_order_margin::order_margin;
-use crate::{round, FuturesTypes, Margin, Order, Position, Side};
+use crate::Result;
+use crate::{round, Error, FuturesTypes, Margin, Order, Position, Side};
 use hashbrown::HashMap;
 
 #[derive(Debug, Clone)]
@@ -104,16 +105,10 @@ impl Account {
     /// Cancel an active order
     /// returns Some order if successful with given order_id
     #[must_use]
-    pub fn cancel_order(&mut self, order_id: u64) -> Option<Order> {
+    pub fn cancel_order(&mut self, order_id: u64) -> Result<Order> {
         debug!("cancel_order: {}", order_id);
         let removed_order = match self.active_limit_orders.remove(&order_id) {
-            None => {
-                debug!(
-                    "order with id {} not found in active limit orders",
-                    order_id
-                );
-                return None;
-            }
+            None => return Err(Error::OrderIdNotFound),
             Some(o) => o,
         };
 
@@ -145,16 +140,18 @@ impl Account {
         }
         self.acc_tracker.log_limit_order_cancellation();
 
-        Some(removed_order)
+        Ok(removed_order)
     }
 
     /// Cancel an active order based on the user_order_id of an Order
+    /// # Returns
+    /// the cancelled order if successfull, error when the user_order_id is not found
     #[inline]
     #[must_use]
-    pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Option<Order> {
+    pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Result<Order> {
         debug!("cancel_order_by_user_id: user_order_id: {}", user_order_id);
         let id: u64 = match self.lookup_id_from_user_order_id.get(&user_order_id) {
-            None => return None,
+            None => return Err(Error::UserOrderIdNotFound),
             Some(id) => *id,
         };
         self.cancel_order(id)

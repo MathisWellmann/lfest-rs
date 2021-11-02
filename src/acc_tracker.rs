@@ -304,7 +304,7 @@ impl AccTracker {
         let rets = &self.hist_ln_returns_hourly_acc;
         if rets.len() < n {
             debug!("not enough hourly returns to compute VaR for n={}", n);
-            return 0.0
+            return 0.0;
         }
         let mut ret_streaks = Vec::with_capacity(rets.len() - n);
         for i in n..rets.len() {
@@ -356,7 +356,7 @@ impl AccTracker {
         let rets = &self.hist_ln_returns_hourly_acc;
         if rets.len() < n {
             debug!("not enough hourly returns to compute CF-VaR for n={}", n);
-            return 0.0
+            return 0.0;
         }
         let mut ret_streaks = Vec::with_capacity(rets.len() - n);
         for i in n..rets.len() {

@@ -27,6 +27,14 @@ pub enum Error {
     /// When data could not be parsed
     #[error("could not parse")]
     ParseError,
+
+    /// when cancelling an order but no matching user order id is found
+    #[error("user order id not found")]
+    UserOrderIdNotFound,
+
+    /// When the internal order id is not found while cancelling order
+    #[error("internal order id not found")]
+    OrderIdNotFound,
 }
 
 /// This is defined as a convenience.
