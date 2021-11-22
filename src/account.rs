@@ -150,9 +150,9 @@ impl Account {
     #[must_use]
     pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Result<Order> {
         debug!("cancel_order_by_user_id: user_order_id: {}", user_order_id);
-        let id: u64 = match self.lookup_id_from_user_order_id.get(&user_order_id) {
+        let id: u64 = match self.lookup_id_from_user_order_id.remove(&user_order_id) {
             None => return Err(Error::UserOrderIdNotFound),
-            Some(id) => *id,
+            Some(id) => id,
         };
         self.cancel_order(id)
     }

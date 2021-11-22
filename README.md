@@ -4,8 +4,9 @@
 :warning: The results may not represent real trading results on any given exchange. 
 
 lfest-rs is a blazingly fast simulated exchange capable of leveraged positions.
- It gets fed external data either as a trade or a candle to update the internal state
-  and check for order execution. For simplicity's sake (and performance) the exchange does not use an order book
+ It gets fed external bid ask data to update the internal state
+  and check for order execution. For simplicity's sake (and performance) the exchange does not use an order book.
+  Supported futures types are both linear and inverse futures.
 
 ### Order Types
 The supported order types are:
@@ -18,18 +19,19 @@ The following performance metrics are available through AccTracker struct:
 - profit_loss_ratio
 - total_rpnl
 - sharpe
-- sharpe_daily_returns
 - sortino
 - cumulative fees
-- sharpe_sterling_ratio
-- max_drawdown
-- max_upnl_drawdown
+- max_drawdown_wallet_balance
+- max_drawdown_total
 - num_trades
 - turnover
 - trade_percentage
 - buy_ratio
 - limit_order_fill_ratio
 - limit_order_cancellation_ratio
+- historical_value_at_risk
+- cornish_fisher_value_at_risk
+- d_ratio
 
 Some of these metric may behave differently from what you would expect, so make sure to take a look at the code.
 
@@ -37,7 +39,7 @@ Some of these metric may behave differently from what you would expect, so make 
 To use this crate in your project, add the following to your Cargo.toml:
 ```
 [dependencies]
-lfest = "0.17.9"
+lfest = "0.19.1"
 ```
 
 Then proceed to use it in your code.
@@ -149,7 +151,6 @@ fn analyze_results(e: &Exchange) {
 ```
  
 ### TODOs:
-- proper order margin mechanism
 - proper liquidations
 - add order filter configuration such as min_qty and qty_precision
 - add max_num_limit_orders to config
