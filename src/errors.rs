@@ -1,15 +1,24 @@
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(thiserror::Error, Debug, Clone, Copy, Serialize, Deserialize)]
 /// Defines the possible order errors that can occur when submitting a new order
 pub enum OrderError {
     /// Maximum number of active orders reached
+    #[error("Maximum number of active orders reached")]
     MaxActiveOrders,
+
     /// Invalid limit price of order
+    #[error("Invalid limit price of order")]
     InvalidLimitPrice,
-    /// Invalid trigger price for order. e.g.: sell stop market order trigger price > ask
+
+    /// Invalid trigger price for order
+    #[error("Invalid trigger price for order. e.g.: sell stop market order trigger price > ask")]
     InvalidTriggerPrice,
+
     /// Invalid order size
+    #[error("invalid order size")]
     InvalidOrderSize,
-    /// The account does not have enough available balance to submit the order
+
+    /// The account does not have enought available balance to submit the order
+    #[error("The account does not have enough available balance to submit the order")]
     NotEnoughAvailableBalance,
 }
 
