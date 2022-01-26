@@ -48,12 +48,21 @@ impl FuturesTypes {
     /// Parse the FuturesType from a string
     #[inline]
     pub fn from_str(s: &str) -> Result<Self> {
-        if s.to_lowercase() == "linear" {
+        if s.to_uppercase() == "LINEAR" {
             Ok(Self::Linear)
-        } else if s.to_lowercase() == "inverse" {
+        } else if s.to_uppercase() == "INVERSE" {
             Ok(Self::Inverse)
         } else {
             Err(Error::ParseError)
+        }
+    }
+
+    /// String representation of the FuturesType
+    #[inline(always)]
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            FuturesTypes::Linear => "LINEAR",
+            FuturesTypes::Inverse => "INVERSE",
         }
     }
 }

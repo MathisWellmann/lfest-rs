@@ -415,7 +415,7 @@ impl AccTracker {
 
         let rtv_acc = roi_acc / cf_var_acc;
         let rtv_bnh = roi_bnh / cf_var_bnh;
-        info!(
+        debug!(
             "roi_acc: {:.2}, roi_bnh: {:.2}, cf_var_bnh: {:.8}, cf_var_acc: {:.8}, rtv_acc: {}, rtv_bnh: {}",
             roi_acc, roi_bnh, cf_var_bnh, cf_var_acc, rtv_acc, rtv_bnh,
         );
