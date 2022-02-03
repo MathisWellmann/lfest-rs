@@ -146,8 +146,10 @@ impl Order {
         self.id = id
     }
 
+    /// Set the timestamp of the order,
+    /// note that the timestamps will be overwritten if set_order_timestamps is set in Config
     #[inline(always)]
-    pub(crate) fn set_timestamp(&mut self, ts: i64) {
+    pub fn set_timestamp(&mut self, ts: i64) {
         self.timestamp = ts
     }
 }

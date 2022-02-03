@@ -13,6 +13,7 @@ fn lin_long_market_win_full() {
         1.0,
         FuturesTypes::Linear,
         String::new(),
+        true,
     )
     .unwrap();
 

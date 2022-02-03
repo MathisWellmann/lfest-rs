@@ -139,7 +139,9 @@ impl Exchange {
         // assign unique order id
         order.set_id(self.next_order_id());
 
-        order.set_timestamp(self.current_ts);
+        if self.config.set_order_timestamps() {
+            order.set_timestamp(self.current_ts);
+        }
 
         match order.order_type() {
             OrderType::Market => {

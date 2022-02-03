@@ -21,6 +21,7 @@ fn main() {
         1.0,
         FuturesTypes::Inverse,
         String::new(),
+        true,
     )
     .unwrap();
 

@@ -16,6 +16,8 @@ pub struct Config {
     futures_type: FuturesTypes,
     /// To identify an exchange by a code
     identification: String,
+    /// Sets the order timestamps on submit_order() call, if enabled
+    set_order_timestamps: bool,
 }
 
 impl Config {
@@ -38,6 +40,7 @@ impl Config {
         leverage: f64,
         futures_type: FuturesTypes,
         identification: String,
+        set_order_timestamps: bool,
     ) -> Result<Config> {
         if leverage < 1.0 {
             return Err(Error::ConfigWrongLeverage);
@@ -52,6 +55,7 @@ impl Config {
             leverage,
             futures_type,
             identification,
+            set_order_timestamps,
         })
     }
 
@@ -89,5 +93,11 @@ impl Config {
     #[inline(always)]
     pub fn identification(&self) -> &str {
         &self.identification
+    }
+
+    /// Return whether or not the Exchange is configured to set order timestamps in submit_order method
+    #[inline(always)]
+    pub fn set_order_timestamps(&self) -> bool {
+        self.set_order_timestamps
     }
 }
