@@ -67,6 +67,14 @@ impl Side {
             _ => Err(Error::ParseError),
         }
     }
+
+    /// Returns the inverted side
+    pub fn inverted(&self) -> Self {
+        match self {
+            Side::Buy => Side::Sell,
+            Side::Sell => Side::Buy,
+        }
+    }
 }
 
 impl std::fmt::Display for Side {
