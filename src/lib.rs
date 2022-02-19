@@ -35,6 +35,7 @@ pub use futures_type::FuturesTypes;
 pub use margin::Margin;
 pub use orders::Order;
 pub use position::Position;
+pub use utils::round;
 pub(crate) use utils::{max, min};
 pub(crate) use validator::Validator;
 
@@ -109,37 +110,5 @@ impl OrderType {
             1 => Ok(Self::Limit),
             _ => Err(Error::ParseError),
         }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-/// Defines the two fee types for different types of orders
-pub enum FeeType {
-    /// The fee for passive maker orders such as limit order
-    Maker,
-    /// The fee for aggressive taker orders such as market and stop loss order
-    Taker,
-}
-
-/// round a value to a given precision of decimal places
-/// used in tests
-#[inline(always)]
-pub fn round(val: f64, prec: i32) -> f64 {
-    ((val * 10.0_f64.powi(prec)).round()) / 10.0_f64.powi(prec)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_round() {
-        assert_eq!(round(0.111111, 0), 0.0);
-        assert_eq!(round(0.111111, 1), 0.1);
-        assert_eq!(round(0.111111, 2), 0.11);
-        assert_eq!(round(0.111111, 3), 0.111);
-        assert_eq!(round(0.111111, 4), 0.1111);
-        assert_eq!(round(0.111111, 5), 0.11111);
-        assert_eq!(round(0.111111, 6), 0.111111);
     }
 }

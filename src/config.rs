@@ -40,7 +40,7 @@ impl Config {
         identification: String,
         set_order_timestamps: bool,
     ) -> Result<Config> {
-        if leverage < 1.0 {
+        if leverage <= 0.0 {
             return Err(Error::ConfigWrongLeverage);
         }
         if starting_balance <= 0.0 {

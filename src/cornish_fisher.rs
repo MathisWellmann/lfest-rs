@@ -157,7 +157,7 @@ mod tests {
     use rand_distr::StandardNormal;
 
     use super::*;
-    use crate::round;
+    use crate::utils::round;
 
     #[test]
     fn test_statistical_moments() {

@@ -129,7 +129,7 @@ impl Position {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::round;
+    use crate::utils::round;
 
     #[test]
     fn position_change_size() {

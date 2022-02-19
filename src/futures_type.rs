@@ -76,7 +76,7 @@ impl FromStr for FuturesTypes {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::round;
+    use crate::utils::round;
 
     #[test]
     fn futures_type_pnl_linear() {

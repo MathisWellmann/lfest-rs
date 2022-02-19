@@ -647,7 +647,7 @@ impl AccTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::round;
+    use crate::utils::round;
 
     // Some example hourly ln returns of BCHEUR i pulled from somewhere from about
     // october 2021
