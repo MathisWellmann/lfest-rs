@@ -1,8 +1,9 @@
-use crate::acc_tracker::AccTracker;
-use crate::limit_order_margin::order_margin;
-use crate::Result;
-use crate::{round, Error, FuturesTypes, Margin, Order, Position, Side};
 use hashbrown::HashMap;
+
+use crate::{
+    acc_tracker::AccTracker, limit_order_margin::order_margin, round, Error, FuturesTypes, Margin,
+    Order, Position, Result, Side,
+};
 
 #[derive(Debug, Clone)]
 /// The users account
@@ -20,7 +21,6 @@ pub struct Account {
     // TODO: remove following two fields
     min_limit_buy_price: f64,
     max_limit_sell_price: f64,
-    starting_balance: f64,
 }
 
 impl Account {
@@ -40,15 +40,13 @@ impl Account {
             open_limit_sell_size: 0.0,
             min_limit_buy_price: 0.0,
             max_limit_sell_price: 0.0,
-            starting_balance,
         }
     }
 
     /// Update the accounts state for the newest price data
     pub(crate) fn update(&mut self, price: f64, trade_timestamp: u64) {
         let upnl: f64 =
-            self.futures_type
-                .pnl(self.position.entry_price(), price, self.position.size());
+            self.futures_type.pnl(self.position.entry_price(), price, self.position.size());
         self.acc_tracker.update(trade_timestamp, price, upnl);
 
         self.position.update_state(price, self.futures_type);
@@ -67,8 +65,8 @@ impl Account {
         &self.position
     }
 
-    /// Set a new margin manually, be sure that you know what you are doing when using this method
-    /// Returns true if successful
+    /// Set a new margin manually, be sure that you know what you are doing when
+    /// using this method Returns true if successful
     #[inline(always)]
     pub fn set_margin(&mut self, margin: Margin) {
         self.margin = margin;
@@ -104,7 +102,6 @@ impl Account {
 
     /// Cancel an active order
     /// returns Some order if successful with given order_id
-    #[must_use]
     pub fn cancel_order(&mut self, order_id: u64) -> Result<Order> {
         debug!("cancel_order: {}", order_id);
         let removed_order = match self.active_limit_orders.remove(&order_id) {
@@ -145,9 +142,9 @@ impl Account {
 
     /// Cancel an active order based on the user_order_id of an Order
     /// # Returns
-    /// the cancelled order if successfull, error when the user_order_id is not found
+    /// the cancelled order if successfull, error when the user_order_id is not
+    /// found
     #[inline]
-    #[must_use]
     pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Result<Order> {
         debug!("cancel_order_by_user_id: user_order_id: {}", user_order_id);
         let id: u64 = match self.lookup_id_from_user_order_id.remove(&user_order_id) {
@@ -184,10 +181,7 @@ impl Account {
 
     /// Append a new limit order as active order
     pub(crate) fn append_limit_order(&mut self, order: Order, order_margin: f64) {
-        debug!(
-            "append_limit_order: order: {:?}, order_margin: {}",
-            order, order_margin
-        );
+        debug!("append_limit_order: order: {:?}, order_margin: {}", order, order_margin);
 
         let limit_price = order.limit_price().unwrap();
         match order.side() {
@@ -226,8 +220,7 @@ impl Account {
         match order.user_order_id() {
             None => {}
             Some(user_order_id) => {
-                self.lookup_id_from_user_order_id
-                    .insert(*user_order_id, order_id);
+                self.lookup_id_from_user_order_id.insert(*user_order_id, order_id);
             }
         };
     }
@@ -270,7 +263,8 @@ impl Account {
                 .fold(f64::NAN, f64::max)
         };
 
-        // set this to 0.0 temporarily and it will be properly assigned at the end of limit order execution
+        // set this to 0.0 temporarily and it will be properly assigned at the end of
+        // limit order execution
         self.margin.set_order_margin(0.0);
     }
 
@@ -320,8 +314,7 @@ impl Account {
                             self.position.size(),
                         )
                     } else {
-                        self.futures_type
-                            .pnl(self.position.entry_price(), exec_price, -size)
+                        self.futures_type.pnl(self.position.entry_price(), exec_price, -size)
                     }
                 } else {
                     0.0
@@ -337,8 +330,7 @@ impl Account {
                             self.position.size(),
                         )
                     } else {
-                        self.futures_type
-                            .pnl(self.position.entry_price(), exec_price, size)
+                        self.futures_type.pnl(self.position.entry_price(), exec_price, size)
                     }
                 } else {
                     0.0
@@ -360,8 +352,7 @@ impl Account {
         }
 
         // change position
-        self.position
-            .change_size(pos_size_delta, exec_price, self.futures_type);
+        self.position.change_size(pos_size_delta, exec_price, self.futures_type);
 
         // set position margin
         let mut pos_margin: f64 = self.position.size().abs() / self.position.leverage();

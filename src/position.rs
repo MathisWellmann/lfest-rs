@@ -1,5 +1,6 @@
-use crate::FuturesTypes;
 use serde::{Deserialize, Serialize};
+
+use crate::FuturesTypes;
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 /// Describes the position information of the account

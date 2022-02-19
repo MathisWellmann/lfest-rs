@@ -1,5 +1,6 @@
-use crate::{OrderError, OrderType, Side};
 use serde::{Deserialize, Serialize};
+
+use crate::{OrderError, OrderType, Side};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Defines an order
@@ -33,7 +34,6 @@ impl Order {
     //  denoted in QUOTE currency when using inverse futures
     /// # Returns
     /// Either a successfully created order or an OrderError
-    #[must_use]
     #[inline]
     pub fn limit(side: Side, limit_price: f64, size: f64) -> Result<Order, OrderError> {
         if limit_price <= 0.0 {
@@ -61,7 +61,6 @@ impl Order {
     /// denoted in QUOTE currency when using inverse futures
     /// # Returns
     /// Either a successfully created order or an OrderError
-    #[must_use]
     #[inline]
     pub fn market(side: Side, size: f64) -> Result<Order, OrderError> {
         if size <= 0.0 {
@@ -147,7 +146,8 @@ impl Order {
     }
 
     /// Set the timestamp of the order,
-    /// note that the timestamps will be overwritten if set_order_timestamps is set in Config
+    /// note that the timestamps will be overwritten if set_order_timestamps is
+    /// set in Config
     #[inline(always)]
     pub fn set_timestamp(&mut self, ts: i64) {
         self.timestamp = ts

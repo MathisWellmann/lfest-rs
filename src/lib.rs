@@ -24,8 +24,9 @@ mod position;
 mod utils;
 mod validator;
 
-pub use acc_tracker::AccTracker;
-pub use acc_tracker::ReturnsSource;
+use std::fmt::Formatter;
+
+pub use acc_tracker::{AccTracker, ReturnsSource};
 pub use account::Account;
 pub use config::Config;
 pub use errors::{Error, OrderError, Result};
@@ -34,8 +35,6 @@ pub use futures_type::FuturesTypes;
 pub use margin::Margin;
 pub use orders::Order;
 pub use position::Position;
-
-use std::fmt::Formatter;
 pub(crate) use utils::{max, min};
 pub(crate) use validator::Validator;
 

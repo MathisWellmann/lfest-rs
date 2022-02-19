@@ -1,5 +1,5 @@
 /// Compute the four statistical moments: mean, std_dev, skew and kurtosis
-fn statistical_moments(vals: &Vec<f64>) -> (f64, f64, f64, f64) {
+fn statistical_moments(vals: &[f64]) -> (f64, f64, f64, f64) {
     let mean = vals.iter().sum::<f64>() / vals.len() as f64;
 
     let variance = vals.iter().map(|v| (*v - mean).powi(2)).sum::<f64>() / vals.len() as f64;
@@ -127,12 +127,12 @@ fn percent_point_function(q: f64) -> f64 {
 /// # Arguments:
 /// log_returns: logarithmic return series: (p1 / p0).ln()
 /// asset_value: current asset value
-/// confidence_interval: in range [0.0, 1.0], usually something like 0.01 or 0.05
-/// # Returns:
+/// confidence_interval: in range [0.0, 1.0], usually something like 0.01 or
+/// 0.05 # Returns:
 /// tuple containing (cf_exp, cf_var, cf_asset_value)
 /// of most importance is cf_var which if the actual CF-VaR
 pub(crate) fn cornish_fisher_value_at_risk(
-    log_returns: &Vec<f64>,
+    log_returns: &[f64],
     asset_value: f64,
     confidence_interval: f64,
 ) -> (f64, f64, f64) {
@@ -144,7 +144,8 @@ pub(crate) fn cornish_fisher_value_at_risk(
         + (quantile.powi(3) - 3.0 * quantile) * kurtosis / 24.0
         - (2.0 * quantile.powi(3) - 5.0 * quantile) * skew.powi(2) / 36.0;
     let cf_var = mean + std_dev * cf_exp;
-    //let cf_asset_value = asset_value * (1.0 + cf_var); // like in the paper, but wrong as the underlying returns are logarithmic
+    //let cf_asset_value = asset_value * (1.0 + cf_var); // like in the paper, but
+    // wrong as the underlying returns are logarithmic
     let cf_asset_value = asset_value - (asset_value * cf_var.exp());
 
     (cf_exp, cf_var, cf_asset_value)

@@ -6,24 +6,17 @@ mod load_trades;
 #[macro_use]
 extern crate log;
 
+use std::time::Instant;
+
 use lfest::{Config, Exchange, FuturesTypes, Order, OrderError, ReturnsSource, Side};
 use load_trades::load_prices_from_csv;
 use rand::{thread_rng, Rng};
-use std::time::Instant;
 
 fn main() {
     let t0 = Instant::now();
 
-    let config = Config::new(
-        0.0002,
-        0.0006,
-        1.0,
-        1.0,
-        FuturesTypes::Inverse,
-        String::new(),
-        true,
-    )
-    .unwrap();
+    let config =
+        Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new(), true).unwrap();
 
     let mut exchange = Exchange::new(config);
 
@@ -46,7 +39,8 @@ fn main() {
             // Trade a fraction of the available wallet balance
             let order_size: f64 = exchange.account().margin().wallet_balance() * 0.1;
             let order: Order = if r > 0.5 {
-                Order::market(Side::Sell, order_size).unwrap() // Sell using market order
+                Order::market(Side::Sell, order_size).unwrap() // Sell using
+                                                               // market order
             } else {
                 Order::market(Side::Buy, order_size).unwrap() // Buy using market order
             };
@@ -81,14 +75,8 @@ fn analyze_results(e: &Exchange) {
     let win_ratio = e.account().acc_tracker().win_ratio();
     let profit_loss_ratio = e.account().acc_tracker().profit_loss_ratio();
     let rpnl = e.account().acc_tracker().total_rpnl();
-    let sharpe = e
-        .account()
-        .acc_tracker()
-        .sharpe(&ReturnsSource::TickByTick, false);
-    let sortino = e
-        .account()
-        .acc_tracker()
-        .sortino(&ReturnsSource::TickByTick, false);
+    let sharpe = e.account().acc_tracker().sharpe(&ReturnsSource::TickByTick, false);
+    let sortino = e.account().acc_tracker().sortino(&ReturnsSource::TickByTick, false);
     let max_drawdown = e.account().acc_tracker().max_drawdown_wallet_balance();
     let max_upnl_drawdown = e.account().acc_tracker().max_drawdown_total();
     let num_trades = e.account().acc_tracker().num_trades();

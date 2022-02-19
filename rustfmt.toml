@@ -1,0 +1,5 @@
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+use_small_heuristics = "Off"
+where_single_line = true
+wrap_comments = true

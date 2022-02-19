@@ -1,5 +1,6 @@
-use crate::limit_order_margin::order_margin;
-use crate::{max, min, Account, FuturesTypes, Order, OrderError, Side};
+use crate::{
+    limit_order_margin::order_margin, max, min, Account, FuturesTypes, Order, OrderError, Side,
+};
 
 #[derive(Clone, Debug, Default)]
 /// Used for validating orders
@@ -37,8 +38,8 @@ impl Validator {
 
     /// Check if market order is correct
     /// # Returns
-    /// debited and credited account balance deltas, if order valid, OrderError otherwise
-    #[must_use]
+    /// debited and credited account balance deltas, if order valid, OrderError
+    /// otherwise
     pub(crate) fn validate_market_order(&self, o: &Order, acc: &Account) -> Result<(), OrderError> {
         let (debit, credit) = self.order_cost_market(o, acc);
         debug!("validate_market_order debit: {}, credit: {}", debit, credit);
@@ -53,7 +54,6 @@ impl Validator {
     /// Check if a limit order is correct
     /// # Returns
     /// order margin if order is valid, OrderError otherwise
-    #[must_use]
     pub(crate) fn validate_limit_order(&self, o: &Order, acc: &Account) -> Result<f64, OrderError> {
         // validate order price
         match o.side() {
@@ -88,11 +88,7 @@ impl Validator {
     /// debited and credited account balance delta
     #[must_use]
     fn order_cost_market(&self, order: &Order, acc: &Account) -> (f64, f64) {
-        debug!(
-            "order_cost_market: order: {:?},\nacc.position: {:?}",
-            order,
-            acc.position()
-        );
+        debug!("order_cost_market: order: {:?},\nacc.position: {:?}", order, acc.position());
 
         let pos_size = acc.position().size();
 
@@ -129,15 +125,15 @@ impl Validator {
         };
         match self.futures_type {
             FuturesTypes::Linear => {
-                // the values fee, debit and credit have to be converted from denoted in BASE currency
-                // to being denoted in QUOTE currency
+                // the values fee, debit and credit have to be converted from denoted in BASE
+                // currency to being denoted in QUOTE currency
                 fee *= price;
                 debit *= price;
                 credit *= price;
             }
             FuturesTypes::Inverse => {
-                // the values fee, debit and credit have to be converted from denoted in QUOTE currency
-                // to being denoted in BASE currency
+                // the values fee, debit and credit have to be converted from denoted in QUOTE
+                // currency to being denoted in BASE currency
                 fee /= price;
                 debit /= price;
                 credit /= price;
@@ -153,10 +149,7 @@ impl Validator {
     #[must_use]
     fn limit_order_margin_cost(&self, order: &Order, acc: &Account) -> f64 {
         let mut orders = acc.active_limit_orders().clone();
-        debug!(
-            "limit_order_margin_cost: order: {:?}, active_limit_orders: {:?}",
-            order, orders
-        );
+        debug!("limit_order_margin_cost: order: {:?}, active_limit_orders: {:?}", order, orders);
         orders.insert(order.id(), *order);
         let needed_order_margin = order_margin(
             orders.values(),

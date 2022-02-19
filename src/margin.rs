@@ -80,13 +80,15 @@ impl Margin {
         self.position_margin
     }
 
-    /// Return the used order margin of account, same denotation as wallet_balance
+    /// Return the used order margin of account, same denotation as
+    /// wallet_balance
     #[inline(always)]
     pub fn order_margin(&self) -> f64 {
         self.order_margin
     }
 
-    /// Return the available balance of account, same denotation as wallet_balance
+    /// Return the available balance of account, same denotation as
+    /// wallet_balance
     #[inline(always)]
     pub fn available_balance(&self) -> f64 {
         self.available_balance
@@ -106,7 +108,8 @@ impl Margin {
         debug_assert!(self.available_balance >= 0.0);
     }
 
-    /// Set the position margin by a given delta and adjust available balance accordingly
+    /// Set the position margin by a given delta and adjust available balance
+    /// accordingly
     #[inline]
     pub(crate) fn set_position_margin(&mut self, val: f64) {
         debug!("set_position_margin({}), self: {:?}", val, self);

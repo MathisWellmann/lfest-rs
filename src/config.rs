@@ -1,5 +1,4 @@
-use crate::FuturesTypes;
-use crate::{Error, Result};
+use crate::{Error, FuturesTypes, Result};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Define the Exchange configuration
@@ -25,13 +24,12 @@ impl Config {
     /// # Arguments
     /// fee_maker: The maker fee as fraction, e.g 6bp -> 0.0006
     /// fee_taker: The taker fee as fraction
-    /// starting_balance: Initial Wallet Balance, denoted in QUOTE if using linear futures, denoted in BASE for inverse futures
-    /// leverage: The positions leverage
-    /// futures_type: The type of futures contract to simulate
-    /// identification: A way to identify an exchange
+    /// starting_balance: Initial Wallet Balance, denoted in QUOTE if using
+    /// linear futures, denoted in BASE for inverse futures leverage: The
+    /// positions leverage futures_type: The type of futures contract to
+    /// simulate identification: A way to identify an exchange
     /// # Returns
     /// Either a valid Config or an Error
-    #[must_use]
     #[inline]
     pub fn new(
         fee_maker: f64,
@@ -95,7 +93,8 @@ impl Config {
         &self.identification
     }
 
-    /// Return whether or not the Exchange is configured to set order timestamps in submit_order method
+    /// Return whether or not the Exchange is configured to set order timestamps
+    /// in submit_order method
     #[inline(always)]
     pub fn set_order_timestamps(&self) -> bool {
         self.set_order_timestamps

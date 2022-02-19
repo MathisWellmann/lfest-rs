@@ -38,9 +38,7 @@ pub(crate) fn order_margin<'a>(
     let bsd = buy_size - min(pos_size, 0.0).abs();
     let ssd = sell_size - max(pos_size, 0.0);
     let mut fees = 0.0;
-    let order_margin: f64 = if buy_size == 0.0 && sell_size == 0.0 {
-        0.0
-    } else if bsd == 0.0 && ssd == 0.0 {
+    let order_margin: f64 = if (buy_size == 0.0 && sell_size == 0.0) || (bsd == 0.0 && ssd == 0.0) {
         0.0
     } else if ssd > bsd {
         if ssd == 0.0 {
@@ -68,7 +66,8 @@ pub(crate) fn order_margin<'a>(
         pos_size, bsd, ssd, buy_price_weight, sell_price_weight, buy_size, sell_size, order_margin, buy_side_fees, sell_side_fees,
     );
 
-    // TODO: not sure if this method of including the fees is correct, but its about right xD
+    // TODO: not sure if this method of including the fees is correct, but its about
+    // right xD
     (order_margin / leverage) + fees
 }
 

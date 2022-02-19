@@ -1,9 +1,9 @@
 //! Example showing how to load trades from csv file
 
-use std::fs::File;
-use std::time::Instant;
+use std::{fs::File, time::Instant};
 
-/// Loads trades from a csv file and on success returns a vector of trades in the proper format
+/// Loads trades from a csv file and on success returns a vector of trades in
+/// the proper format
 pub fn load_prices_from_csv(filename: &str) -> Result<Vec<f64>, Box<dyn std::error::Error>> {
     let f = File::open(filename)?;
 
@@ -24,9 +24,5 @@ fn main() {
     let t0 = Instant::now();
     let trades = load_prices_from_csv("./data/Bitmex_XBTUSD_1M.csv").unwrap();
     println!("last trades: {:?}", trades[trades.len() - 1]);
-    println!(
-        "loaded {} trades in {}ms",
-        trades.len(),
-        t0.elapsed().as_millis()
-    );
+    println!("loaded {} trades in {}ms", trades.len(), t0.elapsed().as_millis());
 }

@@ -1,5 +1,4 @@
-use crate::cornish_fisher::cornish_fisher_value_at_risk;
-use crate::{FuturesTypes, Side};
+use crate::{cornish_fisher::cornish_fisher_value_at_risk, FuturesTypes, Side};
 
 const DAILY_NS: u64 = 86_400_000_000_000;
 const HOURLY_NS: u64 = 3_600_000_000_000;
@@ -23,7 +22,6 @@ pub struct AccTracker {
     wallet_balance_last: f64,  // last wallet balance recording
     wallet_balance_start: f64, // wallet balance at start
     wallet_balance_high: f64,  // maximum wallet balance observed
-    total_balance_high: f64,   // wallet_balance + upnl high
     futures_type: FuturesTypes,
     total_rpnl: f64,
     upnl: f64,
@@ -84,7 +82,6 @@ impl AccTracker {
             wallet_balance_last: starting_wb,
             wallet_balance_start: starting_wb,
             wallet_balance_high: starting_wb,
-            total_balance_high: starting_wb,
             futures_type,
             total_rpnl: 0.0,
             upnl: 0.0,
@@ -129,8 +126,8 @@ impl AccTracker {
         }
     }
 
-    /// Vector of absolute returns the account has generated, including unrealized pnl
-    /// # Parameters
+    /// Vector of absolute returns the account has generated, including
+    /// unrealized pnl # Parameters
     /// source: the sampling interval of pnl snapshots
     #[inline(always)]
     pub fn absolute_returns(&self, source: &ReturnsSource) -> &Vec<f64> {
@@ -141,8 +138,8 @@ impl AccTracker {
         }
     }
 
-    /// Vector of natural logarithmic returns the account has generated, including unrealized pnl
-    /// # Parameters
+    /// Vector of natural logarithmic returns the account has generated,
+    /// including unrealized pnl # Parameters
     /// source: the sampling interval of pnl snapshots
     #[inline(always)]
     pub fn ln_returns(&self, source: &ReturnsSource) -> &Vec<f64> {
@@ -172,8 +169,7 @@ impl AccTracker {
             FuturesTypes::Linear => self.wallet_balance_start / self.price_first,
             FuturesTypes::Inverse => self.wallet_balance_start * self.price_first,
         };
-        self.futures_type
-            .pnl(self.price_first, self.price_last, qty)
+        self.futures_type.pnl(self.price_first, self.price_last, qty)
     }
 
     /// Would be return of sell and hold strategy
@@ -183,15 +179,14 @@ impl AccTracker {
             FuturesTypes::Linear => self.wallet_balance_start / self.price_first,
             FuturesTypes::Inverse => self.wallet_balance_start * self.price_first,
         };
-        self.futures_type
-            .pnl(self.price_first, self.price_last, -qty)
+        self.futures_type.pnl(self.price_first, self.price_last, -qty)
     }
 
     /// Return the sharpe ratio using the selected returns as source
     /// # Parameters:
     /// returns_source: the sampling interval of pnl snapshots
-    /// risk_free_is_buy_and_hold: if true, it will use the market returns as the risk-free comparison
-    ///     else risk-free rate is zero
+    /// risk_free_is_buy_and_hold: if true, it will use the market returns as
+    /// the risk-free comparison     else risk-free rate is zero
     pub fn sharpe(&self, returns_source: &ReturnsSource, risk_free_is_buy_and_hold: bool) -> f64 {
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
@@ -206,11 +201,8 @@ impl AccTracker {
             };
             let n: f64 = rets_acc.len() as f64;
             // compute the difference of returns of account and market
-            let diff_returns: Vec<f64> = rets_acc
-                .iter()
-                .zip(rets_bnh)
-                .map(|(a, b)| *a - *b)
-                .collect();
+            let diff_returns: Vec<f64> =
+                rets_acc.iter().zip(rets_bnh).map(|(a, b)| *a - *b).collect();
             let avg = diff_returns.iter().sum::<f64>() / n;
             let variance = diff_returns.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
             let std_dev = variance.sqrt();
@@ -229,8 +221,8 @@ impl AccTracker {
     /// Return the Sortino ratio based on daily returns data
     /// # Parameters:
     /// returns_source: the sampling interval of pnl snapshots
-    /// risk_free_is_buy_and_hold: if true, it will use the market returns as the risk-free comparison
-    ///     else risk-free rate is zero
+    /// risk_free_is_buy_and_hold: if true, it will use the market returns as
+    /// the risk-free comparison     else risk-free rate is zero
     pub fn sortino(&self, returns_source: &ReturnsSource, risk_free_is_buy_and_hold: bool) -> f64 {
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
@@ -244,12 +236,8 @@ impl AccTracker {
                 ReturnsSource::TickByTick => &self.hist_returns_tick_bnh,
             };
             // compute the difference of returns of account and market
-            let diff_returns: Vec<f64> = rets_acc
-                .iter()
-                .zip(rets_bnh)
-                .map(|(a, b)| *a - *b)
-                .filter(|v| *v < 0.0)
-                .collect();
+            let diff_returns: Vec<f64> =
+                rets_acc.iter().zip(rets_bnh).map(|(a, b)| *a - *b).filter(|v| *v < 0.0).collect();
             let n: f64 = diff_returns.len() as f64;
             let avg = diff_returns.iter().sum::<f64>() / n;
             let variance = diff_returns.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
@@ -257,27 +245,23 @@ impl AccTracker {
 
             (self.total_rpnl - self.buy_and_hold_return()) / std_dev
         } else {
-            let downside_rets: Vec<f64> =
-                rets_acc.iter().map(|v| *v).filter(|v| *v < 0.0).collect();
+            let downside_rets: Vec<f64> = rets_acc.iter().copied().filter(|v| *v < 0.0).collect();
             let n = downside_rets.len() as f64;
             let avg = downside_rets.iter().sum::<f64>() / n;
-            let var = downside_rets
-                .iter()
-                .map(|v| (*v - avg).powi(2))
-                .sum::<f64>()
-                / n;
+            let var = downside_rets.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
             let std_dev = var.sqrt();
 
             self.total_rpnl / std_dev
         }
     }
 
-    /// Calculate the value at risk using the percentile method on daily returns multiplied by starting wallet balance
-    /// The time horizon N is assumed to be 1
-    /// The literature says if you want a larger N, just multiply by N.sqrt(), which assumes standard normal distribution
-    /// # Arguments
+    /// Calculate the value at risk using the percentile method on daily returns
+    /// multiplied by starting wallet balance The time horizon N is assumed
+    /// to be 1 The literature says if you want a larger N, just multiply by
+    /// N.sqrt(), which assumes standard normal distribution # Arguments
     /// returns_source: the sampling interval of pnl snapshots
-    /// percentile: value between [0.0, 1.0], smaller value will return more worst case results
+    /// percentile: value between [0.0, 1.0], smaller value will return more
+    /// worst case results
     #[inline]
     pub fn historical_value_at_risk(&self, returns_source: &ReturnsSource, percentile: f64) -> f64 {
         let mut rets = match returns_source {
@@ -293,13 +277,15 @@ impl AccTracker {
         }
     }
 
-    /// Calculate the historical value at risk from n consequtive hourly return values,
-    /// This should have better statistical properties compared to using daily returns due to having more samples.
-    /// Set n to 24 for daily value at risk, but with 24x more samples from which to take the percentile,
-    /// giving a more accurate VaR
+    /// Calculate the historical value at risk from n consequtive hourly return
+    /// values, This should have better statistical properties compared to
+    /// using daily returns due to having more samples. Set n to 24 for
+    /// daily value at risk, but with 24x more samples from which to take the
+    /// percentile, giving a more accurate VaR
     /// # Parameters:
     /// n: number of hourly returns to use
-    /// percentile: value between [0.0, 1.0], smaller value will return more worst case results
+    /// percentile: value between [0.0, 1.0], smaller value will return more
+    /// worst case results
     pub fn historical_value_at_risk_from_n_hourly_returns(&self, n: usize, percentile: f64) -> f64 {
         let rets = &self.hist_ln_returns_hourly_acc;
         if rets.len() < n {
@@ -309,8 +295,8 @@ impl AccTracker {
         let mut ret_streaks = Vec::with_capacity(rets.len() - n);
         for i in n..rets.len() {
             let mut r = 1.0;
-            for j in (i - n)..i {
-                r *= rets[j].exp();
+            for ret in rets.iter().take(i).skip(i - n) {
+                r *= ret.exp();
             }
             ret_streaks.push(r);
         }
@@ -323,8 +309,8 @@ impl AccTracker {
         }
     }
 
-    /// Calculate the cornish fisher value at risk based on daily returns of the account
-    /// # Arguments
+    /// Calculate the cornish fisher value at risk based on daily returns of the
+    /// account # Arguments
     /// returns_source: the sampling interval of pnl snapshots
     /// percentile: in range [0.0, 1.0], usually something like 0.01 or 0.05
     #[inline]
@@ -338,16 +324,18 @@ impl AccTracker {
             ReturnsSource::Hourly => &self.hist_ln_returns_hourly_acc,
             ReturnsSource::TickByTick => &self.hist_ln_returns_tick_acc,
         };
-        cornish_fisher_value_at_risk(&rets, self.wallet_balance_start, percentile).2
+        cornish_fisher_value_at_risk(rets, self.wallet_balance_start, percentile).2
     }
 
-    /// Calculate the corni fisher value at risk from n consequtive hourly return values
-    /// This should have better statistical properties compared to using daily returns due to having more samples.
-    /// Set n to 24 for daily value at risk, but with 24x more samples from which to take the percentile,
-    /// giving a more accurate VaR
+    /// Calculate the corni fisher value at risk from n consequtive hourly
+    /// return values This should have better statistical properties
+    /// compared to using daily returns due to having more samples. Set n to
+    /// 24 for daily value at risk, but with 24x more samples from which to take
+    /// the percentile, giving a more accurate VaR
     /// # Parameters:
     /// n: number of hourly returns to use
-    /// percentile: value between [0.0, 1.0], smaller value will return more worst case results
+    /// percentile: value between [0.0, 1.0], smaller value will return more
+    /// worst case results
     pub fn cornish_fisher_value_at_risk_from_n_hourly_returns(
         &self,
         n: usize,
@@ -361,8 +349,8 @@ impl AccTracker {
         let mut ret_streaks = Vec::with_capacity(rets.len() - n);
         for i in n..rets.len() {
             let mut r = 1.0;
-            for j in (i - n)..i {
-                r *= rets[j].exp();
+            for ret in rets.iter().take(i).skip(i - n) {
+                r *= ret.exp();
             }
             ret_streaks.push(r);
         }
@@ -379,10 +367,10 @@ impl AccTracker {
         (self.ts_last - self.ts_first) / DAILY_NS
     }
 
-    /// Also called discriminant-ratio, which focuses on the added value of the algorithm
-    /// It uses the Cornish-Fish Value at Risk (CF-VaR)
-    /// It better captures the risk of the asset as it is not limited by the assumption of a gaussian distribution
-    /// It it time-insensitive
+    /// Also called discriminant-ratio, which focuses on the added value of the
+    /// algorithm It uses the Cornish-Fish Value at Risk (CF-VaR)
+    /// It better captures the risk of the asset as it is not limited by the
+    /// assumption of a gaussian distribution It it time-insensitive
     /// from: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3927058
     /// # Parameters
     /// returns_source: the sampling interval of pnl snapshots
@@ -404,14 +392,10 @@ impl AccTracker {
         let num_trading_days = self.num_trading_days() as f64;
 
         // compute annualized returns
-        let roi_acc = rets_acc
-            .iter()
-            .fold(1.0, |acc, x| acc * x.exp())
-            .powf(365.0 / num_trading_days);
-        let roi_bnh = rets_bnh
-            .iter()
-            .fold(1.0, |acc, x| acc * x.exp())
-            .powf(365.0 / num_trading_days);
+        let roi_acc =
+            rets_acc.iter().fold(1.0, |acc, x| acc * x.exp()).powf(365.0 / num_trading_days);
+        let roi_bnh =
+            rets_bnh.iter().fold(1.0, |acc, x| acc * x.exp()).powf(365.0 / num_trading_days);
 
         let rtv_acc = roi_acc / cf_var_acc;
         let rtv_bnh = roi_bnh / cf_var_bnh;
@@ -435,7 +419,8 @@ impl AccTracker {
         self.max_drawdown_wallet_balance
     }
 
-    /// Maximum drawdown of the wallet balance including unrealized profit and loss
+    /// Maximum drawdown of the wallet balance including unrealized profit and
+    /// loss
     #[inline(always)]
     pub fn max_drawdown_total(&self) -> f64 {
         self.max_drawdown_total
@@ -488,13 +473,15 @@ impl AccTracker {
         }
     }
 
-    /// Return the ratio of filled limit orders vs number of submitted limit orders
+    /// Return the ratio of filled limit orders vs number of submitted limit
+    /// orders
     #[inline(always)]
     pub fn limit_order_fill_ratio(&self) -> f64 {
         self.num_filled_limit_orders as f64 / self.num_submitted_limit_orders as f64
     }
 
-    /// Return the ratio of limit order cancellations vs number of submitted limit orders
+    /// Return the ratio of limit order cancellations vs number of submitted
+    /// limit orders
     #[inline(always)]
     pub fn limit_order_cancellation_ratio(&self) -> f64 {
         self.num_cancelled_limit_orders as f64 / self.num_submitted_limit_orders as f64
@@ -534,8 +521,8 @@ impl AccTracker {
         }
     }
 
-    /// Update the most recent timestamp which is used for daily rpnl calculation.
-    /// Assumes timestamp in nanoseconds
+    /// Update the most recent timestamp which is used for daily rpnl
+    /// calculation. Assumes timestamp in nanoseconds
     pub(crate) fn update(&mut self, ts: u64, price: f64, upnl: f64) {
         self.price_last = price;
         if self.price_a_day_ago == 0.0 {
@@ -595,9 +582,7 @@ impl AccTracker {
 
             // calculate hourly return of buy_and_hold
             let bnh_qty = self.wallet_balance_start / self.price_first;
-            let pnl_bnh = self
-                .futures_type
-                .pnl(self.price_an_hour_ago, price, bnh_qty);
+            let pnl_bnh = self.futures_type.pnl(self.price_an_hour_ago, price, bnh_qty);
             self.hist_returns_hourly_bnh.push(pnl_bnh);
 
             // calculate hourly logarithmic return of buy_and_hold
@@ -664,7 +649,8 @@ mod tests {
     use super::*;
     use crate::round;
 
-    // Some example hourly ln returns of BCHEUR i pulled from somewhere from about october 2021
+    // Some example hourly ln returns of BCHEUR i pulled from somewhere from about
+    // october 2021
     const LN_RETS_H: [f64; 400] = [
         0.00081502,
         0.00333945,
@@ -1136,17 +1122,11 @@ mod tests {
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
-            round(
-                acc_tracker.historical_value_at_risk(&ReturnsSource::Hourly, 0.05),
-                3
-            ),
+            round(acc_tracker.historical_value_at_risk(&ReturnsSource::Hourly, 0.05), 3),
             1.173
         );
         assert_eq!(
-            round(
-                acc_tracker.historical_value_at_risk(&ReturnsSource::Hourly, 0.01),
-                3
-            ),
+            round(acc_tracker.historical_value_at_risk(&ReturnsSource::Hourly, 0.01), 3),
             2.54
         );
     }
@@ -1158,20 +1138,8 @@ mod tests {
         let mut at = AccTracker::new(100.0, FuturesTypes::Linear);
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(
-            round(
-                at.historical_value_at_risk_from_n_hourly_returns(24, 0.05),
-                3
-            ),
-            3.835
-        );
-        assert_eq!(
-            round(
-                at.historical_value_at_risk_from_n_hourly_returns(24, 0.01),
-                3
-            ),
-            6.061
-        );
+        assert_eq!(round(at.historical_value_at_risk_from_n_hourly_returns(24, 0.05), 3), 3.835);
+        assert_eq!(round(at.historical_value_at_risk_from_n_hourly_returns(24, 0.01), 3), 6.061);
     }
 
     #[test]
@@ -1182,17 +1150,11 @@ mod tests {
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
-            round(
-                acc_tracker.cornish_fisher_value_at_risk(&ReturnsSource::Hourly, 0.05),
-                3
-            ),
+            round(acc_tracker.cornish_fisher_value_at_risk(&ReturnsSource::Hourly, 0.05), 3),
             1.354
         );
         assert_eq!(
-            round(
-                acc_tracker.cornish_fisher_value_at_risk(&ReturnsSource::Hourly, 0.01),
-                3
-            ),
+            round(acc_tracker.cornish_fisher_value_at_risk(&ReturnsSource::Hourly, 0.01), 3),
             5.786
         );
     }
@@ -1205,17 +1167,11 @@ mod tests {
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
-            round(
-                at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05),
-                3
-            ),
+            round(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05), 3),
             4.043
         );
         assert_eq!(
-            round(
-                at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01),
-                3
-            ),
+            round(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01), 3),
             5.358
         );
     }

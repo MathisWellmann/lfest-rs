@@ -16,18 +16,13 @@ pub struct Exchange {
 }
 
 impl Exchange {
-    /// Create a new Exchange with the desired config and whether to use candles as infomation source
+    /// Create a new Exchange with the desired config and whether to use candles
+    /// as infomation source
     pub fn new(config: Config) -> Exchange {
-        let account = Account::new(
-            config.leverage(),
-            config.starting_balance(),
-            config.futures_type(),
-        );
-        let validator = Validator::new(
-            config.fee_maker(),
-            config.fee_taker(),
-            config.futures_type(),
-        );
+        let account =
+            Account::new(config.leverage(), config.starting_balance(), config.futures_type());
+        let validator =
+            Validator::new(config.fee_maker(), config.fee_taker(), config.futures_type());
         Exchange {
             config,
             account,
@@ -89,9 +84,9 @@ impl Exchange {
     /// bid: bid price
     /// ask: ask price
     /// timestamp: timestamp usually in milliseconds
-    /// high: highest price over last period, use when feeding in candle info, otherwise set high == ask
-    /// low: lowest price over last period, use when feeding in candle info, otherwise set low == bid
-    /// ### Returns
+    /// high: highest price over last period, use when feeding in candle info,
+    /// otherwise set high == ask low: lowest price over last period, use
+    /// when feeding in candle info, otherwise set low == bid ### Returns
     /// executed orders
     /// true if position has been liquidated
     #[must_use]
@@ -132,7 +127,6 @@ impl Exchange {
 
     /// Submit a new order to the exchange.
     /// Returns the order with timestamp and id filled in or OrderError
-    #[must_use]
     pub fn submit_order(&mut self, mut order: Order) -> Result<Order, OrderError> {
         debug!("submit_order: {:?}", order);
 
@@ -146,8 +140,7 @@ impl Exchange {
         match order.order_type() {
             OrderType::Market => {
                 // immediately execute market order
-                self.validator
-                    .validate_market_order(&order, &self.account)?;
+                self.validator.validate_market_order(&order, &self.account)?;
                 self.execute_market(order.side(), order.size());
 
                 Ok(order)
@@ -171,10 +164,7 @@ impl Exchange {
 
     /// Execute a market order
     fn execute_market(&mut self, side: Side, amount: f64) {
-        debug!(
-            "exchange: execute_market: side: {:?}, amount: {}",
-            side, amount
-        );
+        debug!("exchange: execute_market: side: {:?}, amount: {}", side, amount);
 
         let price: f64 = match side {
             Side::Buy => self.ask,
@@ -196,8 +186,7 @@ impl Exchange {
 
         let price = o.limit_price().unwrap();
 
-        self.account
-            .remove_executed_order_from_order_margin_calculation(&o);
+        self.account.remove_executed_order_from_order_margin_calculation(&o);
 
         self.account.change_position(o.side(), o.size(), price);
 
@@ -208,8 +197,7 @@ impl Exchange {
         }
         self.account.deduce_fees(fee);
 
-        self.account
-            .finalize_limit_order(o, self.config.fee_maker());
+        self.account.finalize_limit_order(o, self.config.fee_maker());
     }
 
     /// Perform a liquidation of the account
@@ -223,15 +211,10 @@ impl Exchange {
         }
     }
 
-    /// Check if any active orders have been triggered by the most recent price action
-    /// method is called after new external data has been consumed
+    /// Check if any active orders have been triggered by the most recent price
+    /// action method is called after new external data has been consumed
     fn check_orders(&mut self) {
-        let keys: Vec<u64> = self
-            .account
-            .active_limit_orders()
-            .iter()
-            .map(|(i, _)| *i)
-            .collect();
+        let keys: Vec<u64> = self.account.active_limit_orders().iter().map(|(i, _)| *i).collect();
         for i in keys {
             self.handle_limit_order(i);
         }
@@ -252,8 +235,6 @@ impl Exchange {
                 if self.low < limit_price {
                     // this would be a guaranteed fill no matter the queue position in orderbook
                     self.execute_limit(o)
-                } else {
-                    return;
                 }
             }
             Side::Sell => {
@@ -261,8 +242,6 @@ impl Exchange {
                 if self.high > limit_price {
                     // this would be a guaranteed fill no matter the queue position in orderbook
                     self.execute_limit(o)
-                } else {
-                    return;
                 }
             }
         }
