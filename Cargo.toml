@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.21.0"
+version = "0.21.1"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2018"
 license-file = "LICENSE"
@@ -30,10 +30,9 @@ pretty_env_logger = "^0.4"
 serde = { version = "^1", features = ["derive"] }
 thiserror = "^1"
 hashbrown = "^0.11.2"
-rand = "0.8.4"
-rand_distr = "0.4.2"
-quickersort = "3.0.1"
+rand = "^0.8.4"
+rand_distr = "^0.4.2"
+quickersort = "^3.0.1"
 
 [dev-dependencies]
 csv = "1.1.4"
-time_series_generator = "0.3.0"
