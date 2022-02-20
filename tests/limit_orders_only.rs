@@ -11,7 +11,8 @@ fn limit_orders_only() {
         Config::new(0.0002, 0.0006, 1000.0, 1.0, FuturesTypes::Linear, String::new(), true)
             .unwrap();
 
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config);
 
     let (exec_orders, liq) = exchange.update_state(100.0, 100.1, 0, 100.1, 100.0);
     assert!(!liq);
@@ -60,7 +61,8 @@ fn limit_orders_2() {
     let config =
         Config::new(0.0002, 0.0006, 100.0, 1.0, FuturesTypes::Linear, String::new(), true).unwrap();
 
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config);
 
     let (exec_orders, liq) = exchange.update_state(100.0, 100.1, 0, 100.1, 100.0);
     assert!(!liq);

@@ -1,9 +1,7 @@
-use crate::{cornish_fisher::cornish_fisher_value_at_risk, FuturesTypes, Side};
+use crate::{cornish_fisher::cornish_fisher_value_at_risk, AccountTracker, FuturesTypes, Side};
 
 const DAILY_NS: u64 = 86_400_000_000_000;
 const HOURLY_NS: u64 = 3_600_000_000_000;
-
-// TODO: maybe rename this to Stats?
 
 /// Defines the possible sources of returns to use
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -16,9 +14,11 @@ pub enum ReturnsSource {
     TickByTick,
 }
 
+/// Keep track of many possible Account performance statistics
+/// This can be quite memory intensive, easily reaching beyond 10GB
+/// if using tick-by-tick data due to the storage of many returns
 #[derive(Debug, Clone)]
-/// Used for keeping track of account statistics
-pub struct AccTracker {
+pub struct FullAccountTracker {
     wallet_balance_last: f64,  // last wallet balance recording
     wallet_balance_start: f64, // wallet balance at start
     wallet_balance_high: f64,  // maximum wallet balance observed
@@ -73,12 +73,12 @@ pub struct AccTracker {
     ts_last: u64,
 }
 
-impl AccTracker {
+impl FullAccountTracker {
     #[must_use]
     #[inline]
     /// Create a new AccTracker struct
-    pub(crate) fn new(starting_wb: f64, futures_type: FuturesTypes) -> Self {
-        AccTracker {
+    pub fn new(starting_wb: f64, futures_type: FuturesTypes) -> Self {
+        FullAccountTracker {
             wallet_balance_last: starting_wb,
             wallet_balance_start: starting_wb,
             wallet_balance_high: starting_wb,
@@ -486,44 +486,10 @@ impl AccTracker {
     pub fn limit_order_cancellation_ratio(&self) -> f64 {
         self.num_cancelled_limit_orders as f64 / self.num_submitted_limit_orders as f64
     }
+}
 
-    /// Log the realized profit and loss of a trade
-    pub(crate) fn log_rpnl(&mut self, rpnl: f64) {
-        self.total_rpnl += rpnl;
-        self.wallet_balance_last += rpnl;
-        if rpnl < 0.0 {
-            self.total_loss += rpnl.abs();
-            self.num_losses += 1;
-        } else {
-            self.num_wins += 1;
-            self.total_profit += rpnl;
-        }
-        if self.wallet_balance_last > self.wallet_balance_high {
-            self.wallet_balance_high = self.wallet_balance_last;
-        }
-        let dd = (self.wallet_balance_high - self.wallet_balance_last) / self.wallet_balance_high;
-        if dd > self.max_drawdown_wallet_balance {
-            self.max_drawdown_wallet_balance = dd;
-        }
-    }
-
-    /// Log a user trade
-    #[inline]
-    pub(crate) fn log_trade(&mut self, side: Side, size: f64, price: f64) {
-        self.total_turnover += match self.futures_type {
-            FuturesTypes::Linear => size * price,
-            FuturesTypes::Inverse => size / price,
-        };
-        self.num_trades += 1;
-        match side {
-            Side::Buy => self.num_buys += 1,
-            Side::Sell => {}
-        }
-    }
-
-    /// Update the most recent timestamp which is used for daily rpnl
-    /// calculation. Assumes timestamp in nanoseconds
-    pub(crate) fn update(&mut self, ts: u64, price: f64, upnl: f64) {
+impl AccountTracker for FullAccountTracker {
+    fn update(&mut self, timestamp: u64, price: f64, upnl: f64) {
         self.price_last = price;
         if self.price_a_day_ago == 0.0 {
             self.price_a_day_ago = price;
@@ -539,11 +505,11 @@ impl AccTracker {
         }
         self.num_trading_opportunities += 1;
         if self.ts_first == 0 {
-            self.ts_first = ts;
+            self.ts_first = timestamp;
         }
-        self.ts_last = ts;
-        if ts > self.next_daily_trigger_ts {
-            self.next_daily_trigger_ts = ts + DAILY_NS;
+        self.ts_last = timestamp;
+        if timestamp > self.next_daily_trigger_ts {
+            self.next_daily_trigger_ts = timestamp + DAILY_NS;
 
             // calculate daily return of account
             let pnl: f64 = (self.total_rpnl + upnl) - self.last_daily_pnl;
@@ -567,8 +533,8 @@ impl AccTracker {
             self.last_daily_pnl = self.total_rpnl + upnl;
             self.price_a_day_ago = price;
         }
-        if ts > self.next_hourly_trigger_ts {
-            self.next_hourly_trigger_ts = ts + HOURLY_NS;
+        if timestamp > self.next_hourly_trigger_ts {
+            self.next_hourly_trigger_ts = timestamp + HOURLY_NS;
 
             // calculate hourly return of account
             let pnl: f64 = (self.total_rpnl + upnl) - self.last_hourly_pnl;
@@ -619,28 +585,55 @@ impl AccTracker {
         }
     }
 
-    /// Update the cumulative fee amount
+    fn log_rpnl(&mut self, rpnl: f64) {
+        self.total_rpnl += rpnl;
+        self.wallet_balance_last += rpnl;
+        if rpnl < 0.0 {
+            self.total_loss += rpnl.abs();
+            self.num_losses += 1;
+        } else {
+            self.num_wins += 1;
+            self.total_profit += rpnl;
+        }
+        if self.wallet_balance_last > self.wallet_balance_high {
+            self.wallet_balance_high = self.wallet_balance_last;
+        }
+        let dd = (self.wallet_balance_high - self.wallet_balance_last) / self.wallet_balance_high;
+        if dd > self.max_drawdown_wallet_balance {
+            self.max_drawdown_wallet_balance = dd;
+        }
+    }
+
     #[inline(always)]
-    pub(crate) fn log_fee(&mut self, fee: f64) {
+    fn log_fee(&mut self, fee: f64) {
         self.cumulative_fees += fee
     }
 
-    /// Log a limit order submission
     #[inline(always)]
-    pub(crate) fn log_limit_order_submission(&mut self) {
+    fn log_limit_order_submission(&mut self) {
         self.num_submitted_limit_orders += 1;
     }
 
-    /// Log a limit order cancellation
     #[inline(always)]
-    pub(crate) fn log_limit_order_cancellation(&mut self) {
+    fn log_limit_order_cancellation(&mut self) {
         self.num_cancelled_limit_orders += 1;
     }
 
-    /// Log a limit order fill
     #[inline(always)]
-    pub(crate) fn log_limit_order_fill(&mut self) {
+    fn log_limit_order_fill(&mut self) {
         self.num_filled_limit_orders += 1;
+    }
+
+    fn log_trade(&mut self, side: Side, price: f64, size: f64) {
+        self.total_turnover += match self.futures_type {
+            FuturesTypes::Linear => size * price,
+            FuturesTypes::Inverse => size / price,
+        };
+        self.num_trades += 1;
+        match side {
+            Side::Buy => self.num_buys += 1,
+            Side::Sell => {}
+        }
     }
 }
 
@@ -1056,7 +1049,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_profit_loss_ratio() {
-        let mut at = AccTracker::new(100.0, FuturesTypes::Linear);
+        let mut at = FullAccountTracker::new(100.0, FuturesTypes::Linear);
         at.total_profit = 50.0;
         at.total_loss = 25.0;
         assert_eq!(at.profit_loss_ratio(), 2.0);
@@ -1064,7 +1057,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_cumulative_fees() {
-        let mut at = AccTracker::new(100.0, FuturesTypes::Linear);
+        let mut at = FullAccountTracker::new(100.0, FuturesTypes::Linear);
         at.log_fee(0.1);
         at.log_fee(0.2);
         assert_eq!(round(at.cumulative_fees(), 1), 0.3);
@@ -1072,7 +1065,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_buy_and_hold_return() {
-        let mut at = AccTracker::new(100.0, FuturesTypes::Linear);
+        let mut at = FullAccountTracker::new(100.0, FuturesTypes::Linear);
         at.update(0, 100.0, 0.0);
         at.update(0, 200.0, 0.0);
         assert_eq!(at.buy_and_hold_return(), 100.0);
@@ -1080,7 +1073,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_sell_and_hold_return() {
-        let mut at = AccTracker::new(100.0, FuturesTypes::Linear);
+        let mut at = FullAccountTracker::new(100.0, FuturesTypes::Linear);
         at.update(0, 100.0, 0.0);
         at.update(0, 50.0, 0.0);
         assert_eq!(at.sell_and_hold_return(), 50.0);
@@ -1089,7 +1082,7 @@ mod tests {
     #[test]
     fn acc_tracker_log_rpnl() {
         let rpnls: Vec<f64> = vec![0.1, -0.1, 0.1, 0.2, -0.1];
-        let mut acc_tracker = AccTracker::new(1.0, FuturesTypes::Linear);
+        let mut acc_tracker = FullAccountTracker::new(1.0, FuturesTypes::Linear);
         for r in rpnls {
             acc_tracker.log_rpnl(r);
         }
@@ -1100,7 +1093,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_buy_and_hold() {
-        let mut acc_tracker = AccTracker::new(100.0, FuturesTypes::Linear);
+        let mut acc_tracker = FullAccountTracker::new(100.0, FuturesTypes::Linear);
         acc_tracker.update(0, 100.0, 0.0);
         acc_tracker.update(0, 200.0, 0.0);
         assert_eq!(acc_tracker.buy_and_hold_return(), 100.0);
@@ -1108,7 +1101,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_sell_and_hold() {
-        let mut acc_tracker = AccTracker::new(100.0, FuturesTypes::Linear);
+        let mut acc_tracker = FullAccountTracker::new(100.0, FuturesTypes::Linear);
         acc_tracker.update(0, 100.0, 0.0);
         acc_tracker.update(0, 200.0, 0.0);
         assert_eq!(acc_tracker.sell_and_hold_return(), -100.0);
@@ -1118,7 +1111,7 @@ mod tests {
     fn acc_tracker_historical_value_at_risk() {
         if let Err(_e) = pretty_env_logger::try_init() {}
 
-        let mut acc_tracker = AccTracker::new(100.0, FuturesTypes::Linear);
+        let mut acc_tracker = FullAccountTracker::new(100.0, FuturesTypes::Linear);
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
@@ -1135,7 +1128,7 @@ mod tests {
     fn acc_tracker_historical_value_at_risk_from_n_hourly_returns() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let mut at = AccTracker::new(100.0, FuturesTypes::Linear);
+        let mut at = FullAccountTracker::new(100.0, FuturesTypes::Linear);
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(round(at.historical_value_at_risk_from_n_hourly_returns(24, 0.05), 3), 3.835);
@@ -1146,7 +1139,7 @@ mod tests {
     fn acc_tracker_cornish_fisher_value_at_risk() {
         if let Err(_e) = pretty_env_logger::try_init() {}
 
-        let mut acc_tracker = AccTracker::new(100.0, FuturesTypes::Linear);
+        let mut acc_tracker = FullAccountTracker::new(100.0, FuturesTypes::Linear);
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
@@ -1163,7 +1156,7 @@ mod tests {
     fn acc_tracker_cornish_fisher_value_at_risk_from_n_hourly_returns() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let mut at = AccTracker::new(100.0, FuturesTypes::Linear);
+        let mut at = FullAccountTracker::new(100.0, FuturesTypes::Linear);
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(

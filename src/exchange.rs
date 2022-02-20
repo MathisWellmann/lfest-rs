@@ -1,10 +1,12 @@
-use crate::{Account, Config, FuturesTypes, Order, OrderError, OrderType, Side, Validator};
+use crate::{
+    Account, AccountTracker, Config, FuturesTypes, Order, OrderError, OrderType, Side, Validator,
+};
 
 #[derive(Debug, Clone)]
 /// The main leveraged futures exchange for simulated trading
-pub struct Exchange {
+pub struct Exchange<A> {
     config: Config,
-    account: Account,
+    account: Account<A>,
     validator: Validator,
     bid: f64,
     ask: f64,
@@ -15,15 +17,22 @@ pub struct Exchange {
     current_ts: i64,
 }
 
-impl Exchange {
+impl<A> Exchange<A>
+where A: AccountTracker
+{
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
-    pub fn new(config: Config) -> Exchange {
-        let account =
-            Account::new(config.leverage(), config.starting_balance(), config.futures_type());
+    pub fn new(account_tracker: A, config: Config) -> Self {
+        let account = Account::new(
+            account_tracker,
+            config.leverage(),
+            config.starting_balance(),
+            config.futures_type(),
+        );
         let validator =
             Validator::new(config.fee_maker(), config.fee_taker(), config.futures_type());
-        Exchange {
+
+        Self {
             config,
             account,
             validator,
@@ -63,19 +72,19 @@ impl Exchange {
 
     /// Return a reference to Account
     #[inline(always)]
-    pub fn account(&self) -> &Account {
+    pub fn account(&self) -> &Account<A> {
         &self.account
     }
 
     /// Return a mutable reference to Account
     #[inline(always)]
-    pub fn account_mut(&mut self) -> &mut Account {
+    pub fn account_mut(&mut self) -> &mut Account<A> {
         &mut self.account
     }
 
     /// Set the account, use carefully
     #[inline(always)]
-    pub fn set_account(&mut self, account: Account) {
+    pub fn set_account(&mut self, account: Account<A>) {
         self.account = account
     }
 

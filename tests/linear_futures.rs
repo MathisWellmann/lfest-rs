@@ -10,7 +10,8 @@ fn lin_long_market_win_full() {
         Config::new(0.0002, 0.0006, 1000.0, 1.0, FuturesTypes::Linear, String::new(), true)
             .unwrap();
 
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(100.0, 100.0, 0, 100.0, 100.0);
 
     exchange.submit_order(Order::market(Side::Buy, 5.0).unwrap()).unwrap();

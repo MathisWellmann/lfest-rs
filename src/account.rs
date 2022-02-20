@@ -1,17 +1,17 @@
 use hashbrown::HashMap;
 
 use crate::{
-    acc_tracker::AccTracker, limit_order_margin::order_margin, utils::round, Error, FuturesTypes,
-    Margin, Order, Position, Result, Side,
+    limit_order_margin::order_margin, utils::round, AccountTracker, Error, FuturesTypes, Margin,
+    Order, Position, Result, Side,
 };
 
 #[derive(Debug, Clone)]
 /// The users account
-pub struct Account {
+pub struct Account<A> {
+    account_tracker: A,
     futures_type: FuturesTypes,
     margin: Margin,
     position: Position,
-    acc_tracker: AccTracker,
     active_limit_orders: HashMap<u64, Order>,
     lookup_id_from_user_order_id: HashMap<u64, u64>,
     executed_orders: Vec<Order>,
@@ -23,16 +23,23 @@ pub struct Account {
     max_limit_sell_price: f64,
 }
 
-impl Account {
-    pub(crate) fn new(leverage: f64, starting_balance: f64, futures_type: FuturesTypes) -> Self {
+impl<A> Account<A>
+where A: AccountTracker
+{
+    pub(crate) fn new(
+        account_tracker: A,
+        leverage: f64,
+        starting_balance: f64,
+        futures_type: FuturesTypes,
+    ) -> Self {
         let position = Position::new_init(leverage);
         let margin = Margin::new_init(starting_balance);
-        let acc_tracker = AccTracker::new(starting_balance, futures_type);
+
         Self {
+            account_tracker,
             futures_type,
             margin,
             position,
-            acc_tracker,
             active_limit_orders: HashMap::new(),
             lookup_id_from_user_order_id: HashMap::new(),
             executed_orders: vec![],
@@ -47,13 +54,12 @@ impl Account {
     pub(crate) fn update(&mut self, price: f64, trade_timestamp: u64) {
         let upnl: f64 =
             self.futures_type.pnl(self.position.entry_price(), price, self.position.size());
-        self.acc_tracker.update(trade_timestamp, price, upnl);
+        self.account_tracker.update(trade_timestamp, price, upnl);
 
         self.position.update_state(price, self.futures_type);
     }
 
     /// Set a new position manually, be sure that you know what you are doing
-    /// Returns true if successful
     #[inline(always)]
     pub fn set_position(&mut self, position: Position) {
         self.position = position;
@@ -96,8 +102,8 @@ impl Account {
 
     /// Return a reference to acc_tracker struct
     #[inline(always)]
-    pub fn acc_tracker(&self) -> &AccTracker {
-        &self.acc_tracker
+    pub fn account_tracker(&self) -> &A {
+        &self.account_tracker
     }
 
     /// Cancel an active order
@@ -135,7 +141,7 @@ impl Account {
                 }
             }
         }
-        self.acc_tracker.log_limit_order_cancellation();
+        self.account_tracker.log_limit_order_cancellation();
 
         Ok(removed_order)
     }
@@ -208,7 +214,7 @@ impl Account {
         let new_om = self.margin.order_margin() + order_margin;
         self.margin.set_order_margin(new_om);
 
-        self.acc_tracker.log_limit_order_submission();
+        self.account_tracker.log_limit_order_submission();
         let order_id = order.id();
         match self.active_limit_orders.insert(order_id, order) {
             None => {}
@@ -272,7 +278,7 @@ impl Account {
     pub(crate) fn finalize_limit_order(&mut self, mut exec_order: Order, fee_maker: f64) {
         exec_order.mark_executed();
 
-        self.acc_tracker.log_limit_order_fill();
+        self.account_tracker.log_limit_order_fill();
         self.executed_orders.push(exec_order);
 
         let new_om: f64 = order_margin(
@@ -289,7 +295,7 @@ impl Account {
     pub(crate) fn deduce_fees(&mut self, fee: f64) {
         debug!("account: deduce_fees: deducing {} in fees", fee);
 
-        self.acc_tracker.log_fee(fee);
+        self.account_tracker.log_fee(fee);
         self.margin.change_balance(-fee);
     }
 
@@ -348,7 +354,7 @@ impl Account {
             self.margin.set_position_margin(new_pos_margin);
 
             self.margin.change_balance(rpnl);
-            self.acc_tracker.log_rpnl(rpnl);
+            self.account_tracker.log_rpnl(rpnl);
         }
 
         // change position
@@ -363,21 +369,21 @@ impl Account {
         self.margin.set_position_margin(pos_margin);
 
         // log change
-        self.acc_tracker.log_trade(side, size, exec_price);
+        self.account_tracker.log_trade(side, size, exec_price);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{FuturesTypes, Validator};
+    use crate::{account_tracker::NoAccountTracker, FuturesTypes, Validator};
 
     #[test]
     fn account_append_limit_order() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut acc = Account::new(1.0, 1.0, futures_type);
+        let mut acc = Account::new(NoAccountTracker::default(), 1.0, 1.0, futures_type);
         let mut validator = Validator::new(0.0, 0.0, futures_type);
         validator.update(100.0, 101.0);
 
@@ -426,7 +432,7 @@ mod tests {
     #[test]
     fn account_cancel_order() {
         let futures_type = FuturesTypes::Inverse;
-        let mut account = Account::new(1.0, 1.0, futures_type);
+        let mut account = Account::new(NoAccountTracker::default(), 1.0, 1.0, futures_type);
         let mut validator = Validator::new(0.0, 0.0, futures_type);
         validator.update(900.0, 901.0);
 
@@ -448,7 +454,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut account = Account::new(1.0, 1.0, futures_type);
+        let mut account = Account::new(NoAccountTracker::default(), 1.0, 1.0, futures_type);
         let mut validator = Validator::new(0.0, 0.0, futures_type);
         validator.update(100.0, 100.1);
 
@@ -465,7 +471,7 @@ mod tests {
     #[test]
     fn account_cancel_all_orders() {
         let futures_type = FuturesTypes::Inverse;
-        let mut account = Account::new(1.0, 1.0, futures_type);
+        let mut account = Account::new(NoAccountTracker::default(), 1.0, 1.0, futures_type);
         let mut validator = Validator::new(0.0, 0.0, futures_type);
         validator.update(900.0, 901.0);
 
@@ -488,7 +494,8 @@ mod tests {
 
     #[test]
     fn account_change_position_inverse_future() {
-        let mut acc = Account::new(1.0, 1.0, FuturesTypes::Inverse);
+        let futures_type = FuturesTypes::Inverse;
+        let mut acc = Account::new(NoAccountTracker::default(), 1.0, 1.0, futures_type);
 
         acc.change_position(Side::Buy, 100.0, 200.0);
         assert_eq!(acc.margin().wallet_balance(), 1.0);
@@ -543,7 +550,8 @@ mod tests {
 
     #[test]
     fn account_change_position_linear_futures() {
-        let mut acc = Account::new(1.0, 1000.0, FuturesTypes::Linear);
+        let futures_type = FuturesTypes::Linear;
+        let mut acc = Account::new(NoAccountTracker::default(), 1.0, 1000.0, futures_type);
 
         acc.change_position(Side::Buy, 0.5, 100.0);
         assert_eq!(acc.margin().wallet_balance(), 1000.0);
@@ -559,7 +567,7 @@ mod tests {
     #[test]
     fn account_open_limit_buy_size() {
         let futures_type = FuturesTypes::Linear;
-        let mut acc = Account::new(1.0, 100.0, futures_type);
+        let mut acc = Account::new(NoAccountTracker::default(), 1.0, 100.0, futures_type);
         let mut validator = Validator::new(0.0, 0.0, futures_type);
         validator.update(100.0, 100.1);
 
@@ -587,7 +595,7 @@ mod tests {
     #[test]
     fn account_open_limit_sell_size() {
         let futures_type = FuturesTypes::Linear;
-        let mut acc = Account::new(1.0, 100.0, futures_type);
+        let mut acc = Account::new(NoAccountTracker::default(), 1.0, 100.0, futures_type);
         let mut validator = Validator::new(0.0, 0.0, futures_type);
         validator.update(100.0, 100.1);
 

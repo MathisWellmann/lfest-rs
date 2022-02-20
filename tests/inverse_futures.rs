@@ -8,7 +8,8 @@ fn inv_long_market_win_full() {
         Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new(), true).unwrap();
 
     let fee_taker = config.fee_taker();
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let value = exchange.account().margin().available_balance() * 0.8;
@@ -62,7 +63,8 @@ fn inv_long_market_loss_full() {
         Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new(), true).unwrap();
 
     let fee_taker = config.fee_taker();
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::market(Side::Buy, 800.0).unwrap();
@@ -109,7 +111,8 @@ fn inv_short_market_win_full() {
         Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new(), true).unwrap();
 
     let fee_taker = config.fee_taker();
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::market(Side::Sell, 800.0).unwrap();
@@ -147,7 +150,8 @@ fn inv_short_market_loss_full() {
         Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new(), true).unwrap();
 
     let fee_taker = config.fee_taker();
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let value = exchange.account().margin().available_balance() * 0.4;
@@ -199,7 +203,8 @@ fn inv_long_market_win_partial() {
         Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new(), true).unwrap();
 
     let fee_taker = config.fee_taker();
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let value = exchange.account().margin().available_balance() * 0.8;
@@ -252,7 +257,8 @@ fn inv_long_market_loss_partial() {
         Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new(), true).unwrap();
 
     let fee_taker = config.fee_taker();
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::market(Side::Buy, 800.0).unwrap();
@@ -295,7 +301,8 @@ fn inv_short_market_win_partial() {
         Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new(), true).unwrap();
 
     let fee_taker = config.fee_taker();
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o = Order::market(Side::Sell, 800.0).unwrap();
@@ -345,7 +352,8 @@ fn inv_short_market_loss_partial() {
         Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new(), true).unwrap();
 
     let fee_taker = config.fee_taker();
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let value = exchange.account().margin().available_balance() * 0.8;
@@ -397,7 +405,8 @@ fn inv_test_market_roundtrip() {
         Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new(), true).unwrap();
 
     let fee_taker = config.fee_taker();
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let value = exchange.account().margin().available_balance() * 0.9;
@@ -449,7 +458,8 @@ fn inv_execute_limit() {
     let config =
         Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new(), true).unwrap();
 
-    let mut exchange = Exchange::new(config.clone());
+    let acc_tracker = NoAccountTracker::default();
+    let mut exchange = Exchange::new(acc_tracker, config.clone());
     let _ = exchange.update_state(1000.0, 1000.0, 0, 1000.0, 1000.0);
 
     let o: Order = Order::limit(Side::Buy, 900.0, 450.0).unwrap();

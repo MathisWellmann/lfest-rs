@@ -10,8 +10,8 @@ extern crate log;
 #[macro_use]
 extern crate serde;
 
-mod acc_tracker;
 mod account;
+mod account_tracker;
 mod config;
 mod cornish_fisher;
 mod errors;
@@ -26,8 +26,8 @@ mod validator;
 
 use std::fmt::Formatter;
 
-pub use acc_tracker::{AccTracker, ReturnsSource};
 pub use account::Account;
+pub use account_tracker::{AccountTracker, FullAccountTracker, NoAccountTracker, ReturnsSource};
 pub use config::Config;
 pub use errors::{Error, OrderError, Result};
 pub use exchange::Exchange;

@@ -8,17 +8,20 @@ extern crate log;
 
 use std::time::Instant;
 
-use lfest::{Config, Exchange, FuturesTypes, Order, OrderError, ReturnsSource, Side};
+use lfest::*;
 use load_trades::load_prices_from_csv;
 use rand::{thread_rng, Rng};
 
 fn main() {
     let t0 = Instant::now();
 
+    let starting_wb = 1.0;
+    let futures_type = FuturesTypes::Inverse;
     let config =
-        Config::new(0.0002, 0.0006, 1.0, 1.0, FuturesTypes::Inverse, String::new(), true).unwrap();
+        Config::new(0.0002, 0.0006, starting_wb, 1.0, futures_type, String::new(), true).unwrap();
 
-    let mut exchange = Exchange::new(config);
+    let acc_tracker = FullAccountTracker::new(starting_wb, futures_type);
+    let mut exchange = Exchange::new(acc_tracker, config);
 
     // load trades from csv file
     let prices = load_prices_from_csv("./data/Bitmex_XBTUSD_1M.csv").unwrap();
@@ -31,7 +34,9 @@ fn main() {
         if liq {
             // check liquidation
         }
-        println!("executed orders: {:?}", exec_orders);
+        if !exec_orders.is_empty() {
+            println!("executed orders: {:?}", exec_orders);
+        }
 
         if i % 100 == 0 {
             // randomly buy or sell using a market order
@@ -45,8 +50,7 @@ fn main() {
                 Order::market(Side::Buy, order_size).unwrap() // Buy using market order
             };
             // Handle order error here if needed
-            let response: Result<Order, OrderError> = exchange.submit_order(order);
-            match response {
+            match exchange.submit_order(order) {
                 Ok(order) => println!("succesfully submitted order: {:?}", order),
                 Err(order_err) => match order_err {
                     OrderError::MaxActiveOrders => {
@@ -64,24 +68,25 @@ fn main() {
     }
     println!(
         "time to simulate 1 million historical trades and {} orders: {}ms",
-        exchange.account().acc_tracker().num_trades(),
+        exchange.account().account_tracker().num_trades(),
         t0.elapsed().as_millis()
     );
-    analyze_results(&exchange);
+    analyze_results(&exchange.account().account_tracker());
 }
 
 /// analyze the resulting performance metrics of the traded orders
-fn analyze_results(e: &Exchange) {
-    let win_ratio = e.account().acc_tracker().win_ratio();
-    let profit_loss_ratio = e.account().acc_tracker().profit_loss_ratio();
-    let rpnl = e.account().acc_tracker().total_rpnl();
-    let sharpe = e.account().acc_tracker().sharpe(&ReturnsSource::TickByTick, false);
-    let sortino = e.account().acc_tracker().sortino(&ReturnsSource::TickByTick, false);
-    let max_drawdown = e.account().acc_tracker().max_drawdown_wallet_balance();
-    let max_upnl_drawdown = e.account().acc_tracker().max_drawdown_total();
-    let num_trades = e.account().acc_tracker().num_trades();
-    let turnover = e.account().acc_tracker().turnover();
-    let buy_ratio = e.account().acc_tracker().buy_ratio();
+fn analyze_results(acc_tracker: &FullAccountTracker) {
+    let win_ratio = acc_tracker.win_ratio();
+    let profit_loss_ratio = acc_tracker.profit_loss_ratio();
+    let rpnl = acc_tracker.total_rpnl();
+    let sharpe = acc_tracker.sharpe(&ReturnsSource::TickByTick, false);
+    let sortino = acc_tracker.sortino(&ReturnsSource::TickByTick, false);
+    let max_drawdown = acc_tracker.max_drawdown_wallet_balance();
+    let max_upnl_drawdown = acc_tracker.max_drawdown_total();
+    let num_trades = acc_tracker.num_trades();
+    let turnover = acc_tracker.turnover();
+    let buy_ratio = acc_tracker.buy_ratio();
+
     println!(
         "win_ratio: {:.2}, profit_loss_ratio: {:.2}, rpnl: {:.2}, sharpe: {:.2}, sortino: {:.2}, \
     dd: {:.2}, upnl_dd: {:.2}, #trades: {}, turnover: {}, buy_ratio: {:.2},",
