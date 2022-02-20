@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{cornish_fisher::cornish_fisher_value_at_risk, AccountTracker, FuturesTypes, Side};
 
 const DAILY_NS: u64 = 86_400_000_000_000;
@@ -187,7 +189,7 @@ impl FullAccountTracker {
     /// returns_source: the sampling interval of pnl snapshots
     /// risk_free_is_buy_and_hold: if true, it will use the market returns as
     /// the risk-free comparison     else risk-free rate is zero
-    pub fn sharpe(&self, returns_source: &ReturnsSource, risk_free_is_buy_and_hold: bool) -> f64 {
+    pub fn sharpe(&self, returns_source: ReturnsSource, risk_free_is_buy_and_hold: bool) -> f64 {
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
@@ -223,7 +225,7 @@ impl FullAccountTracker {
     /// returns_source: the sampling interval of pnl snapshots
     /// risk_free_is_buy_and_hold: if true, it will use the market returns as
     /// the risk-free comparison     else risk-free rate is zero
-    pub fn sortino(&self, returns_source: &ReturnsSource, risk_free_is_buy_and_hold: bool) -> f64 {
+    pub fn sortino(&self, returns_source: ReturnsSource, risk_free_is_buy_and_hold: bool) -> f64 {
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
@@ -263,7 +265,7 @@ impl FullAccountTracker {
     /// percentile: value between [0.0, 1.0], smaller value will return more
     /// worst case results
     #[inline]
-    pub fn historical_value_at_risk(&self, returns_source: &ReturnsSource, percentile: f64) -> f64 {
+    pub fn historical_value_at_risk(&self, returns_source: ReturnsSource, percentile: f64) -> f64 {
         let mut rets = match returns_source {
             ReturnsSource::Daily => self.hist_ln_returns_daily_acc.clone(),
             ReturnsSource::Hourly => self.hist_ln_returns_hourly_acc.clone(),
@@ -316,7 +318,7 @@ impl FullAccountTracker {
     #[inline]
     pub fn cornish_fisher_value_at_risk(
         &self,
-        returns_source: &ReturnsSource,
+        returns_source: ReturnsSource,
         percentile: f64,
     ) -> f64 {
         let rets = match returns_source {
@@ -374,7 +376,7 @@ impl FullAccountTracker {
     /// from: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3927058
     /// # Parameters
     /// returns_source: the sampling interval of pnl snapshots
-    pub fn d_ratio(&self, returns_source: &ReturnsSource) -> f64 {
+    pub fn d_ratio(&self, returns_source: ReturnsSource) -> f64 {
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_ln_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_ln_returns_hourly_acc,
@@ -634,6 +636,68 @@ impl AccountTracker for FullAccountTracker {
             Side::Buy => self.num_buys += 1,
             Side::Sell => {}
         }
+    }
+}
+
+impl Display for FullAccountTracker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "
+rpnl: {},
+annualized_roi: {},
+sharpe_daily_returns: {},
+sharpe_hourly_returns: {},
+sharpe_tick_returns: {},
+sortino_daily_returns: {},
+sortino_hourly_returns: {},
+sortino_tick_returns: {},
+drawdown_wallet_balance: {},
+drawdown_total: {},
+historical_value_at_risk_daily: {},
+historical_value_at_risk_hourly: {},
+cornish_fisher_value_at_risk_daily: {},
+cornish_fisher_value_at_risk_daily_from_hourly_returns: {},
+d_ratio_daily: {},
+d_ratio_hourly: {},
+d_ratio_tick: {},
+num_trades: {},
+buy_ratio: {},
+turnover: {},
+win_ratio: {},
+profit_loss_ratio: {},
+buy_and_hold_returns: {},
+trade_percentage: {},
+cumulative_fees: {},
+num_trading_days: {},
+            ",
+            self.total_rpnl(),
+            self.annualized_roi(),
+            self.sharpe(ReturnsSource::Daily, true),
+            self.sharpe(ReturnsSource::Hourly, true),
+            self.sharpe(ReturnsSource::TickByTick, true),
+            self.sortino(ReturnsSource::Daily, true),
+            self.sortino(ReturnsSource::Hourly, true),
+            self.sortino(ReturnsSource::TickByTick, true),
+            self.max_drawdown_wallet_balance(),
+            self.max_drawdown_total(),
+            self.historical_value_at_risk(ReturnsSource::Daily, 0.01),
+            self.historical_value_at_risk_from_n_hourly_returns(24, 0.01),
+            self.cornish_fisher_value_at_risk(ReturnsSource::Daily, 0.01),
+            self.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01),
+            self.d_ratio(ReturnsSource::Daily),
+            self.d_ratio(ReturnsSource::Hourly),
+            self.d_ratio(ReturnsSource::TickByTick),
+            self.num_trades(),
+            self.buy_ratio(),
+            self.turnover(),
+            self.win_ratio(),
+            self.profit_loss_ratio(),
+            self.buy_and_hold_return(),
+            self.trade_percentage(),
+            self.cumulative_fees(),
+            self.num_trading_days(),
+        )
     }
 }
 
@@ -1115,11 +1179,11 @@ mod tests {
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
-            round(acc_tracker.historical_value_at_risk(&ReturnsSource::Hourly, 0.05), 3),
+            round(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.05), 3),
             1.173
         );
         assert_eq!(
-            round(acc_tracker.historical_value_at_risk(&ReturnsSource::Hourly, 0.01), 3),
+            round(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.01), 3),
             2.54
         );
     }
@@ -1143,11 +1207,11 @@ mod tests {
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
-            round(acc_tracker.cornish_fisher_value_at_risk(&ReturnsSource::Hourly, 0.05), 3),
+            round(acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.05), 3),
             1.354
         );
         assert_eq!(
-            round(acc_tracker.cornish_fisher_value_at_risk(&ReturnsSource::Hourly, 0.01), 3),
+            round(acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.01), 3),
             5.786
         );
     }

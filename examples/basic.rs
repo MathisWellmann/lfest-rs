@@ -79,8 +79,8 @@ fn analyze_results(acc_tracker: &FullAccountTracker) {
     let win_ratio = acc_tracker.win_ratio();
     let profit_loss_ratio = acc_tracker.profit_loss_ratio();
     let rpnl = acc_tracker.total_rpnl();
-    let sharpe = acc_tracker.sharpe(&ReturnsSource::TickByTick, false);
-    let sortino = acc_tracker.sortino(&ReturnsSource::TickByTick, false);
+    let sharpe = acc_tracker.sharpe(ReturnsSource::Hourly, false);
+    let sortino = acc_tracker.sortino(ReturnsSource::Hourly, false);
     let max_drawdown = acc_tracker.max_drawdown_wallet_balance();
     let max_upnl_drawdown = acc_tracker.max_drawdown_total();
     let num_trades = acc_tracker.num_trades();

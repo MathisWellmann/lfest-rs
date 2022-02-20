@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::AccountTracker;
 
 /// Performs no tracking of account performance
@@ -18,4 +20,10 @@ impl AccountTracker for NoAccountTracker {
     fn log_limit_order_fill(&mut self) {}
 
     fn log_trade(&mut self, _side: crate::Side, _price: f64, _size: f64) {}
+}
+
+impl Display for NoAccountTracker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "")
+    }
 }
