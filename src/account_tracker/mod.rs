@@ -12,7 +12,7 @@ use crate::Side;
 /// This allows for greated flexibility over using the FullAccountTracker
 /// which can easily use more than 10GB of RAM due to storage of tick-by-tick
 /// returns
-pub trait AccountTracker {
+pub trait AccountTracker: Send {
     /// Update with each tick, using data provided in update_state method of
     /// Exchange # Arguments
     /// timestamp: timestamp of latest tick
