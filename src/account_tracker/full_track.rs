@@ -271,7 +271,7 @@ impl FullAccountTracker {
             ReturnsSource::Hourly => self.hist_ln_returns_hourly_acc.clone(),
             ReturnsSource::TickByTick => self.hist_ln_returns_tick_acc.clone(),
         };
-        quickersort::sort_floats(&mut rets);
+        rets.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let idx = (rets.len() as f64 * percentile) as usize;
         match rets.get(idx) {
             Some(r) => self.wallet_balance_start - (self.wallet_balance_start * r.exp()),
@@ -303,7 +303,7 @@ impl FullAccountTracker {
             ret_streaks.push(r);
         }
 
-        quickersort::sort_floats(&mut ret_streaks);
+        ret_streaks.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let idx = (ret_streaks.len() as f64 * percentile) as usize;
         match ret_streaks.get(idx) {
             Some(r) => self.wallet_balance_start - (self.wallet_balance_start * r),
