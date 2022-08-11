@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{OrderError, OrderType, Side};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 /// Defines an order
 pub struct Order {
     /// id will be filled in using exchange.submit_order()
@@ -151,5 +151,18 @@ impl Order {
     #[inline(always)]
     pub fn set_timestamp(&mut self, ts: i64) {
         self.timestamp = ts
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn order_eq() {
+        assert_eq!(
+            Order::limit(Side::Buy, 100.0, 100.0).unwrap(),
+            Order::limit(Side::Buy, 100.0, 100.0).unwrap()
+        );
     }
 }

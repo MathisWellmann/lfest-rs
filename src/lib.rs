@@ -39,7 +39,7 @@ pub use utils::round;
 pub(crate) use utils::{max, min};
 pub(crate) use validator::Validator;
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 /// Side of the order
 pub enum Side {
     /// Buy side
@@ -83,7 +83,7 @@ impl std::fmt::Display for Side {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
 /// Defines the available order types
 pub enum OrderType {
     /// aggressive market order
