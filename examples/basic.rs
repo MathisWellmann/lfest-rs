@@ -30,7 +30,13 @@ fn main() {
     let mut rng = thread_rng();
 
     for (i, p) in prices.iter().enumerate() {
-        let (exec_orders, liq) = exchange.update_state(*p, *p, i as u64, *p, *p);
+        let (exec_orders, liq) = exchange.update_state(
+            i as u64,
+            MarketUpdate::Bba {
+                bid: *p,
+                ask: *p + 0.1,
+            },
+        );
         if liq {
             // check liquidation
         }

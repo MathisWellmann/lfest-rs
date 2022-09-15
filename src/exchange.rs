@@ -1,5 +1,6 @@
 use crate::{
-    Account, AccountTracker, Config, FuturesTypes, Order, OrderError, OrderType, Side, Validator,
+    Account, AccountTracker, Config, FuturesTypes, MarketUpdate, Order, OrderError, OrderType,
+    Side, Validator,
 };
 
 #[derive(Debug, Clone)]
@@ -89,36 +90,50 @@ where A: AccountTracker
     }
 
     /// Update the exchange state with new information
-    /// ### Parameters
-    /// bid: bid price
-    /// ask: ask price
-    /// timestamp: timestamp usually in milliseconds
-    /// high: highest price over last period, use when feeding in candle info,
-    /// otherwise set high == ask low: lowest price over last period, use
-    /// when feeding in candle info, otherwise set low == bid ### Returns
+    ///
+    /// ### Parameters:
+    /// timestamp: Is used in the AccountTracker A
+    ///     and if setting order timestamps is enabled in the config.
+    ///     So can be set to 0 if not required
+    /// market_update: Newest market information
+    ///
+    /// ### Returns:
     /// executed orders
     /// true if position has been liquidated
     #[must_use]
     pub fn update_state(
         &mut self,
-        bid: f64,
-        ask: f64,
         timestamp: u64,
-        high: f64,
-        low: f64,
+        market_update: MarketUpdate,
     ) -> (Vec<Order>, bool) {
-        debug_assert!(bid <= ask, "make sure bid <= ask");
-        debug_assert!(high >= low, "make sure high >= low");
-        debug_assert!(high >= ask, "make sure high >= ask");
-        debug_assert!(low <= bid, "make sure low <= bid");
-
-        self.bid = bid;
-        self.ask = ask;
-        self.high = high;
-        self.low = low;
+        // TODO: enforce bid ask spread
+        // TODO: add price filters with precision, possibly by changing from f64 to some
+        // decimal lib
+        match market_update {
+            MarketUpdate::Bba {
+                bid,
+                ask,
+            } => {
+                self.bid = bid;
+                self.ask = ask;
+                self.high = ask;
+                self.low = bid;
+            }
+            MarketUpdate::Candle {
+                bid,
+                ask,
+                high,
+                low,
+            } => {
+                self.bid = bid;
+                self.ask = ask;
+                self.high = high;
+                self.low = low;
+            }
+        }
         self.current_ts = timestamp as i64;
 
-        self.validator.update(bid, ask);
+        self.validator.update(self.bid, self.ask);
 
         if self.check_liquidation() {
             self.liquidate();
@@ -127,7 +142,7 @@ where A: AccountTracker
 
         self.check_orders();
 
-        self.account.update((bid + ask) / 2.0, timestamp);
+        self.account.update((self.bid + self.ask) / 2.0, timestamp);
 
         self.step += 1;
 

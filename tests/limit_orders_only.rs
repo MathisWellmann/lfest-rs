@@ -14,7 +14,13 @@ fn limit_orders_only() {
     let acc_tracker = NoAccountTracker::default();
     let mut exchange = Exchange::new(acc_tracker, config);
 
-    let (exec_orders, liq) = exchange.update_state(100.0, 100.1, 0, 100.1, 100.0);
+    let (exec_orders, liq) = exchange.update_state(
+        0,
+        MarketUpdate::Bba {
+            bid: 100.0,
+            ask: 100.1,
+        },
+    );
     assert!(!liq);
     assert_eq!(exec_orders.len(), 0);
 
@@ -23,7 +29,13 @@ fn limit_orders_only() {
     assert_eq!(exchange.account().margin().order_margin(), 990.198);
     assert_eq!(round(exchange.account().margin().available_balance(), 3), 9.802);
 
-    let (exec_orders, liq) = exchange.update_state(99.9, 100.0, 1, 100.0, 99.9);
+    let (exec_orders, liq) = exchange.update_state(
+        1,
+        MarketUpdate::Bba {
+            bid: 99.9,
+            ask: 100.0,
+        },
+    );
     assert!(!liq);
     assert_eq!(exec_orders.len(), 1);
     debug!("exec_orders: {:?}", exec_orders);
@@ -43,7 +55,13 @@ fn limit_orders_only() {
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().margin().order_margin(), 0.0);
 
-    let (exec_orders, liq) = exchange.update_state(106.0, 106.1, 2, 106.1, 106.0);
+    let (exec_orders, liq) = exchange.update_state(
+        2,
+        MarketUpdate::Bba {
+            bid: 106.0,
+            ask: 106.1,
+        },
+    );
     assert!(!liq);
     assert!(!exec_orders.is_empty());
 
@@ -64,7 +82,13 @@ fn limit_orders_2() {
     let acc_tracker = NoAccountTracker::default();
     let mut exchange = Exchange::new(acc_tracker, config);
 
-    let (exec_orders, liq) = exchange.update_state(100.0, 100.1, 0, 100.1, 100.0);
+    let (exec_orders, liq) = exchange.update_state(
+        0,
+        MarketUpdate::Bba {
+            bid: 100.0,
+            ask: 100.1,
+        },
+    );
     assert!(!liq);
     assert!(exec_orders.is_empty());
 
@@ -74,7 +98,13 @@ fn limit_orders_2() {
     let o = Order::limit(Side::Buy, 100.0, 0.5).unwrap();
     exchange.submit_order(o).unwrap();
 
-    let (exec_orders, liq) = exchange.update_state(99.0, 99.1, 0, 99.1, 99.0);
+    let (exec_orders, liq) = exchange.update_state(
+        1,
+        MarketUpdate::Bba {
+            bid: 99.0,
+            ask: 99.1,
+        },
+    );
     assert!(!liq);
     assert_eq!(exec_orders.len(), 1);
 }

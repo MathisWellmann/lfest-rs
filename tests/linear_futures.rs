@@ -12,10 +12,22 @@ fn lin_long_market_win_full() {
 
     let acc_tracker = NoAccountTracker::default();
     let mut exchange = Exchange::new(acc_tracker, config);
-    let _ = exchange.update_state(100.0, 100.0, 0, 100.0, 100.0);
+    let _ = exchange.update_state(
+        0,
+        MarketUpdate::Bba {
+            bid: 100.0,
+            ask: 100.0,
+        },
+    );
 
     exchange.submit_order(Order::market(Side::Buy, 5.0).unwrap()).unwrap();
-    let _ = exchange.update_state(100.0, 100.0, 0, 100.0, 100.0);
+    let _ = exchange.update_state(
+        0,
+        MarketUpdate::Bba {
+            bid: 100.0,
+            ask: 100.0,
+        },
+    );
 
     assert_eq!(exchange.account().position().size(), 5.0);
     assert_eq!(exchange.account().position().entry_price(), 100.0);
@@ -24,7 +36,13 @@ fn lin_long_market_win_full() {
     assert_eq!(exchange.account().margin().position_margin(), 500.0);
     assert_eq!(round(exchange.account().margin().available_balance(), 1), 499.7);
 
-    let _ = exchange.update_state(200.0, 200.0, 1, 200.0, 200.0);
+    let _ = exchange.update_state(
+        0,
+        MarketUpdate::Bba {
+            bid: 200.0,
+            ask: 200.0,
+        },
+    );
     assert_eq!(exchange.account().position().unrealized_pnl(), 500.0);
 
     exchange.submit_order(Order::market(Side::Sell, 5.0).unwrap()).unwrap();
