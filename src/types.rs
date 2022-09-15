@@ -36,6 +36,19 @@ macro_rules! bba {
     }};
 }
 
+/// Creates the MarketUpdate::Candle variant
+#[macro_export]
+macro_rules! candle {
+    ( $b:expr, $a:expr, $l:expr, $h:expr ) => {{
+        MarketUpdate::Candle {
+            bid: $b,
+            ask: $a,
+            low: $l,
+            high: $h,
+        }
+    }};
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 /// Side of the order
 pub enum Side {
@@ -127,5 +140,20 @@ mod tests {
                 ask: 100.1
             }
         );
+    }
+
+    #[test]
+    fn candle_macro() {
+        let c = candle!(100.0, 100.1, 100.0, 100.1);
+
+        assert_eq!(
+            c,
+            MarketUpdate::Candle {
+                bid: 100.0,
+                ask: 100.1,
+                low: 100.0,
+                high: 100.1
+            }
+        )
     }
 }
