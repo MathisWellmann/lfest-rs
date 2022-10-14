@@ -3,7 +3,7 @@ use std::fmt::Formatter;
 use crate::{Error, Result};
 
 /// Decribes the possible updates to the market state
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MarketUpdate {
     /// An update to the best bid and ask has occured
     Bba {

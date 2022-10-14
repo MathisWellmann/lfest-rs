@@ -45,7 +45,7 @@ pub(crate) fn order_margin<'a>(
             return 0.0;
         }
         let price_mult = match futures_type {
-            FuturesTypes::Linear => (sell_price_weight / sell_size),
+            FuturesTypes::Linear => sell_price_weight / sell_size,
             FuturesTypes::Inverse => 1.0 / (sell_price_weight / sell_size),
         };
         fees = sell_side_fees;
@@ -55,7 +55,7 @@ pub(crate) fn order_margin<'a>(
             return 0.0;
         }
         let price_mult = match futures_type {
-            FuturesTypes::Linear => (buy_price_weight / buy_size),
+            FuturesTypes::Linear => buy_price_weight / buy_size,
             FuturesTypes::Inverse => 1.0 / (buy_price_weight / buy_size),
         };
         fees = buy_side_fees;
