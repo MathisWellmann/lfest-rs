@@ -1,31 +1,18 @@
 [package]
 name = "lfest"
-version = "0.23.2"
+version = "0.23.3"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2018"
 license-file = "LICENSE"
 description = "A leveraged perpetual futures exchange for simulated trading is a high performance backtesting exchange"
 repository = "https://github.com/MathisWellmann/lfest-rs"
 readme = "README.md"
-keywords = [
-    "exchange",
-    "trading",
-    "simulation",
-    "backest",
-    "leverage",
-]
-categories = [
-    "algorithms",
-]
-exclude = [
-    "/img",
-    "/data",
-    "/.idea",
-    "/vendor",
-]
+keywords = ["exchange", "trading", "simulation", "backest", "leverage"]
+categories = ["algorithms"]
+exclude = ["/img", "/data", "/.idea", "/vendor"]
 
 [dependencies]
-log = { version = "^0.4.0", features = ["release_max_level_info"]}
+log = { version = "^0.4.0", features = ["release_max_level_info"] }
 pretty_env_logger = "^0.4"
 serde = { version = "^1", features = ["derive"] }
 thiserror = "^1"

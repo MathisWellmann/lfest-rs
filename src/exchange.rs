@@ -166,6 +166,7 @@ where A: AccountTracker
                 // immediately execute market order
                 self.validator.validate_market_order(&order, &self.account)?;
                 self.execute_market(order.side(), order.size());
+                order.executed = true;
 
                 Ok(order)
             }

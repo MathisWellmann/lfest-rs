@@ -22,7 +22,7 @@ pub struct Order {
     /// order side
     side: Side,
     /// whether or not the order has been marked as executed
-    executed: bool,
+    pub(crate) executed: bool,
 }
 
 impl Order {
