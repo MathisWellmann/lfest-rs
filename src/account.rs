@@ -1,8 +1,8 @@
 use hashbrown::HashMap;
 
 use crate::{
-    limit_order_margin::order_margin, utils::round, AccountTracker, Error, Fee, FuturesTypes,
-    Margin, Order, Position, QuoteCurrency, Result, Side,
+    limit_order_margin::order_margin, utils::round, AccountTracker, Currency, Error, Fee,
+    FuturesTypes, Margin, Order, Position, QuoteCurrency, Result, Side,
 };
 
 #[derive(Debug, Clone)]
@@ -28,8 +28,13 @@ pub struct Account<A, S, B> {
 }
 
 impl<A, S, B> Account<A, S, B>
-where A: AccountTracker
+where
+    A: AccountTracker,
+    S: Currency,
+    B: Currency,
 {
+    // TODO: make sure to eliminate the `futures_type`, to infer it based on the
+    // starting_balance type
     pub(crate) fn new(
         account_tracker: A,
         leverage: f64,

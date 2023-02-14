@@ -64,7 +64,7 @@ impl<S> Position<S> {
 
     /// Return the entry price of the position
     #[inline(always)]
-    pub fn entry_price(&self) -> P {
+    pub fn entry_price(&self) -> QuoteCurrency {
         self.entry_price
     }
 
@@ -83,7 +83,12 @@ impl<S> Position<S> {
     }
 
     /// Change the position size by a given delta at a certain price
-    pub(crate) fn change_size(&mut self, size_delta: S, price: P, futures_type: FuturesTypes) {
+    pub(crate) fn change_size(
+        &mut self,
+        size_delta: S,
+        price: QuoteCurrency,
+        futures_type: FuturesTypes,
+    ) {
         debug!("change_size({}, {}, {})", size_delta, price, futures_type);
 
         if self.size > 0.0 {
@@ -113,7 +118,7 @@ impl<S> Position<S> {
 
     /// Update the state to reflect price changes
     #[inline]
-    pub(crate) fn update_state(&mut self, price: P, futures_type: FuturesTypes) {
+    pub(crate) fn update_state(&mut self, price: QuoteCurrency, futures_type: FuturesTypes) {
         self.unrealized_pnl = if self.size != 0.0 {
             futures_type.pnl(self.entry_price, price, self.size)
         } else {

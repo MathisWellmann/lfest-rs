@@ -1,13 +1,17 @@
-use crate::{max, min, Fee, FuturesTypes, Order, Side};
+use crate::{max, min, Currency, Fee, FuturesTypes, Order, Side};
 
 /// Compute the needed order margin with a newly added order
-pub(crate) fn order_margin<S>(
+pub(crate) fn order_margin<S, B>(
     orders: &[Order<S>],
     pos_size: S,
     futures_type: FuturesTypes,
     leverage: f64,
     fee_maker: Fee,
-) -> f64 {
+) -> B
+where
+    S: Currency,
+    B: Currency,
+{
     let mut buy_size: f64 = 0.0;
     let mut sell_size: f64 = 0.0;
     let mut buy_price_weight: f64 = 0.0;

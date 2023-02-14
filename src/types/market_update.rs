@@ -1,21 +1,4 @@
-use std::fmt::Formatter;
-
-/// Fee as a fraction
-/// TODO: make generic
-#[derive(Default, Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct Fee(pub f64);
-
-/// The markets BASE currency, e.g.: BTCUSD -> BTC is the BASE currency
-/// TODO: make inner type private and create getter and setter
-/// TODO: make malachite type / generic
-#[derive(Default, Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct BaseCurrency(pub f64);
-
-/// The markets QUOTE currency, e.g.: BTCUSD -> USD is the quote currency
-/// TODO: make inner type private and create getter and setter
-/// TODO: make malachite type / generic
-#[derive(Default, Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct QuoteCurrency(pub f64);
+use crate::QuoteCurrency;
 
 /// Decribes the possible updates to the market state
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -62,40 +45,6 @@ macro_rules! candle {
             high: $h,
         }
     }};
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-/// Side of the order
-pub enum Side {
-    /// Buy side
-    Buy,
-    /// Sell side
-    Sell,
-}
-
-impl Side {
-    /// Returns the inverted side
-    pub fn inverted(&self) -> Self {
-        match self {
-            Side::Buy => Side::Sell,
-            Side::Sell => Side::Buy,
-        }
-    }
-}
-
-impl std::fmt::Display for Side {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
-/// Defines the available order types
-pub enum OrderType {
-    /// aggressive market order
-    Market,
-    /// passive limit order
-    Limit,
 }
 
 #[cfg(test)]
