@@ -1,29 +1,29 @@
 use crate::{
     Account, AccountTracker, Config, FuturesTypes, MarketUpdate, Order, OrderError, OrderType,
-    Side, Validator,
+    QuoteCurrency, Side, Validator,
 };
 
 #[derive(Debug, Clone)]
 /// The main leveraged futures exchange for simulated trading
-pub struct Exchange<A> {
-    config: Config,
-    account: Account<A>,
+pub struct Exchange<A, S, B> {
+    config: Config<B>,
+    account: Account<A, S, B>,
     validator: Validator,
-    bid: f64,
-    ask: f64,
+    bid: QuoteCurrency,
+    ask: QuoteCurrency,
     next_order_id: u64,
     step: u64, // used for synchronizing orders
-    high: f64,
-    low: f64,
+    high: QuoteCurrency,
+    low: QuoteCurrency,
     current_ts: i64,
 }
 
-impl<A> Exchange<A>
+impl<A, S, B> Exchange<A, S, B>
 where A: AccountTracker
 {
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
-    pub fn new(account_tracker: A, config: Config) -> Self {
+    pub fn new(account_tracker: A, config: Config<B>) -> Self {
         let account = Account::new(
             account_tracker,
             config.leverage(),
@@ -49,19 +49,19 @@ where A: AccountTracker
 
     /// Return a reference to current exchange config
     #[inline(always)]
-    pub fn config(&self) -> &Config {
+    pub fn config(&self) -> &Config<B> {
         &self.config
     }
 
     /// Return the bid price
     #[inline(always)]
-    pub fn bid(&self) -> f64 {
+    pub fn bid(&self) -> QuoteCurrency {
         self.bid
     }
 
     /// Return the ask price
     #[inline(always)]
-    pub fn ask(&self) -> f64 {
+    pub fn ask(&self) -> QuoteCurrency {
         self.ask
     }
 
@@ -73,19 +73,19 @@ where A: AccountTracker
 
     /// Return a reference to Account
     #[inline(always)]
-    pub fn account(&self) -> &Account<A> {
+    pub fn account(&self) -> &Account<A, S, B> {
         &self.account
     }
 
     /// Return a mutable reference to Account
     #[inline(always)]
-    pub fn account_mut(&mut self) -> &mut Account<A> {
+    pub fn account_mut(&mut self) -> &mut Account<A, S, B> {
         &mut self.account
     }
 
     /// Set the account, use carefully
     #[inline(always)]
-    pub fn set_account(&mut self, account: Account<A>) {
+    pub fn set_account(&mut self, account: Account<A, S, B>) {
         self.account = account
     }
 
@@ -105,7 +105,7 @@ where A: AccountTracker
         &mut self,
         timestamp: u64,
         market_update: MarketUpdate,
-    ) -> (Vec<Order>, bool) {
+    ) -> (Vec<Order<S>>, bool) {
         // TODO: enforce bid ask spread
         // TODO: add price filters with precision, possibly by changing from f64 to some
         // decimal lib
@@ -151,7 +151,7 @@ where A: AccountTracker
 
     /// Submit a new order to the exchange.
     /// Returns the order with timestamp and id filled in or OrderError
-    pub fn submit_order(&mut self, mut order: Order) -> Result<Order, OrderError> {
+    pub fn submit_order<S>(&mut self, mut order: Order<S>) -> Result<Order<S>, OrderError> {
         debug!("submit_order: {:?}", order);
 
         // assign unique order id
@@ -188,10 +188,10 @@ where A: AccountTracker
     }
 
     /// Execute a market order
-    fn execute_market(&mut self, side: Side, amount: f64) {
+    fn execute_market<S>(&mut self, side: Side, amount: S) {
         debug!("exchange: execute_market: side: {:?}, amount: {}", side, amount);
 
-        let price: f64 = match side {
+        let price = match side {
             Side::Buy => self.ask,
             Side::Sell => self.bid,
         };
@@ -206,7 +206,7 @@ where A: AccountTracker
     }
 
     /// Execute a limit order, once triggered
-    fn execute_limit(&mut self, o: Order) {
+    fn execute_limit<S>(&mut self, o: Order<S>) {
         debug!("execute_limit: {:?}", o);
 
         let price = o.limit_price().unwrap();

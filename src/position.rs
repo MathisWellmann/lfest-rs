@@ -1,25 +1,24 @@
 use serde::{Deserialize, Serialize};
 
-use crate::FuturesTypes;
+use crate::{FuturesTypes, QuoteCurrency};
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 /// Describes the position information of the account
-pub struct Position {
+pub struct Position<S> {
     /// The position size
-    /// denoted in BASE currency if using linear futures,
-    /// denoted in QUOTE currency if using inverse futures
-    size: f64,
+    size: S,
     /// The entry price of the position
-    entry_price: f64,
+    entry_price: QuoteCurrency,
     /// The current position leverage
     leverage: f64,
     /// The currently unrealized profit and loss
     unrealized_pnl: f64,
 }
 
-impl Position {
+impl<S> Position<S> {
     /// Create a new, initially neutral, position with a given leverage
-    /// # Panics
+    ///
+    /// # Panics:
     /// In debug mode, if leverage is smaller than 1.0
     #[must_use]
     #[inline]
@@ -35,11 +34,12 @@ impl Position {
 
     /// Create a new position with all fields custom.
     /// NOTE: not usually called, but for advanced use cases
-    /// # Panics
+    ///
+    /// # Panics:
     /// In debug mode, if inputs don't make sense
     #[must_use]
     #[inline]
-    pub fn new(size: f64, entry_price: f64, leverage: f64, unrealized_pnl: f64) -> Self {
+    pub fn new(size: S, entry_price: QuoteCurrency, leverage: f64, unrealized_pnl: f64) -> Self {
         debug_assert!(size.is_finite());
         debug_assert!(entry_price.is_finite());
         debug_assert!(leverage.is_finite());
@@ -57,16 +57,14 @@ impl Position {
     }
 
     /// Return the position size
-    /// denoted in BASE currency if using linear futures,
-    /// denoted in QUOTE currency if using inverse futures
     #[inline(always)]
-    pub fn size(&self) -> f64 {
+    pub fn size(&self) -> S {
         self.size
     }
 
     /// Return the entry price of the position
     #[inline(always)]
-    pub fn entry_price(&self) -> f64 {
+    pub fn entry_price(&self) -> P {
         self.entry_price
     }
 
@@ -85,10 +83,8 @@ impl Position {
     }
 
     /// Change the position size by a given delta at a certain price
-    pub(crate) fn change_size(&mut self, size_delta: f64, price: f64, futures_type: FuturesTypes) {
+    pub(crate) fn change_size(&mut self, size_delta: S, price: P, futures_type: FuturesTypes) {
         debug!("change_size({}, {}, {})", size_delta, price, futures_type);
-
-        debug_assert!(price > 0.0);
 
         if self.size > 0.0 {
             if self.size + size_delta < 0.0 {
@@ -117,7 +113,7 @@ impl Position {
 
     /// Update the state to reflect price changes
     #[inline]
-    pub(crate) fn update_state(&mut self, price: f64, futures_type: FuturesTypes) {
+    pub(crate) fn update_state(&mut self, price: P, futures_type: FuturesTypes) {
         self.unrealized_pnl = if self.size != 0.0 {
             futures_type.pnl(self.entry_price, price, self.size)
         } else {

@@ -1,14 +1,14 @@
-use crate::{Error, FuturesTypes, Result};
+use crate::{Error, Fee, FuturesTypes, Result};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Define the Exchange configuration
-pub struct Config {
+pub struct Config<B> {
     /// The maker fee as a fraction. e.g.: 2.5 basis points rebate -> -0.00025
-    fee_maker: f64,
+    fee_maker: Fee,
     /// The taker fee as a fraction. e.g.: 10 basis points -> 0.0010
-    fee_taker: f64,
+    fee_taker: Fee,
     /// The starting balance of account
-    starting_balance: f64,
+    starting_balance: B,
     /// The leverage used for the position
     leverage: f64,
     /// The type of futures to simulate
@@ -19,32 +19,35 @@ pub struct Config {
     set_order_timestamps: bool,
 }
 
-impl Config {
-    /// Create a new Config
-    /// # Arguments
-    /// fee_maker: The maker fee as fraction, e.g 6bp -> 0.0006
-    /// fee_taker: The taker fee as fraction
-    /// starting_balance: Initial Wallet Balance, denoted in QUOTE if using
-    /// linear futures, denoted in BASE for inverse futures leverage: The
-    /// positions leverage futures_type: The type of futures contract to
-    /// simulate identification: A way to identify an exchange
-    /// # Returns
+impl<B> Config<B> {
+    /// Create a new Config.
+    ///
+    /// # Arguments:
+    /// `fee_maker`: The maker fee as fraction, e.g 6bp -> 0.0006
+    /// `fee_taker`: The taker fee as fraction
+    /// `starting_balance`: Initial Wallet Balance, denoted in QUOTE if using
+    /// linear futures, denoted in BASE for inverse futures
+    /// `leverage`: The positions leverage.
+    /// `futures_type`: The type of futures contract to
+    /// simulate.
+    /// `identification`: A way to identify an exchange
+    /// `set_order_timestamps`: Whether the exchange should set order
+    /// timestamps.
+    ///
+    /// # Returns:
     /// Either a valid Config or an Error
     #[inline]
     pub fn new(
-        fee_maker: f64,
-        fee_taker: f64,
-        starting_balance: f64,
+        fee_maker: Fee,
+        fee_taker: Fee,
+        starting_balance: B,
         leverage: f64,
         futures_type: FuturesTypes,
         identification: String,
         set_order_timestamps: bool,
-    ) -> Result<Config> {
-        if leverage <= 0.0 {
+    ) -> Result<Self> {
+        if leverage < 1.0 {
             return Err(Error::ConfigWrongLeverage);
-        }
-        if starting_balance <= 0.0 {
-            return Err(Error::ConfigWrongStartingBalance);
         }
         Ok(Config {
             fee_maker,
@@ -59,19 +62,19 @@ impl Config {
 
     /// Return the maker fee of this config
     #[inline(always)]
-    pub fn fee_maker(&self) -> f64 {
+    pub fn fee_maker(&self) -> Fee {
         self.fee_maker
     }
 
     /// Return the taker fee of this config
     #[inline(always)]
-    pub fn fee_taker(&self) -> f64 {
+    pub fn fee_taker(&self) -> Fee {
         self.fee_taker
     }
 
     /// Return the starting wallet balance of this Config
     #[inline(always)]
-    pub fn starting_balance(&self) -> f64 {
+    pub fn starting_balance(&self) -> B {
         self.starting_balance
     }
 

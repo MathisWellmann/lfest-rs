@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{OrderError, OrderType, Side};
+use crate::{OrderError, OrderType, QuoteCurrency, Side};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 /// Defines an order
-pub struct Order {
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct Order<S> {
     /// id will be filled in using exchange.submit_order()
     id: u64,
     /// Order Id provided by user
@@ -14,28 +14,30 @@ pub struct Order {
     /// order type
     order_type: OrderType,
     /// the limit order price
-    limit_price: Option<f64>,
+    limit_price: Option<QuoteCurrency>,
     /// order size
+    /// TODO: make type level machinery for this
     /// denoted in BASE currency if using linear futures,
     /// denoted in QUOTE currency if using inverse futures
-    size: f64,
+    size: S,
     /// order side
     side: Side,
     /// whether or not the order has been marked as executed
     pub(crate) executed: bool,
 }
 
-impl Order {
+impl<S> Order<S> {
     /// Create a new limit order
-    /// # Arguments
-    /// - side: either buy or sell
-    /// - limit_price: price to execute at or better
-    /// - size: denoted in BASE currency when using linear futures,
-    //  denoted in QUOTE currency when using inverse futures
-    /// # Returns
-    /// Either a successfully created order or an OrderError
+    ///
+    /// # Arguments:
+    /// - `side`: either buy or sell
+    /// - `limit_price`: price to execute at or better
+    /// - `size`: How many contracts should be traded
+    ///
+    /// # Returns:
+    /// Either a successfully created order or an [`OrderError`]
     #[inline]
-    pub fn limit(side: Side, limit_price: f64, size: f64) -> Result<Order, OrderError> {
+    pub fn limit(side: Side, limit_price: QuoteCurrency, size: S) -> Result<Self, OrderError> {
         if limit_price <= 0.0 {
             return Err(OrderError::InvalidLimitPrice);
         }
@@ -54,15 +56,16 @@ impl Order {
         })
     }
 
-    /// Create a new market order
-    /// # Arguments
-    /// - side: either buy or sell
-    /// - size: denoted in BASE currency when using linear futures,
-    /// denoted in QUOTE currency when using inverse futures
-    /// # Returns
-    /// Either a successfully created order or an OrderError
+    /// Create a new market order.
+    ///
+    /// # Arguments.
+    /// - `side`: either buy or sell
+    /// - `size`: How many contracts to trade
+    ///
+    /// # Returns:
+    /// Either a successfully created instance or an [`OrderError`]
     #[inline]
-    pub fn market(side: Side, size: f64) -> Result<Order, OrderError> {
+    pub fn market(side: Side, size: S) -> Result<Self, OrderError> {
         if size <= 0.0 {
             return Err(OrderError::InvalidOrderSize);
         }
@@ -110,15 +113,13 @@ impl Order {
 
     /// limit price of Order
     #[inline(always)]
-    pub fn limit_price(&self) -> Option<f64> {
+    pub fn limit_price(&self) -> Option<QuoteCurrency> {
         self.limit_price
     }
 
     /// Size of Order
-    /// denoted in BASE currency if using linear futures,
-    /// denoted in QUOTE currency if using inverse futures
     #[inline(always)]
-    pub fn size(&self) -> f64 {
+    pub fn size(&self) -> S {
         self.size
     }
 

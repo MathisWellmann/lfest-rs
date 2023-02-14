@@ -1,35 +1,39 @@
 use hashbrown::HashMap;
 
 use crate::{
-    limit_order_margin::order_margin, utils::round, AccountTracker, Error, FuturesTypes, Margin,
-    Order, Position, Result, Side,
+    limit_order_margin::order_margin, utils::round, AccountTracker, Error, Fee, FuturesTypes,
+    Margin, Order, Position, QuoteCurrency, Result, Side,
 };
 
 #[derive(Debug, Clone)]
 /// The users account
-pub struct Account<A> {
+/// Generic over:
+/// A: AccountTracker,
+/// S: Size type
+/// B: Balance type
+pub struct Account<A, S, B> {
     account_tracker: A,
     futures_type: FuturesTypes,
-    margin: Margin,
-    position: Position,
-    active_limit_orders: HashMap<u64, Order>,
+    margin: Margin<B>,
+    position: Position<S>,
+    active_limit_orders: HashMap<u64, Order<S>>,
     lookup_id_from_user_order_id: HashMap<u64, u64>,
-    executed_orders: Vec<Order>,
+    executed_orders: Vec<Order<S>>,
     // used for calculating hedged order size for order margin calculation
-    open_limit_buy_size: f64,
-    open_limit_sell_size: f64,
+    open_limit_buy_size: S,
+    open_limit_sell_size: S,
     // TODO: remove following two fields
-    min_limit_buy_price: f64,
-    max_limit_sell_price: f64,
+    min_limit_buy_price: QuoteCurrency,
+    max_limit_sell_price: QuoteCurrency,
 }
 
-impl<A> Account<A>
+impl<A, S, B> Account<A, S, B>
 where A: AccountTracker
 {
     pub(crate) fn new(
         account_tracker: A,
         leverage: f64,
-        starting_balance: f64,
+        starting_balance: B,
         futures_type: FuturesTypes,
     ) -> Self {
         let position = Position::new_init(leverage);
@@ -61,33 +65,33 @@ where A: AccountTracker
 
     /// Set a new position manually, be sure that you know what you are doing
     #[inline(always)]
-    pub fn set_position(&mut self, position: Position) {
+    pub fn set_position(&mut self, position: Position<S>) {
         self.position = position;
     }
 
     /// Return a reference to position
     #[inline(always)]
-    pub fn position(&self) -> &Position {
+    pub fn position(&self) -> &Position<S> {
         &self.position
     }
 
     /// Set a new margin manually, be sure that you know what you are doing when
     /// using this method Returns true if successful
     #[inline(always)]
-    pub fn set_margin(&mut self, margin: Margin) {
+    pub fn set_margin(&mut self, margin: Margin<B>) {
         self.margin = margin;
     }
 
     /// Return a reference to margin
     #[inline(always)]
-    pub fn margin(&self) -> &Margin {
+    pub fn margin(&self) -> &Margin<B> {
         &self.margin
     }
 
     /// Return recently executed orders
     /// and clear them afterwards
     #[inline(always)]
-    pub(crate) fn executed_orders(&mut self) -> Vec<Order> {
+    pub(crate) fn executed_orders(&mut self) -> Vec<Order<S>> {
         let exec_orders = self.executed_orders.clone();
         self.executed_orders.clear();
 
@@ -96,7 +100,7 @@ where A: AccountTracker
 
     /// Return the currently active limit orders
     #[inline(always)]
-    pub fn active_limit_orders(&self) -> &HashMap<u64, Order> {
+    pub fn active_limit_orders(&self) -> &HashMap<u64, Order<S>> {
         &self.active_limit_orders
     }
 
@@ -108,7 +112,7 @@ where A: AccountTracker
 
     /// Cancel an active order
     /// returns Some order if successful with given order_id
-    pub fn cancel_order(&mut self, order_id: u64) -> Result<Order> {
+    pub fn cancel_order(&mut self, order_id: u64) -> Result<Order<S>> {
         debug!("cancel_order: {}", order_id);
         let removed_order = match self.active_limit_orders.remove(&order_id) {
             None => return Err(Error::OrderIdNotFound),
@@ -147,11 +151,12 @@ where A: AccountTracker
     }
 
     /// Cancel an active order based on the user_order_id of an Order
-    /// # Returns
-    /// the cancelled order if successfull, error when the user_order_id is not
-    /// found
+    ///
+    /// # Returns:
+    /// the cancelled order if successfull, error when the `user_order_id` is
+    /// not found
     #[inline]
-    pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Result<Order> {
+    pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Result<Order<S>> {
         debug!("cancel_order_by_user_id: user_order_id: {}", user_order_id);
         let id: u64 = match self.lookup_id_from_user_order_id.remove(&user_order_id) {
             None => return Err(Error::UserOrderIdNotFound),
@@ -186,7 +191,7 @@ where A: AccountTracker
     }
 
     /// Append a new limit order as active order
-    pub(crate) fn append_limit_order(&mut self, order: Order, order_margin: f64) {
+    pub(crate) fn append_limit_order(&mut self, order: Order<S>, order_margin: B) {
         debug!("append_limit_order: order: {:?}, order_margin: {}", order, order_margin);
 
         let limit_price = order.limit_price().unwrap();
@@ -234,7 +239,7 @@ where A: AccountTracker
     /// Remove the assigned order margin for a given order
     pub(crate) fn remove_executed_order_from_order_margin_calculation(
         &mut self,
-        exec_order: &Order,
+        exec_order: &Order<S>,
     ) {
         match exec_order.side() {
             Side::Buy => self.open_limit_buy_size -= exec_order.size(),
@@ -275,7 +280,7 @@ where A: AccountTracker
     }
 
     /// Finalize an executed limit order
-    pub(crate) fn finalize_limit_order(&mut self, mut exec_order: Order, fee_maker: f64) {
+    pub(crate) fn finalize_limit_order(&mut self, mut exec_order: Order<S>, fee_maker: Fee) {
         exec_order.mark_executed();
 
         self.account_tracker.log_limit_order_fill();
@@ -300,7 +305,7 @@ where A: AccountTracker
     }
 
     /// Changes the position by a given delta while changing margin accordingly
-    pub(crate) fn change_position(&mut self, side: Side, size: f64, exec_price: f64) {
+    pub(crate) fn change_position(&mut self, side: Side, size: S, exec_price: QuoteCurrency) {
         debug!(
             "account: change_position(side: {:?}, size: {}, exec_price: {})",
             side, size, exec_price

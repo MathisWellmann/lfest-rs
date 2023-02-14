@@ -1,6 +1,21 @@
 use std::fmt::Formatter;
 
-use crate::{Error, Result};
+/// Fee as a fraction
+/// TODO: make generic
+#[derive(Default, Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Fee(pub f64);
+
+/// The markets BASE currency, e.g.: BTCUSD -> BTC is the BASE currency
+/// TODO: make inner type private and create getter and setter
+/// TODO: make malachite type / generic
+#[derive(Default, Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct BaseCurrency(pub f64);
+
+/// The markets QUOTE currency, e.g.: BTCUSD -> USD is the quote currency
+/// TODO: make inner type private and create getter and setter
+/// TODO: make malachite type / generic
+#[derive(Default, Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct QuoteCurrency(pub f64);
 
 /// Decribes the possible updates to the market state
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -8,20 +23,20 @@ pub enum MarketUpdate {
     /// An update to the best bid and ask has occured
     Bba {
         /// The new best bid
-        bid: f64,
+        bid: QuoteCurrency,
         /// The new best ask
-        ask: f64,
+        ask: QuoteCurrency,
     },
     /// A new candle has been created
     Candle {
         /// The best bid at the time of candle creation
-        bid: f64,
+        bid: QuoteCurrency,
         /// The best ask at the time of candle creation
-        ask: f64,
+        ask: QuoteCurrency,
         /// The low price of the candle
-        low: f64,
+        low: QuoteCurrency,
         /// The high price of the candle
-        high: f64,
+        high: QuoteCurrency,
     },
 }
 
@@ -59,25 +74,6 @@ pub enum Side {
 }
 
 impl Side {
-    #[inline(always)]
-    /// Return the integer representation of this enum
-    pub fn as_integer(&self) -> u64 {
-        match self {
-            Side::Buy => 0,
-            Side::Sell => 1,
-        }
-    }
-
-    #[inline(always)]
-    /// Parse the Side from an integer value
-    pub fn from_integer(val: u64) -> Result<Self> {
-        match val {
-            0 => Ok(Side::Buy),
-            1 => Ok(Side::Sell),
-            _ => Err(Error::ParseError),
-        }
-    }
-
     /// Returns the inverted side
     pub fn inverted(&self) -> Self {
         match self {
@@ -100,29 +96,6 @@ pub enum OrderType {
     Market,
     /// passive limit order
     Limit,
-}
-
-impl OrderType {
-    /// Return the integer representation of this enum
-    #[deprecated]
-    #[inline(always)]
-    pub fn as_integer(&self) -> u64 {
-        match self {
-            OrderType::Market => 0,
-            OrderType::Limit => 1,
-        }
-    }
-
-    /// Parse the OrderType from integer value
-    #[inline(always)]
-    #[deprecated]
-    pub fn from_integer(val: u64) -> Result<Self> {
-        match val {
-            0 => Ok(Self::Market),
-            1 => Ok(Self::Limit),
-            _ => Err(Error::ParseError),
-        }
-    }
 }
 
 #[cfg(test)]

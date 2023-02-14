@@ -1,30 +1,29 @@
 use serde::{Deserialize, Serialize};
 
+use crate::{Error, Result};
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Describes the margin information of the account
-pub struct Margin {
+pub struct Margin<B> {
     /// The wallet balance of account
     /// denoted in QUOTE currency when using linear futures
     /// denoted in BASE currency when using inverse futures
-    wallet_balance: f64,
+    wallet_balance: B,
     /// The position margin of account, same denotation as wallet_balance
-    position_margin: f64,
+    position_margin: B,
     /// The order margin of account, same denotation as wallet_balance
-    order_margin: f64,
+    order_margin: B,
     /// The available balance of account, same denotation as wallet_balance
-    available_balance: f64,
+    available_balance: B,
 }
 
-impl Margin {
+impl<B> Margin<B> {
     /// Create a new margin account with an initial balance
     /// # Panics
     //  In debug mode, if the input values don't make sense
     #[must_use]
     #[inline]
-    pub fn new_init(init_balance: f64) -> Self {
-        debug_assert!(init_balance > 0.0);
-        debug_assert!(init_balance.is_finite());
-
+    pub fn new_init(init_balance: B) -> Self {
         Margin {
             wallet_balance: init_balance,
             position_margin: 0.0,
@@ -33,73 +32,64 @@ impl Margin {
         }
     }
 
-    /// Create a new Margin with all fields custom
-    /// # Panics
+    /// Create a new Margin with all fields custom.
+    ///
+    /// # Panics:
     /// In debug mode, if the input values don't make sense
     #[must_use]
     #[inline]
     pub fn new(
-        wallet_balance: f64,
-        position_margin: f64,
-        order_margin: f64,
-        available_balance: f64,
-    ) -> Self {
-        debug_assert!(wallet_balance.is_finite());
-        debug_assert!(position_margin.is_finite());
-        debug_assert!(order_margin.is_finite());
-        debug_assert!(available_balance.is_finite());
+        wallet_balance: B,
+        position_margin: B,
+        order_margin: B,
+        available_balance: B,
+    ) -> Result<Self> {
+        if position_margin > wallet_balance {
+            return Err(Error::InvalidPositionMargin);
+        }
+        if order_margin > wallet_balance {
+            return Err(Error::InvalidOrderMargin);
+        }
+        if available_balance > wallet_balance {
+            return Err(Error::InvalidAvailableBalance);
+        }
 
-        debug_assert!(wallet_balance > 0.0);
-        debug_assert!(position_margin >= 0.0);
-        debug_assert!(order_margin >= 0.0);
-        debug_assert!(available_balance >= 0.0);
-
-        debug_assert!(position_margin <= wallet_balance);
-        debug_assert!(order_margin <= wallet_balance);
-        debug_assert!(available_balance <= wallet_balance);
-
-        Margin {
+        Ok(Margin {
             wallet_balance,
             position_margin,
             order_margin,
             available_balance,
-        }
+        })
     }
 
     /// Return the wallet balance of account
-    /// denoted in QUOTE currency when using linear futures
-    /// denoted in BASE currency when using inverse futures
     #[inline(always)]
-    pub fn wallet_balance(&self) -> f64 {
+    pub fn wallet_balance(&self) -> B {
         self.wallet_balance
     }
 
     /// Return the position margin of account, same denotation as wallet_balance
     #[inline(always)]
-    pub fn position_margin(&self) -> f64 {
+    pub fn position_margin(&self) -> B {
         self.position_margin
     }
 
     /// Return the used order margin of account, same denotation as
     /// wallet_balance
     #[inline(always)]
-    pub fn order_margin(&self) -> f64 {
+    pub fn order_margin(&self) -> B {
         self.order_margin
     }
 
     /// Return the available balance of account, same denotation as
     /// wallet_balance
     #[inline(always)]
-    pub fn available_balance(&self) -> f64 {
+    pub fn available_balance(&self) -> B {
         self.available_balance
     }
 
     /// Set a new order margin
-    #[inline]
-    pub(crate) fn set_order_margin(&mut self, om: f64) {
-        debug_assert!(om >= 0.0);
-        debug_assert!(om.is_finite());
-
+    pub(crate) fn set_order_margin(&mut self, om: B) {
         debug!("set_order_margin: om: {}, self: {:?}", om, self);
 
         self.order_margin = om;
@@ -110,8 +100,7 @@ impl Margin {
 
     /// Set the position margin by a given delta and adjust available balance
     /// accordingly
-    #[inline]
-    pub(crate) fn set_position_margin(&mut self, val: f64) {
+    pub(crate) fn set_position_margin(&mut self, val: B) {
         debug!("set_position_margin({}), self: {:?}", val, self);
 
         debug_assert!(val.is_finite());
@@ -127,10 +116,7 @@ impl Margin {
     }
 
     /// Change the balance by a given delta e.g. from realizing profit or loss
-    #[inline]
-    pub(crate) fn change_balance(&mut self, delta: f64) {
-        debug_assert!(delta.is_finite());
-
+    pub(crate) fn change_balance(&mut self, delta: B) {
         debug!("change_balance: delta: {}, self: {:?}", delta, self);
 
         self.wallet_balance += delta;

@@ -1,10 +1,10 @@
 [package]
 name = "lfest"
-version = "0.23.4"
+version = "0.24.0"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2018"
 license-file = "LICENSE"
-description = "A leveraged perpetual futures exchange for simulated trading is a high performance backtesting exchange"
+description = "A leveraged perpetual futures exchange for simulated trading and backtesting"
 repository = "https://github.com/MathisWellmann/lfest-rs"
 readme = "README.md"
 keywords = ["exchange", "trading", "simulation", "backest", "leverage"]
@@ -19,6 +19,7 @@ thiserror = "^1"
 hashbrown = "^0.13"
 rand = "^0.8"
 rand_distr = "^0.4"
+malachite = "^0.3"
 
 [dev-dependencies]
 csv = "^1"

@@ -59,7 +59,6 @@ For an example see [examples](examples/basic.rs)
     * min_size
     * max_size
     * step_size
-- add config option to disable acc_tracker, which will save a bunch of RAM
 
 ### Contributions
 If you find a bug or would like to help out, feel free to create a pull-request.
