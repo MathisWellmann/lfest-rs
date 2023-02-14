@@ -2,7 +2,7 @@ use crate::{max, min, Currency, Fee, FuturesTypes, Order, Side};
 
 /// Compute the needed order margin with a newly added order
 pub(crate) fn order_margin<S, B>(
-    orders: &[Order<S>],
+    orders: impl Iterator<Item = Order<S>>,
     pos_size: S,
     futures_type: FuturesTypes,
     leverage: f64,

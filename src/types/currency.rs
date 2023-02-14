@@ -10,7 +10,7 @@ pub struct BaseCurrency(pub f64);
 #[derive(Default, Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct QuoteCurrency(pub f64);
 
-pub trait Currency: Copy {
+pub trait Currency: Copy + std::fmt::Debug {
     fn val(&self) -> f64;
 }
 

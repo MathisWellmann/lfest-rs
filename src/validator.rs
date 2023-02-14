@@ -181,7 +181,7 @@ impl Validator {
         debug!("limit_order_margin_cost: order: {:?}, active_limit_orders: {:?}", order, orders);
         orders.insert(order.id(), *order);
         let needed_order_margin = order_margin(
-            orders.values(),
+            orders.values().cloned(),
             acc.position().size(),
             self.futures_type,
             acc.position().leverage(),
