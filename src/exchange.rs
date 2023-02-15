@@ -1,13 +1,16 @@
 use crate::{
-    Account, AccountTracker, Config, FuturesTypes, MarketUpdate, Order, OrderError, OrderType,
-    QuoteCurrency, Side, Validator,
+    quote, Account, AccountTracker, Config, Currency, FuturesTypes, MarketUpdate, Order,
+    OrderError, OrderType, QuoteCurrency, Side, Validator,
 };
 
 #[derive(Debug, Clone)]
 /// The main leveraged futures exchange for simulated trading
-pub struct Exchange<A, S, B> {
-    config: Config<B>,
-    account: Account<A, S, B>,
+pub struct Exchange<A, S>
+where
+    S: Currency,
+{
+    config: Config<S::PairedCurrency>,
+    account: Account<A, S>,
     validator: Validator,
     bid: QuoteCurrency,
     ask: QuoteCurrency,
@@ -18,12 +21,14 @@ pub struct Exchange<A, S, B> {
     current_ts: i64,
 }
 
-impl<A, S, B> Exchange<A, S, B>
-where A: AccountTracker
+impl<A, S> Exchange<A, S>
+where
+    A: AccountTracker,
+    S: Currency,
 {
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
-    pub fn new(account_tracker: A, config: Config<B>) -> Self {
+    pub fn new(account_tracker: A, config: Config<S::PairedCurrency>) -> Self {
         let account = Account::new(
             account_tracker,
             config.leverage(),
@@ -37,12 +42,12 @@ where A: AccountTracker
             config,
             account,
             validator,
-            bid: 0.0,
-            ask: 0.0,
+            bid: quote!(0.0),
+            ask: quote!(0.0),
             next_order_id: 0,
             step: 0,
-            high: 0.0,
-            low: 0.0,
+            high: quote!(0.0),
+            low: quote!(0.0),
             current_ts: 0,
         }
     }
@@ -73,19 +78,19 @@ where A: AccountTracker
 
     /// Return a reference to Account
     #[inline(always)]
-    pub fn account(&self) -> &Account<A, S, B> {
+    pub fn account(&self) -> &Account<A, S> {
         &self.account
     }
 
     /// Return a mutable reference to Account
     #[inline(always)]
-    pub fn account_mut(&mut self) -> &mut Account<A, S, B> {
+    pub fn account_mut(&mut self) -> &mut Account<A, S> {
         &mut self.account
     }
 
     /// Set the account, use carefully
     #[inline(always)]
-    pub fn set_account(&mut self, account: Account<A, S, B>) {
+    pub fn set_account(&mut self, account: Account<A, S>) {
         self.account = account
     }
 

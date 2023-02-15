@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{FuturesTypes, QuoteCurrency};
+use crate::{quote, Currency, FuturesTypes, QuoteCurrency};
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 /// Describes the position information of the account
@@ -15,7 +15,10 @@ pub struct Position<S> {
     unrealized_pnl: f64,
 }
 
-impl<S> Position<S> {
+impl<S> Position<S>
+where
+    S: Currency,
+{
     /// Create a new, initially neutral, position with a given leverage
     ///
     /// # Panics:
@@ -26,7 +29,7 @@ impl<S> Position<S> {
         debug_assert!(leverage >= 1.0);
         Position {
             size: 0.0,
-            entry_price: 0.0,
+            entry_price: quote!(0.0),
             leverage,
             unrealized_pnl: 0.0,
         }
@@ -128,7 +131,7 @@ impl<S> Position<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{base, quote, utils::round};
+    use crate::{base, utils::round};
 
     #[test]
     fn position_change_size() {

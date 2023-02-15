@@ -1,6 +1,9 @@
 use std::{fmt::Formatter, str::FromStr};
 
-use crate::errors::{Error, Result};
+use crate::{
+    errors::{Error, Result},
+    Currency, QuoteCurrency,
+};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Enumeration of different futures types
@@ -30,11 +33,20 @@ impl Default for FuturesTypes {
 }
 
 impl FuturesTypes {
-    /// return the profit and loss for a given entry and exit price with a given
-    /// contract_qty Note that negative contract_qty will give the pnl for a
-    /// short position
+    /// Return the profit and loss for a given entry and exit price with a given
+    /// `contract_qty`.
+    /// Note that negative `contract_qty` will give the pnl for a
+    /// short position.
     #[inline]
-    pub fn pnl(&self, entry_price: f64, exit_price: f64, contract_qty: f64) -> f64 {
+    pub fn pnl<S>(
+        &self,
+        entry_price: QuoteCurrency,
+        exit_price: QuoteCurrency,
+        contract_qty: S,
+    ) -> S::PairedCurrency
+    where
+        S: Currency,
+    {
         match self {
             Self::Linear => {
                 // contract_qty is denoted in BASE currency
@@ -76,25 +88,26 @@ impl FromStr for FuturesTypes {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::utils::round;
+    use crate::{base, quote, utils::round};
 
     #[test]
     fn futures_type_pnl_linear() {
         let ft = FuturesTypes::Linear;
 
-        assert_eq!(ft.pnl(100.0, 110.0, 10.0), 100.0);
-        assert_eq!(ft.pnl(100.0, 110.0, -10.0), -100.0);
-        assert_eq!(ft.pnl(100.0, 90.0, 10.0), -100.0);
-        assert_eq!(ft.pnl(100.0, 90.0, -10.0), 100.0);
+        assert_eq!(ft.pnl(quote!(100.0), quote!(110.0), base!(10.0)), quote!(100.0));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(110.0), base!(-10.0)), quote!(-100.0));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(90.0), base!(10.0)), quote!(-100.0));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(90.0), base!(-10.0)), quote!(100.0));
     }
 
     #[test]
     fn futures_type_pnl_inverse() {
         let ft = FuturesTypes::Inverse;
 
-        assert_eq!(round(ft.pnl(100.0, 110.0, 1000.0), 3), 0.909);
-        assert_eq!(round(ft.pnl(100.0, 110.0, -1000.0), 3), -0.909);
-        assert_eq!(round(ft.pnl(100.0, 90.0, 1000.0), 3), -1.111);
-        assert_eq!(round(ft.pnl(100.0, 90.0, -1000.0), 3), 1.111);
+        // TODO: remove rounding and use better float type
+        assert_eq!(round(ft.pnl(quote!(100.0), quote!(110.0), quote!(1000.0)), 3), base!(0.909));
+        assert_eq!(round(ft.pnl(quote!(100.0), quote!(110.0), quote!(-1000.0)), 3), base!(-0.909));
+        assert_eq!(round(ft.pnl(quote!(100.0), quote!(90.0), quote!(1000.0)), 3), base!(-1.111));
+        assert_eq!(round(ft.pnl(quote!(100.0), quote!(90.0), quote!(-1000.0)), 3), base!(1.111));
     }
 }

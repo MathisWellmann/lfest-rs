@@ -1,8 +1,8 @@
 use hashbrown::HashMap;
 
 use crate::{
-    limit_order_margin::order_margin, utils::round, AccountTracker, Currency, Error, Fee,
-    FuturesTypes, Margin, Order, Position, QuoteCurrency, Result, Side,
+    limit_order_margin::order_margin, quote, AccountTracker, Currency, Error, Fee, FuturesTypes,
+    Margin, Order, Position, QuoteCurrency, Result, Side,
 };
 
 #[derive(Debug, Clone)]
@@ -11,10 +11,13 @@ use crate::{
 /// A: AccountTracker,
 /// S: Size type
 /// B: Balance type
-pub struct Account<A, S, B> {
+pub struct Account<A, S>
+where
+    S: Currency,
+{
     account_tracker: A,
     futures_type: FuturesTypes,
-    margin: Margin<B>,
+    margin: Margin<S::PairedCurrency>,
     position: Position<S>,
     active_limit_orders: HashMap<u64, Order<S>>,
     lookup_id_from_user_order_id: HashMap<u64, u64>,
@@ -27,18 +30,17 @@ pub struct Account<A, S, B> {
     max_limit_sell_price: QuoteCurrency,
 }
 
-impl<A, S, B> Account<A, S, B>
+impl<A, S> Account<A, S>
 where
     A: AccountTracker,
     S: Currency,
-    B: Currency,
 {
     // TODO: make sure to eliminate the `futures_type`, to infer it based on the
     // starting_balance type
     pub(crate) fn new(
         account_tracker: A,
         leverage: f64,
-        starting_balance: B,
+        starting_balance: S::PairedCurrency,
         futures_type: FuturesTypes,
     ) -> Self {
         let position = Position::new_init(leverage);
@@ -52,15 +54,15 @@ where
             active_limit_orders: HashMap::new(),
             lookup_id_from_user_order_id: HashMap::new(),
             executed_orders: vec![],
-            open_limit_buy_size: 0.0,
-            open_limit_sell_size: 0.0,
-            min_limit_buy_price: 0.0,
-            max_limit_sell_price: 0.0,
+            open_limit_buy_size: S::new_zero(),
+            open_limit_sell_size: S::new_zero(),
+            min_limit_buy_price: quote!(0.0),
+            max_limit_sell_price: quote!(0.0),
         }
     }
 
     /// Update the accounts state for the newest price data
-    pub(crate) fn update(&mut self, price: f64, trade_timestamp: u64) {
+    pub(crate) fn update(&mut self, price: QuoteCurrency, trade_timestamp: u64) {
         let upnl: f64 =
             self.futures_type.pnl(self.position.entry_price(), price, self.position.size());
         self.account_tracker.update(trade_timestamp, price, upnl);

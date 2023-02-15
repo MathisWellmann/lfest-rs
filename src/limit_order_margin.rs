@@ -1,16 +1,26 @@
 use crate::{max, min, Currency, Fee, FuturesTypes, Order, Side};
 
 /// Compute the needed order margin with a newly added order
-pub(crate) fn order_margin<S, B>(
+///
+/// # Arguments:
+/// `orders`: All the open orders
+/// `pos_size`: The current position size
+/// `futures_type`: The type of futures contract this is computed for
+/// `leverage`: The positions leverage
+/// `fee_maker`: Fee of the maker
+///
+/// # Returns:
+/// The margin required for those orders, measured in the margin currency which is the pair of the order size currency.
+///
+pub(crate) fn order_margin<S>(
     orders: impl Iterator<Item = Order<S>>,
     pos_size: S,
     futures_type: FuturesTypes,
     leverage: f64,
     fee_maker: Fee,
-) -> B
+) -> S::PairedCurrency
 where
     S: Currency,
-    B: Currency,
 {
     let mut buy_size: f64 = 0.0;
     let mut sell_size: f64 = 0.0;
@@ -77,26 +87,28 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::{base, quote};
+
     use super::*;
 
     #[test]
     fn order_margin_linear_futures_with_fees() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let f_m = 0.0002;
+        let f_m = Fee(0.0002);
         let ft = FuturesTypes::Linear;
 
-        let p = 0.0;
-        let orders = vec![Order::limit(Side::Buy, 1.0, 1000.0).unwrap()];
-        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), 1000.2);
-        let orders = vec![Order::limit(Side::Sell, 1.0, 1000.0).unwrap()];
-        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), 1000.2);
+        let p = base!(0.0);
+        let orders = vec![Order::limit(Side::Buy, base!(1.0), quote!(1000.0)).unwrap()];
+        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), quote!(1000.2));
+        let orders = vec![Order::limit(Side::Sell, base!(1.0), quote!(1000.0)).unwrap()];
+        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), quote!(1000.2));
 
         let p = 1000.0;
-        let orders = vec![Order::limit(Side::Sell, 1.0, 1000.0).unwrap()];
-        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), 0.0);
-        let orders = vec![Order::limit(Side::Buy, 1.0, 1000.0).unwrap()];
-        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), 1000.2);
+        let orders = vec![Order::limit(Side::Sell, base!(1.0), quote!(1000.0)).unwrap()];
+        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), quote!(0.0));
+        let orders = vec![Order::limit(Side::Buy, base!(1.0), quote!(1000.0)).unwrap()];
+        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), quote!(1000.2));
     }
 
     #[test]

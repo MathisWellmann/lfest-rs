@@ -40,15 +40,14 @@ impl Validator {
     /// # Returns:
     /// debited and credited account balance deltas, if order valid,
     /// [`OrderError`] otherwise
-    pub(crate) fn validate_market_order<A, S, B>(
+    pub(crate) fn validate_market_order<A, S>(
         &self,
         o: &Order<S>,
-        acc: &Account<A, S, B>,
+        acc: &Account<A, S>,
     ) -> Result<(), OrderError>
     where
         A: AccountTracker,
         S: Currency,
-        B: Currency,
     {
         let (debit, credit) = self.order_cost_market(o, acc);
         debug!("validate_market_order debit: {}, credit: {}", debit, credit);
@@ -64,15 +63,15 @@ impl Validator {
     ///
     /// # Returns:
     /// order margin if order is valid, [`OrderError`] otherwise
-    pub(crate) fn validate_limit_order<A, S, B>(
+    ///
+    pub(crate) fn validate_limit_order<A, S>(
         &self,
         o: &Order<S>,
-        acc: &Account<A, S, B>,
-    ) -> Result<B, OrderError>
+        acc: &Account<A, S>,
+    ) -> Result<S::PairedCurrency, OrderError>
     where
         A: AccountTracker,
         S: Currency,
-        B: Currency,
     {
         // validate order price
         match o.side() {
@@ -107,11 +106,14 @@ impl Validator {
     /// # Returns:
     /// debited and credited account balance delta
     #[must_use]
-    fn order_cost_market<A, S, B>(&self, order: &Order<S>, acc: &Account<A, S, B>) -> (B, B)
+    fn order_cost_market<A, S>(
+        &self,
+        order: &Order<S>,
+        acc: &Account<A, S>,
+    ) -> (S::PairedCurrency, S::PairedCurrency)
     where
         A: AccountTracker,
         S: Currency,
-        B: Currency,
     {
         debug!("order_cost_market: order: {:?},\nacc.position: {:?}", order, acc.position());
 
@@ -171,13 +173,17 @@ impl Validator {
     /// Compute the order cost of a limit order
     ///
     /// # Returns;
-    /// debited and credited account balance delta
+    /// debited and credited account balance delta, measured in the margin currency
+    ///
     #[must_use]
-    fn limit_order_margin_cost<A, S, B>(&self, order: &Order<S>, acc: &Account<A, S, B>) -> f64
+    fn limit_order_margin_cost<A, S, B>(
+        &self,
+        order: &Order<S>,
+        acc: &Account<A, S>,
+    ) -> S::PairedCurrency
     where
         A: AccountTracker,
         S: Currency,
-        B: Currency,
     {
         let mut orders = acc.active_limit_orders().clone();
         debug!("limit_order_margin_cost: order: {:?}, active_limit_orders: {:?}", order, orders);
@@ -869,14 +875,14 @@ mod tests {
             acc.append_limit_order(o, order_margin);
 
             let o = Order::limit(Side::Buy, quote!(100.0), base!(0.5 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), quote!(0.0));
             let o = Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), quote!(0.0));
 
             let o = Order::limit(Side::Sell, quote!(100.0), base!(0.5 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 50.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), quote!(50.0));
             let o = Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 100.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), quote!(100.0));
         }
     }
 
@@ -903,14 +909,14 @@ mod tests {
             acc.append_limit_order(o, order_margin);
 
             let o = Order::limit(Side::Buy, quote!(100.0), base!(0.5 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), quote!(0.0));
             let o = Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 50.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), quote!(50.0));
 
             let o = Order::limit(Side::Sell, quote!(100.0), base!(0.5 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 50.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), quote!(50.0));
             let o = Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 100.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), quote!(100.0));
         }
     }
 
@@ -928,14 +934,14 @@ mod tests {
             let acc = Account::new(NoAccountTracker::default(), l, base!(1.0), futures_type);
 
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
 
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
         }
     }
 
@@ -954,14 +960,14 @@ mod tests {
             acc.change_position(Side::Buy, quote!(50.0 * l), quote!(100.0));
 
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
 
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.0));
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
         }
     }
 
@@ -980,14 +986,14 @@ mod tests {
             acc.change_position(Side::Sell, quote!(50.0 * l), quote!(100.0));
 
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.0));
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
 
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
         }
     }
 
@@ -1009,14 +1015,14 @@ mod tests {
             acc.append_limit_order(o, order_margin);
 
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
 
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.0));
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5) d;
         }
     }
 
@@ -1038,14 +1044,14 @@ mod tests {
             acc.append_limit_order(o, order_margin);
 
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.0));
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
 
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
         }
     }
 
@@ -1071,14 +1077,14 @@ mod tests {
             acc.append_limit_order(o, order_margin);
 
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
 
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
         }
     }
 
@@ -1101,14 +1107,14 @@ mod tests {
             acc.append_limit_order(o, order_margin);
 
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
 
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.0));
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.0));
         }
     }
 
@@ -1131,14 +1137,14 @@ mod tests {
             acc.append_limit_order(o, order_margin);
 
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
 
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
         }
     }
 
@@ -1165,14 +1171,14 @@ mod tests {
             acc.append_limit_order(o, order_margin);
 
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
 
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.0));
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
         }
     }
 
@@ -1195,14 +1201,14 @@ mod tests {
             acc.append_limit_order(o, order_margin);
 
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
 
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o = Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
         }
     }
 
@@ -1227,17 +1233,17 @@ mod tests {
             acc.append_limit_order(o, order_margin);
 
             let o = Order::limit(Side::Buy, QuoteCurrency(100.0), QuoteCurrency(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.0));
             let o =
                 Order::limit(Side::Buy, QuoteCurrency(100.0), QuoteCurrency(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.0));
 
             let o =
                 Order::limit(Side::Sell, QuoteCurrency(100.0), QuoteCurrency(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o =
                 Order::limit(Side::Sell, QuoteCurrency(100.0), QuoteCurrency(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
         }
     }
 
@@ -1266,17 +1272,17 @@ mod tests {
             acc.append_limit_order(o, order_margin);
 
             let o = Order::limit(Side::Buy, QuoteCurrency(100.0), QuoteCurrency(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.0));
             let o =
                 Order::limit(Side::Buy, QuoteCurrency(100.0), QuoteCurrency(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
 
             let o =
                 Order::limit(Side::Sell, QuoteCurrency(100.0), QuoteCurrency(50.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 0.5);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(0.5));
             let o =
                 Order::limit(Side::Sell, QuoteCurrency(100.0), QuoteCurrency(100.0 * l)).unwrap();
-            assert_eq!(validator.limit_order_margin_cost(&o, &acc), 1.0);
+            assert_eq!(validator.limit_order_margin_cost(&o, &acc), base!(1.0));
         }
     }
 }

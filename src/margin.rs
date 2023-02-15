@@ -4,26 +4,26 @@ use crate::{Error, Result};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Describes the margin information of the account
-pub struct Margin<B> {
+pub struct Margin<M> {
     /// The wallet balance of account
     /// denoted in QUOTE currency when using linear futures
     /// denoted in BASE currency when using inverse futures
-    wallet_balance: B,
+    wallet_balance: M,
     /// The position margin of account, same denotation as wallet_balance
-    position_margin: B,
+    position_margin: M,
     /// The order margin of account, same denotation as wallet_balance
-    order_margin: B,
+    order_margin: M,
     /// The available balance of account, same denotation as wallet_balance
-    available_balance: B,
+    available_balance: M,
 }
 
-impl<B> Margin<B> {
+impl<M> Margin<M> {
     /// Create a new margin account with an initial balance
     /// # Panics
     //  In debug mode, if the input values don't make sense
     #[must_use]
     #[inline]
-    pub fn new_init(init_balance: B) -> Self {
+    pub fn new_init(init_balance: M) -> Self {
         Margin {
             wallet_balance: init_balance,
             position_margin: 0.0,
@@ -39,10 +39,10 @@ impl<B> Margin<B> {
     #[must_use]
     #[inline]
     pub fn new(
-        wallet_balance: B,
-        position_margin: B,
-        order_margin: B,
-        available_balance: B,
+        wallet_balance: M,
+        position_margin: M,
+        order_margin: M,
+        available_balance: M,
     ) -> Result<Self> {
         if position_margin > wallet_balance {
             return Err(Error::InvalidPositionMargin);
@@ -64,32 +64,32 @@ impl<B> Margin<B> {
 
     /// Return the wallet balance of account
     #[inline(always)]
-    pub fn wallet_balance(&self) -> B {
+    pub fn wallet_balance(&self) -> M {
         self.wallet_balance
     }
 
     /// Return the position margin of account, same denotation as wallet_balance
     #[inline(always)]
-    pub fn position_margin(&self) -> B {
+    pub fn position_margin(&self) -> M {
         self.position_margin
     }
 
     /// Return the used order margin of account, same denotation as
     /// wallet_balance
     #[inline(always)]
-    pub fn order_margin(&self) -> B {
+    pub fn order_margin(&self) -> M {
         self.order_margin
     }
 
     /// Return the available balance of account, same denotation as
     /// wallet_balance
     #[inline(always)]
-    pub fn available_balance(&self) -> B {
+    pub fn available_balance(&self) -> M {
         self.available_balance
     }
 
     /// Set a new order margin
-    pub(crate) fn set_order_margin(&mut self, om: B) {
+    pub(crate) fn set_order_margin(&mut self, om: M) {
         debug!("set_order_margin: om: {}, self: {:?}", om, self);
 
         self.order_margin = om;
@@ -100,7 +100,7 @@ impl<B> Margin<B> {
 
     /// Set the position margin by a given delta and adjust available balance
     /// accordingly
-    pub(crate) fn set_position_margin(&mut self, val: B) {
+    pub(crate) fn set_position_margin(&mut self, val: M) {
         debug!("set_position_margin({}), self: {:?}", val, self);
 
         debug_assert!(val.is_finite());
@@ -116,7 +116,7 @@ impl<B> Margin<B> {
     }
 
     /// Change the balance by a given delta e.g. from realizing profit or loss
-    pub(crate) fn change_balance(&mut self, delta: B) {
+    pub(crate) fn change_balance(&mut self, delta: M) {
         debug!("change_balance: delta: {}, self: {:?}", delta, self);
 
         self.wallet_balance += delta;
