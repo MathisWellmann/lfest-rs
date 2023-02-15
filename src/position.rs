@@ -40,8 +40,6 @@ impl<S> Position<S> {
     #[must_use]
     #[inline]
     pub fn new(size: S, entry_price: QuoteCurrency, leverage: f64, unrealized_pnl: f64) -> Self {
-        debug_assert!(size.is_finite());
-        debug_assert!(entry_price.is_finite());
         debug_assert!(leverage.is_finite());
         debug_assert!(unrealized_pnl.is_finite());
 
@@ -130,56 +128,56 @@ impl<S> Position<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::round;
+    use crate::{base, quote, utils::round};
 
     #[test]
     fn position_change_size() {
         let mut pos = Position::new_init(1.0);
         let futures_type = FuturesTypes::Inverse;
 
-        pos.change_size(100.0, 100.0, futures_type);
-        assert_eq!(pos.size, 100.0);
-        assert_eq!(pos.entry_price, 100.0);
+        pos.change_size(quote!(100.0), quote!(100.0), futures_type);
+        assert_eq!(pos.size, quote!(100.0));
+        assert_eq!(pos.entry_price, quote!(100.0));
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(pos.unrealized_pnl, 0.0);
 
-        pos.change_size(-50.0, 150.0, futures_type);
-        assert_eq!(pos.size, 50.0);
-        assert_eq!(pos.entry_price, 100.0);
+        pos.change_size(quote!(-50.0), quote!(150.0), futures_type);
+        assert_eq!(pos.size, quote!(50.0));
+        assert_eq!(pos.entry_price, quote!(100.0));
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(round(pos.unrealized_pnl, 2), 0.17);
 
-        pos.change_size(50.0, 150.0, futures_type);
-        assert_eq!(pos.size, 100.0);
-        assert_eq!(pos.entry_price, 125.0);
+        pos.change_size(quote!(50.0), quote!(150.0), futures_type);
+        assert_eq!(pos.size, quote!(100.0));
+        assert_eq!(pos.entry_price, quote!(125.0));
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(round(pos.unrealized_pnl, 2), 0.13);
 
-        pos.change_size(-150.0, 150.0, futures_type);
-        assert_eq!(pos.size, -50.0);
-        assert_eq!(pos.entry_price, 150.0);
+        pos.change_size(quote!(-150.0), quote!(150.0), futures_type);
+        assert_eq!(pos.size, quote!(-50.0));
+        assert_eq!(pos.entry_price, quote!(150.0));
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(pos.unrealized_pnl, 0.0);
 
-        pos.change_size(50.0, 150.0, futures_type);
+        pos.change_size(quote!(50.0), quote!(150.0), futures_type);
         assert_eq!(pos.size, 0.0);
-        assert_eq!(pos.entry_price, 150.0);
+        assert_eq!(pos.entry_price, quote!(150.0));
         assert_eq!(pos.leverage, 1.0);
         assert_eq!(pos.unrealized_pnl, 0.0);
     }
 
     #[test]
     fn position_update_state_inverse_futures() {
-        let mut pos = Position::new(100.0, 100.0, 1.0, 0.0);
-        pos.update_state(110.0, FuturesTypes::Inverse);
+        let mut pos = Position::new(quote!(100.0), quote!(100.0), 1.0, 0.0);
+        pos.update_state(quote!(110.0), FuturesTypes::Inverse);
 
         assert_eq!(round(pos.unrealized_pnl, 2), 0.09);
     }
 
     #[test]
     fn position_update_state_linear_futures() {
-        let mut pos = Position::new(1.0, 100.0, 1.0, 0.0);
-        pos.update_state(110.0, FuturesTypes::Linear);
+        let mut pos = Position::new(base!(1.0), quote!(100.0), 1.0, 0.0);
+        pos.update_state(quote!(110.0), FuturesTypes::Linear);
 
         assert_eq!(round(pos.unrealized_pnl, 2), 10.0);
     }

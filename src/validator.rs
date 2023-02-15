@@ -1,5 +1,5 @@
 use crate::{
-    limit_order_margin::order_margin, max, min, Account, AccountTracker, Currency, Fee,
+    limit_order_margin::order_margin, max, min, quote, Account, AccountTracker, Currency, Fee,
     FuturesTypes, Order, OrderError, QuoteCurrency, Side,
 };
 
@@ -20,8 +20,8 @@ impl Validator {
         Self {
             fee_maker,
             fee_taker,
-            bid: 0.0,
-            ask: 0.0,
+            bid: quote!(0.0),
+            ask: quote!(0.0),
             futures_type,
         }
     }
@@ -47,6 +47,8 @@ impl Validator {
     ) -> Result<(), OrderError>
     where
         A: AccountTracker,
+        S: Currency,
+        B: Currency,
     {
         let (debit, credit) = self.order_cost_market(o, acc);
         debug!("validate_market_order debit: {}, credit: {}", debit, credit);

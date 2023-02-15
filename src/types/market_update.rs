@@ -50,31 +50,32 @@ macro_rules! candle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::quote;
 
     #[test]
     fn bba_macro() {
-        let m = bba!(100.0, 100.1);
+        let m = bba!(quote!(100.0), quote!(100.1));
 
         assert_eq!(
             m,
             MarketUpdate::Bba {
-                bid: 100.0,
-                ask: 100.1
+                bid: quote!(100.0),
+                ask: quote!(100.1)
             }
         );
     }
 
     #[test]
     fn candle_macro() {
-        let c = candle!(100.0, 100.1, 100.0, 100.1);
+        let c = candle!(quote!(100.0), quote!(100.1), quote!(100.0), quote!(100.1));
 
         assert_eq!(
             c,
             MarketUpdate::Candle {
-                bid: 100.0,
-                ask: 100.1,
-                low: 100.0,
-                high: 100.1
+                bid: quote!(100.0),
+                ask: quote!(100.1),
+                low: quote!(100.0),
+                high: quote!(100.1),
             }
         )
     }
