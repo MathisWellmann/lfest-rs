@@ -91,90 +91,70 @@ mod tests {
     use crate::{base, quote, BaseCurrency, QuoteCurrency};
 
     #[test]
-    fn order_margin_linear_futures_with_fees() {
-        if let Err(_) = pretty_env_logger::try_init() {}
-
-        let f_m = Fee(0.0002);
-        let ft = FuturesTypes::Linear;
-
-        let p = base!(0.0);
-        let orders = vec![Order::limit(Side::Buy, base!(1.0), quote!(1000.0)).unwrap()];
-        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), quote!(1000.2));
-        let orders = vec![Order::limit(Side::Sell, base!(1.0), quote!(1000.0)).unwrap()];
-        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), quote!(1000.2));
-
-        let p = 1000.0;
-        let orders = vec![Order::limit(Side::Sell, base!(1.0), quote!(1000.0)).unwrap()];
-        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), quote!(0.0));
-        let orders = vec![Order::limit(Side::Buy, base!(1.0), quote!(1000.0)).unwrap()];
-        assert_eq!(order_margin(orders.iter(), p, ft, 1.0, f_m), quote!(1000.2));
-    }
-
-    #[test]
     fn order_margin_linear_futures_without_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let ft = FuturesTypes::Linear;
-        let p = 0.0;
-        let f_m = 0.0;
+        let p = base!(0.0);
+        let f_m = Fee(0.0);
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
             debug!("leverage: {}", l);
 
             let orders = vec![];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 0.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(0.0));
 
-            let orders = vec![Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap()];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
+            let orders = vec![Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap()];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
 
-            let orders = vec![Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap()];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
-
-            let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-            ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 200.0);
+            let orders = vec![Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap()];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(200.0));
 
             let orders = vec![
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 200.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 300.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(200.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 200.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(300.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 200.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(200.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 0.5 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(200.0));
+
+            let orders = vec![
+                Order::limit(Side::Buy, quote!(100.0), base!(0.5 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(0.5 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+            ];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
         }
     }
 
@@ -183,74 +163,74 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let ft = FuturesTypes::Linear;
-        let f_m = 0.0;
+        let f_m = Fee(0.0);
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
-            let p = l;
+            let p = base!(l);
 
             debug!("leverage: {}", l);
 
             let orders = vec![];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 0.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(0.0));
 
-            let orders = vec![Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap()];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
+            let orders = vec![Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap()];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
 
-            let orders = vec![Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap()];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 0.0);
-
-            let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-            ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 200.0);
+            let orders = vec![Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap()];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(0.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(200.0));
 
             let orders = vec![
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 300.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 200.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(300.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(200.0));
 
             let orders = vec![
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 200.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(200.0));
+
+            let orders = vec![
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(0.5 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+            ];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
         }
     }
 
@@ -259,74 +239,74 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let ft = FuturesTypes::Linear;
-        let f_m = 0.0;
+        let f_m = Fee(0.0);
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
-            let p = -l;
+            let p = base!(-l);
 
             debug!("leverage: {}", l);
 
             let orders = vec![];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 0.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(0.0));
 
-            let orders = vec![Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap()];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 0.0);
+            let orders = vec![Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap()];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(0.0));
 
-            let orders = vec![Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap()];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
-
-            let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-            ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
+            let orders = vec![Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap()];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
 
             let orders = vec![
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 200.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 200.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(200.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 100.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(200.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 200.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(100.0));
 
             let orders = vec![
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 300.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(200.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 1.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 0.5 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 1.0 * l).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 150.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(300.0));
+
+            let orders = vec![
+                Order::limit(Side::Buy, quote!(100.0), base!(1.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(0.5 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), base!(1.0 * l)).unwrap(),
+            ];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), quote!(150.0));
         }
     }
 
@@ -335,73 +315,73 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let ft = FuturesTypes::Inverse;
-        let p = 0.0;
-        let f_m = 0.0;
+        let p = quote!(0.0);
+        let f_m = Fee(0.0);
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
             debug!("leverage: {}", l);
 
             let orders = vec![];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 0.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(0.0));
 
-            let orders = vec![Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap()];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.0);
+            let orders = vec![Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap()];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.0));
 
-            let orders = vec![Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap()];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.0);
-
-            let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-            ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 2.0);
+            let orders = vec![Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap()];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(2.0));
 
             let orders = vec![
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 2.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 3.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(2.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 2.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(3.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 2.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(2.0));
 
             let orders = vec![
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 3.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(2.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.5);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(3.0));
+
+            let orders = vec![
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+            ];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.5));
         }
     }
 
@@ -410,74 +390,74 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let ft = FuturesTypes::Inverse;
-        let f_m = 0.0;
+        let f_m = Fee(0.0);
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
             debug!("leverage: {}", l);
 
-            let p = l * 100.0;
+            let p = quote!(l * 100.0);
 
             let orders = vec![];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 0.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(0.0));
 
-            let orders = vec![Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap()];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.0);
+            let orders = vec![Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap()];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.0));
 
-            let orders = vec![Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap()];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 0.0);
-
-            let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-            ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 2.0);
+            let orders = vec![Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap()];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(0.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(2.0));
 
             let orders = vec![
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 3.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 2.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(3.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(2.0));
 
             let orders = vec![
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 2.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(2.0));
+
+            let orders = vec![
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+            ];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.0));
         }
     }
 
@@ -486,74 +466,74 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let ft = FuturesTypes::Inverse;
-        let f_m = 0.0;
+        let f_m = Fee(0.0);
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
             debug!("leverage: {}", l);
 
-            let p = -l * 100.0;
+            let p = quote!(-l * 100.0);
 
             let orders = vec![];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 0.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(0.0));
 
-            let orders = vec![Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap()];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 0.0);
+            let orders = vec![Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap()];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(0.0));
 
-            let orders = vec![Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap()];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.0);
-
-            let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-            ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.0);
+            let orders = vec![Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap()];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.0));
 
             let orders = vec![
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 2.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 2.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(2.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(2.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 2.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.0));
 
             let orders = vec![
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 3.0);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(2.0));
 
             let orders = vec![
-                Order::limit(Side::Buy, 100.0, 100.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 50.0 * l).unwrap(),
-                Order::limit(Side::Sell, 100.0, 100.0 * l).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.iter(), p, ft, l, f_m), 1.5);
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(3.0));
+
+            let orders = vec![
+                Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap(),
+                Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
+            ];
+            assert_eq!(order_margin(orders.into_iter(), p, ft, l, f_m), base!(1.5));
         }
     }
 }

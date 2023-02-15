@@ -251,7 +251,7 @@ where
 
     /// Handle limit order trigger and execution
     fn handle_limit_order(&mut self, order_id: u64) {
-        let o: Order = *self
+        let o: Order<S> = *self
             .account
             .active_limit_orders()
             .get(&order_id)

@@ -132,30 +132,30 @@ where M: Currency
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::round;
+    use crate::{base, BaseCurrency};
 
     #[test]
     fn margin_set_order_margin() {
-        let mut margin = Margin::new_init(1.0);
-        margin.set_order_margin(1.0);
-        assert_eq!(margin.wallet_balance, 1.0);
-        assert_eq!(margin.position_margin, 0.0);
-        assert_eq!(margin.order_margin, 1.0);
-        assert_eq!(margin.available_balance, 0.0);
+        let mut margin = Margin::new_init(base!(1.0));
+        margin.set_order_margin(base!(1.0));
+        assert_eq!(margin.wallet_balance, base!(1.0));
+        assert_eq!(margin.position_margin, base!(0.0));
+        assert_eq!(margin.order_margin, base!(1.0));
+        assert_eq!(margin.available_balance, base!(0.0));
     }
 
     #[test]
     #[should_panic]
     fn margin_set_order_margin_panic_0() {
-        let mut margin = Margin::new_init(1.0);
-        margin.set_order_margin(1.01);
+        let mut margin = Margin::new_init(base!(1.0));
+        margin.set_order_margin(base!(1.01));
     }
 
     #[test]
     #[should_panic]
     fn margin_set_order_margin_panic_1() {
-        let mut margin = Margin::new_init(1.0);
-        margin.set_order_margin(-0.1);
+        let mut margin = Margin::new_init(base!(1.0));
+        margin.set_order_margin(base!(-0.1));
     }
 
     #[test]
@@ -165,26 +165,26 @@ mod tests {
 
     #[test]
     fn margin_change_balance() {
-        let mut margin = Margin::new_init(1.0);
+        let mut margin = Margin::new_init(base!(1.0));
 
-        margin.change_balance(0.05);
-        assert_eq!(margin.wallet_balance, 1.05);
-        assert_eq!(margin.position_margin, 0.0);
-        assert_eq!(margin.order_margin, 0.0);
-        assert_eq!(margin.available_balance, 1.05);
+        margin.change_balance(base!(0.05));
+        assert_eq!(margin.wallet_balance, base!(1.05));
+        assert_eq!(margin.position_margin, base!(0.0));
+        assert_eq!(margin.order_margin, base!(0.0));
+        assert_eq!(margin.available_balance, base!(1.05));
 
-        margin.change_balance(-0.1);
-        assert_eq!(round(margin.wallet_balance, 2), 0.95);
-        assert_eq!(margin.position_margin, 0.0);
-        assert_eq!(margin.order_margin, 0.0);
-        assert_eq!(round(margin.available_balance, 2), 0.95);
+        margin.change_balance(base!(-0.1));
+        assert_eq!(margin.wallet_balance.into_rounded(2), base!(0.95));
+        assert_eq!(margin.position_margin, base!(0.0));
+        assert_eq!(margin.order_margin, base!(0.0));
+        assert_eq!(margin.available_balance.into_rounded(2), base!(0.95));
     }
 
     #[test]
     #[should_panic]
     fn margin_change_balance_panic_0() {
-        let mut margin = Margin::new_init(1.0);
+        let mut margin = Margin::new_init(base!(1.0));
 
-        margin.change_balance(-1.01);
+        margin.change_balance(base!(-1.01));
     }
 }

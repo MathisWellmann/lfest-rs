@@ -21,6 +21,8 @@ use derive_more::{Add, AddAssign, Display, Div, Mul, Sub, SubAssign};
     Display,
     /* From */
 )]
+#[mul(forward)]
+#[div(forward)]
 pub struct BaseCurrency(pub f64);
 
 /// The markets QUOTE currency, e.g.: BTCUSD -> USD is the quote currency
@@ -44,6 +46,8 @@ pub struct BaseCurrency(pub f64);
     Display,
     /* From, */
 )]
+#[mul(forward)]
+#[div(forward)]
 pub struct QuoteCurrency(pub f64);
 
 pub trait Currency:

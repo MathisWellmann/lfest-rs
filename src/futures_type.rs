@@ -88,7 +88,7 @@ impl FromStr for FuturesTypes {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{base, quote, utils::round, BaseCurrency};
+    use crate::{base, quote, BaseCurrency};
 
     #[test]
     fn futures_type_pnl_linear() {
@@ -105,9 +105,21 @@ mod test {
         let ft = FuturesTypes::Inverse;
 
         // TODO: remove rounding and use better float type
-        assert_eq!(round(ft.pnl(quote!(100.0), quote!(110.0), quote!(1000.0)), 3), base!(0.909));
-        assert_eq!(round(ft.pnl(quote!(100.0), quote!(110.0), quote!(-1000.0)), 3), base!(-0.909));
-        assert_eq!(round(ft.pnl(quote!(100.0), quote!(90.0), quote!(1000.0)), 3), base!(-1.111));
-        assert_eq!(round(ft.pnl(quote!(100.0), quote!(90.0), quote!(-1000.0)), 3), base!(1.111));
+        assert_eq!(
+            ft.pnl(quote!(100.0), quote!(110.0), quote!(1000.0)).into_rounded(3),
+            base!(0.909)
+        );
+        assert_eq!(
+            ft.pnl(quote!(100.0), quote!(110.0), quote!(-1000.0)).into_rounded(3),
+            base!(-0.909)
+        );
+        assert_eq!(
+            ft.pnl(quote!(100.0), quote!(90.0), quote!(1000.0)).into_rounded(3),
+            base!(-1.111)
+        );
+        assert_eq!(
+            ft.pnl(quote!(100.0), quote!(90.0), quote!(-1000.0)).into_rounded(3),
+            base!(1.111)
+        );
     }
 }

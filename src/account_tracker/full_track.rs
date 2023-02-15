@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
-use crate::{cornish_fisher::cornish_fisher_value_at_risk, AccountTracker, FuturesTypes, Side};
+use crate::{
+    cornish_fisher::cornish_fisher_value_at_risk, quote, AccountTracker, Currency, Fee,
+    FuturesTypes, QuoteCurrency, Side,
+};
 
 const DAILY_NS: u64 = 86_400_000_000_000;
 const HOURLY_NS: u64 = 3_600_000_000_000;
@@ -20,13 +23,13 @@ pub enum ReturnsSource {
 /// This can be quite memory intensive, easily reaching beyond 10GB
 /// if using tick-by-tick data due to the storage of many returns
 #[derive(Debug, Clone)]
-pub struct FullAccountTracker {
-    wallet_balance_last: f64,  // last wallet balance recording
-    wallet_balance_start: f64, // wallet balance at start
-    wallet_balance_high: f64,  // maximum wallet balance observed
+pub struct FullAccountTracker<M> {
+    wallet_balance_last: M,  // last wallet balance recording
+    wallet_balance_start: M, // wallet balance at start
+    wallet_balance_high: M,  // maximum wallet balance observed
     futures_type: FuturesTypes,
-    total_rpnl: f64,
-    upnl: f64,
+    total_rpnl: M,
+    upnl: M,
     num_trades: i64,
     num_buys: i64,
     num_wins: usize,
@@ -36,8 +39,8 @@ pub struct FullAccountTracker {
     num_filled_limit_orders: usize,
     num_trading_opportunities: usize,
     total_turnover: f64,
-    max_drawdown_wallet_balance: f64,
-    max_drawdown_total: f64,
+    max_drawdown_wallet_balance: B,
+    max_drawdown_total: M,
     // historical daily absolute returns
     hist_returns_daily_acc: Vec<f64>,
     hist_returns_daily_bnh: Vec<f64>,
@@ -60,33 +63,35 @@ pub struct FullAccountTracker {
     // timestamps for when to trigger the next pnl snapshots
     next_daily_trigger_ts: u64,
     next_hourly_trigger_ts: u64,
-    last_daily_pnl: f64,
-    last_hourly_pnl: f64,
-    last_tick_pnl: f64,
+    last_daily_pnl: M,
+    last_hourly_pnl: M,
+    last_tick_pnl: M,
     cumulative_fees: f64,
-    total_profit: f64,
-    total_loss: f64,
-    price_first: f64,
-    price_last: f64,
-    price_a_day_ago: f64,
-    price_an_hour_ago: f64,
-    price_a_tick_ago: f64,
+    total_profit: M,
+    total_loss: M,
+    price_first: QuoteCurrency,
+    price_last: QuoteCurrency,
+    price_a_day_ago: QuoteCurrency,
+    price_an_hour_ago: QuoteCurrency,
+    price_a_tick_ago: QuoteCurrency,
     ts_first: u64,
     ts_last: u64,
 }
 
-impl FullAccountTracker {
+impl<M> FullAccountTracker<M>
+where M: Currency + Send
+{
     #[must_use]
     #[inline]
     /// Create a new AccTracker struct
-    pub fn new(starting_wb: f64, futures_type: FuturesTypes) -> Self {
+    pub fn new(starting_wb: M, futures_type: FuturesTypes) -> Self {
         FullAccountTracker {
             wallet_balance_last: starting_wb,
             wallet_balance_start: starting_wb,
             wallet_balance_high: starting_wb,
             futures_type,
-            total_rpnl: 0.0,
-            upnl: 0.0,
+            total_rpnl: M::new_zero(),
+            upnl: M::new_zero(),
             num_trades: 0,
             num_buys: 0,
             num_wins: 0,
@@ -112,17 +117,17 @@ impl FullAccountTracker {
             hist_ln_returns_tick_bnh: vec![],
             next_daily_trigger_ts: 0,
             next_hourly_trigger_ts: 0,
-            last_daily_pnl: 0.0,
-            last_hourly_pnl: 0.0,
-            last_tick_pnl: 0.0,
+            last_daily_pnl: M::new_zero(),
+            last_hourly_pnl: M::new_zero(),
+            last_tick_pnl: M::new_zero(),
             cumulative_fees: 0.0,
-            total_profit: 0.0,
-            total_loss: 0.0,
-            price_first: 0.0,
-            price_last: 0.0,
-            price_a_day_ago: 0.0,
-            price_an_hour_ago: 0.0,
-            price_a_tick_ago: 0.0,
+            total_profit: M::new_zero(),
+            total_loss: M::new_zero(),
+            price_first: quote!(0.0),
+            price_last: quote!(0.0),
+            price_a_day_ago: quote!(0.0),
+            price_an_hour_ago: quote!(0.0),
+            price_a_tick_ago: quote!(0.0),
             ts_first: 0,
             ts_last: 0,
         }
@@ -284,6 +289,7 @@ impl FullAccountTracker {
     /// using daily returns due to having more samples. Set n to 24 for
     /// daily value at risk, but with 24x more samples from which to take the
     /// percentile, giving a more accurate VaR
+    ///
     /// # Parameters:
     /// n: number of hourly returns to use
     /// percentile: value between [0.0, 1.0], smaller value will return more
@@ -455,13 +461,13 @@ impl FullAccountTracker {
 
     /// Return the total realized profit and loss of the account
     #[inline(always)]
-    pub fn total_rpnl(&self) -> f64 {
+    pub fn total_rpnl(&self) -> M {
         self.total_rpnl
     }
 
     /// Return the current unrealized profit and loss
     #[inline(always)]
-    pub fn upnl(&self) -> f64 {
+    pub fn upnl(&self) -> M {
         self.upnl
     }
 
@@ -490,19 +496,21 @@ impl FullAccountTracker {
     }
 }
 
-impl AccountTracker for FullAccountTracker {
-    fn update(&mut self, timestamp: u64, price: f64, upnl: f64) {
+impl<M> AccountTracker for FullAccountTracker<M>
+where M: Currency + Send
+{
+    fn update(&mut self, timestamp: u64, price: QuoteCurrency, upnl: M) {
         self.price_last = price;
-        if self.price_a_day_ago == 0.0 {
+        if self.price_a_day_ago.is_zero() {
             self.price_a_day_ago = price;
         }
-        if self.price_an_hour_ago == 0.0 {
+        if self.price_an_hour_ago.is_zero() {
             self.price_an_hour_ago = price;
         }
-        if self.price_a_tick_ago == 0.0 {
+        if self.price_a_tick_ago.is_zero() {
             self.price_a_tick_ago = price;
         }
-        if self.price_first == 0.0 {
+        if self.price_first.is_zero() {
             self.price_first = price;
         }
         self.num_trading_opportunities += 1;
@@ -514,7 +522,7 @@ impl AccountTracker for FullAccountTracker {
             self.next_daily_trigger_ts = timestamp + DAILY_NS;
 
             // calculate daily return of account
-            let pnl: f64 = (self.total_rpnl + upnl) - self.last_daily_pnl;
+            let pnl = (self.total_rpnl + upnl) - self.last_daily_pnl;
             self.hist_returns_daily_acc.push(pnl);
 
             // calculate daily log return of account
@@ -539,7 +547,7 @@ impl AccountTracker for FullAccountTracker {
             self.next_hourly_trigger_ts = timestamp + HOURLY_NS;
 
             // calculate hourly return of account
-            let pnl: f64 = (self.total_rpnl + upnl) - self.last_hourly_pnl;
+            let pnl = (self.total_rpnl + upnl) - self.last_hourly_pnl;
             self.hist_returns_hourly_acc.push(pnl);
 
             // calculate hourly logarithmic return of account
@@ -561,7 +569,7 @@ impl AccountTracker for FullAccountTracker {
             self.price_an_hour_ago = price;
         }
         // compute tick-by-tick return statistics
-        let pnl: f64 = (self.total_rpnl + upnl) - self.last_tick_pnl;
+        let pnl = (self.total_rpnl + upnl) - self.last_tick_pnl;
         self.hist_returns_tick_acc.push(pnl);
 
         let ln_ret: f64 = ((self.wallet_balance_last + upnl)
@@ -587,10 +595,10 @@ impl AccountTracker for FullAccountTracker {
         }
     }
 
-    fn log_rpnl(&mut self, rpnl: f64) {
+    fn log_rpnl(&mut self, rpnl: M) {
         self.total_rpnl += rpnl;
         self.wallet_balance_last += rpnl;
-        if rpnl < 0.0 {
+        if rpnl < M::new_zero() {
             self.total_loss += rpnl.abs();
             self.num_losses += 1;
         } else {
@@ -607,7 +615,7 @@ impl AccountTracker for FullAccountTracker {
     }
 
     #[inline(always)]
-    fn log_fee(&mut self, fee: f64) {
+    fn log_fee(&mut self, fee: Fee) {
         self.cumulative_fees += fee
     }
 
@@ -626,7 +634,7 @@ impl AccountTracker for FullAccountTracker {
         self.num_filled_limit_orders += 1;
     }
 
-    fn log_trade(&mut self, side: Side, price: f64, size: f64) {
+    fn log_trade(&mut self, side: Side, price: QuoteCurrency, size: M::PairedCurrency) {
         self.total_turnover += match self.futures_type {
             FuturesTypes::Linear => size * price,
             FuturesTypes::Inverse => size / price,
@@ -639,7 +647,9 @@ impl AccountTracker for FullAccountTracker {
     }
 }
 
-impl Display for FullAccountTracker {
+impl<M> Display for FullAccountTracker<M>
+where M: Currency
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
