@@ -4,7 +4,9 @@ use crate::{quote, Currency, FuturesTypes, QuoteCurrency};
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 /// Describes the position information of the account
-pub struct Position<S> {
+pub struct Position<S>
+where S: Currency
+{
     /// The position size
     size: S,
     /// The entry price of the position
@@ -12,12 +14,11 @@ pub struct Position<S> {
     /// The current position leverage
     leverage: f64,
     /// The currently unrealized profit and loss
-    unrealized_pnl: f64,
+    unrealized_pnl: S::PairedCurrency,
 }
 
 impl<S> Position<S>
-where
-    S: Currency,
+where S: Currency
 {
     /// Create a new, initially neutral, position with a given leverage
     ///
@@ -28,10 +29,10 @@ where
     pub fn new_init(leverage: f64) -> Self {
         debug_assert!(leverage >= 1.0);
         Position {
-            size: 0.0,
+            size: S::new_zero(),
             entry_price: quote!(0.0),
             leverage,
-            unrealized_pnl: 0.0,
+            unrealized_pnl: S::PairedCurrency::new_zero(),
         }
     }
 
@@ -42,12 +43,17 @@ where
     /// In debug mode, if inputs don't make sense
     #[must_use]
     #[inline]
-    pub fn new(size: S, entry_price: QuoteCurrency, leverage: f64, unrealized_pnl: f64) -> Self {
+    pub fn new(
+        size: S,
+        entry_price: QuoteCurrency,
+        leverage: f64,
+        unrealized_pnl: S::PairedCurrency,
+    ) -> Self {
         debug_assert!(leverage.is_finite());
         debug_assert!(unrealized_pnl.is_finite());
 
         debug_assert!(leverage >= 1.0);
-        debug_assert!(entry_price >= 0.0);
+        debug_assert!(entry_price >= quote!(0.0));
 
         Position {
             size,
@@ -79,7 +85,7 @@ where
     /// denoted in QUOTE when using linear futures,
     /// denoted in BASE when using inverse futures
     #[inline(always)]
-    pub fn unrealized_pnl(&self) -> f64 {
+    pub fn unrealized_pnl(&self) -> S::PairedCurrency {
         self.unrealized_pnl
     }
 
@@ -92,8 +98,8 @@ where
     ) {
         debug!("change_size({}, {}, {})", size_delta, price, futures_type);
 
-        if self.size > 0.0 {
-            if self.size + size_delta < 0.0 {
+        if self.size > S::new_zero() {
+            if self.size + size_delta < S::new_zero() {
                 // counts as new position as all old position size is sold
                 self.entry_price = price;
             } else if (self.size + size_delta).abs() > self.size {
@@ -101,8 +107,8 @@ where
                     + (size_delta.abs() * price))
                     / (self.size.abs() + size_delta.abs());
             }
-        } else if self.size < 0.0 {
-            if self.size + size_delta > 0.0 {
+        } else if self.size < S::new_zero() {
+            if self.size + size_delta > S::new_zero() {
                 self.entry_price = price;
             } else if self.size + size_delta < self.size {
                 self.entry_price = ((self.size.abs() * self.entry_price)
@@ -131,7 +137,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{base, utils::round};
+    use crate::{base, BaseCurrency};
 
     #[test]
     fn position_change_size() {
@@ -142,46 +148,46 @@ mod tests {
         assert_eq!(pos.size, quote!(100.0));
         assert_eq!(pos.entry_price, quote!(100.0));
         assert_eq!(pos.leverage, 1.0);
-        assert_eq!(pos.unrealized_pnl, 0.0);
+        assert_eq!(pos.unrealized_pnl, base!(0.0));
 
         pos.change_size(quote!(-50.0), quote!(150.0), futures_type);
         assert_eq!(pos.size, quote!(50.0));
         assert_eq!(pos.entry_price, quote!(100.0));
         assert_eq!(pos.leverage, 1.0);
-        assert_eq!(round(pos.unrealized_pnl, 2), 0.17);
+        assert_eq!(pos.unrealized_pnl.into_rounded(2), base!(0.17));
 
         pos.change_size(quote!(50.0), quote!(150.0), futures_type);
         assert_eq!(pos.size, quote!(100.0));
         assert_eq!(pos.entry_price, quote!(125.0));
         assert_eq!(pos.leverage, 1.0);
-        assert_eq!(round(pos.unrealized_pnl, 2), 0.13);
+        assert_eq!(pos.unrealized_pnl.into_rounded(2), base!(0.13));
 
         pos.change_size(quote!(-150.0), quote!(150.0), futures_type);
         assert_eq!(pos.size, quote!(-50.0));
         assert_eq!(pos.entry_price, quote!(150.0));
         assert_eq!(pos.leverage, 1.0);
-        assert_eq!(pos.unrealized_pnl, 0.0);
+        assert_eq!(pos.unrealized_pnl, base!(0.0));
 
         pos.change_size(quote!(50.0), quote!(150.0), futures_type);
-        assert_eq!(pos.size, 0.0);
+        assert_eq!(pos.size, quote!(0.0));
         assert_eq!(pos.entry_price, quote!(150.0));
         assert_eq!(pos.leverage, 1.0);
-        assert_eq!(pos.unrealized_pnl, 0.0);
+        assert_eq!(pos.unrealized_pnl, base!(0.0));
     }
 
     #[test]
     fn position_update_state_inverse_futures() {
-        let mut pos = Position::new(quote!(100.0), quote!(100.0), 1.0, 0.0);
+        let mut pos = Position::new(quote!(100.0), quote!(100.0), 1.0, base!(0.0));
         pos.update_state(quote!(110.0), FuturesTypes::Inverse);
 
-        assert_eq!(round(pos.unrealized_pnl, 2), 0.09);
+        assert_eq!(pos.unrealized_pnl.into_rounded(2), base!(0.09));
     }
 
     #[test]
     fn position_update_state_linear_futures() {
-        let mut pos = Position::new(base!(1.0), quote!(100.0), 1.0, 0.0);
+        let mut pos = Position::new(base!(1.0), quote!(100.0), 1.0, quote!(0.0));
         pos.update_state(quote!(110.0), FuturesTypes::Linear);
 
-        assert_eq!(round(pos.unrealized_pnl, 2), 10.0);
+        assert_eq!(pos.unrealized_pnl.into_rounded(2), quote!(10.0));
     }
 }

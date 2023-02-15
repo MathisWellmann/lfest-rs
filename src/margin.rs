@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{Error, Result};
+use crate::{Currency, Error, Result};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Describes the margin information of the account
@@ -17,7 +17,9 @@ pub struct Margin<M> {
     available_balance: M,
 }
 
-impl<M> Margin<M> {
+impl<M> Margin<M>
+where M: Currency
+{
     /// Create a new margin account with an initial balance
     /// # Panics
     //  In debug mode, if the input values don't make sense
@@ -90,28 +92,28 @@ impl<M> Margin<M> {
 
     /// Set a new order margin
     pub(crate) fn set_order_margin(&mut self, om: M) {
-        debug!("set_order_margin: om: {}, self: {:?}", om, self);
+        trace!("set_order_margin: om: {}, self: {:?}", om, self);
 
         self.order_margin = om;
         self.available_balance = self.wallet_balance - self.position_margin - self.order_margin;
 
-        debug_assert!(self.available_balance >= 0.0);
+        debug_assert!(self.available_balance >= M::new_zero());
     }
 
     /// Set the position margin by a given delta and adjust available balance
     /// accordingly
     pub(crate) fn set_position_margin(&mut self, val: M) {
-        debug!("set_position_margin({}), self: {:?}", val, self);
+        trace!("set_position_margin({}), self: {:?}", val, self);
 
         debug_assert!(val.is_finite());
-        debug_assert!(val >= 0.0);
+        debug_assert!(val >= M::new_zero());
 
         self.position_margin = val;
         self.available_balance = self.wallet_balance - self.order_margin - self.position_margin;
 
-        debug_assert!(self.position_margin >= 0.0);
+        debug_assert!(self.position_margin >= M::new_zero());
         debug_assert!(self.position_margin <= self.wallet_balance);
-        debug_assert!(self.available_balance >= 0.0);
+        debug_assert!(self.available_balance >= M::new_zero());
         debug_assert!(self.available_balance <= self.wallet_balance);
     }
 
@@ -122,8 +124,8 @@ impl<M> Margin<M> {
         self.wallet_balance += delta;
         self.available_balance += delta;
 
-        debug_assert!(self.wallet_balance >= 0.0);
-        debug_assert!(self.available_balance >= 0.0);
+        debug_assert!(self.wallet_balance >= M::new_zero());
+        debug_assert!(self.available_balance >= M::new_zero());
     }
 }
 

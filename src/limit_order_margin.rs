@@ -10,8 +10,8 @@ use crate::{max, min, Currency, Fee, FuturesTypes, Order, Side};
 /// `fee_maker`: Fee of the maker
 ///
 /// # Returns:
-/// The margin required for those orders, measured in the margin currency which is the pair of the order size currency.
-///
+/// The margin required for those orders, measured in the margin currency which
+/// is the pair of the order size currency.
 pub(crate) fn order_margin<S>(
     orders: impl Iterator<Item = Order<S>>,
     pos_size: S,
@@ -87,9 +87,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{base, quote};
-
     use super::*;
+    use crate::{base, quote, BaseCurrency, QuoteCurrency};
 
     #[test]
     fn order_margin_linear_futures_with_fees() {

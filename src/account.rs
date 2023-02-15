@@ -12,8 +12,7 @@ use crate::{
 /// S: Size type
 /// B: Balance type
 pub struct Account<A, S>
-where
-    S: Currency,
+where S: Currency
 {
     account_tracker: A,
     futures_type: FuturesTypes,
@@ -85,13 +84,13 @@ where
     /// Set a new margin manually, be sure that you know what you are doing when
     /// using this method Returns true if successful
     #[inline(always)]
-    pub fn set_margin(&mut self, margin: Margin<B>) {
+    pub fn set_margin(&mut self, margin: Margin<S::PairedCurrency>) {
         self.margin = margin;
     }
 
     /// Return a reference to margin
     #[inline(always)]
-    pub fn margin(&self) -> &Margin<B> {
+    pub fn margin(&self) -> &Margin<S::PairedCurrency> {
         &self.margin
     }
 
@@ -127,13 +126,13 @@ where
         };
 
         // re compute min and max prices for open orders
-        self.min_limit_buy_price = 0.0;
-        self.max_limit_sell_price = 0.0;
+        self.min_limit_buy_price = quote!(0.0);
+        self.max_limit_sell_price = quote!(0.0);
         for (_, o) in self.active_limit_orders.iter() {
             let limit_price = o.limit_price().unwrap();
             match o.side() {
                 Side::Buy => {
-                    if self.min_limit_buy_price == 0.0 {
+                    if self.min_limit_buy_price.is_zero() {
                         self.min_limit_buy_price = limit_price;
                         continue;
                     }
@@ -142,7 +141,7 @@ where
                     }
                 }
                 Side::Sell => {
-                    if self.max_limit_sell_price == 0.0 {
+                    if self.max_limit_sell_price.is_zero() {
                         self.max_limit_sell_price = limit_price;
                         continue;
                     }
@@ -177,35 +176,35 @@ where
     pub fn cancel_all_orders(&mut self) {
         debug!("cancel_all_orders");
 
-        self.margin.set_order_margin(0.0);
-        self.open_limit_buy_size = 0.0;
-        self.open_limit_sell_size = 0.0;
-        self.min_limit_buy_price = 0.0;
-        self.max_limit_sell_price = 0.0;
+        self.margin.set_order_margin(S::PairedCurrency::new_zero());
+        self.open_limit_buy_size = S::new_zero();
+        self.open_limit_sell_size = S::new_zero();
+        self.min_limit_buy_price = quote!(0.0);
+        self.max_limit_sell_price = quote!(0.0);
         self.active_limit_orders.clear();
     }
 
     /// Cumulative open limit order size of buy orders
     #[inline(always)]
-    pub fn open_limit_buy_size(&self) -> f64 {
+    pub fn open_limit_buy_size(&self) -> S {
         self.open_limit_buy_size
     }
 
     /// Cumulative
     #[inline(always)]
-    pub fn open_limit_sell_size(&self) -> f64 {
+    pub fn open_limit_sell_size(&self) -> S {
         self.open_limit_sell_size
     }
 
     /// Append a new limit order as active order
-    pub(crate) fn append_limit_order(&mut self, order: Order<S>, order_margin: B) {
+    pub(crate) fn append_limit_order(&mut self, order: Order<S>, order_margin: S::PairedCurrency) {
         debug!("append_limit_order: order: {:?}, order_margin: {}", order, order_margin);
 
         let limit_price = order.limit_price().unwrap();
         match order.side() {
             Side::Buy => {
                 self.open_limit_buy_size += order.size();
-                if self.min_limit_buy_price == 0.0 {
+                if self.min_limit_buy_price.is_zero() {
                     self.min_limit_buy_price = limit_price;
                 }
                 if limit_price < self.min_limit_buy_price {
@@ -214,7 +213,7 @@ where
             }
             Side::Sell => {
                 self.open_limit_sell_size += order.size();
-                if self.max_limit_sell_price == 0.0 {
+                if self.max_limit_sell_price.is_zero() {
                     self.max_limit_sell_price = limit_price;
                 }
                 if limit_price > self.max_limit_sell_price {
@@ -256,14 +255,14 @@ where
             "remove_executed_order_from_order_margin_calculation: olbs {}, olss: {}",
             self.open_limit_buy_size, self.open_limit_sell_size
         );
-        debug_assert!(round(self.open_limit_buy_size, 4) >= 0.0);
-        debug_assert!(round(self.open_limit_sell_size, 4) >= 0.0);
+        debug_assert!(self.open_limit_buy_size.into_rounded(4) >= S::new_zero());
+        debug_assert!(self.open_limit_sell_size.into_rounded(4) >= S::new_zero());
 
         self.active_limit_orders.remove(&exec_order.id()).unwrap();
 
         // re-calculate min and max price
         self.min_limit_buy_price = if self.active_limit_orders.is_empty() {
-            0.0
+            quote!(0.0)
         } else {
             self.active_limit_orders
                 .iter()
@@ -272,7 +271,7 @@ where
                 .fold(f64::NAN, f64::min)
         };
         self.max_limit_sell_price = if self.active_limit_orders.is_empty() {
-            0.0
+            quote!(0.0)
         } else {
             self.active_limit_orders
                 .iter()
@@ -283,7 +282,7 @@ where
 
         // set this to 0.0 temporarily and it will be properly assigned at the end of
         // limit order execution
-        self.margin.set_order_margin(0.0);
+        self.margin.set_order_margin(S::PairedCurrency::new_zero());
     }
 
     /// Finalize an executed limit order
@@ -304,7 +303,7 @@ where
     }
 
     /// Reduce the account equity by a fee amount
-    pub(crate) fn deduce_fees(&mut self, fee: f64) {
+    pub(crate) fn deduce_fees(&mut self, fee: Fee) {
         debug!("account: deduce_fees: deducing {} in fees", fee);
 
         self.account_tracker.log_fee(fee);

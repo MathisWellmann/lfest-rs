@@ -1,5 +1,5 @@
-#![deny(missing_docs, rustdoc::missing_crate_level_docs, unused_dependencies)]
-#![warn(clippy::all)]
+#![deny(missing_docs, rustdoc::missing_crate_level_docs, unused_crate_dependencies)]
+#![warn(clippy::all, unused_imports)]
 
 //! lfest - leveraged futures exchange for simulated trading
 //! aims to be a high performance exchange for backtesting
@@ -35,6 +35,5 @@ pub use margin::Margin;
 pub use orders::Order;
 pub use position::Position;
 pub use types::*;
-pub use utils::round;
 pub(crate) use utils::{max, min};
 pub(crate) use validator::Validator;

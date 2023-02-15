@@ -44,6 +44,15 @@ pub enum Error {
     /// When the internal order id is not found while cancelling order
     #[error("internal order id not found")]
     OrderIdNotFound,
+
+    #[error("Invalid position margin")]
+    InvalidPositionMargin,
+
+    #[error("Invalid order margin")]
+    InvalidOrderMargin,
+
+    #[error("Invalid available balance")]
+    InvalidAvailableBalance,
 }
 
 /// This is defined as a convenience.

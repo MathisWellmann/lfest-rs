@@ -6,8 +6,7 @@ use crate::{
 #[derive(Debug, Clone)]
 /// The main leveraged futures exchange for simulated trading
 pub struct Exchange<A, S>
-where
-    S: Currency,
+where S: Currency
 {
     config: Config<S::PairedCurrency>,
     account: Account<A, S>,
@@ -54,7 +53,7 @@ where
 
     /// Return a reference to current exchange config
     #[inline(always)]
-    pub fn config(&self) -> &Config<B> {
+    pub fn config(&self) -> &Config<S::PairedCurrency> {
         &self.config
     }
 
@@ -156,7 +155,7 @@ where
 
     /// Submit a new order to the exchange.
     /// Returns the order with timestamp and id filled in or OrderError
-    pub fn submit_order<S>(&mut self, mut order: Order<S>) -> Result<Order<S>, OrderError> {
+    pub fn submit_order(&mut self, mut order: Order<S>) -> Result<Order<S>, OrderError> {
         debug!("submit_order: {:?}", order);
 
         // assign unique order id
@@ -193,7 +192,7 @@ where
     }
 
     /// Execute a market order
-    fn execute_market<S>(&mut self, side: Side, amount: S) {
+    fn execute_market(&mut self, side: Side, amount: S) {
         debug!("exchange: execute_market: side: {:?}, amount: {}", side, amount);
 
         let price = match side {
@@ -211,7 +210,7 @@ where
     }
 
     /// Execute a limit order, once triggered
-    fn execute_limit<S>(&mut self, o: Order<S>) {
+    fn execute_limit(&mut self, o: Order<S>) {
         debug!("execute_limit: {:?}", o);
 
         let price = o.limit_price().unwrap();

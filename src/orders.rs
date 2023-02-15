@@ -158,12 +158,13 @@ impl<S> Order<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{base, quote, BaseCurrency, QuoteCurrency};
 
     #[test]
     fn order_eq() {
         assert_eq!(
-            Order::limit(Side::Buy, 100.0, 100.0).unwrap(),
-            Order::limit(Side::Buy, 100.0, 100.0).unwrap()
+            Order::limit(Side::Buy, quote!(100.0), base!(100.0)).unwrap(),
+            Order::limit(Side::Buy, quote!(100.0), base!(100.0)).unwrap()
         );
     }
 }
