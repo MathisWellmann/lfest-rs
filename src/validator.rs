@@ -117,7 +117,7 @@ impl Validator {
 
         let pos_size = acc.position().size();
 
-        let (mut debit, mut credit) = if pos_size == 0.0 {
+        let (mut debit, mut credit) = if pos_size.is_zero() {
             match order.side() {
                 Side::Buy => (min(order.size(), acc.open_limit_sell_size()), order.size()),
                 Side::Sell => (min(order.size(), acc.open_limit_buy_size()), order.size()),

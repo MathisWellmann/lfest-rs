@@ -1,6 +1,7 @@
 /// Return the minimum of two values
 #[inline(always)]
-pub(crate) fn min(v0: f64, v1: f64) -> f64 {
+pub(crate) fn min<T>(v0: T, v1: T) -> T
+where T: PartialOrd {
     if v0 < v1 {
         v0
     } else {
@@ -10,7 +11,8 @@ pub(crate) fn min(v0: f64, v1: f64) -> f64 {
 
 /// Return the maximum of two values
 #[inline(always)]
-pub(crate) fn max(v0: f64, v1: f64) -> f64 {
+pub(crate) fn max<T>(v0: T, v1: T) -> T
+where T: PartialOrd {
     if v0 > v1 {
         v0
     } else {
@@ -21,6 +23,7 @@ pub(crate) fn max(v0: f64, v1: f64) -> f64 {
 /// round a value to a given precision of decimal places
 /// used in tests
 #[inline(always)]
+#[cfg(test)]
 pub fn round(val: f64, prec: i32) -> f64 {
     ((val * 10.0_f64.powi(prec)).round()) / 10.0_f64.powi(prec)
 }

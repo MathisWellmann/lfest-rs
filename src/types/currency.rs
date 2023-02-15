@@ -16,11 +16,24 @@ pub struct BaseCurrency(pub f64);
 )]
 pub struct QuoteCurrency(pub f64);
 
-pub trait Currency: Copy + std::fmt::Display + std::ops::Add + std::ops::Sub {}
+pub trait Currency:
+    Copy + std::fmt::Display + std::ops::Add + std::ops::Sub + PartialEq + PartialOrd
+{
+    /// Check if the value is zero
+    fn is_zero(&self) -> bool;
+}
 
-impl Currency for BaseCurrency {}
+impl Currency for BaseCurrency {
+    fn is_zero(&self) -> bool {
+        self.0 == 0.0
+    }
+}
 
-impl Currency for QuoteCurrency {}
+impl Currency for QuoteCurrency {
+    fn is_zero(&self) -> bool {
+        self.0 == 0.0
+    }
+}
 
 /// Allows the quick construction on `QuoteCurrency`
 #[macro_export]
