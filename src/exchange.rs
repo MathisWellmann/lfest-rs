@@ -22,7 +22,7 @@ where S: Currency
 
 impl<A, S> Exchange<A, S>
 where
-    A: AccountTracker,
+    A: AccountTracker<S::PairedCurrency>,
     S: Currency,
 {
     /// Create a new Exchange with the desired config and whether to use candles

@@ -31,7 +31,7 @@ where S: Currency
 
 impl<A, S> Account<A, S>
 where
-    A: AccountTracker,
+    A: AccountTracker<S::PairedCurrency>,
     S: Currency,
 {
     // TODO: make sure to eliminate the `futures_type`, to infer it based on the
@@ -62,8 +62,7 @@ where
 
     /// Update the accounts state for the newest price data
     pub(crate) fn update(&mut self, price: QuoteCurrency, trade_timestamp: u64) {
-        let upnl: f64 =
-            self.futures_type.pnl(self.position.entry_price(), price, self.position.size());
+        let upnl = self.futures_type.pnl(self.position.entry_price(), price, self.position.size());
         self.account_tracker.update(trade_timestamp, price, upnl);
 
         self.position.update_state(price, self.futures_type);

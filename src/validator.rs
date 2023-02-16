@@ -46,7 +46,7 @@ impl Validator {
         acc: &Account<A, S>,
     ) -> Result<(), OrderError>
     where
-        A: AccountTracker,
+        A: AccountTracker<S::PairedCurrency>,
         S: Currency,
     {
         let (debit, credit) = self.order_cost_market(o, acc);
@@ -69,7 +69,7 @@ impl Validator {
         acc: &Account<A, S>,
     ) -> Result<S::PairedCurrency, OrderError>
     where
-        A: AccountTracker,
+        A: AccountTracker<S::PairedCurrency>,
         S: Currency,
     {
         // validate order price
@@ -111,7 +111,7 @@ impl Validator {
         acc: &Account<A, S>,
     ) -> (S::PairedCurrency, S::PairedCurrency)
     where
-        A: AccountTracker,
+        A: AccountTracker<S::PairedCurrency>,
         S: Currency,
     {
         debug!("order_cost_market: order: {:?},\nacc.position: {:?}", order, acc.position());
@@ -181,7 +181,7 @@ impl Validator {
         acc: &Account<A, S>,
     ) -> S::PairedCurrency
     where
-        A: AccountTracker,
+        A: AccountTracker<S::PairedCurrency>,
         S: Currency,
     {
         let mut orders = acc.active_limit_orders().clone();

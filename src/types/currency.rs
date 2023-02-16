@@ -19,7 +19,7 @@ use derive_more::{Add, AddAssign, Display, Div, Mul, Sub, SubAssign};
     AddAssign,
     SubAssign,
     Display,
-    /* From */
+    /* Into, */
 )]
 #[mul(forward)]
 #[div(forward)]
@@ -44,7 +44,7 @@ pub struct BaseCurrency(pub f64);
     AddAssign,
     SubAssign,
     Display,
-    /* From, */
+    /* Into, */
 )]
 #[mul(forward)]
 #[div(forward)]
@@ -61,7 +61,7 @@ pub trait Currency:
     + std::ops::AddAssign
     + std::ops::SubAssign
     + PartialEq
-    + PartialOrd // + From<f64>
+    + PartialOrd // + Into<f64>
 {
     /// The paired currency.
     /// e.g.: for the BTCUSD market the BTC currency is paired with USD, so the
@@ -80,6 +80,9 @@ pub trait Currency:
     /// TODO: it may be smart to remove this here and use another type that can
     /// be negative Get the absolute value
     fn abs(self) -> Self;
+
+    /// Compute the natural logarithm
+    fn ln(&self) -> Self;
 
     /// Convert into a rounded value with the given precision of decimal prices
     #[cfg(test)]
@@ -109,6 +112,11 @@ impl Currency for BaseCurrency {
         Self(self.0.abs())
     }
 
+    #[inline(always)]
+    fn ln(&self) -> Self {
+        Self(self.0.ln())
+    }
+
     #[cfg(test)]
     fn into_rounded(self, prec: i32) -> Self {
         Self(crate::utils::round(self.0, prec))
@@ -136,6 +144,11 @@ impl Currency for QuoteCurrency {
     #[inline(always)]
     fn abs(self) -> Self {
         Self(self.0.abs())
+    }
+
+    #[inline(always)]
+    fn ln(&self) -> Self {
+        Self(self.0.ln())
     }
 
     #[cfg(test)]
