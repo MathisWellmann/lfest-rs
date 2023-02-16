@@ -144,7 +144,7 @@ impl Validator {
         debit = debit / l;
         credit = credit / l;
 
-        let mut fee: S = order.size().fee_portion(self.fee_taker);
+        let mut fee_of_size: S = order.size().fee_portion(self.fee_taker);
 
         let price = match order.side() {
             Side::Buy => self.ask,
@@ -154,20 +154,24 @@ impl Validator {
             FuturesTypes::Linear => {
                 // the values fee, debit and credit have to be converted from denoted in BASE
                 // currency to being denoted in QUOTE currency
-                fee = fee * price.into();
-                debit = debit * price.into();
-                credit = credit * price.into();
+                let fee_margin = fee_of_size.convert(price);
+                let debit = debit.convert(price);
+                let credit = credit.convert(price);
+
+                (debit, credit + fee_margin)
             }
             FuturesTypes::Inverse => {
                 // the values fee, debit and credit have to be converted from denoted in QUOTE
                 // currency to being denoted in BASE currency
-                fee = fee / price;
-                debit = debit / price;
-                credit = credit / price;
+                let fee_margin = fee_of_size.convert(price);
+                let debit = debit.convert(price);
+                let credit = credit.convert(price);
+
+                (debit, credit + fee_margin)
             }
         }
 
-        (debit, credit + fee)
+        // (debit, credit + fee)
     }
 
     /// Compute the order cost of a limit order

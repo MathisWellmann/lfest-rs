@@ -93,6 +93,11 @@ pub trait Currency:
     /// Compute the fee denoted in the currency
     fn fee_portion(&self, fee: Fee) -> Self;
 
+    /// Convert this `Currency`'s value into its pair at the conversion `rate`.
+    /// E.g:
+    /// 1 BTC @ 20_000 USD means that 1 USD = 1 / 20_000 BTC
+    fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency;
+
     /// Convert into a rounded value with the given precision of decimal prices
     #[cfg(test)]
     fn into_rounded(self, prec: i32) -> Self;
@@ -130,6 +135,12 @@ impl Currency for BaseCurrency {
     fn fee_portion(&self, fee: Fee) -> Self {
         let f: f64 = fee.into();
         Self(self.0 * f)
+    }
+
+    #[inline(always)]
+    fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency {
+        let r: f64 = rate.into();
+        QuoteCurrency(self.0 * r)
     }
 
     #[cfg(test)]
@@ -171,6 +182,11 @@ impl Currency for QuoteCurrency {
         let f: f64 = fee.into();
         Self(self.0 * f)
     }
+    #[inline(always)]
+    fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency {
+        let r: f64 = rate.into();
+        BaseCurrency(self.0 / r)
+    }
 
     #[cfg(test)]
     fn into_rounded(self, prec: i32) -> Self {
@@ -201,5 +217,15 @@ mod tests {
     #[test]
     fn base_display() {
         println!("{}", base!(0.5));
+    }
+
+    fn conversion() {
+        assert_eq!(BaseCurrency(1.0).convert(quote!(20_000.0)), QuoteCurrency(20_000.0));
+        assert_eq!(BaseCurrency(0.5).convert(quote!(20_000.0)), QuoteCurrency(10_000.0));
+        assert_eq!(BaseCurrency(0.25).convert(quote!(20_000.0)), QuoteCurrency(5_000.0));
+
+        assert_eq!(QuoteCurrency(20_000.0).convert(quote!(20_000.0)), BaseCurrency(1.0));
+        assert_eq!(QuoteCurrency(10_000.0).convert(quote!(20_000.0)), BaseCurrency(0.5));
+        assert_eq!(QuoteCurrency(5_000.0).convert(quote!(20_000.0)), BaseCurrency(0.5));
     }
 }
