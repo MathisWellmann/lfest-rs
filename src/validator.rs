@@ -144,7 +144,7 @@ impl Validator {
         debit = debit / l;
         credit = credit / l;
 
-        let mut fee: f64 = order.size().into() * self.fee_taker.into();
+        let mut fee: S = order.size().fee_portion(self.fee_taker);
 
         let price = match order.side() {
             Side::Buy => self.ask,

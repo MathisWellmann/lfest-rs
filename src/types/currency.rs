@@ -91,7 +91,7 @@ pub trait Currency:
     fn ln(&self) -> Self;
 
     /// Compute the fee denoted in the currency
-    // fn fee_portion(&self, fee: Fee) -> Self;
+    fn fee_portion(&self, fee: Fee) -> Self;
 
     /// Convert into a rounded value with the given precision of decimal prices
     #[cfg(test)]
@@ -126,11 +126,11 @@ impl Currency for BaseCurrency {
         Self(self.0.ln())
     }
 
-    // #[inline(always)]
-    // fn fee_portion(&self, fee: Fee) -> Self {
-    //     let f: f64 = fee.into();
-    //     Self(self.0 * f)
-    // }
+    #[inline(always)]
+    fn fee_portion(&self, fee: Fee) -> Self {
+        let f: f64 = fee.into();
+        Self(self.0 * f)
+    }
 
     #[cfg(test)]
     fn into_rounded(self, prec: i32) -> Self {
@@ -166,13 +166,11 @@ impl Currency for QuoteCurrency {
         Self(self.0.ln())
     }
 
-    /*
     #[inline(always)]
     fn fee_portion(&self, fee: Fee) -> Self {
         let f: f64 = fee.into();
         Self(self.0 * f)
     }
-    */
 
     #[cfg(test)]
     fn into_rounded(self, prec: i32) -> Self {
