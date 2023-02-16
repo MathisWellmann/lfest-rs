@@ -386,55 +386,55 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{account_tracker::NoAccountTracker, FuturesTypes, Validator};
+    use crate::{account_tracker::NoAccountTracker, base, BaseCurrency, FuturesTypes, Validator};
 
     #[test]
     fn account_append_limit_order() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut acc = Account::new(NoAccountTracker::default(), 1.0, 1.0, futures_type);
-        let mut validator = Validator::new(0.0, 0.0, futures_type);
-        validator.update(100.0, 101.0);
+        let mut acc = Account::new(NoAccountTracker::default(), 1.0, base!(1.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        validator.update(quote!(100.0), quote!(101.0));
 
-        let o = Order::limit(Side::Buy, 100.0, 25.0).unwrap();
+        let o = Order::limit(Side::Buy, quote!(100.0), quote!(25.0)).unwrap();
         let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
         acc.append_limit_order(o, order_margin);
-        assert_eq!(acc.open_limit_buy_size, 25.0);
-        assert_eq!(acc.open_limit_sell_size, 0.0);
-        assert_eq!(acc.min_limit_buy_price, 100.0);
-        assert_eq!(acc.max_limit_sell_price, 0.0);
-        assert_eq!(acc.margin().order_margin(), 0.25);
-        assert_eq!(acc.margin().available_balance(), 0.75);
+        assert_eq!(acc.open_limit_buy_size, quote!(25.0));
+        assert_eq!(acc.open_limit_sell_size, quote!(0.0));
+        assert_eq!(acc.min_limit_buy_price, quote!(100.0));
+        assert_eq!(acc.max_limit_sell_price, quote!(0.0));
+        assert_eq!(acc.margin().order_margin(), base!(0.25));
+        assert_eq!(acc.margin().available_balance(), base!(0.75));
 
-        let o = Order::limit(Side::Sell, 100.0, 25.0).unwrap();
+        let o = Order::limit(Side::Sell, quote!(100.0), quote!(25.0)).unwrap();
         let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
         acc.append_limit_order(o, order_margin);
-        assert_eq!(acc.open_limit_buy_size, 25.0);
-        assert_eq!(acc.open_limit_sell_size, 25.0);
-        assert_eq!(acc.min_limit_buy_price, 100.0);
-        assert_eq!(acc.max_limit_sell_price, 100.0);
-        assert_eq!(acc.margin().order_margin(), 0.25);
-        assert_eq!(acc.margin().available_balance(), 0.75);
+        assert_eq!(acc.open_limit_buy_size, quote!(25.0));
+        assert_eq!(acc.open_limit_sell_size, quote!(25.0));
+        assert_eq!(acc.min_limit_buy_price, quote!(100.0));
+        assert_eq!(acc.max_limit_sell_price, quote!(100.0));
+        assert_eq!(acc.margin().order_margin(), base!(0.25));
+        assert_eq!(acc.margin().available_balance(), base!(0.75));
 
-        let o = Order::limit(Side::Buy, 90.0, 25.0).unwrap();
+        let o = Order::limit(Side::Buy, quote!(90.0), quote!(25.0)).unwrap();
         let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
         acc.append_limit_order(o, order_margin);
-        assert_eq!(acc.open_limit_buy_size, 50.0);
-        assert_eq!(acc.open_limit_sell_size, 25.0);
-        assert_eq!(acc.min_limit_buy_price, 90.0);
-        assert_eq!(acc.max_limit_sell_price, 100.0);
+        assert_eq!(acc.open_limit_buy_size, quote!(50.0));
+        assert_eq!(acc.open_limit_sell_size, quote!(25.0));
+        assert_eq!(acc.min_limit_buy_price, quote!(90.0));
+        assert_eq!(acc.max_limit_sell_price, quote!(100.0));
         // TODO: what is the proper test result here
         // assert_eq!(account.margin().order_margin(), 0.5278);
         // assert_eq!(account.margin().available_balance(), 0.75);
 
-        let o = Order::limit(Side::Sell, 110.0, 25.0).unwrap();
+        let o = Order::limit(Side::Sell, quote!(110.0), quote!(25.0)).unwrap();
         let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
         acc.append_limit_order(o, order_margin);
-        assert_eq!(acc.open_limit_buy_size, 50.0);
-        assert_eq!(acc.open_limit_sell_size, 50.0);
-        assert_eq!(acc.min_limit_buy_price, 90.0);
-        assert_eq!(acc.max_limit_sell_price, 110.0);
+        assert_eq!(acc.open_limit_buy_size, quote!(50.0));
+        assert_eq!(acc.open_limit_sell_size, quote!(50.0));
+        assert_eq!(acc.min_limit_buy_price, quote!(90.0));
+        assert_eq!(acc.max_limit_sell_price, quote!(110.0));
         // assert_eq!(account.margin().order_margin(), 0.5278);
         // assert_eq!(account.margin().available_balance(), 0.75);
     }
@@ -442,21 +442,21 @@ mod tests {
     #[test]
     fn account_cancel_order() {
         let futures_type = FuturesTypes::Inverse;
-        let mut account = Account::new(NoAccountTracker::default(), 1.0, 1.0, futures_type);
-        let mut validator = Validator::new(0.0, 0.0, futures_type);
-        validator.update(900.0, 901.0);
+        let mut account = Account::new(NoAccountTracker::default(), 1.0, base!(1.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        validator.update(quote!(900.0), quote!(901.0));
 
-        let o = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
+        let o = Order::limit(Side::Buy, quote!(900.0), quote!(450.0)).unwrap();
         let order_margin = validator.validate_limit_order(&o, &account).unwrap();
         account.append_limit_order(o, order_margin);
         assert_eq!(account.active_limit_orders().len(), 1);
-        assert_eq!(account.margin().wallet_balance(), 1.0);
-        assert_eq!(account.margin().position_margin(), 0.0);
+        assert_eq!(account.margin().wallet_balance(), base!(1.0));
+        assert_eq!(account.margin().position_margin(), base!(0.0));
 
         account.cancel_order(0).unwrap();
         assert_eq!(account.active_limit_orders().len(), 0);
-        assert_eq!(account.margin().wallet_balance(), 1.0);
-        assert_eq!(account.margin().position_margin(), 0.0);
+        assert_eq!(account.margin().wallet_balance(), base!(1.0));
+        assert_eq!(account.margin().position_margin(), base!(0.0));
     }
 
     #[test]
@@ -464,11 +464,11 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut account = Account::new(NoAccountTracker::default(), 1.0, 1.0, futures_type);
-        let mut validator = Validator::new(0.0, 0.0, futures_type);
-        validator.update(100.0, 100.1);
+        let mut account = Account::new(NoAccountTracker::default(), 1.0, base!(1.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        validator.update(quote!(100.0), quote!(100.1));
 
-        let mut o = Order::limit(Side::Buy, 100.0, 50.0).unwrap();
+        let mut o = Order::limit(Side::Buy, quote!(100.0), quote!(50.0)).unwrap();
         o.set_user_order_id(1000);
         let order_margin = validator.validate_limit_order(&o, &account).unwrap();
         account.append_limit_order(o, order_margin);
@@ -481,148 +481,148 @@ mod tests {
     #[test]
     fn account_cancel_all_orders() {
         let futures_type = FuturesTypes::Inverse;
-        let mut account = Account::new(NoAccountTracker::default(), 1.0, 1.0, futures_type);
-        let mut validator = Validator::new(0.0, 0.0, futures_type);
-        validator.update(900.0, 901.0);
+        let mut account = Account::new(NoAccountTracker::default(), 1.0, base!(1.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        validator.update(quote!(900.0), quote!(901.0));
 
-        let o = Order::limit(Side::Buy, 900.0, 450.0).unwrap();
+        let o = Order::limit(Side::Buy, quote!(900.0), quote!(450.0)).unwrap();
         let order_margin = validator.validate_limit_order(&o, &account).unwrap();
         account.append_limit_order(o, order_margin);
         assert_eq!(account.active_limit_orders().len(), 1);
-        assert_eq!(account.margin().wallet_balance(), 1.0);
-        assert_eq!(account.margin().position_margin(), 0.0);
-        assert_eq!(account.margin().order_margin(), 0.5);
-        assert_eq!(account.margin().available_balance(), 0.5);
+        assert_eq!(account.margin().wallet_balance(), base!(1.0));
+        assert_eq!(account.margin().position_margin(), base!(0.0));
+        assert_eq!(account.margin().order_margin(), base!(0.5));
+        assert_eq!(account.margin().available_balance(), base!(0.5));
 
         account.cancel_all_orders();
         assert_eq!(account.active_limit_orders().len(), 0);
-        assert_eq!(account.margin().wallet_balance(), 1.0);
-        assert_eq!(account.margin().position_margin(), 0.0);
-        assert_eq!(account.margin().order_margin(), 0.0);
-        assert_eq!(account.margin().available_balance(), 1.0);
+        assert_eq!(account.margin().wallet_balance(), base!(1.0));
+        assert_eq!(account.margin().position_margin(), base!(0.0));
+        assert_eq!(account.margin().order_margin(), base!(0.0));
+        assert_eq!(account.margin().available_balance(), base!(1.0));
     }
 
     #[test]
     fn account_change_position_inverse_future() {
         let futures_type = FuturesTypes::Inverse;
-        let mut acc = Account::new(NoAccountTracker::default(), 1.0, 1.0, futures_type);
+        let mut acc = Account::new(NoAccountTracker::default(), 1.0, base!(1.0), futures_type);
 
-        acc.change_position(Side::Buy, 100.0, 200.0);
-        assert_eq!(acc.margin().wallet_balance(), 1.0);
-        assert_eq!(acc.margin().position_margin(), 0.5);
-        assert_eq!(acc.margin().order_margin(), 0.0);
-        assert_eq!(acc.margin().available_balance(), 0.5);
-        assert_eq!(acc.position().size(), 100.0);
-        assert_eq!(acc.position().entry_price(), 200.0);
+        acc.change_position(Side::Buy, quote!(100.0), quote!(200.0));
+        assert_eq!(acc.margin().wallet_balance(), base!(1.0));
+        assert_eq!(acc.margin().position_margin(), base!(0.5));
+        assert_eq!(acc.margin().order_margin(), base!(0.0));
+        assert_eq!(acc.margin().available_balance(), base!(0.5));
+        assert_eq!(acc.position().size(), quote!(100.0));
+        assert_eq!(acc.position().entry_price(), quote!(200.0));
         assert_eq!(acc.position().leverage(), 1.0);
-        assert_eq!(acc.position().unrealized_pnl(), 0.0);
+        assert_eq!(acc.position().unrealized_pnl(), base!(0.0));
 
-        acc.change_position(Side::Sell, 100.0, 200.0);
-        assert_eq!(acc.position().size(), 0.0);
-        assert_eq!(acc.position().entry_price(), 200.0);
+        acc.change_position(Side::Sell, quote!(100.0), quote!(200.0));
+        assert_eq!(acc.position().size(), quote!(0.0));
+        assert_eq!(acc.position().entry_price(), quote!(200.0));
         assert_eq!(acc.position().leverage(), 1.0);
-        assert_eq!(acc.position().unrealized_pnl(), 0.0);
-        assert_eq!(acc.margin().wallet_balance(), 1.0);
-        assert_eq!(acc.margin().position_margin(), 0.0);
-        assert_eq!(acc.margin().order_margin(), 0.0);
-        assert_eq!(acc.margin().available_balance(), 1.0);
+        assert_eq!(acc.position().unrealized_pnl(), base!(0.0));
+        assert_eq!(acc.margin().wallet_balance(), base!(1.0));
+        assert_eq!(acc.margin().position_margin(), base!(0.0));
+        assert_eq!(acc.margin().order_margin(), base!(0.0));
+        assert_eq!(acc.margin().available_balance(), base!(1.0));
 
-        acc.change_position(Side::Sell, 100.0, 200.0);
-        assert_eq!(acc.margin().wallet_balance(), 1.0);
-        assert_eq!(acc.margin().position_margin(), 0.5);
-        assert_eq!(acc.margin().order_margin(), 0.0);
-        assert_eq!(acc.margin().available_balance(), 0.5);
-        assert_eq!(acc.position().size(), -100.0);
-        assert_eq!(acc.position().entry_price(), 200.0);
+        acc.change_position(Side::Sell, quote!(100.0), quote!(200.0));
+        assert_eq!(acc.margin().wallet_balance(), base!(1.0));
+        assert_eq!(acc.margin().position_margin(), base!(0.5));
+        assert_eq!(acc.margin().order_margin(), base!(0.0));
+        assert_eq!(acc.margin().available_balance(), base!(0.5));
+        assert_eq!(acc.position().size(), quote!(-100.0));
+        assert_eq!(acc.position().entry_price(), quote!(200.0));
         assert_eq!(acc.position().leverage(), 1.0);
-        assert_eq!(acc.position().unrealized_pnl(), 0.0);
+        assert_eq!(acc.position().unrealized_pnl(), base!(0.0));
 
-        acc.change_position(Side::Buy, 150.0, 200.0);
-        assert_eq!(acc.margin().wallet_balance(), 1.0);
-        assert_eq!(acc.margin().position_margin(), 0.25);
-        assert_eq!(acc.margin().order_margin(), 0.0);
-        assert_eq!(acc.margin().available_balance(), 0.75);
-        assert_eq!(acc.position().size(), 50.0);
-        assert_eq!(acc.position().entry_price(), 200.0);
+        acc.change_position(Side::Buy, quote!(150.0), quote!(200.0));
+        assert_eq!(acc.margin().wallet_balance(), base!(1.0));
+        assert_eq!(acc.margin().position_margin(), base!(0.25));
+        assert_eq!(acc.margin().order_margin(), base!(0.0));
+        assert_eq!(acc.margin().available_balance(), base!(0.75));
+        assert_eq!(acc.position().size(), quote!(50.0));
+        assert_eq!(acc.position().entry_price(), quote!(200.0));
         assert_eq!(acc.position().leverage(), 1.0);
-        assert_eq!(acc.position().unrealized_pnl(), 0.0);
+        assert_eq!(acc.position().unrealized_pnl(), base!(0.0));
 
-        acc.change_position(Side::Sell, 25.0, 200.0);
-        assert_eq!(acc.margin().wallet_balance(), 1.0);
-        assert_eq!(acc.margin().position_margin(), 0.125);
-        assert_eq!(acc.margin().order_margin(), 0.0);
-        assert_eq!(acc.margin().available_balance(), 0.875);
-        assert_eq!(acc.position().size(), 25.0);
-        assert_eq!(acc.position().entry_price(), 200.0);
+        acc.change_position(Side::Sell, quote!(25.0), quote!(200.0));
+        assert_eq!(acc.margin().wallet_balance(), base!(1.0));
+        assert_eq!(acc.margin().position_margin(), base!(0.125));
+        assert_eq!(acc.margin().order_margin(), base!(0.0));
+        assert_eq!(acc.margin().available_balance(), base!(0.875));
+        assert_eq!(acc.position().size(), quote!(25.0));
+        assert_eq!(acc.position().entry_price(), quote!(200.0));
         assert_eq!(acc.position().leverage(), 1.0);
-        assert_eq!(acc.position().unrealized_pnl(), 0.0);
+        assert_eq!(acc.position().unrealized_pnl(), base!(0.0));
     }
 
     #[test]
     fn account_change_position_linear_futures() {
         let futures_type = FuturesTypes::Linear;
-        let mut acc = Account::new(NoAccountTracker::default(), 1.0, 1000.0, futures_type);
+        let mut acc = Account::new(NoAccountTracker::default(), 1.0, quote!(1000.0), futures_type);
 
-        acc.change_position(Side::Buy, 0.5, 100.0);
-        assert_eq!(acc.margin().wallet_balance(), 1000.0);
-        assert_eq!(acc.margin().position_margin(), 50.0);
-        assert_eq!(acc.margin().order_margin(), 0.0);
-        assert_eq!(acc.margin().available_balance(), 950.0);
-        assert_eq!(acc.position().size(), 0.5);
-        assert_eq!(acc.position().entry_price(), 100.0);
+        acc.change_position(Side::Buy, base!(0.5), quote!(100.0));
+        assert_eq!(acc.margin().wallet_balance(), quote!(1000.0));
+        assert_eq!(acc.margin().position_margin(), quote!(50.0));
+        assert_eq!(acc.margin().order_margin(), quote!(0.0));
+        assert_eq!(acc.margin().available_balance(), quote!(950.0));
+        assert_eq!(acc.position().size(), base!(0.5));
+        assert_eq!(acc.position().entry_price(), quote!(100.0));
         assert_eq!(acc.position().leverage(), 1.0);
-        assert_eq!(acc.position().unrealized_pnl(), 0.0);
+        assert_eq!(acc.position().unrealized_pnl(), quote!(0.0));
     }
 
     #[test]
     fn account_open_limit_buy_size() {
         let futures_type = FuturesTypes::Linear;
-        let mut acc = Account::new(NoAccountTracker::default(), 1.0, 100.0, futures_type);
-        let mut validator = Validator::new(0.0, 0.0, futures_type);
-        validator.update(100.0, 100.1);
+        let mut acc = Account::new(NoAccountTracker::default(), 1.0, quote!(100.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        validator.update(quote!(100.0), quote!(100.1));
 
-        let o = Order::limit(Side::Buy, 100.0, 0.5).unwrap();
+        let o = Order::limit(Side::Buy, quote!(100.0), base!(0.5)).unwrap();
         let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
         acc.append_limit_order(o, order_margin);
-        assert_eq!(acc.open_limit_buy_size(), 0.5);
+        assert_eq!(acc.open_limit_buy_size(), base!(0.5));
 
-        let mut o = Order::limit(Side::Buy, 100.0, 0.5).unwrap();
+        let mut o = Order::limit(Side::Buy, quote!(100.0), base!(0.5)).unwrap();
         o.set_id(1);
         let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
         acc.append_limit_order(o, order_margin);
-        assert_eq!(acc.open_limit_buy_size(), 1.0);
+        assert_eq!(acc.open_limit_buy_size(), base!(1.0));
 
-        let mut o = Order::limit(Side::Sell, 100.0, 0.5).unwrap();
+        let mut o = Order::limit(Side::Sell, quote!(100.0), base!(0.5)).unwrap();
         o.set_id(2);
         let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
         acc.append_limit_order(o, order_margin);
-        assert_eq!(acc.open_limit_buy_size(), 1.0);
+        assert_eq!(acc.open_limit_buy_size(), base!(1.0));
 
         acc.cancel_order(0).unwrap();
-        assert_eq!(acc.open_limit_buy_size(), 1.0);
+        assert_eq!(acc.open_limit_buy_size(), base!(1.0));
     }
 
     #[test]
     fn account_open_limit_sell_size() {
         let futures_type = FuturesTypes::Linear;
-        let mut acc = Account::new(NoAccountTracker::default(), 1.0, 100.0, futures_type);
-        let mut validator = Validator::new(0.0, 0.0, futures_type);
-        validator.update(100.0, 100.1);
+        let mut acc = Account::new(NoAccountTracker::default(), 1.0, quote!(100.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        validator.update(quote!(100.0), quote!(100.1));
 
-        let o = Order::limit(Side::Sell, 100.0, 0.5).unwrap();
+        let o = Order::limit(Side::Sell, quote!(100.0), base!(0.5)).unwrap();
         let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
         acc.append_limit_order(o, order_margin);
-        assert_eq!(acc.open_limit_sell_size(), 0.5);
+        assert_eq!(acc.open_limit_sell_size(), base!(0.5));
 
-        let mut o = Order::limit(Side::Sell, 100.0, 0.5).unwrap();
+        let mut o = Order::limit(Side::Sell, quote!(100.0), base!(0.5)).unwrap();
         o.set_id(1);
         let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
         acc.append_limit_order(o, order_margin);
-        assert_eq!(acc.open_limit_sell_size(), 1.0);
+        assert_eq!(acc.open_limit_sell_size(), base!(1.0));
 
-        let o = Order::limit(Side::Buy, 100.0, 0.5).unwrap();
+        let o = Order::limit(Side::Buy, quote!(100.0), base!(0.5)).unwrap();
         let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
         acc.append_limit_order(o, order_margin);
-        assert_eq!(acc.open_limit_sell_size(), 1.0);
+        assert_eq!(acc.open_limit_sell_size(), base!(1.0));
     }
 }

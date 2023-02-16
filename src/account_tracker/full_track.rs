@@ -615,7 +615,7 @@ where M: Currency + Send
     }
 
     #[inline(always)]
-    fn log_fee(&mut self, fee: Fee) {
+    fn log_fee(&mut self, fee: f64) {
         self.cumulative_fees += fee
     }
 
