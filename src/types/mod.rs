@@ -4,12 +4,12 @@ mod market_update;
 use std::fmt::Formatter;
 
 pub use currency::*;
-use derive_more::Display;
+use derive_more::{Display, Into};
 pub use market_update::*;
 
 /// Fee as a fraction
 /// TODO: make generic
-#[derive(Default, Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Display)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Display, Into)]
 pub struct Fee(pub f64);
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]

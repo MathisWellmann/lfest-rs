@@ -140,10 +140,11 @@ impl Validator {
                 Side::Sell => (S::new_zero(), order.size()),
             }
         };
-        debit = debit / acc.position().leverage().into::<S>();
-        credit = credit / acc.position().leverage().into::<S>();
+        let l: S = acc.position().leverage().into();
+        debit = debit / l;
+        credit = credit / l;
 
-        let mut fee: f64 = order.size() * self.fee_taker;
+        let mut fee: f64 = order.size().into() * self.fee_taker.into();
 
         let price = match order.side() {
             Side::Buy => self.ask,
@@ -153,16 +154,16 @@ impl Validator {
             FuturesTypes::Linear => {
                 // the values fee, debit and credit have to be converted from denoted in BASE
                 // currency to being denoted in QUOTE currency
-                fee *= price;
-                debit *= price;
-                credit *= price;
+                fee = fee * price.into();
+                debit = debit * price.into();
+                credit = credit * price.into();
             }
             FuturesTypes::Inverse => {
                 // the values fee, debit and credit have to be converted from denoted in QUOTE
                 // currency to being denoted in BASE currency
-                fee /= price;
-                debit /= price;
-                credit /= price;
+                fee = fee / price;
+                debit = debit / price;
+                credit = credit / price;
             }
         }
 

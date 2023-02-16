@@ -39,8 +39,8 @@ pub struct FullAccountTracker<M> {
     num_filled_limit_orders: usize,
     num_trading_opportunities: usize,
     total_turnover: f64,
-    max_drawdown_wallet_balance: B,
-    max_drawdown_total: M,
+    max_drawdown_wallet_balance: f64,
+    max_drawdown_total: f64,
     // historical daily absolute returns
     hist_returns_daily_acc: Vec<f64>,
     hist_returns_daily_bnh: Vec<f64>,
@@ -160,7 +160,7 @@ where M: Currency + Send
     /// Ratio of cumulative trade profit over cumulative trade loss
     #[inline(always)]
     pub fn profit_loss_ratio(&self) -> f64 {
-        self.total_profit / self.total_loss
+        self.total_profit.into() / self.total_loss.into()
     }
 
     /// Cumulative fees paid to the exchange
@@ -172,21 +172,27 @@ where M: Currency + Send
     /// Would be return of buy and hold strategy
     #[inline(always)]
     pub fn buy_and_hold_return(&self) -> M {
-        let qty = match self.futures_type {
-            FuturesTypes::Linear => self.wallet_balance_start / self.price_first,
-            FuturesTypes::Inverse => self.wallet_balance_start * self.price_first,
+        let wb_start: f64 = self.wallet_balance_start.into();
+        let price_first: f64 = self.price_first.into();
+        let qty: f64 = match self.futures_type {
+            FuturesTypes::Linear => wb_start / price_first,
+            FuturesTypes::Inverse => wb_start * price_first,
         };
+        let qty: M::PairedCurrency = qty.into();
         self.futures_type.pnl(self.price_first, self.price_last, qty)
     }
 
     /// Would be return of sell and hold strategy
     #[inline(always)]
     pub fn sell_and_hold_return(&self) -> M {
-        let qty = match self.futures_type {
-            FuturesTypes::Linear => self.wallet_balance_start / self.price_first,
-            FuturesTypes::Inverse => self.wallet_balance_start * self.price_first,
+        let wb_start: f64 = self.wallet_balance_start.into();
+        let price_first: f64 = self.price_first.into();
+        let qty: f64 = match self.futures_type {
+            FuturesTypes::Linear => -wb_start / price_first,
+            FuturesTypes::Inverse => -wb_start * price_first,
         };
-        self.futures_type.pnl(self.price_first, self.price_last, -qty)
+        let qty: M::PairedCurrency = qty.into();
+        self.futures_type.pnl(self.price_first, self.price_last, qty)
     }
 
     /// Return the sharpe ratio using the selected returns as source
@@ -214,14 +220,14 @@ where M: Currency + Send
             let variance = diff_returns.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
             let std_dev = variance.sqrt();
 
-            (self.total_rpnl - self.buy_and_hold_return()) / std_dev
+            (self.total_rpnl.into() - self.buy_and_hold_return().into()) / std_dev
         } else {
             let n = rets_acc.len() as f64;
             let avg = rets_acc.iter().sum::<f64>() / n;
             let var = rets_acc.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
             let std_dev = var.sqrt();
 
-            self.total_rpnl / std_dev
+            self.total_rpnl.into() / std_dev
         }
     }
 
@@ -250,7 +256,7 @@ where M: Currency + Send
             let variance = diff_returns.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
             let std_dev = variance.sqrt();
 
-            (self.total_rpnl - self.buy_and_hold_return()) / std_dev
+            (self.total_rpnl.into() - self.buy_and_hold_return().into()) / std_dev
         } else {
             let downside_rets: Vec<f64> = rets_acc.iter().copied().filter(|v| *v < 0.0).collect();
             let n = downside_rets.len() as f64;
@@ -258,7 +264,7 @@ where M: Currency + Send
             let var = downside_rets.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
             let std_dev = var.sqrt();
 
-            self.total_rpnl / std_dev
+            self.total_rpnl.into() / std_dev
         }
     }
 
@@ -270,7 +276,7 @@ where M: Currency + Send
     /// percentile: value between [0.0, 1.0], smaller value will return more
     /// worst case results
     #[inline]
-    pub fn historical_value_at_risk(&self, returns_source: ReturnsSource, percentile: f64) -> f64 {
+    pub fn historical_value_at_risk(&self, returns_source: ReturnsSource, percentile: f64) -> M {
         let mut rets = match returns_source {
             ReturnsSource::Daily => self.hist_ln_returns_daily_acc.clone(),
             ReturnsSource::Hourly => self.hist_ln_returns_hourly_acc.clone(),
@@ -279,8 +285,11 @@ where M: Currency + Send
         rets.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let idx = (rets.len() as f64 * percentile) as usize;
         match rets.get(idx) {
-            Some(r) => self.wallet_balance_start - (self.wallet_balance_start * r.exp()),
-            None => 0.0,
+            Some(r) => {
+                let r: M = r.exp().into();
+                self.wallet_balance_start - (self.wallet_balance_start * r)
+            }
+            None => M::new_zero(),
         }
     }
 
@@ -294,11 +303,11 @@ where M: Currency + Send
     /// n: number of hourly returns to use
     /// percentile: value between [0.0, 1.0], smaller value will return more
     /// worst case results
-    pub fn historical_value_at_risk_from_n_hourly_returns(&self, n: usize, percentile: f64) -> f64 {
+    pub fn historical_value_at_risk_from_n_hourly_returns(&self, n: usize, percentile: f64) -> M {
         let rets = &self.hist_ln_returns_hourly_acc;
         if rets.len() < n {
             debug!("not enough hourly returns to compute VaR for n={}", n);
-            return 0.0;
+            return M::new_zero();
         }
         let mut ret_streaks = Vec::with_capacity(rets.len() - n);
         for i in n..rets.len() {
@@ -312,8 +321,11 @@ where M: Currency + Send
         ret_streaks.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let idx = (ret_streaks.len() as f64 * percentile) as usize;
         match ret_streaks.get(idx) {
-            Some(r) => self.wallet_balance_start - (self.wallet_balance_start * r),
-            None => 0.0,
+            Some(r) => {
+                let r: M = (*r).into();
+                self.wallet_balance_start - (self.wallet_balance_start * r)
+            }
+            None => M::new_zero(),
         }
     }
 
@@ -332,7 +344,7 @@ where M: Currency + Send
             ReturnsSource::Hourly => &self.hist_ln_returns_hourly_acc,
             ReturnsSource::TickByTick => &self.hist_ln_returns_tick_acc,
         };
-        cornish_fisher_value_at_risk(rets, self.wallet_balance_start, percentile).2
+        cornish_fisher_value_at_risk(rets, self.wallet_balance_start.into(), percentile).2
     }
 
     /// Calculate the corni fisher value at risk from n consequtive hourly
@@ -365,8 +377,12 @@ where M: Currency + Send
 
         self.wallet_balance_start
             - (self.wallet_balance_start
-                * cornish_fisher_value_at_risk(&ret_streaks, self.wallet_balance_start, percentile)
-                    .1)
+                * cornish_fisher_value_at_risk(
+                    &ret_streaks,
+                    self.wallet_balance_start.into(),
+                    percentile,
+                )
+                .1)
     }
 
     /// Return the number of trading days
@@ -394,8 +410,10 @@ where M: Currency + Send
             ReturnsSource::TickByTick => &self.hist_ln_returns_tick_bnh,
         };
 
-        let cf_var_bnh = cornish_fisher_value_at_risk(rets_bnh, self.wallet_balance_start, 0.01).1;
-        let cf_var_acc = cornish_fisher_value_at_risk(rets_acc, self.wallet_balance_start, 0.01).1;
+        let cf_var_bnh =
+            cornish_fisher_value_at_risk(rets_bnh, self.wallet_balance_start.into(), 0.01).1;
+        let cf_var_acc =
+            cornish_fisher_value_at_risk(rets_acc, self.wallet_balance_start.into(), 0.01).1;
 
         let num_trading_days = self.num_trading_days() as f64;
 
