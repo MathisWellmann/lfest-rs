@@ -7,7 +7,6 @@ use crate::{
 
 /// Enumeration of different futures types
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[deprecated]
 pub enum FuturesTypes {
     /// Linear futures with a linear payout
     /// profit and loss calculation: position_size * (exit_price - entry_price)

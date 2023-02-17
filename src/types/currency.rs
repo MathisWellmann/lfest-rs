@@ -103,7 +103,7 @@ pub trait Currency:
     fn into_negative(self) -> Self;
 
     /// Convert into a rounded value with the given precision of decimal prices
-    #[cfg(test)]
+    /// This is a band-aid for the f64 behaviour
     fn into_rounded(self, prec: i32) -> Self;
 }
 
@@ -152,7 +152,7 @@ impl Currency for BaseCurrency {
         Self(-self.0)
     }
 
-    #[cfg(test)]
+    #[inline(always)]
     fn into_rounded(self, prec: i32) -> Self {
         Self(crate::utils::round(self.0, prec))
     }
@@ -202,7 +202,7 @@ impl Currency for QuoteCurrency {
         Self(-self.0)
     }
 
-    #[cfg(test)]
+    #[inline(always)]
     fn into_rounded(self, prec: i32) -> Self {
         Self(crate::utils::round(self.0, prec))
     }

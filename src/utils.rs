@@ -23,7 +23,6 @@ where T: PartialOrd {
 /// round a value to a given precision of decimal places
 /// used in tests
 #[inline(always)]
-#[cfg(test)]
 pub fn round(val: f64, prec: i32) -> f64 {
     ((val * 10.0_f64.powi(prec)).round()) / 10.0_f64.powi(prec)
 }
