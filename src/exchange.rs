@@ -155,7 +155,7 @@ where
 
         self.check_orders();
 
-        self.user_account.update((self.bid + self.ask) / 2.0, timestamp);
+        self.user_account.update((self.bid + self.ask) / 2.0.into(), timestamp);
 
         self.step += 1;
 

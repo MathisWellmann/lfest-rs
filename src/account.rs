@@ -292,8 +292,8 @@ where
         self.account_tracker.log_limit_order_fill();
         self.executed_orders.push(exec_order);
 
-        let new_om: f64 = order_margin(
-            self.active_limit_orders.values(),
+        let new_om = order_margin(
+            self.active_limit_orders.values().cloned(),
             self.position.size(),
             self.futures_type,
             self.position.leverage(),
@@ -380,7 +380,7 @@ where
         self.margin.set_position_margin(pos_margin);
 
         // log change
-        self.account_tracker.log_trade(side, size, exec_price);
+        self.account_tracker.log_trade(side, exec_price, size);
     }
 }
 

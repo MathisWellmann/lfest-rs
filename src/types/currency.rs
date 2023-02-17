@@ -54,6 +54,7 @@ pub struct BaseCurrency(pub f64);
 #[div(forward)]
 pub struct QuoteCurrency(pub f64);
 
+/// Every unit of account must implement this trait
 pub trait Currency:
     Copy
     + std::fmt::Debug

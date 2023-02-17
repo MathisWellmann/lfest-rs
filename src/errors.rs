@@ -24,6 +24,7 @@ pub enum OrderError {
 
 /// Describes possible Errors that may occur when calling methods in this crate
 #[derive(thiserror::Error, Debug, Clone)]
+#[allow(missing_docs)]
 pub enum Error {
     /// Config::new was provided an invalid leverage value
     #[error("Wrong leverage provided")]

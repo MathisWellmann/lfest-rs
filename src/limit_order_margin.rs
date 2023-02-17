@@ -32,15 +32,16 @@ where
         let limit_price = o.limit_price().expect("Limit price must exist; qed");
         let fee_margin = o.size().convert(limit_price).fee_portion(fee_maker);
         let size: f64 = o.size().into();
+        let limit_price: f64 = limit_price.into();
         match o.side() {
             Side::Buy => {
                 buy_size += o.size();
-                buy_price_weight += limit_price.into() * size;
+                buy_price_weight += limit_price * size;
                 buy_side_fees += fee_margin;
             }
             Side::Sell => {
                 sell_size += o.size();
-                sell_price_weight += limit_price.into() * size;
+                sell_price_weight += limit_price * size;
                 sell_side_fees += fee_margin;
             }
         }

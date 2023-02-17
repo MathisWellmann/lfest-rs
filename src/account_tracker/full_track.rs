@@ -38,19 +38,19 @@ pub struct FullAccountTracker<M> {
     num_cancelled_limit_orders: usize,
     num_filled_limit_orders: usize,
     num_trading_opportunities: usize,
-    total_turnover: f64,
-    max_drawdown_wallet_balance: f64,
-    max_drawdown_total: f64,
+    total_turnover: M,
+    max_drawdown_wallet_balance: M,
+    max_drawdown_total: M,
     // historical daily absolute returns
-    hist_returns_daily_acc: Vec<f64>,
-    hist_returns_daily_bnh: Vec<f64>,
+    hist_returns_daily_acc: Vec<M>,
+    hist_returns_daily_bnh: Vec<M>,
     // historical hourly absolute returns
-    hist_returns_hourly_acc: Vec<f64>,
-    hist_returns_hourly_bnh: Vec<f64>,
+    hist_returns_hourly_acc: Vec<M>,
+    hist_returns_hourly_bnh: Vec<M>,
     // historical tick by tick absolute returns
     // TODO: if these tick-by-tick returns vectors get too large, disable it in live mode
-    hist_returns_tick_acc: Vec<f64>,
-    hist_returns_tick_bnh: Vec<f64>,
+    hist_returns_tick_acc: Vec<M>,
+    hist_returns_tick_bnh: Vec<M>,
     // historical daily logarithmic returns
     hist_ln_returns_daily_acc: Vec<f64>,
     hist_ln_returns_daily_bnh: Vec<f64>,
@@ -100,9 +100,9 @@ where M: Currency + Send
             num_cancelled_limit_orders: 0,
             num_filled_limit_orders: 0,
             num_trading_opportunities: 0,
-            total_turnover: 0.0,
-            max_drawdown_wallet_balance: 0.0,
-            max_drawdown_total: 0.0,
+            total_turnover: M::new_zero(),
+            max_drawdown_wallet_balance: M::new_zero(),
+            max_drawdown_total: M::new_zero(),
             hist_returns_daily_acc: vec![],
             hist_returns_daily_bnh: vec![],
             hist_returns_hourly_acc: vec![],
@@ -120,7 +120,7 @@ where M: Currency + Send
             last_daily_pnl: M::new_zero(),
             last_hourly_pnl: M::new_zero(),
             last_tick_pnl: M::new_zero(),
-            cumulative_fees: 0.0,
+            cumulative_fees: M::new_zero(),
             total_profit: M::new_zero(),
             total_loss: M::new_zero(),
             price_first: quote!(0.0),
@@ -137,7 +137,7 @@ where M: Currency + Send
     /// unrealized pnl # Parameters
     /// source: the sampling interval of pnl snapshots
     #[inline(always)]
-    pub fn absolute_returns(&self, source: &ReturnsSource) -> &Vec<f64> {
+    pub fn absolute_returns(&self, source: &ReturnsSource) -> &Vec<M> {
         match source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
@@ -165,34 +165,22 @@ where M: Currency + Send
 
     /// Cumulative fees paid to the exchange
     #[inline(always)]
-    pub fn cumulative_fees(&self) -> f64 {
+    pub fn cumulative_fees(&self) -> M {
         self.cumulative_fees
     }
 
     /// Would be return of buy and hold strategy
     #[inline(always)]
     pub fn buy_and_hold_return(&self) -> M {
-        let wb_start: f64 = self.wallet_balance_start.into();
-        let price_first: f64 = self.price_first.into();
-        let qty: f64 = match self.futures_type {
-            FuturesTypes::Linear => wb_start / price_first,
-            FuturesTypes::Inverse => wb_start * price_first,
-        };
-        let qty: M::PairedCurrency = qty.into();
+        let qty = self.wallet_balance_start.convert(self.price_first);
         self.futures_type.pnl(self.price_first, self.price_last, qty)
     }
 
     /// Would be return of sell and hold strategy
     #[inline(always)]
     pub fn sell_and_hold_return(&self) -> M {
-        let wb_start: f64 = self.wallet_balance_start.into();
-        let price_first: f64 = self.price_first.into();
-        let qty: f64 = match self.futures_type {
-            FuturesTypes::Linear => -wb_start / price_first,
-            FuturesTypes::Inverse => -wb_start * price_first,
-        };
-        let qty: M::PairedCurrency = qty.into();
-        self.futures_type.pnl(self.price_first, self.price_last, qty)
+        let qty = self.wallet_balance_start.convert(self.price_first);
+        self.futures_type.pnl(self.price_first, self.price_last, qty.into_negative())
     }
 
     /// Return the sharpe ratio using the selected returns as source
@@ -214,17 +202,31 @@ where M: Currency + Send
             };
             let n: f64 = rets_acc.len() as f64;
             // compute the difference of returns of account and market
-            let diff_returns: Vec<f64> =
+            let diff_returns: Vec<M> =
                 rets_acc.iter().zip(rets_bnh).map(|(a, b)| *a - *b).collect();
-            let avg = diff_returns.iter().sum::<f64>() / n;
-            let variance = diff_returns.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
+            let avg = diff_returns.iter().map(|v| (*v).into()).sum::<f64>() / n;
+            let variance = diff_returns
+                .iter()
+                .map(|v| {
+                    let v: f64 = (*v).into();
+                    (v - avg).powi(2)
+                })
+                .sum::<f64>()
+                / n;
             let std_dev = variance.sqrt();
 
             (self.total_rpnl.into() - self.buy_and_hold_return().into()) / std_dev
         } else {
             let n = rets_acc.len() as f64;
-            let avg = rets_acc.iter().sum::<f64>() / n;
-            let var = rets_acc.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
+            let avg = rets_acc.iter().map(|v| (*v).into()).sum::<f64>() / n;
+            let var = rets_acc
+                .iter()
+                .map(|v| {
+                    let v: f64 = (*v).into();
+                    (v - avg).powi(2)
+                })
+                .sum::<f64>()
+                / n;
             let std_dev = var.sqrt();
 
             self.total_rpnl.into() / std_dev
@@ -249,8 +251,13 @@ where M: Currency + Send
                 ReturnsSource::TickByTick => &self.hist_returns_tick_bnh,
             };
             // compute the difference of returns of account and market
-            let diff_returns: Vec<f64> =
-                rets_acc.iter().zip(rets_bnh).map(|(a, b)| *a - *b).filter(|v| *v < 0.0).collect();
+            let diff_returns: Vec<f64> = rets_acc
+                .iter()
+                .zip(rets_bnh)
+                .map(|(a, b)| *a - *b)
+                .filter(|v| *v < M::new_zero())
+                .map(|v| v.into())
+                .collect();
             let n: f64 = diff_returns.len() as f64;
             let avg = diff_returns.iter().sum::<f64>() / n;
             let variance = diff_returns.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
@@ -258,7 +265,8 @@ where M: Currency + Send
 
             (self.total_rpnl.into() - self.buy_and_hold_return().into()) / std_dev
         } else {
-            let downside_rets: Vec<f64> = rets_acc.iter().copied().filter(|v| *v < 0.0).collect();
+            let downside_rets: Vec<f64> =
+                rets_acc.iter().copied().filter(|v| *v < M::new_zero()).map(|v| v.into()).collect();
             let n = downside_rets.len() as f64;
             let avg = downside_rets.iter().sum::<f64>() / n;
             let var = downside_rets.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
@@ -360,11 +368,11 @@ where M: Currency + Send
         &self,
         n: usize,
         percentile: f64,
-    ) -> f64 {
+    ) -> M {
         let rets = &self.hist_ln_returns_hourly_acc;
         if rets.len() < n {
             debug!("not enough hourly returns to compute CF-VaR for n={}", n);
-            return 0.0;
+            return M::new_zero();
         }
         let mut ret_streaks = Vec::with_capacity(rets.len() - n);
         for i in n..rets.len() {
@@ -375,14 +383,14 @@ where M: Currency + Send
             ret_streaks.push(r);
         }
 
-        self.wallet_balance_start
-            - (self.wallet_balance_start
-                * cornish_fisher_value_at_risk(
-                    &ret_streaks,
-                    self.wallet_balance_start.into(),
-                    percentile,
-                )
-                .1)
+        let cf_var: M = cornish_fisher_value_at_risk(
+            &ret_streaks.iter().map(|v| (*v).into()).collect::<Vec<f64>>(),
+            self.wallet_balance_start.into(),
+            percentile,
+        )
+        .1
+        .into();
+        self.wallet_balance_start - (self.wallet_balance_start * cf_var)
     }
 
     /// Return the number of trading days
@@ -435,20 +443,21 @@ where M: Currency + Send
 
     /// Annualized return on investment as a factor, e.g.: 100% -> 2x
     pub fn annualized_roi(&self) -> f64 {
-        (1.0 + (self.total_rpnl / self.wallet_balance_start))
-            .powf(365.0 / self.num_trading_days() as f64)
+        let total_rpnl: f64 = self.total_rpnl.into();
+        let wb_start: f64 = self.wallet_balance_start.into();
+        (1.0 + (total_rpnl / wb_start)).powf(365.0 / self.num_trading_days() as f64)
     }
 
     /// Maximum drawdown of the wallet balance
     #[inline(always)]
-    pub fn max_drawdown_wallet_balance(&self) -> f64 {
+    pub fn max_drawdown_wallet_balance(&self) -> M {
         self.max_drawdown_wallet_balance
     }
 
     /// Maximum drawdown of the wallet balance including unrealized profit and
     /// loss
     #[inline(always)]
-    pub fn max_drawdown_total(&self) -> f64 {
+    pub fn max_drawdown_total(&self) -> M {
         self.max_drawdown_total
     }
 
@@ -473,7 +482,7 @@ where M: Currency + Send
 
     /// Return the cumulative turnover denoted in margin currency
     #[inline(always)]
-    pub fn turnover(&self) -> f64 {
+    pub fn turnover(&self) -> M {
         self.total_turnover
     }
 
@@ -546,17 +555,18 @@ where M: Currency + Send
             // calculate daily log return of account
             let ln_ret: f64 = ((self.wallet_balance_last + upnl)
                 / (self.wallet_balance_start + self.last_daily_pnl))
+                .into()
                 .ln();
             self.hist_ln_returns_daily_acc.push(ln_ret);
 
             // calculate daily return of buy_and_hold
-            let bnh_qty = self.wallet_balance_start / self.price_first;
+            let bnh_qty = self.wallet_balance_start.convert(self.price_first);
             let pnl_bnh = self.futures_type.pnl(self.price_a_day_ago, price, bnh_qty);
             self.hist_returns_daily_bnh.push(pnl_bnh);
 
             // calculate daily log return of market
-            let ln_ret: f64 = (price / self.price_a_day_ago).ln();
-            self.hist_ln_returns_daily_bnh.push(ln_ret);
+            let ln_ret: f64 = (price / self.price_a_day_ago).into();
+            self.hist_ln_returns_daily_bnh.push(ln_ret.ln());
 
             self.last_daily_pnl = self.total_rpnl + upnl;
             self.price_a_day_ago = price;
@@ -571,17 +581,18 @@ where M: Currency + Send
             // calculate hourly logarithmic return of account
             let ln_ret: f64 = ((self.wallet_balance_last + upnl)
                 / (self.wallet_balance_start + self.last_hourly_pnl))
+                .into()
                 .ln();
             self.hist_ln_returns_hourly_acc.push(ln_ret);
 
             // calculate hourly return of buy_and_hold
-            let bnh_qty = self.wallet_balance_start / self.price_first;
+            let bnh_qty = self.wallet_balance_start.convert(self.price_first);
             let pnl_bnh = self.futures_type.pnl(self.price_an_hour_ago, price, bnh_qty);
             self.hist_returns_hourly_bnh.push(pnl_bnh);
 
             // calculate hourly logarithmic return of buy_and_hold
-            let ln_ret: f64 = (price / self.price_an_hour_ago).ln();
-            self.hist_ln_returns_hourly_bnh.push(ln_ret);
+            let ln_ret: f64 = (price / self.price_an_hour_ago).into();
+            self.hist_ln_returns_hourly_bnh.push(ln_ret.ln());
 
             self.last_hourly_pnl = self.total_rpnl + upnl;
             self.price_an_hour_ago = price;
@@ -592,11 +603,12 @@ where M: Currency + Send
 
         let ln_ret: f64 = ((self.wallet_balance_last + upnl)
             / (self.wallet_balance_start + self.last_tick_pnl))
+            .into()
             .ln();
         self.hist_ln_returns_tick_acc.push(ln_ret);
 
-        let bnh_qty = self.wallet_balance_start / self.price_first;
-        let pnl_bnh: f64 = self.futures_type.pnl(self.price_a_tick_ago, price, bnh_qty);
+        let bnh_qty = self.wallet_balance_start.convert(self.price_first);
+        let pnl_bnh = self.futures_type.pnl(self.price_a_tick_ago, price, bnh_qty);
         self.hist_returns_tick_bnh.push(pnl_bnh);
 
         let ln_ret = (price / self.price_a_tick_ago).ln();
@@ -653,10 +665,7 @@ where M: Currency + Send
     }
 
     fn log_trade(&mut self, side: Side, price: QuoteCurrency, size: M::PairedCurrency) {
-        self.total_turnover += match self.futures_type {
-            FuturesTypes::Linear => size * price,
-            FuturesTypes::Inverse => size / price,
-        };
+        self.total_turnover += size.convert(price);
         self.num_trades += 1;
         match side {
             Side::Buy => self.num_buys += 1,
@@ -1152,7 +1161,7 @@ mod tests {
         let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         at.log_fee(quote!(0.1));
         at.log_fee(quote!(0.2));
-        assert_eq!(round(at.cumulative_fees(), 1), 0.3);
+        assert_eq!(at.cumulative_fees().into_rounded(1), quote!(0.3));
     }
 
     #[test]
@@ -1179,7 +1188,7 @@ mod tests {
             acc_tracker.log_rpnl(quote!(r));
         }
 
-        assert_eq!(round(acc_tracker.max_drawdown_wallet_balance(), 2), 9.0);
+        assert_eq!(acc_tracker.max_drawdown_wallet_balance().into_rounded(2), quote!(9.0));
         assert_eq!(acc_tracker.total_rpnl().into_rounded(1), quote!(20.0));
     }
 
@@ -1258,12 +1267,12 @@ mod tests {
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
-            round(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05), 3),
-            4.043
+            at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05).into_rounded(3),
+            quote!(4.043)
         );
         assert_eq!(
-            round(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01), 3),
-            5.358
+            at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01).into_rounded(3),
+            quote!(5.358)
         );
     }
 }

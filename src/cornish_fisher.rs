@@ -124,11 +124,14 @@ fn percent_point_function(q: f64) -> f64 {
 }
 
 /// Compute the Cornish-Fisher Value at Risk (CF-VaR)
+///
 /// # Arguments:
-/// log_returns: logarithmic return series: (p1 / p0).ln()
+/// 'log_returns': logarithmic return series: (p1 / p0).ln()
 /// asset_value: current asset value
 /// confidence_interval: in range [0.0, 1.0], usually something like 0.01 or
-/// 0.05 # Returns:
+/// 0.05.
+///
+/// # Returns:
 /// tuple containing (cf_exp, cf_var, cf_asset_value)
 /// of most importance is cf_var which if the actual CF-VaR
 pub(crate) fn cornish_fisher_value_at_risk(

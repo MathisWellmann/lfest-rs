@@ -1,14 +1,14 @@
-use crate::{Error, Fee, FuturesTypes, Result};
+use crate::{Currency, Error, Fee, FuturesTypes, Result};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Define the Exchange configuration
-pub struct Config<B> {
+pub struct Config<M> {
     /// The maker fee as a fraction. e.g.: 2.5 basis points rebate -> -0.00025
     fee_maker: Fee,
     /// The taker fee as a fraction. e.g.: 10 basis points -> 0.0010
     fee_taker: Fee,
     /// The starting balance of account
-    starting_balance: B,
+    starting_balance: M,
     /// The leverage used for the position
     leverage: f64,
     /// The type of futures to simulate
@@ -19,7 +19,9 @@ pub struct Config<B> {
     set_order_timestamps: bool,
 }
 
-impl<B> Config<B> {
+impl<M> Config<M>
+where M: Currency
+{
     /// Create a new Config.
     ///
     /// # Arguments:
@@ -40,7 +42,7 @@ impl<B> Config<B> {
     pub fn new(
         fee_maker: Fee,
         fee_taker: Fee,
-        starting_balance: B,
+        starting_balance: M,
         leverage: f64,
         futures_type: FuturesTypes,
         identification: String,
@@ -74,7 +76,7 @@ impl<B> Config<B> {
 
     /// Return the starting wallet balance of this Config
     #[inline(always)]
-    pub fn starting_balance(&self) -> B {
+    pub fn starting_balance(&self) -> M {
         self.starting_balance
     }
 
