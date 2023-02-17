@@ -28,8 +28,8 @@ where M: Currency
     pub fn new_init(init_balance: M) -> Self {
         Margin {
             wallet_balance: init_balance,
-            position_margin: 0.0,
-            order_margin: 0.0,
+            position_margin: M::new_zero(),
+            order_margin: M::new_zero(),
             available_balance: init_balance,
         }
     }

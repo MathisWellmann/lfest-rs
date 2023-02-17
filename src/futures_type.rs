@@ -51,12 +51,18 @@ impl FuturesTypes {
         match self {
             Self::Linear => {
                 // contract_qty is denoted in BASE currency
-                contract_qty * (exit_price - entry_price)
+                // contract_qty * (exit_price - entry_price)
+                contract_qty.convert(exit_price) - contract_qty.convert(entry_price)
                 // resulting pnl denoted in QUOTE currency
             }
             Self::Inverse => {
                 // contract_qty is denoted in QUOTE currency
-                contract_qty * (1.0 / entry_price - 1.0 / exit_price)
+                // contract_qty * (1.0 / entry_price - 1.0 / exit_price)
+                let entry_price: f64 = entry_price.into();
+                let exit_price: f64 = exit_price.into();
+                let mult: f64 = 1.0 / entry_price - 1.0 / exit_price;
+                let ct: f64 = contract_qty.into();
+                (ct * mult).into()
                 // resulting pnl denoted in BASE currency
             }
         }

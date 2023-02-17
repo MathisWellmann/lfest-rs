@@ -89,31 +89,39 @@ where S: Currency
     }
 
     /// Change the position size by a given delta at a certain price
-    #[deprecated]
+    #[deprecated] // Needs to be reworked
     pub(crate) fn change_size(
         &mut self,
         size_delta: S,
         price: QuoteCurrency,
         futures_type: FuturesTypes,
     ) {
-        debug!("change_size({}, {}, {})", size_delta, price, futures_type);
+        trace!("change_size({}, {}, {})", size_delta, price, futures_type);
 
         if self.size > S::new_zero() {
             if self.size + size_delta < S::new_zero() {
                 // counts as new position as all old position size is sold
                 self.entry_price = price;
             } else if (self.size + size_delta).abs() > self.size {
-                self.entry_price = ((self.size.abs() * self.entry_price)
-                    + (size_delta.abs() * price))
-                    / (self.size.abs() + size_delta.abs());
+                let size_abs: f64 = self.size.abs().into();
+                let size_delta_abs: f64 = size_delta.abs().into();
+                let entry_price: f64 = self.entry_price.into();
+                let price: f64 = price.into();
+                let entry_price: f64 = ((size_abs * entry_price) + (size_delta_abs * price))
+                    / (size_abs + size_delta_abs);
+                self.entry_price = entry_price.into()
             }
         } else if self.size < S::new_zero() {
             if self.size + size_delta > S::new_zero() {
                 self.entry_price = price;
             } else if self.size + size_delta < self.size {
-                self.entry_price = ((self.size.abs() * self.entry_price)
-                    + (size_delta.abs() * price))
-                    / (self.size.abs() + size_delta.abs());
+                let size_abs: f64 = self.size.abs().into();
+                let size_delta_abs: f64 = size_delta.abs().into();
+                let entry_price: f64 = self.entry_price.into();
+                let price: f64 = price.into();
+                let entry_price: f64 = ((size_abs * entry_price) + (size_delta_abs * price))
+                    / (size_abs + size_delta_abs);
+                self.entry_price = entry_price.into()
             }
         } else {
             self.entry_price = price;

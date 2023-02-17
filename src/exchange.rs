@@ -214,7 +214,7 @@ where
         let fee_margin = fee_of_size.convert(price);
 
         self.user_account.change_position(side, amount, price);
-        self.user_account.deduce_fees(fee);
+        self.user_account.deduce_fees(fee_margin);
     }
 
     /// Execute a limit order, once triggered
@@ -227,13 +227,10 @@ where
 
         self.user_account.change_position(o.side(), o.size(), price);
 
-        let mut fee = self.config.fee_maker() * o.size();
-        match self.config.futures_type() {
-            FuturesTypes::Linear => fee *= price,
-            FuturesTypes::Inverse => fee /= price,
-        }
-        self.user_account.deduce_fees(fee);
+        let mut fee_of_size = o.size().fee_portion(self.config.fee_maker());
+        let fee_margin = fee_of_size.convert(price);
 
+        self.user_account.deduce_fees(fee_margin);
         self.user_account.finalize_limit_order(o, self.config.fee_maker());
     }
 
@@ -241,7 +238,7 @@ where
     fn liquidate(&mut self) {
         // TODO: better liquidate
         debug!("liquidating");
-        if self.user_account.position().size() > 0.0 {
+        if self.user_account.position().size() > S::new_zero() {
             self.execute_market(Side::Sell, self.user_account.position().size());
         } else {
             self.execute_market(Side::Buy, self.user_account.position().size().abs());

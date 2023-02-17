@@ -98,6 +98,9 @@ pub trait Currency:
     /// 1 BTC @ 20_000 USD means that 1 USD = 1 / 20_000 BTC
     fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency;
 
+    /// Convert the Currency to a negative value
+    fn into_negative(self) -> Self;
+
     /// Convert into a rounded value with the given precision of decimal prices
     #[cfg(test)]
     fn into_rounded(self, prec: i32) -> Self;
@@ -143,6 +146,11 @@ impl Currency for BaseCurrency {
         QuoteCurrency(self.0 * r)
     }
 
+    #[inline(always)]
+    fn into_negative(self) -> Self {
+        Self(-self.0)
+    }
+
     #[cfg(test)]
     fn into_rounded(self, prec: i32) -> Self {
         Self(crate::utils::round(self.0, prec))
@@ -186,6 +194,11 @@ impl Currency for QuoteCurrency {
     fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency {
         let r: f64 = rate.into();
         BaseCurrency(self.0 / r)
+    }
+
+    #[inline(always)]
+    fn into_negative(self) -> Self {
+        Self(-self.0)
     }
 
     #[cfg(test)]

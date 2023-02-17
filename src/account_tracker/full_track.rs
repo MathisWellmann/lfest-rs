@@ -1150,8 +1150,8 @@ mod tests {
     #[test]
     fn acc_tracker_cumulative_fees() {
         let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
-        at.log_fee(base!(0.1));
-        at.log_fee(base!(0.2));
+        at.log_fee(quote!(0.1));
+        at.log_fee(quote!(0.2));
         assert_eq!(round(at.cumulative_fees(), 1), 0.3);
     }
 
