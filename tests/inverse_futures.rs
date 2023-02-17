@@ -427,23 +427,23 @@ fn inv_short_market_loss_partial() {
 
     let _ = exchange.update_state(1, bba!(quote!(1000.0), quote!(1000.0)));
 
-    let fee_base1 = size * fee_taker;
-    let fee_asset1 = fee_base1 / exchange.bid();
+    let fee_quote1 = size.fee_portion(fee_taker);
+    let fee_base1: BaseCurrency = fee_quote1.convert(exchange.bid());
 
     assert_eq!(exchange.account().position().size(), size.into_negative());
     assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.0));
-    assert_eq!(exchange.account().margin().wallet_balance(), base!(1.0 - fee_asset1));
+    assert_eq!(exchange.account().margin().wallet_balance(), base!(1.0 - fee_base1));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.8));
     assert_eq!(
         exchange.account().margin().available_balance().into_rounded(4),
-        round(0.2 - fee_asset1, 4)
+        round(0.2 - fee_base1, 4).into()
     );
     let _ = exchange.update_state(1, bba!(quote!(2000.0), quote!(2000.0)));
 
     let size = quote!(400.0);
-    let fee_base2 = size * fee_taker;
-    let fee_asset2 = fee_base2 / 2000.0;
+    let fee_quote2 = size.fee_portion(fee_taker);
+    let fee_base2: BaseCurrency = fee_quote2.convert(quote!(2000.0));
 
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(-0.4));
 
@@ -454,12 +454,12 @@ fn inv_short_market_loss_partial() {
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(-0.2));
     assert_eq!(
         exchange.account().margin().wallet_balance().into_rounded(5),
-        round(0.8 - fee_asset1 - fee_asset2, 5)
+        round(0.8 - fee_base1 - fee_base2, 5).into()
     );
-    assert_eq!(exchange.account().margin().position_margin(), 0.4);
+    assert_eq!(exchange.account().margin().position_margin(), base!(0.4));
     assert_eq!(
         exchange.account().margin().available_balance().into_rounded(2),
-        round(0.4 - fee_asset1 - fee_asset2, 2)
+        round(0.4 - fee_base1 - fee_base2, 2).into()
     );
 }
 
@@ -481,7 +481,7 @@ fn inv_test_market_roundtrip() {
     let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(0, bba!(quote!(1000.0), quote!(1000.0)));
 
-    let value = exchange.account().margin().available_balance() * 0.9;
+    let value = exchange.account().margin().available_balance() * base!(0.9);
     let size = exchange.ask() * value;
     let buy_order = Order::market(Side::Buy, size).unwrap();
     exchange.submit_order(buy_order).unwrap();
@@ -491,17 +491,16 @@ fn inv_test_market_roundtrip() {
 
     exchange.submit_order(sell_order).unwrap();
 
-    let fee_base = size * fee_taker;
-    let fee_asset = fee_base / exchange.ask();
+    let fee_base = size.fee_portion(fee_taker);
 
     let _ = exchange.update_state(2, bba!(quote!(1000.0), quote!(1000.0)));
 
     assert_eq!(exchange.account().position().size(), quote!(0.0));
     assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.0));
-    assert_eq!(exchange.account().margin().wallet_balance(), base!(1.0 - 2.0 * fee_asset));
+    assert_eq!(exchange.account().margin().wallet_balance(), base!(1_f64 - 2.0 * fee_base.into()));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.0));
-    assert_eq!(exchange.account().margin().available_balance(), base!(1.0 - 2.0 * fee_asset));
+    assert_eq!(exchange.account().margin().available_balance(), base!(1_f64 - 2.0 * fee_base.into()));
 
     let size = quote!(900.0);
     let buy_order = Order::market(Side::Buy, size).unwrap();
@@ -513,14 +512,14 @@ fn inv_test_market_roundtrip() {
 
     exchange.submit_order(sell_order).unwrap();
 
-    let _ = exchange.update_state(4, bba!(1000.0, 1000.0));
+    let _ = exchange.update_state(4, bba!(quote!(1000.0), quote!(1000.0));
 
     assert_eq!(exchange.account().position().size(), quote!(-50.0));
     assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.0));
     assert!(exchange.account().margin().wallet_balance() < base!(1.0));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.05));
-    assert!(exchange.account().margin().available_balance(gh) < 1.0.into());
+    assert!(exchange.account().margin().available_balance() < 1.0.into());
 }
 
 #[test]

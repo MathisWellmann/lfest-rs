@@ -35,5 +35,6 @@ pub use margin::Margin;
 pub use orders::Order;
 pub use position::Position;
 pub use types::*;
+pub use utils::round;
 pub(crate) use utils::{max, min};
 pub(crate) use validator::Validator;
