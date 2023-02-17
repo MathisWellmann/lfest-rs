@@ -66,7 +66,7 @@ pub struct FullAccountTracker<M> {
     last_daily_pnl: M,
     last_hourly_pnl: M,
     last_tick_pnl: M,
-    cumulative_fees: f64,
+    cumulative_fees: M,
     total_profit: M,
     total_loss: M,
     price_first: QuoteCurrency,
@@ -633,8 +633,8 @@ where M: Currency + Send
     }
 
     #[inline(always)]
-    fn log_fee(&mut self, fee: f64) {
-        self.cumulative_fees += fee
+    fn log_fee(&mut self, fee_in_margin: M) {
+        self.cumulative_fees += fee_in_margin
     }
 
     #[inline(always)]
@@ -732,7 +732,7 @@ num_trading_days: {},
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::round;
+    use crate::{base, utils::round, BaseCurrency};
 
     // Some example hourly ln returns of BCHEUR i pulled from somewhere from about
     // october 2021
@@ -1150,8 +1150,8 @@ mod tests {
     #[test]
     fn acc_tracker_cumulative_fees() {
         let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
-        at.log_fee(Fee(0.1));
-        at.log_fee(Fee(0.2));
+        at.log_fee(base!(0.1));
+        at.log_fee(base!(0.2));
         assert_eq!(round(at.cumulative_fees(), 1), 0.3);
     }
 
@@ -1207,12 +1207,12 @@ mod tests {
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
-            round(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.05), 3),
-            1.173
+            acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.05).into_rounded(3),
+            quote!(1.173)
         );
         assert_eq!(
-            round(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.01), 3),
-            2.54
+            acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.01).into_rounded(3),
+            quote!(2.54)
         );
     }
 
@@ -1223,8 +1223,14 @@ mod tests {
         let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(round(at.historical_value_at_risk_from_n_hourly_returns(24, 0.05), 3), 3.835);
-        assert_eq!(round(at.historical_value_at_risk_from_n_hourly_returns(24, 0.01), 3), 6.061);
+        assert_eq!(
+            at.historical_value_at_risk_from_n_hourly_returns(24, 0.05).into_rounded(3),
+            quote!(3.835)
+        );
+        assert_eq!(
+            at.historical_value_at_risk_from_n_hourly_returns(24, 0.01).into_rounded(3),
+            quote!(6.061)
+        );
     }
 
     #[test]

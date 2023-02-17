@@ -1,6 +1,6 @@
 use crate::{
-    quote, Account, AccountTracker, Config, Currency, FuturesTypes, MarketUpdate, Order,
-    OrderError, OrderType, QuoteCurrency, Side, Validator,
+    quote, Account, AccountTracker, Config, Currency, FuturesTypes, MarketUpdate, NoAccountTracker,
+    Order, OrderError, OrderType, QuoteCurrency, Side, Validator,
 };
 
 #[derive(Debug, Clone)]
@@ -9,7 +9,9 @@ pub struct Exchange<A, S>
 where S: Currency
 {
     config: Config<S::PairedCurrency>,
-    account: Account<A, S>,
+    user_account: Account<A, S>,
+    /// An infinitely liquid counterparty that can
+    counterparty_account: Account<NoAccountTracker, S::PairedCurrency>,
     validator: Validator,
     bid: QuoteCurrency,
     ask: QuoteCurrency,
@@ -37,9 +39,16 @@ where
         let validator =
             Validator::new(config.fee_maker(), config.fee_taker(), config.futures_type());
 
+        let counterparty_account = Account::new(
+            NoAccountTracker::default(),
+            1.0,
+            (f64::MAX).into(),
+            config.futures_type(),
+        );
         Self {
             config,
-            account,
+            user_account: account,
+            counterparty_account,
             validator,
             bid: quote!(0.0),
             ask: quote!(0.0),
@@ -78,19 +87,19 @@ where
     /// Return a reference to Account
     #[inline(always)]
     pub fn account(&self) -> &Account<A, S> {
-        &self.account
+        &self.user_account
     }
 
     /// Return a mutable reference to Account
     #[inline(always)]
     pub fn account_mut(&mut self) -> &mut Account<A, S> {
-        &mut self.account
+        &mut self.user_account
     }
 
     /// Set the account, use carefully
     #[inline(always)]
     pub fn set_account(&mut self, account: Account<A, S>) {
-        self.account = account
+        self.user_account = account
     }
 
     /// Update the exchange state with new information
@@ -146,11 +155,11 @@ where
 
         self.check_orders();
 
-        self.account.update((self.bid + self.ask) / 2.0, timestamp);
+        self.user_account.update((self.bid + self.ask) / 2.0, timestamp);
 
         self.step += 1;
 
-        (self.account.executed_orders(), false)
+        (self.user_account.executed_orders(), false)
     }
 
     /// Submit a new order to the exchange.
@@ -168,15 +177,16 @@ where
         match order.order_type() {
             OrderType::Market => {
                 // immediately execute market order
-                self.validator.validate_market_order(&order, &self.account)?;
+                self.validator.validate_market_order(&order, &self.user_account)?;
                 self.execute_market(order.side(), order.size());
                 order.executed = true;
 
                 Ok(order)
             }
             _ => {
-                let order_margin = self.validator.validate_limit_order(&order, &self.account)?;
-                self.account.append_limit_order(order, order_margin);
+                let order_margin =
+                    self.validator.validate_limit_order(&order, &self.user_account)?;
+                self.user_account.append_limit_order(order, order_margin);
 
                 Ok(order)
             }
@@ -200,13 +210,11 @@ where
             Side::Sell => self.bid,
         };
 
-        let mut fee = self.config.fee_taker() * amount;
-        match self.config.futures_type() {
-            FuturesTypes::Linear => fee *= price,
-            FuturesTypes::Inverse => fee /= price,
-        }
-        self.account.change_position(side, amount, price);
-        self.account.deduce_fees(fee);
+        let fee_of_size = amount.fee_portion(self.config.fee_taker());
+        let fee_margin = fee_of_size.convert(price);
+
+        self.user_account.change_position(side, amount, price);
+        self.user_account.deduce_fees(fee);
     }
 
     /// Execute a limit order, once triggered
@@ -215,35 +223,36 @@ where
 
         let price = o.limit_price().unwrap();
 
-        self.account.remove_executed_order_from_order_margin_calculation(&o);
+        self.user_account.remove_executed_order_from_order_margin_calculation(&o);
 
-        self.account.change_position(o.side(), o.size(), price);
+        self.user_account.change_position(o.side(), o.size(), price);
 
         let mut fee = self.config.fee_maker() * o.size();
         match self.config.futures_type() {
             FuturesTypes::Linear => fee *= price,
             FuturesTypes::Inverse => fee /= price,
         }
-        self.account.deduce_fees(fee);
+        self.user_account.deduce_fees(fee);
 
-        self.account.finalize_limit_order(o, self.config.fee_maker());
+        self.user_account.finalize_limit_order(o, self.config.fee_maker());
     }
 
     /// Perform a liquidation of the account
     fn liquidate(&mut self) {
         // TODO: better liquidate
         debug!("liquidating");
-        if self.account.position().size() > 0.0 {
-            self.execute_market(Side::Sell, self.account.position().size());
+        if self.user_account.position().size() > 0.0 {
+            self.execute_market(Side::Sell, self.user_account.position().size());
         } else {
-            self.execute_market(Side::Buy, self.account.position().size().abs());
+            self.execute_market(Side::Buy, self.user_account.position().size().abs());
         }
     }
 
     /// Check if any active orders have been triggered by the most recent price
     /// action method is called after new external data has been consumed
     fn check_orders(&mut self) {
-        let keys: Vec<u64> = self.account.active_limit_orders().iter().map(|(i, _)| *i).collect();
+        let keys: Vec<u64> =
+            self.user_account.active_limit_orders().iter().map(|(i, _)| *i).collect();
         for i in keys {
             self.handle_limit_order(i);
         }
@@ -252,7 +261,7 @@ where
     /// Handle limit order trigger and execution
     fn handle_limit_order(&mut self, order_id: u64) {
         let o: Order<S> = *self
-            .account
+            .user_account
             .active_limit_orders()
             .get(&order_id)
             .expect("This order should be in HashMap for active limit orders");

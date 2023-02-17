@@ -42,7 +42,6 @@ where S: Currency
     /// # Panics:
     /// In debug mode, if inputs don't make sense
     #[must_use]
-    #[inline]
     pub fn new(
         size: S,
         entry_price: QuoteCurrency,
@@ -90,6 +89,7 @@ where S: Currency
     }
 
     /// Change the position size by a given delta at a certain price
+    #[deprecated]
     pub(crate) fn change_size(
         &mut self,
         size_delta: S,
@@ -124,12 +124,11 @@ where S: Currency
     }
 
     /// Update the state to reflect price changes
-    #[inline]
     pub(crate) fn update_state(&mut self, price: QuoteCurrency, futures_type: FuturesTypes) {
-        self.unrealized_pnl = if self.size != 0.0 {
+        self.unrealized_pnl = if self.size != S::new_zero() {
             futures_type.pnl(self.entry_price, price, self.size)
         } else {
-            0.0
+            S::PairedCurrency::new_zero()
         };
     }
 }

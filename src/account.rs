@@ -301,8 +301,9 @@ where
         self.margin.set_order_margin(new_om);
     }
 
-    /// Reduce the account equity by a fee amount
-    pub(crate) fn deduce_fees(&mut self, fee: Fee) {
+    /// Reduce the account equity by a fee amount, measured in the margin
+    /// currency
+    pub(crate) fn deduce_fees(&mut self, fee: S::PairedCurrency) {
         debug!("account: deduce_fees: deducing {} in fees", fee);
 
         self.account_tracker.log_fee(fee);
@@ -321,7 +322,7 @@ where
         };
         let rpnl = match side {
             Side::Buy => {
-                if self.position.size() < 0.0 {
+                if self.position.size() < S::new_zero() {
                     // pnl needs to be realized
                     if size > self.position.size().abs() {
                         self.futures_type.pnl(
@@ -333,11 +334,11 @@ where
                         self.futures_type.pnl(self.position.entry_price(), exec_price, -size)
                     }
                 } else {
-                    0.0
+                    S::PairedCurrency::new_zero()
                 }
             }
             Side::Sell => {
-                if self.position.size() > 0.0 {
+                if self.position.size() > S::new_zero() {
                     // pnl needs to be realized
                     if size > self.position.size() {
                         self.futures_type.pnl(
@@ -349,11 +350,11 @@ where
                         self.futures_type.pnl(self.position.entry_price(), exec_price, size)
                     }
                 } else {
-                    0.0
+                    S::PairedCurrency::new_zero()
                 }
             }
         };
-        if rpnl != 0.0 {
+        if rpnl != S::PairedCurrency::new_zero() {
             // first free up existing position margin if any
             let mut new_pos_margin: f64 =
                 (self.position().size() + pos_size_delta).abs() / self.position().leverage();
@@ -371,7 +372,8 @@ where
         self.position.change_size(pos_size_delta, exec_price, self.futures_type);
 
         // set position margin
-        let mut pos_margin: f64 = self.position.size().abs() / self.position.leverage();
+        let mut pos_margin: S::PairedCurrency =
+            self.position.size().abs() / self.position.leverage();
         match self.futures_type {
             FuturesTypes::Linear => pos_margin *= self.position.entry_price(),
             FuturesTypes::Inverse => pos_margin /= self.position.entry_price(),

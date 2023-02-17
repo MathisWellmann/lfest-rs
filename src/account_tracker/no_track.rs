@@ -13,7 +13,7 @@ where M: Currency
 
     fn log_rpnl(&mut self, _rpnl: M) {}
 
-    fn log_fee(&mut self, _fee: Fee) {}
+    fn log_fee(&mut self, _fee: M) {}
 
     fn log_limit_order_submission(&mut self) {}
 

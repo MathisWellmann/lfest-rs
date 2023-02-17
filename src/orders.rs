@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{OrderError, OrderType, QuoteCurrency, Side};
+use crate::{Currency, OrderError, OrderType, QuoteCurrency, Side};
 
 /// Defines an order
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -26,7 +26,9 @@ pub struct Order<S> {
     pub(crate) executed: bool,
 }
 
-impl<S> Order<S> {
+impl<S> Order<S>
+where S: Currency
+{
     /// Create a new limit order
     ///
     /// # Arguments:
@@ -66,7 +68,7 @@ impl<S> Order<S> {
     /// Either a successfully created instance or an [`OrderError`]
     #[inline]
     pub fn market(side: Side, size: S) -> Result<Self, OrderError> {
-        if size <= 0.0 {
+        if size <= S::new_zero() {
             return Err(OrderError::InvalidOrderSize);
         }
         Ok(Order {
