@@ -3,7 +3,7 @@
 
 :warning: The results may not represent real trading results on any given exchange. 
 
-lfest-rs is a blazingly fast simulated exchange capable of leveraged positions.
+lfest-rs is a simulated futures exchange capable of leveraged positions.
  It gets fed external bid ask data to update the internal state
   and check for order execution. For simplicity's sake (and performance) the exchange does not use an order book.
   Supported futures types are both linear and inverse futures.
