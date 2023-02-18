@@ -15,10 +15,11 @@ use rand::{thread_rng, Rng};
 fn main() {
     let t0 = Instant::now();
 
-    let starting_wb = 1.0;
+    let starting_wb = base!(1.0);
     let futures_type = FuturesTypes::Inverse;
     let config =
-        Config::new(0.0002, 0.0006, starting_wb, 1.0, futures_type, String::new(), true).unwrap();
+        Config::new(Fee(0.0002), Fee(0.0006), starting_wb, 1.0, futures_type, String::new(), true)
+            .unwrap();
 
     let acc_tracker = FullAccountTracker::new(starting_wb, futures_type);
     let mut exchange = Exchange::new(acc_tracker, config);
@@ -33,8 +34,8 @@ fn main() {
         let (exec_orders, liq) = exchange.update_state(
             i as u64,
             MarketUpdate::Bba {
-                bid: *p,
-                ask: *p + 0.1,
+                bid: quote!(*p),
+                ask: quote!(*p + 0.1),
             },
         );
         if liq {
@@ -45,11 +46,11 @@ fn main() {
         }
 
         if i % 100 == 0 {
-            // randomly buy or sell using a market order
-            let r = rng.gen::<f64>();
             // Trade a fraction of the available wallet balance
-            let order_size: f64 = exchange.account().margin().wallet_balance() * 0.1;
-            let order: Order = if r > 0.5 {
+            let order_value: BaseCurrency =
+                exchange.account().margin().wallet_balance() * base!(0.1);
+            let order_size = order_value.convert(exchange.bid());
+            let order = if rng.gen() {
                 Order::market(Side::Sell, order_size).unwrap() // Sell using
                                                                // market order
             } else {
@@ -81,7 +82,8 @@ fn main() {
 }
 
 /// analyze the resulting performance metrics of the traded orders
-fn analyze_results(acc_tracker: &FullAccountTracker) {
+fn analyze_results<M>(acc_tracker: &FullAccountTracker<M>)
+where M: Currency + Send {
     let win_ratio = acc_tracker.win_ratio();
     let profit_loss_ratio = acc_tracker.profit_loss_ratio();
     let rpnl = acc_tracker.total_rpnl();

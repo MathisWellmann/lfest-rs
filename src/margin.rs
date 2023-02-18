@@ -94,6 +94,8 @@ where M: Currency
     pub(crate) fn set_order_margin(&mut self, om: M) {
         trace!("set_order_margin: om: {}, self: {:?}", om, self);
 
+        debug_assert!(om >= M::new_zero());
+
         self.order_margin = om;
         self.available_balance = self.wallet_balance - self.position_margin - self.order_margin;
 

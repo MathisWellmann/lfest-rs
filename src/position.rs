@@ -89,7 +89,6 @@ where S: Currency
     }
 
     /// Change the position size by a given delta at a certain price
-    #[deprecated] // Needs to be reworked
     pub(crate) fn change_size(
         &mut self,
         size_delta: S,

@@ -1,4 +1,4 @@
-#![deny(missing_docs, rustdoc::missing_crate_level_docs, unused_crate_dependencies)]
+#![deny(missing_docs, rustdoc::missing_crate_level_docs)]
 #![warn(clippy::all, unused_imports)]
 
 //! lfest - leveraged futures exchange for simulated trading

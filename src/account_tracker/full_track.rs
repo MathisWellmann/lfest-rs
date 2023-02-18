@@ -39,8 +39,8 @@ pub struct FullAccountTracker<M> {
     num_filled_limit_orders: usize,
     num_trading_opportunities: usize,
     total_turnover: M,
-    max_drawdown_wallet_balance: M,
-    max_drawdown_total: M,
+    max_drawdown_wallet_balance: f64,
+    max_drawdown_total: f64,
     // historical daily absolute returns
     hist_returns_daily_acc: Vec<M>,
     hist_returns_daily_bnh: Vec<M>,
@@ -101,8 +101,8 @@ where M: Currency + Send
             num_filled_limit_orders: 0,
             num_trading_opportunities: 0,
             total_turnover: M::new_zero(),
-            max_drawdown_wallet_balance: M::new_zero(),
-            max_drawdown_total: M::new_zero(),
+            max_drawdown_wallet_balance: 0.0,
+            max_drawdown_total: 0.0,
             hist_returns_daily_acc: vec![],
             hist_returns_daily_bnh: vec![],
             hist_returns_hourly_acc: vec![],
@@ -450,14 +450,14 @@ where M: Currency + Send
 
     /// Maximum drawdown of the wallet balance
     #[inline(always)]
-    pub fn max_drawdown_wallet_balance(&self) -> M {
+    pub fn max_drawdown_wallet_balance(&self) -> f64 {
         self.max_drawdown_wallet_balance
     }
 
     /// Maximum drawdown of the wallet balance including unrealized profit and
     /// loss
     #[inline(always)]
-    pub fn max_drawdown_total(&self) -> M {
+    pub fn max_drawdown_total(&self) -> f64 {
         self.max_drawdown_total
     }
 
@@ -620,6 +620,7 @@ where M: Currency + Send
         // update max_drawdown_total
         let curr_dd = (self.wallet_balance_high - (self.wallet_balance_last + upnl))
             / self.wallet_balance_high;
+        let curr_dd: f64 = curr_dd.into();
         if curr_dd > self.max_drawdown_total {
             self.max_drawdown_total = curr_dd;
         }
@@ -639,6 +640,7 @@ where M: Currency + Send
             self.wallet_balance_high = self.wallet_balance_last;
         }
         let dd = (self.wallet_balance_high - self.wallet_balance_last) / self.wallet_balance_high;
+        let dd: f64 = dd.into();
         if dd > self.max_drawdown_wallet_balance {
             self.max_drawdown_wallet_balance = dd;
         }
@@ -1182,14 +1184,14 @@ mod tests {
 
     #[test]
     fn acc_tracker_log_rpnl() {
-        let rpnls: Vec<f64> = vec![0.1, -0.1, 0.1, 0.2, -0.1];
+        let rpnls: Vec<f64> = vec![1.0, -1.0, 1.0, 2.0, -1.0];
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         for r in rpnls {
             acc_tracker.log_rpnl(quote!(r));
         }
 
-        assert_eq!(acc_tracker.max_drawdown_wallet_balance().into_rounded(2), quote!(9.0));
-        assert_eq!(acc_tracker.total_rpnl().into_rounded(1), quote!(20.0));
+        assert_eq!(round(acc_tracker.max_drawdown_wallet_balance(), 2), 0.01);
+        assert_eq!(acc_tracker.total_rpnl().into_rounded(1), quote!(2.0));
     }
 
     #[test]
