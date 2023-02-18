@@ -57,6 +57,7 @@ pub struct QuoteCurrency(pub f64);
 /// Every unit of account must implement this trait
 pub trait Currency:
     Copy
+    + Send
     + std::fmt::Debug
     + std::fmt::Display
     + std::ops::Add<Output = Self>
