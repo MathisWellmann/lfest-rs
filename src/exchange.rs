@@ -1,6 +1,6 @@
 use crate::{
-    quote, Account, AccountTracker, Config, Currency, FuturesTypes, MarketUpdate, NoAccountTracker,
-    Order, OrderError, OrderType, QuoteCurrency, Side, Validator,
+    quote, Account, AccountTracker, Config, Currency, MarketUpdate, Order, OrderError, OrderType,
+    QuoteCurrency, Side, Validator,
 };
 
 #[derive(Debug, Clone)]
@@ -11,7 +11,8 @@ where S: Currency
     config: Config<S::PairedCurrency>,
     user_account: Account<A, S>,
     /// An infinitely liquid counterparty that can
-    counterparty_account: Account<NoAccountTracker, S::PairedCurrency>,
+    // TODO: future
+    // counterparty_account: Account<NoAccountTracker, S::PairedCurrency>,
     validator: Validator,
     bid: QuoteCurrency,
     ask: QuoteCurrency,
@@ -39,16 +40,16 @@ where
         let validator =
             Validator::new(config.fee_maker(), config.fee_taker(), config.futures_type());
 
-        let counterparty_account = Account::new(
-            NoAccountTracker::default(),
-            1.0,
-            (f64::MAX).into(),
-            config.futures_type(),
-        );
+        // let counterparty_account = Account::new(
+        //     NoAccountTracker::default(),
+        //     1.0,
+        //     (f64::MAX).into(),
+        //     config.futures_type(),
+        // );
         Self {
             config,
             user_account: account,
-            counterparty_account,
+            // counterparty_account,
             validator,
             bid: quote!(0.0),
             ask: quote!(0.0),
@@ -227,7 +228,7 @@ where
 
         self.user_account.change_position(o.side(), o.size(), price);
 
-        let mut fee_of_size = o.size().fee_portion(self.config.fee_maker());
+        let fee_of_size = o.size().fee_portion(self.config.fee_maker());
         let fee_margin = fee_of_size.convert(price);
 
         self.user_account.deduce_fees(fee_margin);

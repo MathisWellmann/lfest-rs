@@ -234,6 +234,7 @@ mod tests {
         println!("{}", base!(0.5));
     }
 
+    #[test]
     fn conversion() {
         assert_eq!(BaseCurrency(1.0).convert(quote!(20_000.0)), QuoteCurrency(20_000.0));
         assert_eq!(BaseCurrency(0.5).convert(quote!(20_000.0)), QuoteCurrency(10_000.0));
@@ -241,6 +242,6 @@ mod tests {
 
         assert_eq!(QuoteCurrency(20_000.0).convert(quote!(20_000.0)), BaseCurrency(1.0));
         assert_eq!(QuoteCurrency(10_000.0).convert(quote!(20_000.0)), BaseCurrency(0.5));
-        assert_eq!(QuoteCurrency(5_000.0).convert(quote!(20_000.0)), BaseCurrency(0.5));
+        assert_eq!(QuoteCurrency(5_000.0).convert(quote!(20_000.0)), BaseCurrency(0.25));
     }
 }

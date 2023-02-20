@@ -65,7 +65,7 @@ fn main() {
                     }
                     OrderError::InvalidLimitPrice => error!("invalid limit price of order"),
                     OrderError::InvalidTriggerPrice => error!("invalid trigger price of order"),
-                    OrderError::InvalidOrderSize => error!("invalid order size"),
+                    OrderError::OrderSizeMustBePositive => error!("invalid order size"),
                     OrderError::NotEnoughAvailableBalance => {
                         error!("not enough available balance in account")
                     }

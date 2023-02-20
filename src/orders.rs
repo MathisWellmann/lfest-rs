@@ -44,7 +44,7 @@ where S: Currency
             return Err(OrderError::InvalidLimitPrice);
         }
         if size <= S::new_zero() {
-            return Err(OrderError::InvalidOrderSize);
+            return Err(OrderError::OrderSizeMustBePositive);
         }
         Ok(Order {
             id: 0,
@@ -69,7 +69,7 @@ where S: Currency
     #[inline]
     pub fn market(side: Side, size: S) -> Result<Self, OrderError> {
         if size <= S::new_zero() {
-            return Err(OrderError::InvalidOrderSize);
+            return Err(OrderError::OrderSizeMustBePositive);
         }
         Ok(Order {
             id: 0,

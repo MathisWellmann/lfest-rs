@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
 use crate::{
-    cornish_fisher::cornish_fisher_value_at_risk, quote, AccountTracker, Currency, Fee,
-    FuturesTypes, QuoteCurrency, Side,
+    cornish_fisher::cornish_fisher_value_at_risk, quote, AccountTracker, Currency, FuturesTypes,
+    QuoteCurrency, Side,
 };
 
 const DAILY_NS: u64 = 86_400_000_000_000;
@@ -743,7 +743,7 @@ num_trading_days: {},
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{base, utils::round, BaseCurrency};
+    use crate::utils::round;
 
     // Some example hourly ln returns of BCHEUR i pulled from somewhere from about
     // october 2021

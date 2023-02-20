@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{AccountTracker, Currency, Fee, QuoteCurrency};
+use crate::{AccountTracker, Currency, QuoteCurrency};
 
 /// Performs no tracking of account performance
 #[derive(Default, Debug, Clone)]
