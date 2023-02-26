@@ -61,6 +61,10 @@ impl FuturesTypes {
                 // TODO: this may be wrong, check it
                 contract_qty.convert(entry_price) - contract_qty.convert(exit_price)
 
+                // TODO: this should work, but lets see the above one first
+                // contract_qty.inner() * (entry_price.inner().reciprocal() -
+                // entry_price.inner().reciprocal())
+
                 // let entry_price: f64 = entry_price.into();
                 // let exit_price: f64 = exit_price.into();
                 // let mult: f64 = 1.0 / entry_price - 1.0 / exit_price;

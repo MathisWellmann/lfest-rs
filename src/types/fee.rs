@@ -1,7 +1,7 @@
 use derive_more::Display;
 use malachite::Rational;
 
-/// Allows the quick construction on `BaseCurrency`
+/// Allows the quick construction of `Fee`
 #[macro_export]
 macro_rules! fee {
     ( $a:expr ) => {{

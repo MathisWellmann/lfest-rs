@@ -1,3 +1,4 @@
+use malachite::Rational;
 use serde::{Deserialize, Serialize};
 
 use crate::{quote, Currency, FuturesTypes, Leverage, QuoteCurrency};
@@ -95,25 +96,24 @@ where S: Currency
                 // counts as new position as all old position size is sold
                 self.entry_price = price;
             } else if (self.size + size_delta).abs() > self.size {
-                let size_abs: f64 = self.size.abs().into();
-                let size_delta_abs: f64 = size_delta.abs().into();
-                let entry_price: f64 = self.entry_price.into();
-                let price: f64 = price.into();
-                let entry_price: f64 = ((size_abs * entry_price) + (size_delta_abs * price))
+                let size_abs = self.size.abs().inner();
+                let size_delta_abs = size_delta.abs().inner();
+                let entry_price: Rational = ((size_abs * self.entry_price.inner())
+                    + (size_delta_abs * price.inner()))
                     / (size_abs + size_delta_abs);
-                self.entry_price = entry_price.into()
+                self.entry_price = QuoteCurrency::new(entry_price);
             }
         } else if self.size < S::new_zero() {
             if self.size + size_delta > S::new_zero() {
                 self.entry_price = price;
             } else if self.size + size_delta < self.size {
-                let size_abs: f64 = self.size.abs().into();
-                let size_delta_abs: f64 = size_delta.abs().into();
-                let entry_price: f64 = self.entry_price.into();
-                let price: f64 = price.into();
-                let entry_price: f64 = ((size_abs * entry_price) + (size_delta_abs * price))
+                let size_abs = self.size.abs().inner();
+                let size_delta_abs = size_delta.abs().inner();
+                let entry_price = self.entry_price.inner();
+                let entry_price: Rational = ((size_abs * entry_price)
+                    + (size_delta_abs * price.inner()))
                     / (size_abs + size_delta_abs);
-                self.entry_price = entry_price.into()
+                self.entry_price = QuoteCurrency::new(entry_price);
             }
         } else {
             self.entry_price = price;

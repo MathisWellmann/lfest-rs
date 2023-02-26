@@ -3,7 +3,7 @@ use malachite::{num::arithmetic::traits::Abs, Rational};
 
 use crate::{BaseCurrency, Currency, Fee};
 
-/// Allows the quick construction on `QuoteCurrency`
+/// Allows the quick construction of `QuoteCurrency`
 #[macro_export]
 macro_rules! quote {
     ( $a:expr ) => {{
@@ -34,13 +34,6 @@ macro_rules! quote {
 #[div(forward)]
 pub struct QuoteCurrency(Rational);
 
-impl QuoteCurrency {
-    #[inline(always)]
-    pub(crate) fn inner(&self) -> &Rational {
-        &self.0
-    }
-}
-
 impl Currency for QuoteCurrency {
     type PairedCurrency = BaseCurrency;
 
@@ -55,6 +48,11 @@ impl Currency for QuoteCurrency {
     }
 
     #[inline(always)]
+    fn inner(&self) -> &Rational {
+        &self.0
+    }
+
+    #[inline(always)]
     fn new_zero() -> Self {
         Self::from_f64(0.0)
     }
@@ -65,8 +63,10 @@ impl Currency for QuoteCurrency {
     }
 
     #[inline(always)]
+    #[deprecated]
     fn is_finite(&self) -> bool {
-        self.0.is_finite()
+        // self.0.is_finite()
+        todo!()
     }
 
     #[inline(always)]

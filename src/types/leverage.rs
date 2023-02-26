@@ -1,6 +1,14 @@
 use derive_more::Display;
 use malachite::Rational;
 
+/// Allows the quick construction of `Leverage`
+#[macro_export]
+macro_rules! leverage {
+    ( $a:expr ) => {{
+        Leverage::from_f64($a)
+    }};
+}
+
 /// Leverage
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Display)]
 pub struct Leverage(Rational);

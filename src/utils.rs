@@ -29,6 +29,7 @@ pub fn round(val: f64, prec: i32) -> f64 {
 
 /// Convert the minimum (price, size) increment to decimal places
 #[inline(always)]
+#[deprecated]
 pub(crate) fn decimal_places_from_min_incr(min_incr: f64) -> i32 {
     (1.0 / min_incr).log10().ceil() as i32
 }

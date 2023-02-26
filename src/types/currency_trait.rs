@@ -29,6 +29,9 @@ pub trait Currency:
     /// Create a new instance from a `f64` value
     fn from_f64(val: f64) -> Self;
 
+    /// Get a reference to the inner `Rational`
+    fn inner(&self) -> &Rational;
+
     /// Create a new currency instance with zero value
     fn new_zero() -> Self;
 
@@ -36,6 +39,7 @@ pub trait Currency:
     fn is_zero(&self) -> bool;
 
     /// Check if the value is finite
+    #[deprecated] // TODO: See if this method can be removed
     fn is_finite(&self) -> bool;
 
     /// TODO: it may be smart to remove this here and use another type that can
