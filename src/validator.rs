@@ -86,12 +86,12 @@ impl Validator {
         match o.side() {
             Side::Buy => {
                 if o.limit_price().unwrap() > self.ask {
-                    return Err(OrderError::InvalidLimitPrice);
+                    return Err(OrderError::LimitPriceLargerThanAsk);
                 }
             }
             Side::Sell => {
                 if o.limit_price().unwrap() < self.bid {
-                    return Err(OrderError::InvalidLimitPrice);
+                    return Err(OrderError::LimitPriceLowerThanBid);
                 }
             }
         }

@@ -1,4 +1,4 @@
-use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
+use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Rem, Sub, SubAssign};
 
 use crate::Fee;
 
@@ -20,12 +20,14 @@ use crate::Fee;
     Div,
     AddAssign,
     SubAssign,
+    Rem,
     Display,
     Into,
     From,
 )]
 #[mul(forward)]
 #[div(forward)]
+#[rem(forward)]
 pub struct BaseCurrency(pub f64);
 
 /// The markets QUOTE currency, e.g.: BTCUSD -> USD is the quote currency
@@ -46,12 +48,14 @@ pub struct BaseCurrency(pub f64);
     Div,
     AddAssign,
     SubAssign,
+    Rem,
     Display,
     Into,
     From,
 )]
 #[mul(forward)]
 #[div(forward)]
+#[rem(forward)]
 pub struct QuoteCurrency(pub f64);
 
 /// Every unit of account must implement this trait
@@ -66,6 +70,7 @@ pub trait Currency:
     + std::ops::Div<Output = Self>
     + std::ops::AddAssign
     + std::ops::SubAssign
+    + std::ops::Rem<Output = Self>
     + PartialEq
     + PartialOrd
     + Into<f64>

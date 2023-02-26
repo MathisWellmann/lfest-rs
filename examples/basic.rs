@@ -67,17 +67,7 @@ fn main() {
             // Handle order error here if needed
             match exchange.submit_order(order) {
                 Ok(order) => println!("succesfully submitted order: {:?}", order),
-                Err(order_err) => match order_err {
-                    OrderError::MaxActiveOrders => {
-                        error!("maximum number of active orders reached")
-                    }
-                    OrderError::InvalidLimitPrice => error!("invalid limit price of order"),
-                    OrderError::InvalidTriggerPrice => error!("invalid trigger price of order"),
-                    OrderError::OrderSizeMustBePositive => error!("invalid order size"),
-                    OrderError::NotEnoughAvailableBalance => {
-                        error!("not enough available balance in account")
-                    }
-                },
+                Err(order_err) => error!("an error has occurred: {}", order_err),
             }
         }
     }

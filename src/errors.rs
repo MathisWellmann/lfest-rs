@@ -5,8 +5,20 @@ pub enum OrderError {
     #[error("Maximum number of active orders reached")]
     MaxActiveOrders,
 
-    #[error("Invalid limit price of order")]
-    InvalidLimitPrice,
+    #[error("The limit order price is lower than the minimum price filter.")]
+    LimitPriceTooLow,
+
+    #[error("The limit order price exceeds the maximum price filter.")]
+    LimitPriceTooHigh,
+
+    #[error("The limit price is larger than the current ask")]
+    LimitPriceLargerThanAsk,
+
+    #[error("The limit price is lower than the current bid")]
+    LimitPriceLowerThanBid,
+
+    #[error("The order price does not conform to the step size.")]
+    InvalidOrderPriceStepSize,
 
     #[error("Invalid trigger price for order. e.g.: sell stop market order trigger price > ask")]
     InvalidTriggerPrice,
