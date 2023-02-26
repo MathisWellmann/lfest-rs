@@ -2,7 +2,8 @@ use crate::{Fee, QuoteCurrency};
 
 /// Every unit of account must implement this trait
 pub trait Currency:
-    Send
+    Clone
+    + Send
     + Sized
     + std::fmt::Debug
     + std::fmt::Display
@@ -19,6 +20,9 @@ pub trait Currency:
     /// e.g.: for the BTCUSD market the BTC currency is paired with USD, so the
     /// `PairedCurrency` would be USD
     type PairedCurrency: Currency<PairedCurrency = Self>;
+
+    /// Create a new instance from a f64 value
+    fn new(val: f64) -> Self;
 
     /// Create a new currency instance with zero value
     fn new_zero() -> Self;

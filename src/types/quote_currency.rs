@@ -34,16 +34,14 @@ macro_rules! quote {
 #[div(forward)]
 pub struct QuoteCurrency(Rational);
 
-impl QuoteCurrency {
-    /// Create a new instance from an f64 value
-    #[inline]
-    pub fn new(val: f64) -> Self {
-        Self(Rational::try_from_float_simplest(val).expect("Unable to get Rational from float"))
-    }
-}
-
 impl Currency for QuoteCurrency {
     type PairedCurrency = BaseCurrency;
+
+    /// Create a new instance from an f64 value
+    #[inline]
+    fn new(val: f64) -> Self {
+        Self(Rational::try_from_float_simplest(val).expect("Unable to get Rational from float"))
+    }
 
     #[inline(always)]
     fn new_zero() -> Self {

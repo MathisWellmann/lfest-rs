@@ -275,7 +275,7 @@ where
                 .iter()
                 .filter(|(_, o)| o.side() == Side::Buy)
                 .map(|(_, o)| o.limit_price().unwrap())
-                .fold(f64::NAN.into(), min)
+                .fold(quote!(f64::MAX), min)
         };
         self.max_limit_sell_price = if self.active_limit_orders.is_empty() {
             quote!(0.0)
@@ -284,7 +284,7 @@ where
                 .iter()
                 .filter(|(_, o)| o.side() == Side::Sell)
                 .map(|(_, o)| o.limit_price().unwrap())
-                .fold(f64::NAN.into(), max)
+                .fold(quote!(f64::MIN), max)
         };
 
         // set this to 0.0 temporarily and it will be properly assigned at the end of
@@ -369,7 +369,7 @@ where
         if rpnl != S::PairedCurrency::new_zero() {
             // first free up existing position margin if any
             let new_pos_margin = ((self.position().size() + pos_size_delta).abs()
-                / self.position().leverage().into())
+                / S::new(self.position().leverage()))
             .convert(self.position.entry_price());
             self.margin.set_position_margin(new_pos_margin);
 
@@ -382,7 +382,7 @@ where
 
         // set position margin
         let pos_margin: S::PairedCurrency = (self.position.size().abs()
-            / self.position.leverage().into())
+            / S::new(self.position.leverage()))
         .convert(self.position.entry_price());
         self.margin.set_position_margin(pos_margin);
 
