@@ -1,11 +1,15 @@
-mod currency;
+mod base_currency;
+mod currency_trait;
 mod market_update;
+mod quote_currency;
 
 use std::fmt::Formatter;
 
-pub use currency::*;
+pub use base_currency::*;
+pub use currency_trait::Currency;
 use derive_more::{Display, Into};
 pub use market_update::*;
+pub use quote_currency::*;
 
 /// Fee as a fraction
 /// TODO: make generic

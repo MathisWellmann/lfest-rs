@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{quote, Currency, FuturesTypes, QuoteCurrency};
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 /// Describes the position information of the account
 pub struct Position<S>
 where S: Currency
