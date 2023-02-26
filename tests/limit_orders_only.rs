@@ -15,6 +15,7 @@ fn limit_orders_only() {
         FuturesTypes::Linear,
         String::new(),
         true,
+        100,
     )
     .unwrap();
 
@@ -94,6 +95,7 @@ fn limit_orders_2() {
         FuturesTypes::Linear,
         String::new(),
         true,
+        100,
     )
     .unwrap();
 

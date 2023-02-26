@@ -12,6 +12,7 @@ fn inv_long_market_win_full() {
         FuturesTypes::Inverse,
         String::new(),
         true,
+        100,
     )
     .unwrap();
 
@@ -75,6 +76,7 @@ fn inv_long_market_loss_full() {
         FuturesTypes::Inverse,
         String::new(),
         true,
+        100,
     )
     .unwrap();
 
@@ -132,6 +134,7 @@ fn inv_short_market_win_full() {
         FuturesTypes::Inverse,
         String::new(),
         true,
+        100,
     )
     .unwrap();
 
@@ -180,6 +183,7 @@ fn inv_short_market_loss_full() {
         FuturesTypes::Inverse,
         String::new(),
         true,
+        100,
     )
     .unwrap();
 
@@ -241,6 +245,7 @@ fn inv_long_market_win_partial() {
         FuturesTypes::Inverse,
         String::new(),
         true,
+        100,
     )
     .unwrap();
 
@@ -303,6 +308,7 @@ fn inv_long_market_loss_partial() {
         FuturesTypes::Inverse,
         String::new(),
         true,
+        100,
     )
     .unwrap();
 
@@ -355,6 +361,7 @@ fn inv_short_market_win_partial() {
         FuturesTypes::Inverse,
         String::new(),
         true,
+        100,
     )
     .unwrap();
 
@@ -414,6 +421,7 @@ fn inv_short_market_loss_partial() {
         FuturesTypes::Inverse,
         String::new(),
         true,
+        100,
     )
     .unwrap();
 
@@ -475,6 +483,7 @@ fn inv_test_market_roundtrip() {
         FuturesTypes::Inverse,
         String::new(),
         true,
+        100,
     )
     .unwrap();
 
@@ -537,6 +546,7 @@ fn inv_execute_limit() {
         FuturesTypes::Inverse,
         String::new(),
         true,
+        100,
     )
     .unwrap();
 

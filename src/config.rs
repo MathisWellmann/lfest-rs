@@ -17,6 +17,8 @@ pub struct Config<M> {
     identification: String,
     /// Sets the order timestamps on submit_order() call, if enabled
     set_order_timestamps: bool,
+    /// The maximum number of open orders the user can have at any given time
+    max_num_open_orders: usize,
 }
 
 impl<M> Config<M>
@@ -35,6 +37,8 @@ where M: Currency
     /// `identification`: A way to identify an exchange
     /// `set_order_timestamps`: Whether the exchange should set order
     /// timestamps.
+    /// `max_num_open_orders`: The maximum number of open ordes a user can have
+    /// at any time.
     ///
     /// # Returns:
     /// Either a valid Config or an Error
@@ -47,9 +51,13 @@ where M: Currency
         futures_type: FuturesTypes,
         identification: String,
         set_order_timestamps: bool,
+        max_num_open_orders: usize,
     ) -> Result<Self> {
         if leverage < 1.0 {
             return Err(Error::ConfigWrongLeverage);
+        }
+        if max_num_open_orders == 0 {
+            return Err(Error::InvalidMaxNumOpenOrders);
         }
         Ok(Config {
             fee_maker,
@@ -59,6 +67,7 @@ where M: Currency
             futures_type,
             identification,
             set_order_timestamps,
+            max_num_open_orders,
         })
     }
 
@@ -103,5 +112,11 @@ where M: Currency
     #[inline(always)]
     pub fn set_order_timestamps(&self) -> bool {
         self.set_order_timestamps
+    }
+
+    /// Returns the maximum number of open orders that are allowed
+    #[inline(always)]
+    pub fn max_num_open_orders(&self) -> usize {
+        self.max_num_open_orders
     }
 }

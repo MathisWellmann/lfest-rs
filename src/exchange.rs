@@ -37,8 +37,12 @@ where
             config.starting_balance(),
             config.futures_type(),
         );
-        let validator =
-            Validator::new(config.fee_maker(), config.fee_taker(), config.futures_type());
+        let validator = Validator::new(
+            config.fee_maker(),
+            config.fee_taker(),
+            config.futures_type(),
+            config.max_num_open_orders(),
+        );
 
         // let counterparty_account = Account::new(
         //     NoAccountTracker::default(),

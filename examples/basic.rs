@@ -17,9 +17,17 @@ fn main() {
 
     let starting_wb = base!(1.0);
     let futures_type = FuturesTypes::Inverse;
-    let config =
-        Config::new(Fee(0.0002), Fee(0.0006), starting_wb, 1.0, futures_type, String::new(), true)
-            .unwrap();
+    let config = Config::new(
+        Fee(0.0002),
+        Fee(0.0006),
+        starting_wb,
+        1.0,
+        futures_type,
+        String::new(),
+        true,
+        100,
+    )
+    .unwrap();
 
     let acc_tracker = FullAccountTracker::new(starting_wb, futures_type);
     let mut exchange = Exchange::new(acc_tracker, config);

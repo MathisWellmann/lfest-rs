@@ -12,7 +12,7 @@ use crate::{
 /// The users account
 /// Generic over:
 /// A: AccountTracker,
-/// S: Size type
+/// S: The `Currency` representing the order quantity
 /// B: Balance type
 pub struct Account<A, S>
 where S: Currency
@@ -69,6 +69,12 @@ where
         self.account_tracker.update(trade_timestamp, price, upnl);
 
         self.position.update_state(price, self.futures_type);
+    }
+
+    /// The number of currently active limit orders
+    #[inline(always)]
+    pub(crate) fn num_active_limit_orders(&self) -> usize {
+        self.active_limit_orders.len()
     }
 
     /// Set a new position manually, be sure that you know what you are doing
@@ -396,7 +402,7 @@ mod tests {
 
         let futures_type = FuturesTypes::Inverse;
         let mut acc = Account::new(NoAccountTracker::default(), 1.0, base!(1.0), futures_type);
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         let o = Order::limit(Side::Buy, quote!(100.0), quote!(25.0)).unwrap();
@@ -445,7 +451,7 @@ mod tests {
     fn account_cancel_order() {
         let futures_type = FuturesTypes::Inverse;
         let mut account = Account::new(NoAccountTracker::default(), 1.0, base!(1.0), futures_type);
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(900.0), quote!(901.0));
 
         let o = Order::limit(Side::Buy, quote!(900.0), quote!(450.0)).unwrap();
@@ -467,7 +473,7 @@ mod tests {
 
         let futures_type = FuturesTypes::Inverse;
         let mut account = Account::new(NoAccountTracker::default(), 1.0, base!(1.0), futures_type);
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.1));
 
         let mut o = Order::limit(Side::Buy, quote!(100.0), quote!(50.0)).unwrap();
@@ -484,7 +490,7 @@ mod tests {
     fn account_cancel_all_orders() {
         let futures_type = FuturesTypes::Inverse;
         let mut account = Account::new(NoAccountTracker::default(), 1.0, base!(1.0), futures_type);
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(900.0), quote!(901.0));
 
         let o = Order::limit(Side::Buy, quote!(900.0), quote!(450.0)).unwrap();
@@ -580,7 +586,7 @@ mod tests {
     fn account_open_limit_buy_size() {
         let futures_type = FuturesTypes::Linear;
         let mut acc = Account::new(NoAccountTracker::default(), 1.0, quote!(100.0), futures_type);
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.1));
 
         let o = Order::limit(Side::Buy, quote!(100.0), base!(0.5)).unwrap();
@@ -608,7 +614,7 @@ mod tests {
     fn account_open_limit_sell_size() {
         let futures_type = FuturesTypes::Linear;
         let mut acc = Account::new(NoAccountTracker::default(), 1.0, quote!(100.0), futures_type);
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.1));
 
         let o = Order::limit(Side::Sell, quote!(100.0), base!(0.5)).unwrap();

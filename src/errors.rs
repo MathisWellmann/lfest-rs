@@ -45,6 +45,9 @@ pub enum Error {
 
     #[error("Invalid available balance")]
     InvalidAvailableBalance,
+
+    #[error("The max_num_open_orders must be > 0")]
+    InvalidMaxNumOpenOrders,
 }
 
 /// This is defined as a convenience.

@@ -11,18 +11,25 @@ pub(crate) struct Validator {
     bid: QuoteCurrency,
     ask: QuoteCurrency,
     futures_type: FuturesTypes,
+    max_num_open_orders: usize,
 }
 
 impl Validator {
     /// Create a new Validator with a given fee maker and taker
     #[inline]
-    pub(crate) fn new(fee_maker: Fee, fee_taker: Fee, futures_type: FuturesTypes) -> Self {
+    pub(crate) fn new(
+        fee_maker: Fee,
+        fee_taker: Fee,
+        futures_type: FuturesTypes,
+        max_num_open_orders: usize,
+    ) -> Self {
         Self {
             fee_maker,
             fee_taker,
             bid: quote!(0.0),
             ask: quote!(0.0),
             futures_type,
+            max_num_open_orders,
         }
     }
 
@@ -72,6 +79,9 @@ impl Validator {
         A: AccountTracker<S::PairedCurrency>,
         S: Currency,
     {
+        if acc.num_active_limit_orders() >= self.max_num_open_orders {
+            return Err(OrderError::MaxActiveOrders);
+        }
         // validate order price
         match o.side() {
             Side::Buy => {
@@ -223,7 +233,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type);
+        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -248,7 +258,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type);
+        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -278,7 +288,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type);
+        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -308,7 +318,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type);
+        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for leverage in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -361,7 +371,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type);
+        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -386,7 +396,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type);
+        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -414,7 +424,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type);
+        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -441,7 +451,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type);
+        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -473,7 +483,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type);
+        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -505,7 +515,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type);
+        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -546,7 +556,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type);
+        let mut validator = Validator::new(Fee(0.0002), Fee(0.0006), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
         let mut acc = Account::new(NoAccountTracker::default(), 1.0, base!(1.0), futures_type);
 
@@ -573,7 +583,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -598,7 +608,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -624,7 +634,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -650,7 +660,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -679,7 +689,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -708,7 +718,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -741,7 +751,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -771,7 +781,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -801,7 +811,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -835,7 +845,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -865,7 +875,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -895,7 +905,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -929,7 +939,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -954,7 +964,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -980,7 +990,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -1006,7 +1016,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -1035,7 +1045,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -1064,7 +1074,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -1097,7 +1107,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -1127,7 +1137,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -1157,7 +1167,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -1191,7 +1201,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -1221,7 +1231,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(QuoteCurrency(100.0), QuoteCurrency(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
@@ -1256,7 +1266,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type);
+        let mut validator = Validator::new(Fee(0.0), Fee(0.0), futures_type, 100);
         validator.update(QuoteCurrency(100.0), QuoteCurrency(100.0));
 
         for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
