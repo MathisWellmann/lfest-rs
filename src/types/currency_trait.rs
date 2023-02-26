@@ -1,3 +1,5 @@
+use malachite::Rational;
+
 use crate::{Fee, QuoteCurrency};
 
 /// Every unit of account must implement this trait
@@ -21,8 +23,11 @@ pub trait Currency:
     /// `PairedCurrency` would be USD
     type PairedCurrency: Currency<PairedCurrency = Self>;
 
-    /// Create a new instance from a f64 value
-    fn new(val: f64) -> Self;
+    /// Create a new instance from a `Rational` value
+    fn new(val: Rational) -> Self;
+
+    /// Create a new instance from a `f64` value
+    fn from_f64(val: f64) -> Self;
 
     /// Create a new currency instance with zero value
     fn new_zero() -> Self;

@@ -1,5 +1,5 @@
 use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
-use malachite::Rational;
+use malachite::{num::arithmetic::traits::Abs, Rational};
 
 use crate::{BaseCurrency, Currency, Fee};
 
@@ -7,7 +7,7 @@ use crate::{BaseCurrency, Currency, Fee};
 #[macro_export]
 macro_rules! quote {
     ( $a:expr ) => {{
-        QuoteCurrency::new($a)
+        QuoteCurrency::from_f64($a)
     }};
 }
 
@@ -34,18 +34,29 @@ macro_rules! quote {
 #[div(forward)]
 pub struct QuoteCurrency(Rational);
 
+impl QuoteCurrency {
+    #[inline(always)]
+    pub(crate) fn inner(&self) -> &Rational {
+        &self.0
+    }
+}
+
 impl Currency for QuoteCurrency {
     type PairedCurrency = BaseCurrency;
 
-    /// Create a new instance from an f64 value
+    #[inline(always)]
+    fn new(val: Rational) -> Self {
+        Self(val)
+    }
+
     #[inline]
-    fn new(val: f64) -> Self {
+    fn from_f64(val: f64) -> Self {
         Self(Rational::try_from_float_simplest(val).expect("Unable to get Rational from float"))
     }
 
     #[inline(always)]
     fn new_zero() -> Self {
-        Self::new(0.0)
+        Self::from_f64(0.0)
     }
 
     #[inline(always)]
@@ -65,13 +76,11 @@ impl Currency for QuoteCurrency {
 
     #[inline(always)]
     fn fee_portion(&self, fee: Fee) -> Self {
-        let f: f64 = fee.into();
-        Self(self.0 * f)
+        Self(self.0 * fee.inner())
     }
     #[inline(always)]
     fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency {
-        let r: f64 = rate.into();
-        BaseCurrency(self.0 / r)
+        BaseCurrency::new(self.0 / rate.inner())
     }
 
     #[inline(always)]
