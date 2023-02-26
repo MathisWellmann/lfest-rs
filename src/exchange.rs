@@ -179,7 +179,7 @@ where
             OrderType::Market => {
                 // immediately execute market order
                 self.validator.validate_market_order(&order, &self.user_account)?;
-                self.execute_market(order.side(), order.size());
+                self.execute_market(order.side(), order.quantity());
                 order.executed = true;
 
                 Ok(order)
@@ -187,7 +187,7 @@ where
             _ => {
                 let order_margin =
                     self.validator.validate_limit_order(&order, &self.user_account)?;
-                self.user_account.append_limit_order(order, order_margin);
+                self.user_account.append_limit_order(order.clone(), order_margin);
 
                 Ok(order)
             }
@@ -226,9 +226,9 @@ where
 
         self.user_account.remove_executed_order_from_order_margin_calculation(&o);
 
-        self.user_account.change_position(o.side(), o.size(), price);
+        self.user_account.change_position(o.side(), o.quantity(), price);
 
-        let fee_of_size = o.size().fee_portion(self.config.fee_maker());
+        let fee_of_size = o.quantity().fee_portion(self.config.fee_maker());
         let fee_margin = fee_of_size.convert(price);
 
         self.user_account.deduce_fees(fee_margin);
@@ -258,11 +258,12 @@ where
 
     /// Handle limit order trigger and execution
     fn handle_limit_order(&mut self, order_id: u64) {
-        let o: Order<S> = *self
+        let o: Order<S> = self
             .user_account
             .active_limit_orders()
             .get(&order_id)
-            .expect("This order should be in HashMap for active limit orders");
+            .expect("This order should be in HashMap for active limit orders; qed")
+            .clone();
         debug!("handle_limit_order: o: {:?}", o);
         let limit_price = o.limit_price().unwrap();
         match o.side() {

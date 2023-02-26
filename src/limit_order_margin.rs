@@ -30,17 +30,17 @@ where
     let mut sell_side_fees = S::PairedCurrency::new_zero();
     for o in orders {
         let limit_price = o.limit_price().expect("Limit price must exist; qed");
-        let fee_margin = o.size().convert(limit_price).fee_portion(fee_maker);
-        let size: f64 = o.size().into();
+        let fee_margin = o.quantity().convert(limit_price).fee_portion(fee_maker);
+        let size: f64 = o.quantity().into();
         let limit_price: f64 = limit_price.into();
         match o.side() {
             Side::Buy => {
-                buy_size += o.size();
+                buy_size += o.quantity();
                 buy_price_weight += limit_price * size;
                 buy_side_fees += fee_margin;
             }
             Side::Sell => {
-                sell_size += o.size();
+                sell_size += o.quantity();
                 sell_price_weight += limit_price * size;
                 sell_side_fees += fee_margin;
             }

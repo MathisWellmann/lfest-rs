@@ -205,7 +205,7 @@ where
         let limit_price = order.limit_price().unwrap();
         match order.side() {
             Side::Buy => {
-                self.open_limit_buy_size += order.size();
+                self.open_limit_buy_size += order.quantity();
                 if self.min_limit_buy_price.is_zero() {
                     self.min_limit_buy_price = limit_price;
                 }
@@ -214,7 +214,7 @@ where
                 }
             }
             Side::Sell => {
-                self.open_limit_sell_size += order.size();
+                self.open_limit_sell_size += order.quantity();
                 if self.max_limit_sell_price.is_zero() {
                     self.max_limit_sell_price = limit_price;
                 }
@@ -229,6 +229,7 @@ where
 
         self.account_tracker.log_limit_order_submission();
         let order_id = order.id();
+        let user_order_id = order.user_order_id().clone();
         match self.active_limit_orders.insert(order_id, order) {
             None => {}
             Some(_) => warn!(
@@ -236,10 +237,10 @@ where
             This should not happen as order id should be incrementing"
             ),
         };
-        match order.user_order_id() {
+        match user_order_id {
             None => {}
             Some(user_order_id) => {
-                self.lookup_id_from_user_order_id.insert(*user_order_id, order_id);
+                self.lookup_id_from_user_order_id.insert(user_order_id, order_id);
             }
         };
     }
@@ -250,8 +251,8 @@ where
         exec_order: &Order<S>,
     ) {
         match exec_order.side() {
-            Side::Buy => self.open_limit_buy_size -= exec_order.size(),
-            Side::Sell => self.open_limit_sell_size -= exec_order.size(),
+            Side::Buy => self.open_limit_buy_size -= exec_order.quantity(),
+            Side::Sell => self.open_limit_sell_size -= exec_order.quantity(),
         }
         debug!(
             "remove_executed_order_from_order_margin_calculation: olbs {}, olss: {}",

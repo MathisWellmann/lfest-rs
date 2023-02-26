@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::{Currency, OrderError, OrderType, QuoteCurrency, Side};
 
 /// Defines an order
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Order<S> {
     /// id will be filled in using exchange.submit_order()
     id: u64,
@@ -15,11 +15,8 @@ pub struct Order<S> {
     order_type: OrderType,
     /// the limit order price
     limit_price: Option<QuoteCurrency>,
-    /// order size
-    /// TODO: make type level machinery for this
-    /// denoted in BASE currency if using linear futures,
-    /// denoted in QUOTE currency if using inverse futures
-    size: S,
+    /// The amount of Currency `S` the order is for
+    quantity: S,
     /// order side
     side: Side,
     /// whether or not the order has been marked as executed
@@ -52,7 +49,7 @@ where S: Currency
             timestamp: 0,
             order_type: OrderType::Limit,
             limit_price: Some(limit_price),
-            size,
+            quantity: size,
             side,
             executed: false,
         })
@@ -77,7 +74,7 @@ where S: Currency
             timestamp: 0,
             order_type: OrderType::Market,
             limit_price: None,
-            size,
+            quantity: size,
             side,
             executed: false,
         })
@@ -119,10 +116,10 @@ where S: Currency
         self.limit_price
     }
 
-    /// Size of Order
+    /// Quantity of Order
     #[inline(always)]
-    pub fn size(&self) -> S {
-        self.size
+    pub fn quantity(&self) -> S {
+        self.quantity
     }
 
     /// Side of Order

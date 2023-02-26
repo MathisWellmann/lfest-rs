@@ -120,31 +120,31 @@ impl Validator {
 
         let (mut debit, mut credit) = if pos_size.is_zero() {
             match order.side() {
-                Side::Buy => (min(order.size(), acc.open_limit_sell_size()), order.size()),
-                Side::Sell => (min(order.size(), acc.open_limit_buy_size()), order.size()),
+                Side::Buy => (min(order.quantity(), acc.open_limit_sell_size()), order.quantity()),
+                Side::Sell => (min(order.quantity(), acc.open_limit_buy_size()), order.quantity()),
             }
         } else if pos_size > S::new_zero() {
             match order.side() {
-                Side::Buy => (S::new_zero(), order.size()),
+                Side::Buy => (S::new_zero(), order.quantity()),
                 Side::Sell => (
-                    min(order.size(), acc.position().size()),
-                    max(S::new_zero(), order.size() - acc.position().size()),
+                    min(order.quantity(), acc.position().size()),
+                    max(S::new_zero(), order.quantity() - acc.position().size()),
                 ),
             }
         } else {
             match order.side() {
                 Side::Buy => (
-                    min(order.size(), acc.position().size().abs()),
-                    max(S::new_zero(), order.size() - acc.position().size().abs()),
+                    min(order.quantity(), acc.position().size().abs()),
+                    max(S::new_zero(), order.quantity() - acc.position().size().abs()),
                 ),
-                Side::Sell => (S::new_zero(), order.size()),
+                Side::Sell => (S::new_zero(), order.quantity()),
             }
         };
         let l: S = acc.position().leverage().into();
         debit = debit / l;
         credit = credit / l;
 
-        let fee_of_size: S = order.size().fee_portion(self.fee_taker);
+        let fee_of_size: S = order.quantity().fee_portion(self.fee_taker);
 
         let price = match order.side() {
             Side::Buy => self.ask,
@@ -191,7 +191,7 @@ impl Validator {
     {
         let mut orders = acc.active_limit_orders().clone();
         debug!("limit_order_margin_cost: order: {:?}, active_limit_orders: {:?}", order, orders);
-        orders.insert(order.id(), *order);
+        orders.insert(order.id(), order.clone());
         let needed_order_margin = order_margin(
             orders.values().cloned(),
             acc.position().size(),
