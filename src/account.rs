@@ -4,8 +4,8 @@ use crate::{
     limit_order_margin::order_margin,
     quote,
     utils::{max, min},
-    AccountTracker, Currency, Error, Fee, FuturesTypes, Margin, Order, Position, QuoteCurrency,
-    Result, Side,
+    AccountTracker, Currency, Error, Fee, FuturesTypes, Leverage, Margin, Order, Position,
+    QuoteCurrency, Result, Side,
 };
 
 #[derive(Debug, Clone)]
@@ -41,7 +41,7 @@ where
     // starting_balance type
     pub(crate) fn new(
         account_tracker: A,
-        leverage: f64,
+        leverage: Leverage,
         starting_balance: S::PairedCurrency,
         futures_type: FuturesTypes,
     ) -> Self {
@@ -369,7 +369,7 @@ where
         if rpnl != S::PairedCurrency::new_zero() {
             // first free up existing position margin if any
             let new_pos_margin = ((self.position().size() + pos_size_delta).abs()
-                / S::new(self.position().leverage()))
+                / S::new(*self.position().leverage().inner()))
             .convert(self.position.entry_price());
             self.margin.set_position_margin(new_pos_margin);
 

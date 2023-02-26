@@ -1,4 +1,4 @@
-use crate::{Currency, Error, Fee, FuturesTypes, Result};
+use crate::{Currency, Error, Fee, FuturesTypes, Leverage, Result};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Define the Exchange configuration
@@ -10,7 +10,7 @@ pub struct Config<M> {
     /// The starting balance of account
     starting_balance: M,
     /// The leverage used for the position
-    leverage: f64,
+    leverage: Leverage,
     /// The type of futures to simulate
     futures_type: FuturesTypes,
     /// To identify an exchange by a code
@@ -47,15 +47,12 @@ where M: Currency
         fee_maker: Fee,
         fee_taker: Fee,
         starting_balance: M,
-        leverage: f64,
+        leverage: Leverage,
         futures_type: FuturesTypes,
         identification: String,
         set_order_timestamps: bool,
         max_num_open_orders: usize,
     ) -> Result<Self> {
-        if leverage < 1.0 {
-            return Err(Error::ConfigWrongLeverage);
-        }
         if max_num_open_orders == 0 {
             return Err(Error::InvalidMaxNumOpenOrders);
         }
@@ -91,7 +88,7 @@ where M: Currency
 
     /// Return the leverage of the Config
     #[inline(always)]
-    pub fn leverage(&self) -> f64 {
+    pub fn leverage(&self) -> Leverage {
         self.leverage
     }
 

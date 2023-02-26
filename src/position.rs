@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{quote, Currency, FuturesTypes, QuoteCurrency};
+use crate::{quote, Currency, FuturesTypes, Leverage, QuoteCurrency};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 /// Describes the position information of the account
@@ -12,7 +12,7 @@ where S: Currency
     /// The entry price of the position
     entry_price: QuoteCurrency,
     /// The current position leverage
-    leverage: f64,
+    leverage: Leverage,
     /// The currently unrealized profit and loss
     unrealized_pnl: S::PairedCurrency,
 }
@@ -21,13 +21,9 @@ impl<S> Position<S>
 where S: Currency
 {
     /// Create a new, initially neutral, position with a given leverage
-    ///
-    /// # Panics:
-    /// In debug mode, if leverage is smaller than 1.0
     #[must_use]
     #[inline]
-    pub fn new_init(leverage: f64) -> Self {
-        debug_assert!(leverage >= 1.0);
+    pub fn new_init(leverage: Leverage) -> Self {
         Position {
             size: S::new_zero(),
             entry_price: quote!(0.0),
@@ -45,13 +41,10 @@ where S: Currency
     pub fn new(
         size: S,
         entry_price: QuoteCurrency,
-        leverage: f64,
+        leverage: Leverage,
         unrealized_pnl: S::PairedCurrency,
     ) -> Self {
-        debug_assert!(leverage.is_finite());
         debug_assert!(unrealized_pnl.is_finite());
-
-        debug_assert!(leverage >= 1.0);
         debug_assert!(entry_price >= quote!(0.0));
 
         Position {
@@ -76,7 +69,7 @@ where S: Currency
 
     /// Return the positions leverage
     #[inline(always)]
-    pub fn leverage(&self) -> f64 {
+    pub fn leverage(&self) -> Leverage {
         self.leverage
     }
 

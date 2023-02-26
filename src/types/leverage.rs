@@ -1,19 +1,11 @@
 use derive_more::Display;
 use malachite::Rational;
 
-/// Allows the quick construction on `BaseCurrency`
-#[macro_export]
-macro_rules! fee {
-    ( $a:expr ) => {{
-        Fee::from_f64($a)
-    }};
-}
-
-/// Fee as a fraction
+/// Leverage
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Display)]
-pub struct Fee(Rational);
+pub struct Leverage(Rational);
 
-impl Fee {
+impl Leverage {
     #[inline(always)]
     pub(crate) fn new(val: Rational) -> Self {
         Self(val)
