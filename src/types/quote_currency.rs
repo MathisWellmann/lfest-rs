@@ -48,8 +48,8 @@ impl Currency for QuoteCurrency {
     }
 
     #[inline(always)]
-    fn inner(&self) -> &Rational {
-        &self.0
+    fn inner(self) -> Rational {
+        self.0
     }
 
     #[inline(always)]
@@ -63,7 +63,6 @@ impl Currency for QuoteCurrency {
     }
 
     #[inline(always)]
-    #[deprecated]
     fn is_finite(&self) -> bool {
         // self.0.is_finite()
         todo!()

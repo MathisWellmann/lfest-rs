@@ -1,5 +1,10 @@
 use std::fmt::Display;
 
+use malachite::{
+    num::arithmetic::traits::{CheckedSqrt, Pow},
+    Rational,
+};
+
 use crate::{
     cornish_fisher::cornish_fisher_value_at_risk, quote, AccountTracker, Currency, FuturesTypes,
     QuoteCurrency, Side,
@@ -39,8 +44,8 @@ pub struct FullAccountTracker<M> {
     num_filled_limit_orders: usize,
     num_trading_opportunities: usize,
     total_turnover: M,
-    max_drawdown_wallet_balance: f64,
-    max_drawdown_total: f64,
+    max_drawdown_wallet_balance: Rational,
+    max_drawdown_total: Rational,
     // historical daily absolute returns
     hist_returns_daily_acc: Vec<M>,
     hist_returns_daily_bnh: Vec<M>,
@@ -101,8 +106,8 @@ where M: Currency + Send
             num_filled_limit_orders: 0,
             num_trading_opportunities: 0,
             total_turnover: M::new_zero(),
-            max_drawdown_wallet_balance: 0.0,
-            max_drawdown_total: 0.0,
+            max_drawdown_wallet_balance: Rational::from(0),
+            max_drawdown_total: Rational::from(0),
             hist_returns_daily_acc: vec![],
             hist_returns_daily_bnh: vec![],
             hist_returns_hourly_acc: vec![],
@@ -159,8 +164,8 @@ where M: Currency + Send
 
     /// Ratio of cumulative trade profit over cumulative trade loss
     #[inline(always)]
-    pub fn profit_loss_ratio(&self) -> f64 {
-        self.total_profit.into() / self.total_loss.into()
+    pub fn profit_loss_ratio(&self) -> Rational {
+        self.total_profit.inner() / self.total_loss.inner()
     }
 
     /// Cumulative fees paid to the exchange
@@ -188,7 +193,13 @@ where M: Currency + Send
     /// returns_source: the sampling interval of pnl snapshots
     /// risk_free_is_buy_and_hold: if true, it will use the market returns as
     /// the risk-free comparison     else risk-free rate is zero
-    pub fn sharpe(&self, returns_source: ReturnsSource, risk_free_is_buy_and_hold: bool) -> f64 {
+    ///
+    /// TODO: annualized depending on the `ReturnsSource`
+    pub fn sharpe(
+        &self,
+        returns_source: ReturnsSource,
+        risk_free_is_buy_and_hold: bool,
+    ) -> Rational {
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
@@ -200,36 +211,22 @@ where M: Currency + Send
                 ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
                 ReturnsSource::TickByTick => &self.hist_returns_tick_bnh,
             };
-            let n: f64 = rets_acc.len() as f64;
+            let n = Rational::from(rets_acc.len());
             // compute the difference of returns of account and market
-            let diff_returns: Vec<M> =
-                rets_acc.iter().zip(rets_bnh).map(|(a, b)| *a - *b).collect();
-            let avg = diff_returns.iter().map(|v| (*v).into()).sum::<f64>() / n;
-            let variance = diff_returns
-                .iter()
-                .map(|v| {
-                    let v: f64 = (*v).into();
-                    (v - avg).powi(2)
-                })
-                .sum::<f64>()
-                / n;
-            let std_dev = variance.sqrt();
+            let diff_returns: Vec<Rational> =
+                rets_acc.iter().zip(rets_bnh).map(|(a, b)| (*a - *b).inner()).collect();
+            let avg: Rational = diff_returns.iter().map(|v| v).sum::<Rational>() / n;
+            let variance = diff_returns.iter().map(|v| (v - avg).pow(2_u64)).sum::<Rational>() / n;
+            let std_dev = variance.checked_sqrt().unwrap_or(Rational::from(1));
 
-            (self.total_rpnl.into() - self.buy_and_hold_return().into()) / std_dev
+            (self.total_rpnl.inner() - self.buy_and_hold_return().inner()) / std_dev
         } else {
-            let n = rets_acc.len() as f64;
-            let avg = rets_acc.iter().map(|v| (*v).into()).sum::<f64>() / n;
-            let var = rets_acc
-                .iter()
-                .map(|v| {
-                    let v: f64 = (*v).into();
-                    (v - avg).powi(2)
-                })
-                .sum::<f64>()
-                / n;
-            let std_dev = var.sqrt();
+            let n = Rational::from(rets_acc.len());
+            let avg = rets_acc.iter().map(|v| v.inner()).sum::<Rational>() / n;
+            let var = rets_acc.iter().map(|v| (v.inner() - avg).pow(2_u64)).sum::<Rational>() / n;
+            let std_dev = var.checked_sqrt().unwrap_or(Rational::from(1));
 
-            self.total_rpnl.into() / std_dev
+            self.total_rpnl.inner() / std_dev
         }
     }
 
@@ -238,7 +235,13 @@ where M: Currency + Send
     /// returns_source: the sampling interval of pnl snapshots
     /// risk_free_is_buy_and_hold: if true, it will use the market returns as
     /// the risk-free comparison     else risk-free rate is zero
-    pub fn sortino(&self, returns_source: ReturnsSource, risk_free_is_buy_and_hold: bool) -> f64 {
+    ///
+    /// TODO: annualized depending on the `ReturnsSource`
+    pub fn sortino(
+        &self,
+        returns_source: ReturnsSource,
+        risk_free_is_buy_and_hold: bool,
+    ) -> Rational {
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
@@ -251,28 +254,28 @@ where M: Currency + Send
                 ReturnsSource::TickByTick => &self.hist_returns_tick_bnh,
             };
             // compute the difference of returns of account and market
-            let diff_returns: Vec<f64> = rets_acc
+            let diff_returns: Vec<Rational> = rets_acc
                 .iter()
                 .zip(rets_bnh)
                 .map(|(a, b)| *a - *b)
                 .filter(|v| *v < M::new_zero())
-                .map(|v| v.into())
+                .map(|v| v.inner())
                 .collect();
-            let n: f64 = diff_returns.len() as f64;
-            let avg = diff_returns.iter().sum::<f64>() / n;
-            let variance = diff_returns.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
-            let std_dev = variance.sqrt();
+            let n = Rational::from(diff_returns.len());
+            let avg = diff_returns.iter().sum::<Rational>() / n;
+            let variance = diff_returns.iter().map(|v| (*v - avg).pow(2_u64)).sum::<Rational>() / n;
+            let std_dev = variance.checked_sqrt().unwrap_or(Rational::from(1));
 
-            (self.total_rpnl.into() - self.buy_and_hold_return().into()) / std_dev
+            (self.total_rpnl.inner() - self.buy_and_hold_return().inner()) / std_dev
         } else {
-            let downside_rets: Vec<f64> =
-                rets_acc.iter().copied().filter(|v| *v < M::new_zero()).map(|v| v.into()).collect();
-            let n = downside_rets.len() as f64;
-            let avg = downside_rets.iter().sum::<f64>() / n;
-            let var = downside_rets.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
-            let std_dev = var.sqrt();
+            let downside_rets: Vec<Rational> =
+                rets_acc.iter().filter(|v| **v < M::new_zero()).map(|v| v.inner()).collect();
+            let n = Rational::from(downside_rets.len());
+            let avg = downside_rets.iter().sum::<Rational>() / n;
+            let var = downside_rets.iter().map(|v| (v - avg).pow(2_u64)).sum::<Rational>() / n;
+            let std_dev = var.checked_sqrt().unwrap_or(Rational::from(1));
 
-            self.total_rpnl.into() / std_dev
+            self.total_rpnl.inner() / std_dev
         }
     }
 
@@ -283,6 +286,8 @@ where M: Currency + Send
     /// returns_source: the sampling interval of pnl snapshots
     /// percentile: value between [0.0, 1.0], smaller value will return more
     /// worst case results
+
+    /// TODO: annualized depending on the `ReturnsSource`
     #[inline]
     pub fn historical_value_at_risk(&self, returns_source: ReturnsSource, percentile: f64) -> M {
         let mut rets = match returns_source {
@@ -294,7 +299,7 @@ where M: Currency + Send
         let idx = (rets.len() as f64 * percentile) as usize;
         match rets.get(idx) {
             Some(r) => {
-                let r: M = r.exp().into();
+                let r = Rational::from_f64(r.exp());
                 self.wallet_balance_start - (self.wallet_balance_start * r)
             }
             None => M::new_zero(),
@@ -620,7 +625,7 @@ where M: Currency + Send
         // update max_drawdown_total
         let curr_dd = (self.wallet_balance_high - (self.wallet_balance_last + upnl))
             / self.wallet_balance_high;
-        let curr_dd: f64 = curr_dd.into();
+        let curr_dd = curr_dd.inner();
         if curr_dd > self.max_drawdown_total {
             self.max_drawdown_total = curr_dd;
         }
@@ -640,7 +645,7 @@ where M: Currency + Send
             self.wallet_balance_high = self.wallet_balance_last;
         }
         let dd = (self.wallet_balance_high - self.wallet_balance_last) / self.wallet_balance_high;
-        let dd: f64 = dd.into();
+        let dd = dd.inner();
         if dd > self.max_drawdown_wallet_balance {
             self.max_drawdown_wallet_balance = dd;
         }

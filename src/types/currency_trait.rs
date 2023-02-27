@@ -30,7 +30,7 @@ pub trait Currency:
     fn from_f64(val: f64) -> Self;
 
     /// Get a reference to the inner `Rational`
-    fn inner(&self) -> &Rational;
+    fn inner(self) -> Rational;
 
     /// Create a new currency instance with zero value
     fn new_zero() -> Self;

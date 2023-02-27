@@ -160,7 +160,8 @@ where
 
         self.check_orders();
 
-        self.user_account.update((self.bid + self.ask) / 2.0.into(), timestamp);
+        // TODO: pass through bid and ask, instead of the mid price
+        self.user_account.update((self.bid + self.ask) / quote!(2.0), timestamp);
 
         self.step += 1;
 

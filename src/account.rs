@@ -369,7 +369,7 @@ where
         if rpnl != S::PairedCurrency::new_zero() {
             // first free up existing position margin if any
             let new_pos_margin = ((self.position().size() + pos_size_delta).abs()
-                / S::new(*self.position().leverage().inner()))
+                / S::new(self.position().leverage().inner()))
             .convert(self.position.entry_price());
             self.margin.set_position_margin(new_pos_margin);
 
@@ -382,7 +382,7 @@ where
 
         // set position margin
         let pos_margin: S::PairedCurrency = (self.position.size().abs()
-            / S::new(self.position.leverage()))
+            / S::new(self.position.leverage().inner()))
         .convert(self.position.entry_price());
         self.margin.set_position_margin(pos_margin);
 

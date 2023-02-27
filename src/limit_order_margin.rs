@@ -1,3 +1,8 @@
+use malachite::{
+    num::arithmetic::traits::{Abs, Reciprocal},
+    Rational,
+};
+
 use crate::{max, min, Currency, Fee, FuturesTypes, Leverage, Order, Side};
 
 /// Compute the needed order margin with a newly added order
@@ -12,6 +17,8 @@ use crate::{max, min, Currency, Fee, FuturesTypes, Leverage, Order, Side};
 /// # Returns:
 /// The margin required for those orders, measured in the margin currency which
 /// is the pair of the order size currency.
+///
+/// TODO: rework this, its too complex
 pub(crate) fn order_margin<S>(
     orders: impl Iterator<Item = Order<S>>,
     pos_size: S,
@@ -24,57 +31,57 @@ where
 {
     let mut buy_size = S::new_zero();
     let mut sell_size = S::new_zero();
-    let mut buy_price_weight: f64 = 0.0;
-    let mut sell_price_weight: f64 = 0.0;
+    let mut buy_price_weight = Rational::from(0_i32);
+    let mut sell_price_weight = Rational::from(0_i32);
     let mut buy_side_fees = S::PairedCurrency::new_zero();
     let mut sell_side_fees = S::PairedCurrency::new_zero();
     for o in orders {
         let limit_price = o.limit_price().expect("Limit price must exist; qed");
         let fee_margin = o.quantity().convert(limit_price).fee_portion(fee_maker);
         let size = o.quantity();
-        let limit_price: f64 = limit_price.into();
         match o.side() {
             Side::Buy => {
                 buy_size += o.quantity();
-                buy_price_weight += limit_price * size;
+                buy_price_weight += limit_price.inner() * size.inner();
                 buy_side_fees += fee_margin;
             }
             Side::Sell => {
                 sell_size += o.quantity();
-                sell_price_weight += limit_price * size;
+                sell_price_weight += limit_price.inner() * size.inner();
                 sell_side_fees += fee_margin;
             }
         }
     }
 
-    let bsd: f64 = (buy_size - min(pos_size, S::new_zero()).abs()).into();
-    let ssd: f64 = (sell_size - max(pos_size, S::new_zero())).into();
+    let bsd: Rational = buy_size.inner() - min(pos_size.inner(), Rational::from(0_i32)).abs();
+    let ssd: Rational = sell_size.inner() - max(pos_size.inner(), Rational::from(0_i32));
     let mut fees = S::PairedCurrency::new_zero();
-    let order_margin: S::PairedCurrency = if (buy_size == S::new_zero()
-        && sell_size == S::new_zero())
+    let order_margin: Rational = if (buy_size == S::new_zero() && sell_size == S::new_zero())
         || (bsd == 0.0 && ssd == 0.0)
     {
-        S::PairedCurrency::new_zero()
+        Rational::from(0_i32)
     } else if ssd > bsd {
         if ssd == 0.0 {
             return S::PairedCurrency::new_zero();
         }
         fees = sell_side_fees;
-        let price_mult: f64 = match futures_type {
-            FuturesTypes::Linear => sell_price_weight / sell_size.into(),
-            FuturesTypes::Inverse => 1.0 / (sell_price_weight / sell_size.into()),
+
+        let price_mult = match futures_type {
+            FuturesTypes::Linear => sell_price_weight / sell_size.inner(),
+            FuturesTypes::Inverse => (sell_price_weight / sell_size.inner()).reciprocal(),
         };
-        (ssd * price_mult).into()
+        ssd * price_mult
     } else {
         if bsd == 0.0 {
             return S::PairedCurrency::new_zero();
         }
         fees = buy_side_fees;
-        let price_mult: f64 = match futures_type {
-            FuturesTypes::Linear => buy_price_weight / buy_size.into(),
-            FuturesTypes::Inverse => 1.0 / (buy_price_weight / buy_size.into()),
+
+        let price_mult = match futures_type {
+            FuturesTypes::Linear => buy_price_weight / buy_size.inner(),
+            FuturesTypes::Inverse => (buy_price_weight / buy_size.inner()).reciprocal(),
         };
-        (bsd * price_mult).into()
+        bsd * price_mult
     };
     debug!(
         "pos_size: {}, bsd: {}, ssd: {}, buy_price_weight {}, sell_price_weight {}, buy_size: {}, sell_size: {}, om: {}, buy_side_fees: {}, sell_side_fees: {}",
@@ -83,7 +90,7 @@ where
 
     // TODO: not sure if this method of including the fees is correct, but its about
     // right xD
-    (order_margin / leverage.into()) + fees
+    S::PairedCurrency::new(order_margin / leverage.inner()) + fees
 }
 
 #[cfg(test)]

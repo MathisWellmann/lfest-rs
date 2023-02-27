@@ -48,8 +48,8 @@ impl Currency for BaseCurrency {
     }
 
     #[inline(always)]
-    fn inner(&self) -> &Rational {
-        &self.0
+    fn inner(self) -> Rational {
+        self.0
     }
 
     #[inline(always)]
