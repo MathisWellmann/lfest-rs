@@ -4,41 +4,15 @@ mod fee;
 mod leverage;
 mod market_update;
 mod quote_currency;
-
-use std::fmt::Formatter;
+mod side;
 
 pub use base_currency::*;
 pub use currency_trait::Currency;
-use derive_more::{Display, Into};
 pub use fee::Fee;
 pub use leverage::Leverage;
 pub use market_update::*;
 pub use quote_currency::*;
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-/// Side of the order
-pub enum Side {
-    /// Buy side
-    Buy,
-    /// Sell side
-    Sell,
-}
-
-impl Side {
-    /// Returns the inverted side
-    pub fn inverted(&self) -> Self {
-        match self {
-            Side::Buy => Side::Sell,
-            Side::Sell => Side::Buy,
-        }
-    }
-}
-
-impl std::fmt::Display for Side {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
+pub use side::Side;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
 /// Defines the available order types
