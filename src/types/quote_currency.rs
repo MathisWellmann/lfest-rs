@@ -1,5 +1,8 @@
 use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
-use malachite::{num::arithmetic::traits::Abs, Rational};
+use malachite::{
+    num::{arithmetic::traits::Abs, basic::traits::Zero},
+    Rational,
+};
 
 use crate::{BaseCurrency, Currency, Fee};
 
@@ -53,13 +56,18 @@ impl Currency for QuoteCurrency {
     }
 
     #[inline(always)]
+    fn inner_ref(&self) -> &Rational {
+        &self.0
+    }
+
+    #[inline(always)]
     fn new_zero() -> Self {
-        Self::from_f64(0.0)
+        Self::new(Rational::ZERO)
     }
 
     #[inline(always)]
     fn is_zero(&self) -> bool {
-        self.0 == 0.0
+        self.0.eq(&Rational::ZERO)
     }
 
     #[inline(always)]
@@ -74,11 +82,11 @@ impl Currency for QuoteCurrency {
     }
 
     #[inline(always)]
-    fn fee_portion(&self, fee: Fee) -> Self {
+    fn fee_portion(&self, fee: &Fee) -> Self {
         Self(self.0 * fee.inner())
     }
     #[inline(always)]
-    fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency {
+    fn convert(&self, rate: &QuoteCurrency) -> Self::PairedCurrency {
         BaseCurrency::new(self.0 / rate.inner())
     }
 

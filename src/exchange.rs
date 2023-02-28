@@ -44,12 +44,6 @@ where
             config.max_num_open_orders(),
         );
 
-        // let counterparty_account = Account::new(
-        //     NoAccountTracker::default(),
-        //     1.0,
-        //     (f64::MAX).into(),
-        //     config.futures_type(),
-        // );
         Self {
             config,
             user_account: account,
@@ -132,8 +126,8 @@ where
                 bid,
                 ask,
             } => {
-                self.bid = bid;
-                self.ask = ask;
+                self.bid = bid.clone();
+                self.ask = ask.clone();
                 self.high = ask;
                 self.low = bid;
             }
@@ -151,7 +145,7 @@ where
         }
         self.current_ts = timestamp as i64;
 
-        self.validator.update(self.bid, self.ask);
+        self.validator.update(self.bid.clone(), self.ask.clone());
 
         if self.check_liquidation() {
             self.liquidate();
@@ -161,7 +155,7 @@ where
         self.check_orders();
 
         // TODO: pass through bid and ask, instead of the mid price
-        self.user_account.update((self.bid + self.ask) / quote!(2.0), timestamp);
+        self.user_account.update((&self.bid + &self.ask) / quote!(2.0), timestamp);
 
         self.step += 1;
 
@@ -217,7 +211,7 @@ where
         };
 
         let fee_of_size = amount.fee_portion(self.config.fee_taker());
-        let fee_margin = fee_of_size.convert(price);
+        let fee_margin = fee_of_size.convert(&price);
 
         self.user_account.change_position(side, amount, price);
         self.user_account.deduce_fees(fee_margin);
@@ -234,7 +228,7 @@ where
         self.user_account.change_position(o.side(), o.quantity(), price);
 
         let fee_of_size = o.quantity().fee_portion(self.config.fee_maker());
-        let fee_margin = fee_of_size.convert(price);
+        let fee_margin = fee_of_size.convert(&price);
 
         self.user_account.deduce_fees(fee_margin);
         self.user_account.finalize_limit_order(o, self.config.fee_maker());

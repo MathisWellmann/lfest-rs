@@ -180,15 +180,15 @@ where M: Currency + Send
     /// Would be return of buy and hold strategy
     #[inline(always)]
     pub fn buy_and_hold_return(&self) -> M {
-        let qty = self.wallet_balance_start.convert(self.price_first);
-        self.futures_type.pnl(self.price_first, self.price_last, qty)
+        let qty = self.wallet_balance_start.convert(&self.price_first);
+        self.futures_type.pnl(&self.price_first, &self.price_last, qty)
     }
 
     /// Would be return of sell and hold strategy
     #[inline(always)]
     pub fn sell_and_hold_return(&self) -> M {
-        let qty = self.wallet_balance_start.convert(self.price_first);
-        self.futures_type.pnl(self.price_first, self.price_last, qty.into_negative())
+        let qty = self.wallet_balance_start.convert(&self.price_first);
+        self.futures_type.pnl(&self.price_first, &self.price_last, qty.into_negative())
     }
 
     /// Return the sharpe ratio using the selected returns as source
@@ -217,7 +217,7 @@ where M: Currency + Send
             let n = Rational::from(rets_acc.len());
             // compute the difference of returns of account and market
             let diff_returns: Vec<Rational> =
-                rets_acc.iter().zip(rets_bnh).map(|(a, b)| (*a - *b).inner()).collect();
+                rets_acc.iter().zip(rets_bnh).map(|(a, b)| (*a - *b).inner().clone()).collect();
             let avg: Rational = diff_returns.iter().map(|v| v).sum::<Rational>() / n;
             let variance = diff_returns.iter().map(|v| (v - avg).pow(2_u64)).sum::<Rational>() / n;
             let std_dev = variance.checked_sqrt().unwrap_or(Rational::from(1));
@@ -262,7 +262,7 @@ where M: Currency + Send
                 .zip(rets_bnh)
                 .map(|(a, b)| *a - *b)
                 .filter(|v| *v < M::new_zero())
-                .map(|v| v.inner())
+                .map(|v| v.inner().clone())
                 .collect();
             let n = Rational::from(diff_returns.len());
             let avg = diff_returns.iter().sum::<Rational>() / n;
@@ -271,8 +271,11 @@ where M: Currency + Send
 
             (self.total_rpnl.inner() - self.buy_and_hold_return().inner()) / std_dev
         } else {
-            let downside_rets: Vec<Rational> =
-                rets_acc.iter().filter(|v| **v < M::new_zero()).map(|v| v.inner()).collect();
+            let downside_rets: Vec<Rational> = rets_acc
+                .iter()
+                .filter(|v| **v < M::new_zero())
+                .map(|v| v.inner().clone())
+                .collect();
             let n = Rational::from(downside_rets.len());
             let avg = downside_rets.iter().sum::<Rational>() / n;
             let var = downside_rets.iter().map(|v| (v - avg).pow(2_u64)).sum::<Rational>() / n;
@@ -578,8 +581,8 @@ where M: Currency + Send
             self.hist_ln_returns_daily_acc.push(ln_ret);
 
             // calculate daily return of buy_and_hold
-            let bnh_qty = self.wallet_balance_start.convert(self.price_first);
-            let pnl_bnh = self.futures_type.pnl(self.price_a_day_ago, price, bnh_qty);
+            let bnh_qty = self.wallet_balance_start.convert(&self.price_first);
+            let pnl_bnh = self.futures_type.pnl(&self.price_a_day_ago, &price, bnh_qty);
             self.hist_returns_daily_bnh.push(pnl_bnh);
 
             // calculate daily log return of market
@@ -604,8 +607,8 @@ where M: Currency + Send
             self.hist_ln_returns_hourly_acc.push(ln_ret);
 
             // calculate hourly return of buy_and_hold
-            let bnh_qty = self.wallet_balance_start.convert(self.price_first);
-            let pnl_bnh = self.futures_type.pnl(self.price_an_hour_ago, price, bnh_qty);
+            let bnh_qty = self.wallet_balance_start.convert(&self.price_first);
+            let pnl_bnh = self.futures_type.pnl(&self.price_an_hour_ago, &price, bnh_qty);
             self.hist_returns_hourly_bnh.push(pnl_bnh);
 
             // calculate hourly logarithmic return of buy_and_hold
@@ -625,8 +628,8 @@ where M: Currency + Send
             .approx_log();
         self.hist_ln_returns_tick_acc.push(ln_ret);
 
-        let bnh_qty = self.wallet_balance_start.convert(self.price_first);
-        let pnl_bnh = self.futures_type.pnl(self.price_a_tick_ago, price, bnh_qty);
+        let bnh_qty = self.wallet_balance_start.convert(&self.price_first);
+        let pnl_bnh = self.futures_type.pnl(&self.price_a_tick_ago, &price, bnh_qty);
         self.hist_returns_tick_bnh.push(pnl_bnh);
 
         let ln_ret = (price / self.price_a_tick_ago).inner().approx_log();
@@ -638,7 +641,7 @@ where M: Currency + Send
         // update max_drawdown_total
         let curr_dd = (self.wallet_balance_high - (self.wallet_balance_last + upnl))
             / self.wallet_balance_high;
-        let curr_dd = curr_dd.inner();
+        let curr_dd = curr_dd.inner().clone();
         if curr_dd > self.max_drawdown_total {
             self.max_drawdown_total = curr_dd;
         }
@@ -658,7 +661,7 @@ where M: Currency + Send
             self.wallet_balance_high = self.wallet_balance_last;
         }
         let dd = (self.wallet_balance_high - self.wallet_balance_last) / self.wallet_balance_high;
-        let dd = dd.inner();
+        let dd = dd.inner().clone();
         if dd > self.max_drawdown_wallet_balance {
             self.max_drawdown_wallet_balance = dd;
         }
@@ -684,7 +687,7 @@ where M: Currency + Send
         self.num_filled_limit_orders += 1;
     }
 
-    fn log_trade(&mut self, side: Side, price: QuoteCurrency, size: M::PairedCurrency) {
+    fn log_trade(&mut self, side: Side, price: &QuoteCurrency, size: &M::PairedCurrency) {
         self.total_turnover += size.convert(price);
         self.num_trades += 1;
         match side {

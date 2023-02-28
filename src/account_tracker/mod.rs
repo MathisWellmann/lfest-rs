@@ -40,5 +40,5 @@ where M: Currency
     fn log_limit_order_fill(&mut self);
 
     /// Log a trade event where some order got filled and the position changed
-    fn log_trade(&mut self, side: Side, price: QuoteCurrency, size: M::PairedCurrency);
+    fn log_trade(&mut self, side: Side, price: &QuoteCurrency, size: &M::PairedCurrency);
 }

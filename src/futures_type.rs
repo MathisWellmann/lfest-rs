@@ -40,8 +40,8 @@ impl FuturesTypes {
     #[inline]
     pub fn pnl<S>(
         &self,
-        entry_price: QuoteCurrency,
-        exit_price: QuoteCurrency,
+        entry_price: &QuoteCurrency,
+        exit_price: &QuoteCurrency,
         contract_qty: S,
     ) -> S::PairedCurrency
     where
@@ -119,22 +119,9 @@ mod test {
     fn futures_type_pnl_inverse() {
         let ft = FuturesTypes::Inverse;
 
-        // TODO: remove rounding and use better float type
-        assert_eq!(
-            ft.pnl(quote!(100.0), quote!(110.0), quote!(1000.0)).into_rounded(3),
-            base!(0.909)
-        );
-        assert_eq!(
-            ft.pnl(quote!(100.0), quote!(110.0), quote!(-1000.0)).into_rounded(3),
-            base!(-0.909)
-        );
-        assert_eq!(
-            ft.pnl(quote!(100.0), quote!(90.0), quote!(1000.0)).into_rounded(3),
-            base!(-1.111)
-        );
-        assert_eq!(
-            ft.pnl(quote!(100.0), quote!(90.0), quote!(-1000.0)).into_rounded(3),
-            base!(1.111)
-        );
+        assert_eq!(ft.pnl(quote!(100.0), quote!(110.0), quote!(1000.0)), base!(0.909));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(110.0), quote!(-1000.0)), base!(-0.909));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(90.0), quote!(1000.0)), base!(-1.111));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(90.0), quote!(-1000.0)), base!(1.111));
     }
 }

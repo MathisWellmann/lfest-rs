@@ -64,9 +64,9 @@ where
     }
 
     /// Update the accounts state for the newest price data
-    pub(crate) fn update(&mut self, price: QuoteCurrency, trade_timestamp: u64) {
+    pub(crate) fn update(&mut self, price: &QuoteCurrency, trade_timestamp: u64) {
         let upnl = self.futures_type.pnl(self.position.entry_price(), price, self.position.size());
-        self.account_tracker.update(trade_timestamp, price, upnl);
+        self.account_tracker.update(trade_timestamp, *price, upnl);
 
         self.position.update_state(price, self.futures_type);
     }
@@ -293,7 +293,7 @@ where
     }
 
     /// Finalize an executed limit order
-    pub(crate) fn finalize_limit_order(&mut self, mut exec_order: Order<S>, fee_maker: Fee) {
+    pub(crate) fn finalize_limit_order(&mut self, mut exec_order: Order<S>, fee_maker: &Fee) {
         exec_order.mark_executed();
 
         self.account_tracker.log_limit_order_fill();
@@ -335,13 +335,13 @@ where
                     if size > self.position.size().abs() {
                         self.futures_type.pnl(
                             self.position.entry_price(),
-                            exec_price,
+                            &exec_price,
                             self.position.size(),
                         )
                     } else {
                         self.futures_type.pnl(
                             self.position.entry_price(),
-                            exec_price,
+                            &exec_price,
                             size.into_negative(),
                         )
                     }
@@ -355,11 +355,11 @@ where
                     if size > self.position.size() {
                         self.futures_type.pnl(
                             self.position.entry_price(),
-                            exec_price,
+                            &exec_price,
                             self.position.size(),
                         )
                     } else {
-                        self.futures_type.pnl(self.position.entry_price(), exec_price, size)
+                        self.futures_type.pnl(self.position.entry_price(), &exec_price, size)
                     }
                 } else {
                     S::PairedCurrency::new_zero()
@@ -369,8 +369,8 @@ where
         if rpnl != S::PairedCurrency::new_zero() {
             // first free up existing position margin if any
             let new_pos_margin = ((self.position().size() + pos_size_delta).abs()
-                / S::new(self.position().leverage().inner()))
-            .convert(self.position.entry_price());
+                / S::new(self.position().leverage().inner().clone()))
+            .convert(&self.position.entry_price());
             self.margin.set_position_margin(new_pos_margin);
 
             self.margin.change_balance(rpnl);
@@ -382,12 +382,12 @@ where
 
         // set position margin
         let pos_margin: S::PairedCurrency = (self.position.size().abs()
-            / S::new(self.position.leverage().inner()))
-        .convert(self.position.entry_price());
+            / S::new(self.position.leverage().inner().clone()))
+        .convert(&self.position.entry_price());
         self.margin.set_position_margin(pos_margin);
 
         // log change
-        self.account_tracker.log_trade(side, exec_price, size);
+        self.account_tracker.log_trade(side, &exec_price, &size);
     }
 }
 

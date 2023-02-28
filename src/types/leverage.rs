@@ -25,7 +25,7 @@ impl Leverage {
     }
 
     #[inline(always)]
-    pub(crate) fn inner(&self) -> Rational {
-        self.0
+    pub(crate) fn inner(&self) -> &Rational {
+        &self.0
     }
 }

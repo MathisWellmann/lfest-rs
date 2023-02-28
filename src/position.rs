@@ -64,14 +64,14 @@ where S: Currency
 
     /// Return the entry price of the position
     #[inline(always)]
-    pub fn entry_price(&self) -> QuoteCurrency {
-        self.entry_price
+    pub fn entry_price(&self) -> &QuoteCurrency {
+        &self.entry_price
     }
 
     /// Return the positions leverage
     #[inline(always)]
-    pub fn leverage(&self) -> Leverage {
-        self.leverage
+    pub fn leverage(&self) -> &Leverage {
+        &self.leverage
     }
 
     /// Return the positions unrealized profit and loss
@@ -116,17 +116,17 @@ where S: Currency
                 self.entry_price = QuoteCurrency::new(entry_price);
             }
         } else {
-            self.entry_price = price;
+            self.entry_price = price.clone();
         }
         self.size += size_delta;
 
-        self.update_state(price, futures_type);
+        self.update_state(&price, futures_type);
     }
 
     /// Update the state to reflect price changes
-    pub(crate) fn update_state(&mut self, price: QuoteCurrency, futures_type: FuturesTypes) {
+    pub(crate) fn update_state(&mut self, price: &QuoteCurrency, futures_type: FuturesTypes) {
         self.unrealized_pnl = if self.size != S::new_zero() {
-            futures_type.pnl(self.entry_price, price, self.size)
+            futures_type.pnl(&self.entry_price, price, self.size)
         } else {
             S::PairedCurrency::new_zero()
         };

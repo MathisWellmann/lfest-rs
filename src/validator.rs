@@ -18,14 +18,14 @@ impl Validator {
     /// Create a new Validator with a given fee maker and taker
     #[inline]
     pub(crate) fn new(
-        fee_maker: Fee,
-        fee_taker: Fee,
+        fee_maker: &Fee,
+        fee_taker: &Fee,
         futures_type: FuturesTypes,
         max_num_open_orders: usize,
     ) -> Self {
         Self {
-            fee_maker,
-            fee_taker,
+            fee_maker: fee_maker.clone(),
+            fee_taker: fee_maker.clone(),
             bid: quote!(0.0),
             ask: quote!(0.0),
             futures_type,
@@ -154,7 +154,7 @@ impl Validator {
         debit = S::new(debit.inner() / l);
         credit = S::new(credit.inner() / l);
 
-        let fee_of_size: S = order.quantity().fee_portion(self.fee_taker);
+        let fee_of_size: S = order.quantity().fee_portion(&self.fee_taker);
 
         let price = match order.side() {
             Side::Buy => self.ask,
@@ -164,18 +164,18 @@ impl Validator {
             FuturesTypes::Linear => {
                 // the values fee, debit and credit have to be converted from denoted in BASE
                 // currency to being denoted in QUOTE currency
-                let fee_margin = fee_of_size.convert(price);
-                let debit = debit.convert(price);
-                let credit = credit.convert(price);
+                let fee_margin = fee_of_size.convert(&price);
+                let debit = debit.convert(&price);
+                let credit = credit.convert(&price);
 
                 (debit, credit + fee_margin)
             }
             FuturesTypes::Inverse => {
                 // the values fee, debit and credit have to be converted from denoted in QUOTE
                 // currency to being denoted in BASE currency
-                let fee_margin = fee_of_size.convert(price);
-                let debit = debit.convert(price);
-                let credit = credit.convert(price);
+                let fee_margin = fee_of_size.convert(&price);
+                let debit = debit.convert(&price);
+                let credit = credit.convert(&price);
 
                 (debit, credit + fee_margin)
             }
@@ -207,7 +207,7 @@ impl Validator {
             acc.position().size(),
             self.futures_type,
             acc.position().leverage(),
-            self.fee_maker,
+            &self.fee_maker,
         );
 
         // get the additional needed difference

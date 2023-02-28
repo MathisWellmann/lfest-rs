@@ -70,14 +70,14 @@ where M: Currency
 
     /// Return the maker fee of this config
     #[inline(always)]
-    pub fn fee_maker(&self) -> Fee {
-        self.fee_maker
+    pub fn fee_maker(&self) -> &Fee {
+        &self.fee_maker
     }
 
     /// Return the taker fee of this config
     #[inline(always)]
-    pub fn fee_taker(&self) -> Fee {
-        self.fee_taker
+    pub fn fee_taker(&self) -> &Fee {
+        &self.fee_taker
     }
 
     /// Return the starting wallet balance of this Config

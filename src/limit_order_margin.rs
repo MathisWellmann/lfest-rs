@@ -23,8 +23,8 @@ pub(crate) fn order_margin<S>(
     orders: impl Iterator<Item = Order<S>>,
     pos_size: S,
     futures_type: FuturesTypes,
-    leverage: Leverage,
-    fee_maker: Fee,
+    leverage: &Leverage,
+    fee_maker: &Fee,
 ) -> S::PairedCurrency
 where
     S: Currency,
@@ -37,7 +37,7 @@ where
     let mut sell_side_fees = S::PairedCurrency::new_zero();
     for o in orders {
         let limit_price = o.limit_price().expect("Limit price must exist; qed");
-        let fee_margin = o.quantity().convert(limit_price).fee_portion(fee_maker);
+        let fee_margin = o.quantity().convert(&limit_price).fee_portion(fee_maker);
         let size = o.quantity();
         match o.side() {
             Side::Buy => {
@@ -96,7 +96,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{base, fee, quote, BaseCurrency, QuoteCurrency};
+    use crate::{base, fee, leverage, quote, BaseCurrency, QuoteCurrency};
 
     #[test]
     fn order_margin_linear_futures_without_position() {
@@ -104,9 +104,9 @@ mod tests {
 
         let ft = FuturesTypes::Linear;
         let p = base!(0.0);
-        let f_m = fee!(0.0);
+        let f_m = &fee!(0.0);
 
-        for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
+        for l in (1..5).map(|v| &leverage!(v as f64)) {
             debug!("leverage: {}", l);
 
             let orders = vec![];
@@ -171,9 +171,9 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let ft = FuturesTypes::Linear;
-        let f_m = fee!(0.0);
+        let f_m = &fee!(0.0);
 
-        for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
+        for l in (1..5).map(|v| &leverage!(v as f64)) {
             let p = base!(l);
 
             debug!("leverage: {}", l);
@@ -247,9 +247,9 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let ft = FuturesTypes::Linear;
-        let f_m = fee!(0.0);
+        let f_m = &fee!(0.0);
 
-        for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
+        for l in (1..5).map(|v| &leverage!(v as f64)) {
             let p = base!(-l);
 
             debug!("leverage: {}", l);
@@ -326,7 +326,7 @@ mod tests {
         let p = quote!(0.0);
         let f_m = fee!(0.0);
 
-        for l in [1.0, 2.0, 3.0, 4.0, 5.0] {
+        for l in (1..5).map(|v| leverage!(v as f64)) {
             debug!("leverage: {}", l);
 
             let orders = vec![];

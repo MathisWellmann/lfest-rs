@@ -29,8 +29,11 @@ pub trait Currency:
     /// Create a new instance from a `f64` value
     fn from_f64(val: f64) -> Self;
 
-    /// Get a reference to the inner `Rational`
+    /// Get the inner `Rational` by value
     fn inner(self) -> Rational;
+
+    /// Get the inner `Rational` by reference
+    fn inner_ref(&self) -> &Rational;
 
     /// Create a new currency instance with zero value
     fn new_zero() -> Self;
@@ -47,12 +50,12 @@ pub trait Currency:
     fn abs(self) -> Self;
 
     /// Compute the fee denoted in the currency
-    fn fee_portion(&self, fee: Fee) -> Self;
+    fn fee_portion(&self, fee: &Fee) -> Self;
 
     /// Convert this `Currency`'s value into its pair at the conversion `rate`.
     /// E.g:
     /// 1 BTC @ 20_000 USD means that 1 USD = 1 / 20_000 BTC
-    fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency;
+    fn convert(&self, rate: &QuoteCurrency) -> Self::PairedCurrency;
 
     /// Convert the Currency to a negative value
     fn into_negative(self) -> Self;
@@ -65,12 +68,12 @@ mod tests {
 
     #[test]
     fn conversion() {
-        assert_eq!(base!(1.0).convert(quote!(20_000.0)), quote!(20_000.0));
-        assert_eq!(base!(0.5).convert(quote!(20_000.0)), quote!(10_000.0));
-        assert_eq!(base!(0.25).convert(quote!(20_000.0)), quote!(5_000.0));
+        assert_eq!(base!(1.0).convert(&quote!(20_000.0)), quote!(20_000.0));
+        assert_eq!(base!(0.5).convert(&quote!(20_000.0)), quote!(10_000.0));
+        assert_eq!(base!(0.25).convert(&quote!(20_000.0)), quote!(5_000.0));
 
-        assert_eq!(quote!(20_000.0).convert(quote!(20_000.0)), base!(1.0));
-        assert_eq!(quote!(10_000.0).convert(quote!(20_000.0)), base!(0.5));
-        assert_eq!(quote!(5_000.0).convert(quote!(20_000.0)), base!(0.25));
+        assert_eq!(quote!(20_000.0).convert(&quote!(20_000.0)), base!(1.0));
+        assert_eq!(quote!(10_000.0).convert(&quote!(20_000.0)), base!(0.5));
+        assert_eq!(quote!(5_000.0).convert(&quote!(20_000.0)), base!(0.25));
     }
 }
