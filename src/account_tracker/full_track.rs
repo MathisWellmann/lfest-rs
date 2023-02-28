@@ -1,7 +1,10 @@
-use std::fmt::Display;
+use std::{convert::TryInto, fmt::Display};
 
 use malachite::{
-    num::arithmetic::traits::{CheckedSqrt, Pow},
+    num::{
+        arithmetic::traits::{CheckedSqrt, Pow},
+        basic::traits::One,
+    },
     Rational,
 };
 
@@ -299,7 +302,7 @@ where M: Currency + Send
         let idx = (rets.len() as f64 * percentile) as usize;
         match rets.get(idx) {
             Some(r) => {
-                let r = Rational::from_f64(r.exp());
+                let r = M::from_f64(r.exp());
                 self.wallet_balance_start - (self.wallet_balance_start * r)
             }
             None => M::new_zero(),
@@ -334,10 +337,7 @@ where M: Currency + Send
         ret_streaks.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let idx = (ret_streaks.len() as f64 * percentile) as usize;
         match ret_streaks.get(idx) {
-            Some(r) => {
-                let r: M = (*r).into();
-                self.wallet_balance_start - (self.wallet_balance_start * r)
-            }
+            Some(r) => self.wallet_balance_start - (self.wallet_balance_start * M::from_f64(*r)),
             None => M::new_zero(),
         }
     }
@@ -357,7 +357,12 @@ where M: Currency + Send
             ReturnsSource::Hourly => &self.hist_ln_returns_hourly_acc,
             ReturnsSource::TickByTick => &self.hist_ln_returns_tick_acc,
         };
-        cornish_fisher_value_at_risk(rets, self.wallet_balance_start.into(), percentile).2
+        cornish_fisher_value_at_risk(
+            rets,
+            self.wallet_balance_start.inner().try_into().unwrap(),
+            percentile,
+        )
+        .2
     }
 
     /// Calculate the corni fisher value at risk from n consequtive hourly
@@ -388,13 +393,14 @@ where M: Currency + Send
             ret_streaks.push(r);
         }
 
-        let cf_var: M = cornish_fisher_value_at_risk(
-            &ret_streaks.iter().map(|v| (*v).into()).collect::<Vec<f64>>(),
-            self.wallet_balance_start.into(),
-            percentile,
-        )
-        .1
-        .into();
+        let cf_var: M = M::from_f64(
+            cornish_fisher_value_at_risk(
+                &ret_streaks.iter().map(|v| (*v).into()).collect::<Vec<f64>>(),
+                self.wallet_balance_start.inner().try_into().unwrap(),
+                percentile,
+            )
+            .1,
+        );
         self.wallet_balance_start - (self.wallet_balance_start * cf_var)
     }
 
@@ -423,10 +429,18 @@ where M: Currency + Send
             ReturnsSource::TickByTick => &self.hist_ln_returns_tick_bnh,
         };
 
-        let cf_var_bnh =
-            cornish_fisher_value_at_risk(rets_bnh, self.wallet_balance_start.into(), 0.01).1;
-        let cf_var_acc =
-            cornish_fisher_value_at_risk(rets_acc, self.wallet_balance_start.into(), 0.01).1;
+        let cf_var_bnh = cornish_fisher_value_at_risk(
+            rets_bnh,
+            self.wallet_balance_start.inner().try_into().unwrap(),
+            0.01,
+        )
+        .1;
+        let cf_var_acc = cornish_fisher_value_at_risk(
+            rets_acc,
+            self.wallet_balance_start.inner().try_into().unwrap(),
+            0.01,
+        )
+        .1;
 
         let num_trading_days = self.num_trading_days() as f64;
 
@@ -447,22 +461,21 @@ where M: Currency + Send
     }
 
     /// Annualized return on investment as a factor, e.g.: 100% -> 2x
-    pub fn annualized_roi(&self) -> f64 {
-        let total_rpnl: f64 = self.total_rpnl.into();
-        let wb_start: f64 = self.wallet_balance_start.into();
-        (1.0 + (total_rpnl / wb_start)).powf(365.0 / self.num_trading_days() as f64)
+    pub fn annualized_roi(&self) -> Rational {
+        let power: u64 = 365 / self.num_trading_days() as u64;
+        (Rational::ONE + (self.total_rpnl.inner() / self.wallet_balance_start.inner())).pow(power)
     }
 
     /// Maximum drawdown of the wallet balance
     #[inline(always)]
-    pub fn max_drawdown_wallet_balance(&self) -> f64 {
+    pub fn max_drawdown_wallet_balance(&self) -> Rational {
         self.max_drawdown_wallet_balance
     }
 
     /// Maximum drawdown of the wallet balance including unrealized profit and
     /// loss
     #[inline(always)]
-    pub fn max_drawdown_total(&self) -> f64 {
+    pub fn max_drawdown_total(&self) -> Rational {
         self.max_drawdown_total
     }
 
@@ -560,8 +573,8 @@ where M: Currency + Send
             // calculate daily log return of account
             let ln_ret: f64 = ((self.wallet_balance_last + upnl)
                 / (self.wallet_balance_start + self.last_daily_pnl))
-                .into()
-                .ln();
+                .inner()
+                .approx_log();
             self.hist_ln_returns_daily_acc.push(ln_ret);
 
             // calculate daily return of buy_and_hold
@@ -570,8 +583,8 @@ where M: Currency + Send
             self.hist_returns_daily_bnh.push(pnl_bnh);
 
             // calculate daily log return of market
-            let ln_ret: f64 = (price / self.price_a_day_ago).into();
-            self.hist_ln_returns_daily_bnh.push(ln_ret.ln());
+            let ln_ret = (price / self.price_a_day_ago).inner().approx_log();
+            self.hist_ln_returns_daily_bnh.push(ln_ret);
 
             self.last_daily_pnl = self.total_rpnl + upnl;
             self.price_a_day_ago = price;
@@ -586,8 +599,8 @@ where M: Currency + Send
             // calculate hourly logarithmic return of account
             let ln_ret: f64 = ((self.wallet_balance_last + upnl)
                 / (self.wallet_balance_start + self.last_hourly_pnl))
-                .into()
-                .ln();
+                .inner()
+                .approx_log();
             self.hist_ln_returns_hourly_acc.push(ln_ret);
 
             // calculate hourly return of buy_and_hold
@@ -596,8 +609,8 @@ where M: Currency + Send
             self.hist_returns_hourly_bnh.push(pnl_bnh);
 
             // calculate hourly logarithmic return of buy_and_hold
-            let ln_ret: f64 = (price / self.price_an_hour_ago).into();
-            self.hist_ln_returns_hourly_bnh.push(ln_ret.ln());
+            let ln_ret = (price / self.price_an_hour_ago).inner().approx_log();
+            self.hist_ln_returns_hourly_bnh.push(ln_ret);
 
             self.last_hourly_pnl = self.total_rpnl + upnl;
             self.price_an_hour_ago = price;
@@ -608,15 +621,15 @@ where M: Currency + Send
 
         let ln_ret: f64 = ((self.wallet_balance_last + upnl)
             / (self.wallet_balance_start + self.last_tick_pnl))
-            .into()
-            .ln();
+            .inner()
+            .approx_log();
         self.hist_ln_returns_tick_acc.push(ln_ret);
 
         let bnh_qty = self.wallet_balance_start.convert(self.price_first);
         let pnl_bnh = self.futures_type.pnl(self.price_a_tick_ago, price, bnh_qty);
         self.hist_returns_tick_bnh.push(pnl_bnh);
 
-        let ln_ret = (price / self.price_a_tick_ago).ln();
+        let ln_ret = (price / self.price_a_tick_ago).inner().approx_log();
         self.hist_ln_returns_tick_bnh.push(ln_ret.into());
 
         self.last_tick_pnl = self.total_rpnl + upnl;

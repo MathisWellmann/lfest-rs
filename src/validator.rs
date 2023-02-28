@@ -348,7 +348,8 @@ mod tests {
             assert!(validator.validate_market_order(&o, &acc).is_err());
 
             // with sell limit order
-            let mut acc = Account::new(NoAccountTracker::default(), l, base!(1.0), futures_type);
+            let mut acc =
+                Account::new(NoAccountTracker::default(), leverage!(l), base!(1.0), futures_type);
             let mut o = Order::limit(Side::Sell, quote!(100.0), quote!(50.0 * l)).unwrap();
             o.set_id(2); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
