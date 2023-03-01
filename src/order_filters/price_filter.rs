@@ -49,13 +49,10 @@ impl PriceFilter {
                 // if ((limit_price - self.min_price) % self.tick_size) !=
                 // QuoteCurrency::new_zero() {     return
                 // Err(OrderError::InvalidOrderPriceStepSize); }
-                if limit_price > mark_price * self.multiplier_up.into() && self.multiplier_up != 0.0
-                {
+                if limit_price > mark_price * self.multiplier_up && self.multiplier_up != 0.0 {
                     return Err(OrderError::LimitPriceTooHigh);
                 }
-                if limit_price < mark_price * self.multiplier_down.into()
-                    && self.multiplier_down != 0.0
-                {
+                if limit_price < mark_price * self.multiplier_down && self.multiplier_down != 0.0 {
                     return Err(OrderError::LimitPriceTooLow);
                 }
                 Ok(())

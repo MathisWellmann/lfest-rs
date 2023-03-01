@@ -18,14 +18,14 @@ impl Validator {
     /// Create a new Validator with a given fee maker and taker
     #[inline]
     pub(crate) fn new(
-        fee_maker: &Fee,
-        fee_taker: &Fee,
+        fee_maker: Fee,
+        fee_taker: Fee,
         futures_type: FuturesTypes,
         max_num_open_orders: usize,
     ) -> Self {
         Self {
-            fee_maker: fee_maker.clone(),
-            fee_taker: fee_maker.clone(),
+            fee_maker,
+            fee_taker,
             bid: quote!(0.0),
             ask: quote!(0.0),
             futures_type,
@@ -157,8 +157,8 @@ impl Validator {
         let fee_of_size: S = order.quantity().fee_portion(&self.fee_taker);
 
         let price = match order.side() {
-            Side::Buy => self.ask,
-            Side::Sell => self.bid,
+            Side::Buy => &self.ask,
+            Side::Sell => &self.bid,
         };
         match self.futures_type {
             FuturesTypes::Linear => {
@@ -211,7 +211,7 @@ impl Validator {
         );
 
         // get the additional needed difference
-        let diff = needed_order_margin - acc.margin().order_margin();
+        let diff = needed_order_margin.inner_ref() - acc.margin().order_margin().inner_ref();
         debug!(
             "needed_order_margin: {}, acc_om: {}, diff: {}",
             needed_order_margin,
@@ -219,7 +219,7 @@ impl Validator {
             diff
         );
 
-        diff
+        S::PairedCurrency::new(diff)
     }
 }
 

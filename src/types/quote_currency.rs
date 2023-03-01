@@ -1,3 +1,5 @@
+use std::ops::{Add, Div, Mul, Sub};
+
 use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
 use malachite::{
     num::{arithmetic::traits::Abs, basic::traits::Zero},
@@ -83,16 +85,115 @@ impl Currency for QuoteCurrency {
 
     #[inline(always)]
     fn fee_portion(&self, fee: &Fee) -> Self {
-        Self(self.0 * fee.inner())
+        Self(&self.0 * fee.inner_ref())
     }
+
     #[inline(always)]
     fn convert(&self, rate: &QuoteCurrency) -> Self::PairedCurrency {
-        BaseCurrency::new(self.0 / rate.inner())
+        BaseCurrency::new(&self.0 / rate.inner_ref())
     }
 
     #[inline(always)]
     fn into_negative(self) -> Self {
         Self(-self.0)
+    }
+}
+
+/// ### Arithmetic with `Rational` on the right hand side
+impl Add<Rational> for QuoteCurrency {
+    type Output = Self;
+
+    fn add(self, rhs: Rational) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+
+impl<'a> Add<&'a Rational> for QuoteCurrency {
+    type Output = Self;
+
+    fn add(self, rhs: &'a Rational) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+
+impl Sub<Rational> for QuoteCurrency {
+    type Output = Self;
+
+    fn sub(self, rhs: Rational) -> Self::Output {
+        Self(self.0 - rhs)
+    }
+}
+
+impl<'a> Sub<&'a Rational> for QuoteCurrency {
+    type Output = Self;
+
+    fn sub(self, rhs: &'a Rational) -> Self::Output {
+        Self(self.0 - rhs)
+    }
+}
+
+impl Mul<Rational> for QuoteCurrency {
+    type Output = Self;
+
+    fn mul(self, rhs: Rational) -> Self::Output {
+        Self(self.0 * rhs)
+    }
+}
+
+impl<'a> Mul<&'a Rational> for QuoteCurrency {
+    type Output = Self;
+
+    fn mul(self, rhs: &'a Rational) -> Self::Output {
+        Self(self.0 * rhs)
+    }
+}
+
+impl Div<Rational> for QuoteCurrency {
+    type Output = Self;
+
+    fn div(self, rhs: Rational) -> Self::Output {
+        Self(self.0 / rhs)
+    }
+}
+
+impl<'a> Div<&'a Rational> for QuoteCurrency {
+    type Output = Self;
+
+    fn div(self, rhs: &'a Rational) -> Self::Output {
+        Self(self.0 / rhs)
+    }
+}
+
+/// ### Arithmetic with `&Self` on the right hand side
+impl<'a> Add<&'a Self> for QuoteCurrency {
+    type Output = Self;
+
+    fn add(self, rhs: &'a Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl<'a> Sub<&'a Self> for QuoteCurrency {
+    type Output = Self;
+
+    fn sub(self, rhs: &'a Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+impl<'a> Mul<&'a Self> for QuoteCurrency {
+    type Output = Self;
+
+    fn mul(self, rhs: &'a Self) -> Self::Output {
+        Self(self.0 * rhs.0)
+    }
+}
+
+impl<'a> Div<&'a Self> for QuoteCurrency {
+    type Output = Self;
+
+    fn div(self, rhs: &'a Self) -> Self::Output {
+        Self(self.0 / rhs.0)
     }
 }
 

@@ -378,7 +378,7 @@ where
         }
 
         // change position
-        self.position.change_size(pos_size_delta, exec_price, self.futures_type);
+        self.position.change_size(&pos_size_delta, &exec_price, self.futures_type);
 
         // set position margin
         let pos_margin: S::PairedCurrency = (self.position.size().abs()

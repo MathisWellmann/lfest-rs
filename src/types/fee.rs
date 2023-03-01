@@ -25,7 +25,12 @@ impl Fee {
     }
 
     #[inline(always)]
-    pub(crate) fn inner(&self) -> &Rational {
+    pub(crate) fn inner(self) -> Rational {
+        self.0
+    }
+
+    #[inline(always)]
+    pub(crate) fn inner_ref(&self) -> &Rational {
         &self.0
     }
 }

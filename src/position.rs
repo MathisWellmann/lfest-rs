@@ -45,7 +45,6 @@ where S: Currency
         leverage: Leverage,
         unrealized_pnl: S::PairedCurrency,
     ) -> Self {
-        debug_assert!(unrealized_pnl.is_finite());
         debug_assert!(entry_price >= quote!(0.0));
 
         Position {
@@ -78,15 +77,15 @@ where S: Currency
     /// denoted in QUOTE when using linear futures,
     /// denoted in BASE when using inverse futures
     #[inline(always)]
-    pub fn unrealized_pnl(&self) -> S::PairedCurrency {
-        self.unrealized_pnl
+    pub fn unrealized_pnl(&self) -> &S::PairedCurrency {
+        &self.unrealized_pnl
     }
 
     /// Change the position size by a given delta at a certain price
     pub(crate) fn change_size(
         &mut self,
-        size_delta: S,
-        price: QuoteCurrency,
+        size_delta: &S,
+        price: &QuoteCurrency,
         futures_type: FuturesTypes,
     ) {
         trace!("change_size({}, {}, {})", size_delta, price, futures_type);
@@ -94,7 +93,7 @@ where S: Currency
         if self.size > S::new_zero() {
             if self.size + size_delta < S::new_zero() {
                 // counts as new position as all old position size is sold
-                self.entry_price = price;
+                self.entry_price = price.clone();
             } else if (self.size + size_delta).abs() > self.size {
                 let size_abs = self.size.abs().inner();
                 let size_delta_abs = size_delta.abs().inner();
@@ -105,7 +104,7 @@ where S: Currency
             }
         } else if self.size < S::new_zero() {
             if self.size + size_delta > S::new_zero() {
-                self.entry_price = price;
+                self.entry_price = price.clone();
             } else if self.size + size_delta < self.size {
                 let size_abs = self.size.abs().inner();
                 let size_delta_abs = size_delta.abs().inner();
@@ -118,7 +117,7 @@ where S: Currency
         } else {
             self.entry_price = price.clone();
         }
-        self.size += size_delta;
+        self.size += size_delta.clone();
 
         self.update_state(&price, futures_type);
     }

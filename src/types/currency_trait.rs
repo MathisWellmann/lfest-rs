@@ -13,6 +13,14 @@ pub trait Currency:
     + std::ops::Sub<Output = Self>
     + std::ops::Mul<Output = Self>
     + std::ops::Div<Output = Self>
+    + std::ops::Add<Rational, Output = Self>
+    + std::ops::Sub<Rational, Output = Self>
+    + std::ops::Mul<Rational, Output = Self>
+    + std::ops::Div<Rational, Output = Self>
+    + for<'a> std::ops::Add<&'a Self, Output = Self>
+    + for<'a> std::ops::Sub<&'a Self, Output = Self>
+    + for<'a> std::ops::Mul<&'a Self, Output = Self>
+    + for<'a> std::ops::Div<&'a Self, Output = Self>
     + std::ops::AddAssign
     + std::ops::SubAssign
     + PartialEq
@@ -24,18 +32,23 @@ pub trait Currency:
     type PairedCurrency: Currency<PairedCurrency = Self>;
 
     /// Create a new instance from a `Rational` value
+    #[must_use]
     fn new(val: Rational) -> Self;
 
     /// Create a new instance from a `f64` value
+    #[must_use]
     fn from_f64(val: f64) -> Self;
 
     /// Get the inner `Rational` by value
+    #[must_use]
     fn inner(self) -> Rational;
 
     /// Get the inner `Rational` by reference
+    #[must_use]
     fn inner_ref(&self) -> &Rational;
 
     /// Create a new currency instance with zero value
+    #[must_use]
     fn new_zero() -> Self;
 
     /// Check if the value is zero

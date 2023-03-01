@@ -1,3 +1,5 @@
+use malachite::{num::basic::traits::Two, Rational};
+
 use crate::{
     quote, Account, AccountTracker, Config, Currency, MarketUpdate, Order, OrderError, OrderType,
     QuoteCurrency, Side, Validator,
@@ -38,8 +40,8 @@ where
             config.futures_type(),
         );
         let validator = Validator::new(
-            config.fee_maker(),
-            config.fee_taker(),
+            config.fee_maker().clone(),
+            config.fee_taker().clone(),
             config.futures_type(),
             config.max_num_open_orders(),
         );
@@ -155,7 +157,8 @@ where
         self.check_orders();
 
         // TODO: pass through bid and ask, instead of the mid price
-        self.user_account.update((&self.bid + &self.ask) / quote!(2.0), timestamp);
+        let mid_price = (self.bid.inner_ref() + self.ask.inner_ref()) / Rational::TWO;
+        self.user_account.update(&QuoteCurrency::from(mid_price), timestamp);
 
         self.step += 1;
 
