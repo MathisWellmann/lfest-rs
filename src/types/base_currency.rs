@@ -169,7 +169,7 @@ impl<'a> Add<&'a Self> for BaseCurrency {
     type Output = Self;
 
     fn add(self, rhs: &'a Self) -> Self::Output {
-        Self(self.0 + rhs.0)
+        Self(self.0 + &rhs.0)
     }
 }
 
@@ -177,7 +177,7 @@ impl<'a> Sub<&'a Self> for BaseCurrency {
     type Output = Self;
 
     fn sub(self, rhs: &'a Self) -> Self::Output {
-        Self(self.0 - rhs.0)
+        Self(self.0 - &rhs.0)
     }
 }
 
@@ -185,7 +185,7 @@ impl<'a> Mul<&'a Self> for BaseCurrency {
     type Output = Self;
 
     fn mul(self, rhs: &'a Self) -> Self::Output {
-        Self(self.0 * rhs.0)
+        Self(self.0 * &rhs.0)
     }
 }
 
@@ -193,7 +193,7 @@ impl<'a> Div<&'a Self> for BaseCurrency {
     type Output = Self;
 
     fn div(self, rhs: &'a Self) -> Self::Output {
-        Self(self.0 / rhs.0)
+        Self(self.0 / &rhs.0)
     }
 }
 

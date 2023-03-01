@@ -42,7 +42,7 @@ impl FuturesTypes {
         &self,
         entry_price: &QuoteCurrency,
         exit_price: &QuoteCurrency,
-        contract_qty: S,
+        contract_qty: &S,
     ) -> S::PairedCurrency
     where
         S: Currency,

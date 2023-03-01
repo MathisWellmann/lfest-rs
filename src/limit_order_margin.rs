@@ -21,7 +21,7 @@ use crate::{max, min, Currency, Fee, FuturesTypes, Leverage, Order, Side};
 /// TODO: rework this, its too complex
 pub(crate) fn order_margin<S>(
     orders: impl Iterator<Item = Order<S>>,
-    pos_size: S,
+    pos_size: &S,
     futures_type: FuturesTypes,
     leverage: &Leverage,
     fee_maker: &Fee,

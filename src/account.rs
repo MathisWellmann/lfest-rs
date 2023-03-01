@@ -194,14 +194,14 @@ where
 
     /// Cumulative open limit order size of buy orders
     #[inline(always)]
-    pub fn open_limit_buy_size(&self) -> S {
-        self.open_limit_buy_size
+    pub fn open_limit_buy_size(&self) -> &S {
+        &self.open_limit_buy_size
     }
 
     /// Cumulative
     #[inline(always)]
-    pub fn open_limit_sell_size(&self) -> S {
-        self.open_limit_sell_size
+    pub fn open_limit_sell_size(&self) -> &S {
+        &self.open_limit_sell_size
     }
 
     /// Append a new limit order as active order
@@ -342,7 +342,7 @@ where
                         self.futures_type.pnl(
                             self.position.entry_price(),
                             &exec_price,
-                            size.into_negative(),
+                            &size.into_negative(),
                         )
                     }
                 } else {

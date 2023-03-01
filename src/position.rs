@@ -57,8 +57,8 @@ where S: Currency
 
     /// Return the position size
     #[inline(always)]
-    pub fn size(&self) -> S {
-        self.size
+    pub fn size(&self) -> &S {
+        &self.size
     }
 
     /// Return the entry price of the position
@@ -125,7 +125,7 @@ where S: Currency
     /// Update the state to reflect price changes
     pub(crate) fn update_state(&mut self, price: &QuoteCurrency, futures_type: FuturesTypes) {
         self.unrealized_pnl = if self.size != S::new_zero() {
-            futures_type.pnl(&self.entry_price, price, self.size)
+            futures_type.pnl(&self.entry_price, price, &self.size)
         } else {
             S::PairedCurrency::new_zero()
         };

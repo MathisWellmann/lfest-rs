@@ -181,14 +181,14 @@ where M: Currency + Send
     #[inline(always)]
     pub fn buy_and_hold_return(&self) -> M {
         let qty = self.wallet_balance_start.convert(&self.price_first);
-        self.futures_type.pnl(&self.price_first, &self.price_last, qty)
+        self.futures_type.pnl(&self.price_first, &self.price_last, &qty)
     }
 
     /// Would be return of sell and hold strategy
     #[inline(always)]
     pub fn sell_and_hold_return(&self) -> M {
         let qty = self.wallet_balance_start.convert(&self.price_first);
-        self.futures_type.pnl(&self.price_first, &self.price_last, qty.into_negative())
+        self.futures_type.pnl(&self.price_first, &self.price_last, &qty.into_negative())
     }
 
     /// Return the sharpe ratio using the selected returns as source
@@ -582,7 +582,7 @@ where M: Currency + Send
 
             // calculate daily return of buy_and_hold
             let bnh_qty = self.wallet_balance_start.convert(&self.price_first);
-            let pnl_bnh = self.futures_type.pnl(&self.price_a_day_ago, &price, bnh_qty);
+            let pnl_bnh = self.futures_type.pnl(&self.price_a_day_ago, &price, &bnh_qty);
             self.hist_returns_daily_bnh.push(pnl_bnh);
 
             // calculate daily log return of market
@@ -608,7 +608,7 @@ where M: Currency + Send
 
             // calculate hourly return of buy_and_hold
             let bnh_qty = self.wallet_balance_start.convert(&self.price_first);
-            let pnl_bnh = self.futures_type.pnl(&self.price_an_hour_ago, &price, bnh_qty);
+            let pnl_bnh = self.futures_type.pnl(&self.price_an_hour_ago, &price, &bnh_qty);
             self.hist_returns_hourly_bnh.push(pnl_bnh);
 
             // calculate hourly logarithmic return of buy_and_hold
@@ -629,7 +629,7 @@ where M: Currency + Send
         self.hist_ln_returns_tick_acc.push(ln_ret);
 
         let bnh_qty = self.wallet_balance_start.convert(&self.price_first);
-        let pnl_bnh = self.futures_type.pnl(&self.price_a_tick_ago, &price, bnh_qty);
+        let pnl_bnh = self.futures_type.pnl(&self.price_a_tick_ago, &price, &bnh_qty);
         self.hist_returns_tick_bnh.push(pnl_bnh);
 
         let ln_ret = (price / self.price_a_tick_ago).inner().approx_log();

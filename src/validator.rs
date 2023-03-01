@@ -130,24 +130,33 @@ impl Validator {
 
         let (mut debit, mut credit) = if pos_size.is_zero() {
             match order.side() {
-                Side::Buy => (min(order.quantity(), acc.open_limit_sell_size()), order.quantity()),
-                Side::Sell => (min(order.quantity(), acc.open_limit_buy_size()), order.quantity()),
-            }
-        } else if pos_size > S::new_zero() {
-            match order.side() {
-                Side::Buy => (S::new_zero(), order.quantity()),
+                Side::Buy => (
+                    min(order.quantity().clone(), acc.open_limit_sell_size().clone()),
+                    order.quantity().clone(),
+                ),
                 Side::Sell => (
-                    min(order.quantity(), acc.position().size()),
-                    max(S::new_zero(), order.quantity() - acc.position().size()),
+                    min(order.quantity().clone(), acc.open_limit_buy_size().clone()),
+                    order.quantity().clone(),
+                ),
+            }
+        } else if pos_size > &S::new_zero() {
+            match order.side() {
+                Side::Buy => (S::new_zero(), order.quantity().clone()),
+                Side::Sell => (
+                    min(order.quantity().clone(), acc.position().size().clone()),
+                    max(S::new_zero(), order.quantity().clone() - acc.position().size().clone()),
                 ),
             }
         } else {
             match order.side() {
                 Side::Buy => (
-                    min(order.quantity(), acc.position().size().abs()),
-                    max(S::new_zero(), order.quantity() - acc.position().size().abs()),
+                    min(order.quantity().clone(), acc.position().size().clone().abs()),
+                    max(
+                        S::new_zero(),
+                        order.quantity().clone() - acc.position().size().clone().abs(),
+                    ),
                 ),
-                Side::Sell => (S::new_zero(), order.quantity()),
+                Side::Sell => (S::new_zero(), order.quantity().clone()),
             }
         };
         let l = acc.position().leverage().inner();

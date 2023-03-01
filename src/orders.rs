@@ -112,14 +112,14 @@ where S: Currency
 
     /// limit price of Order
     #[inline(always)]
-    pub fn limit_price(&self) -> Option<QuoteCurrency> {
-        self.limit_price
+    pub fn limit_price(&self) -> &Option<QuoteCurrency> {
+        &self.limit_price
     }
 
     /// Quantity of Order
     #[inline(always)]
-    pub fn quantity(&self) -> S {
-        self.quantity
+    pub fn quantity(&self) -> &S {
+        &self.quantity
     }
 
     /// Side of Order
