@@ -53,16 +53,6 @@ impl Currency for BaseCurrency {
     }
 
     #[inline(always)]
-    fn inner(self) -> Rational {
-        self.0
-    }
-
-    #[inline(always)]
-    fn inner_ref(&self) -> &Rational {
-        &self.0
-    }
-
-    #[inline(always)]
     fn new_zero() -> Self {
         Self::new(Rational::ZERO)
     }

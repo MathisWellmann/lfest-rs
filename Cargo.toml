@@ -18,7 +18,6 @@ serde = { version = "^1", features = ["derive"] }
 thiserror = "^1"
 hashbrown = "^0.13"
 derive_more = { version = "^0.99", features = ["add", "mul"] }
-malachite = { version = "^0.3", features = ["enable_serde"] }
 
 [dev-dependencies]
 csv = "^1"

@@ -44,14 +44,6 @@ pub trait Currency:
     #[must_use]
     fn from_f64(val: f64) -> Self;
 
-    /// Get the inner `Rational` by value
-    #[must_use]
-    fn inner(self) -> Rational;
-
-    /// Get the inner `Rational` by reference
-    #[must_use]
-    fn inner_ref(&self) -> &Rational;
-
     /// Create a new currency instance with zero value
     #[must_use]
     fn new_zero() -> Self;
