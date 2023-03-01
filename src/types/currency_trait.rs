@@ -9,20 +9,25 @@ pub trait Currency:
     + Sized
     + std::fmt::Debug
     + std::fmt::Display
+    // Require to do arithmetic with `Self` on the right hand side
     + std::ops::Add<Output = Self>
     + std::ops::Sub<Output = Self>
     + std::ops::Mul<Output = Self>
     + std::ops::Div<Output = Self>
+    // Require to do arithmetic with `Rational` on the right hand side
     + std::ops::Add<Rational, Output = Self>
     + std::ops::Sub<Rational, Output = Self>
     + std::ops::Mul<Rational, Output = Self>
     + std::ops::Div<Rational, Output = Self>
+    // Require to do arithmetic with `&Self` on the right hand side
     + for<'a> std::ops::Add<&'a Self, Output = Self>
     + for<'a> std::ops::Sub<&'a Self, Output = Self>
     + for<'a> std::ops::Mul<&'a Self, Output = Self>
     + for<'a> std::ops::Div<&'a Self, Output = Self>
     + std::ops::AddAssign
     + std::ops::SubAssign
+    + for<'a> std::ops::AddAssign<&'a Self>
+    + for<'a> std::ops::SubAssign<&'a Self>
     + PartialEq
     + PartialOrd
 {

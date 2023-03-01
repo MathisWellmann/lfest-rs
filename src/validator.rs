@@ -83,14 +83,16 @@ impl Validator {
             return Err(OrderError::MaxActiveOrders);
         }
         // validate order price
+        let limit_price =
+            o.limit_price().clone().expect("The limit order must contain a price; qed");
         match o.side() {
             Side::Buy => {
-                if o.limit_price().unwrap() > self.ask {
+                if limit_price > self.ask {
                     return Err(OrderError::LimitPriceLargerThanAsk);
                 }
             }
             Side::Sell => {
-                if o.limit_price().unwrap() < self.bid {
+                if limit_price < self.bid {
                     return Err(OrderError::LimitPriceLowerThanBid);
                 }
             }

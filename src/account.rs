@@ -319,20 +319,20 @@ where
     }
 
     /// Changes the position by a given delta while changing margin accordingly
-    pub(crate) fn change_position(&mut self, side: Side, size: S, exec_price: QuoteCurrency) {
+    pub(crate) fn change_position(&mut self, side: Side, size: &S, exec_price: &QuoteCurrency) {
         debug!(
             "account: change_position(side: {:?}, size: {}, exec_price: {})",
             side, size, exec_price
         );
         let pos_size_delta = match side {
-            Side::Buy => size,
+            Side::Buy => size.clone(),
             Side::Sell => size.into_negative(),
         };
         let rpnl = match side {
             Side::Buy => {
-                if self.position.size() < S::new_zero() {
+                if self.position.size() < &S::new_zero() {
                     // pnl needs to be realized
-                    if size > self.position.size().abs() {
+                    if size > &self.position.size().abs() {
                         self.futures_type.pnl(
                             self.position.entry_price(),
                             &exec_price,
@@ -350,7 +350,7 @@ where
                 }
             }
             Side::Sell => {
-                if self.position.size() > S::new_zero() {
+                if self.position.size() > &S::new_zero() {
                     // pnl needs to be realized
                     if size > self.position.size() {
                         self.futures_type.pnl(
@@ -368,7 +368,7 @@ where
         };
         if rpnl != S::PairedCurrency::new_zero() {
             // first free up existing position margin if any
-            let new_pos_margin = ((self.position().size() + pos_size_delta).abs()
+            let new_pos_margin = ((self.position().size().clone() + pos_size_delta).abs()
                 / S::new(self.position().leverage().inner().clone()))
             .convert(&self.position.entry_price());
             self.margin.set_position_margin(new_pos_margin);

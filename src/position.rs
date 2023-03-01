@@ -91,16 +91,14 @@ where S: Currency
         trace!("change_size({}, {}, {})", size_delta, price, futures_type);
 
         if self.size > S::new_zero() {
-            if self.size + size_delta < S::new_zero() {
+            if self.size.clone() + size_delta < S::new_zero() {
                 // counts as new position as all old position size is sold
                 self.entry_price = price.clone();
-            } else if (self.size + size_delta).abs() > self.size {
-                let size_abs = self.size.abs().inner();
-                let size_delta_abs = size_delta.abs().inner();
-                let entry_price: Rational = ((size_abs * self.entry_price.inner())
-                    + (size_delta_abs * price.inner()))
-                    / (size_abs + size_delta_abs);
-                self.entry_price = QuoteCurrency::new(entry_price);
+            } else if (self.size.clone() + size_delta).abs() > self.size {
+                let entry_price = ((self.entry_price.clone() * self.size.clone().abs().inner())
+                    + (price * size_delta.abs().inner()))
+                    / QuoteCurrency::new((self.size.clone().abs() + size_delta.abs()).inner());
+                self.entry_price = entry_price;
             }
         } else if self.size < S::new_zero() {
             if self.size + size_delta > S::new_zero() {

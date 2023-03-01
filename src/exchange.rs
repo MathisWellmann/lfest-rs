@@ -205,7 +205,7 @@ where
     }
 
     /// Execute a market order
-    fn execute_market(&mut self, side: Side, amount: S) {
+    fn execute_market(&mut self, side: Side, amount: &S) {
         debug!("exchange: execute_market: side: {:?}, amount: {}", side, amount);
 
         let price = match side {
@@ -216,7 +216,7 @@ where
         let fee_of_size = amount.fee_portion(self.config.fee_taker());
         let fee_margin = fee_of_size.convert(&price);
 
-        self.user_account.change_position(side, amount, price);
+        self.user_account.change_position(side, amount, &price);
         self.user_account.deduce_fees(fee_margin);
     }
 
@@ -228,7 +228,7 @@ where
 
         self.user_account.remove_executed_order_from_order_margin_calculation(&o);
 
-        self.user_account.change_position(o.side(), o.quantity(), price);
+        self.user_account.change_position(o.side(), o.quantity(), &price);
 
         let fee_of_size = o.quantity().fee_portion(self.config.fee_maker());
         let fee_margin = fee_of_size.convert(&price);
@@ -241,10 +241,10 @@ where
     fn liquidate(&mut self) {
         // TODO: better liquidate
         debug!("liquidating");
-        if self.user_account.position().size() > S::new_zero() {
+        if self.user_account.position().size() > &S::new_zero() {
             self.execute_market(Side::Sell, self.user_account.position().size());
         } else {
-            self.execute_market(Side::Buy, self.user_account.position().size().abs());
+            self.execute_market(Side::Buy, &self.user_account.position().size().abs());
         }
     }
 

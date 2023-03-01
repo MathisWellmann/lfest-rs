@@ -32,27 +32,28 @@ impl PriceFilter {
     pub(crate) fn validate_order<S>(
         &self,
         order: &Order<S>,
-        mark_price: QuoteCurrency,
+        mark_price: &QuoteCurrency,
     ) -> Result<(), OrderError>
     where
         S: Currency,
     {
         match order.limit_price() {
             Some(limit_price) => {
-                if limit_price < self.min_price && self.min_price != QuoteCurrency::new_zero() {
+                if limit_price < &self.min_price && self.min_price != QuoteCurrency::new_zero() {
                     return Err(OrderError::LimitPriceTooLow);
                 }
-                if limit_price > self.max_price && self.max_price != QuoteCurrency::new_zero() {
+                if limit_price > &self.max_price && self.max_price != QuoteCurrency::new_zero() {
                     return Err(OrderError::LimitPriceTooHigh);
                 }
                 // TODO:
                 // if ((limit_price - self.min_price) % self.tick_size) !=
                 // QuoteCurrency::new_zero() {     return
                 // Err(OrderError::InvalidOrderPriceStepSize); }
-                if limit_price > mark_price * self.multiplier_up && self.multiplier_up != 0.0 {
+                if limit_price > &(mark_price * self.multiplier_up) && self.multiplier_up != 0.0 {
                     return Err(OrderError::LimitPriceTooHigh);
                 }
-                if limit_price < mark_price * self.multiplier_down && self.multiplier_down != 0.0 {
+                if limit_price < &(mark_price * self.multiplier_down) && self.multiplier_down != 0.0
+                {
                     return Err(OrderError::LimitPriceTooLow);
                 }
                 Ok(())
