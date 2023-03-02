@@ -104,7 +104,7 @@ mod tests {
 
         let ft = FuturesTypes::Linear;
         let p = base!(0.0);
-        let f_m = &fee!(0.0);
+        let f_m = fee!(0.0);
 
         for l in (1..5).map(|v| v as f64) {
             debug!("leverage: {}", l);
@@ -171,7 +171,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let ft = FuturesTypes::Linear;
-        let f_m = &fee!(0.0);
+        let f_m = fee!(0.0);
 
         for l in (1..5).map(|v| v as f64) {
             let p = base!(l);
@@ -247,7 +247,7 @@ mod tests {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let ft = FuturesTypes::Linear;
-        let f_m = &fee!(0.0);
+        let f_m = fee!(0.0);
 
         for l in (1..5).map(|v| v as f64) {
             let p = base!(-l);

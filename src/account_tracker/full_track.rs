@@ -1178,7 +1178,7 @@ mod tests {
         let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         at.total_profit = quote!(50.0);
         at.total_loss = quote!(25.0);
-        assert_eq!(at.profit_loss_ratio(), 2.0);
+        assert_eq!(at.profit_loss_ratio(), Decimal::TWO);
     }
 
     #[test]
@@ -1186,7 +1186,7 @@ mod tests {
         let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         at.log_fee(quote!(0.1));
         at.log_fee(quote!(0.2));
-        assert_eq!(at.cumulative_fees().into_rounded(1), quote!(0.3));
+        assert_eq!(at.cumulative_fees(), quote!(0.3));
     }
 
     #[test]
@@ -1214,7 +1214,7 @@ mod tests {
         }
 
         assert_eq!(round(acc_tracker.max_drawdown_wallet_balance(), 2), 0.01);
-        assert_eq!(acc_tracker.total_rpnl().into_rounded(1), quote!(2.0));
+        assert_eq!(acc_tracker.total_rpnl(), quote!(2.0));
     }
 
     #[test]
@@ -1241,13 +1241,10 @@ mod tests {
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
-            acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.05).into_rounded(3),
+            acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.05),
             quote!(1.173)
         );
-        assert_eq!(
-            acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.01).into_rounded(3),
-            quote!(2.54)
-        );
+        assert_eq!(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.01), quote!(2.54));
     }
 
     #[test]
@@ -1257,14 +1254,8 @@ mod tests {
         let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(
-            at.historical_value_at_risk_from_n_hourly_returns(24, 0.05).into_rounded(3),
-            quote!(3.835)
-        );
-        assert_eq!(
-            at.historical_value_at_risk_from_n_hourly_returns(24, 0.01).into_rounded(3),
-            quote!(6.061)
-        );
+        assert_eq!(at.historical_value_at_risk_from_n_hourly_returns(24, 0.05), quote!(3.835));
+        assert_eq!(at.historical_value_at_risk_from_n_hourly_returns(24, 0.01), quote!(6.061));
     }
 
     #[test]
@@ -1291,13 +1282,7 @@ mod tests {
         let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(
-            at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05).into_rounded(3),
-            quote!(4.043)
-        );
-        assert_eq!(
-            at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01).into_rounded(3),
-            quote!(5.358)
-        );
+        assert_eq!(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05), quote!(4.043));
+        assert_eq!(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01), quote!(5.358));
     }
 }
