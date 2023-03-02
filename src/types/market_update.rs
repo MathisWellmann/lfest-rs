@@ -50,7 +50,7 @@ macro_rules! candle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{quote, Currency, QuoteCurrency};
+    use crate::prelude::*;
 
     #[test]
     fn bba_macro() {

@@ -175,6 +175,7 @@ impl<'a> std::ops::SubAssign<&'a Self> for QuoteCurrency {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prelude::*;
 
     #[test]
     fn quote_display() {

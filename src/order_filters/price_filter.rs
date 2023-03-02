@@ -71,6 +71,8 @@ impl PriceFilter {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryFrom;
+
     use super::*;
     use crate::{base, quote, BaseCurrency, Side};
 
