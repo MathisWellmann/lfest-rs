@@ -79,12 +79,12 @@ impl Currency for QuoteCurrency {
 
     #[inline(always)]
     fn fee_portion(&self, fee: Fee) -> Self {
-        Self(self.0 * fee)
+        Self(self.0 * fee.inner())
     }
 
     #[inline(always)]
     fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency {
-        BaseCurrency::new(self.0 / rate)
+        BaseCurrency::new(self.0 / rate.0)
     }
 
     #[inline(always)]

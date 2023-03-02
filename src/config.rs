@@ -1,6 +1,6 @@
 use crate::{Currency, Error, Fee, FuturesTypes, Leverage, Result};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 /// Define the Exchange configuration
 pub struct Config<M> {
     /// The maker fee as a fraction. e.g.: 2.5 basis points rebate -> -0.00025
@@ -70,14 +70,14 @@ where M: Currency
 
     /// Return the maker fee of this config
     #[inline(always)]
-    pub fn fee_maker(&self) -> &Fee {
-        &self.fee_maker
+    pub fn fee_maker(&self) -> Fee {
+        self.fee_maker
     }
 
     /// Return the taker fee of this config
     #[inline(always)]
-    pub fn fee_taker(&self) -> &Fee {
-        &self.fee_taker
+    pub fn fee_taker(&self) -> Fee {
+        self.fee_taker
     }
 
     /// Return the starting wallet balance of this Config

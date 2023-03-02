@@ -1,7 +1,4 @@
-use malachite::{
-    num::arithmetic::traits::{Abs, Reciprocal},
-    Rational,
-};
+use fpdec::Decimal;
 
 use crate::{max, min, Currency, Fee, FuturesTypes, Leverage, Order, Side};
 
@@ -31,8 +28,8 @@ where
 {
     let mut buy_size = S::new_zero();
     let mut sell_size = S::new_zero();
-    let mut buy_price_weight = Rational::from(0_i32);
-    let mut sell_price_weight = Rational::from(0_i32);
+    let mut buy_price_weight = Decimal::ZERO;
+    let mut sell_price_weight = Decimal::ZERO;
     let mut buy_side_fees = S::PairedCurrency::new_zero();
     let mut sell_side_fees = S::PairedCurrency::new_zero();
     for o in orders {
@@ -53,33 +50,33 @@ where
         }
     }
 
-    let bsd: Rational = buy_size.inner() - min(pos_size.inner(), Rational::from(0_i32)).abs();
-    let ssd: Rational = sell_size.inner() - max(pos_size.inner(), Rational::from(0_i32));
+    let bsd = buy_size.inner() - min(pos_size.inner(), Decimal::ZERO).abs();
+    let ssd = sell_size.inner() - max(pos_size.inner(), Decimal::ZERO);
     let mut fees = S::PairedCurrency::new_zero();
-    let order_margin: Rational = if (buy_size == S::new_zero() && sell_size == S::new_zero())
-        || (bsd == 0.0 && ssd == 0.0)
+    let order_margin = if (buy_size == S::new_zero() && sell_size == S::new_zero())
+        || (bsd == Decimal::ZERO && ssd == Decimal::ZERO)
     {
-        Rational::from(0_i32)
+        Decimal::ZERO
     } else if ssd > bsd {
-        if ssd == 0.0 {
+        if ssd == Decimal::ZERO {
             return S::PairedCurrency::new_zero();
         }
         fees = sell_side_fees;
 
         let price_mult = match futures_type {
             FuturesTypes::Linear => sell_price_weight / sell_size.inner(),
-            FuturesTypes::Inverse => (sell_price_weight / sell_size.inner()).reciprocal(),
+            FuturesTypes::Inverse => Decimal::ONE / (sell_price_weight / sell_size.inner()),
         };
         ssd * price_mult
     } else {
-        if bsd == 0.0 {
+        if bsd == Decimal::ZERO {
             return S::PairedCurrency::new_zero();
         }
         fees = buy_side_fees;
 
         let price_mult = match futures_type {
             FuturesTypes::Linear => buy_price_weight / buy_size.inner(),
-            FuturesTypes::Inverse => (buy_price_weight / buy_size.inner()).reciprocal(),
+            FuturesTypes::Inverse => Decimal::ONE / (buy_price_weight / buy_size.inner()),
         };
         bsd * price_mult
     };

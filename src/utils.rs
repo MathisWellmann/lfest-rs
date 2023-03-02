@@ -1,3 +1,5 @@
+use fpdec::Decimal;
+
 /// Return the minimum of two values
 #[inline(always)]
 pub(crate) fn min<T>(v0: T, v1: T) -> T
@@ -34,8 +36,28 @@ pub(crate) fn decimal_places_from_min_incr(min_incr: f64) -> i32 {
     (1.0 / min_incr).log10().ceil() as i32
 }
 
+/// TODO: create PR to `impl std::iter::Sum for Decimal` on upstream `fpdec`
+/// Sums a bunch of decimals up
+pub(crate) fn sum_decimals(vals: &[Decimal]) -> Decimal {
+    let mut out = Decimal::ZERO;
+    for v in vals {
+        out += v;
+    }
+    out
+}
+
+/// Convert a `Decimal` value into `f64`.
+#[inline(always)]
+pub(crate) fn decimal_to_f64(val: Decimal) -> f64 {
+    val.coefficient() as f64 / val.n_frac_digits() as f64
+}
+
 #[cfg(test)]
 mod tests {
+    use std::convert::TryFrom;
+
+    use rand::{thread_rng, Rng};
+
     use super::*;
 
     #[test]
@@ -58,5 +80,20 @@ mod tests {
         assert_eq!(decimal_places_from_min_incr(0.07), 2);
         assert_eq!(decimal_places_from_min_incr(0.003), 3);
         assert_eq!(decimal_places_from_min_incr(0.007), 3);
+    }
+
+    #[test]
+    fn test_decimal_to_f64() {
+        assert_eq!(decimal_to_f64(Decimal::ZERO), 0.0);
+        assert_eq!(decimal_to_f64(Decimal::ONE), 1.0);
+        assert_eq!(decimal_to_f64(Decimal::TWO), 2.0);
+
+        let mut rng = thread_rng();
+        for i in 0..1_000_000 {
+            let val: f64 = rng.gen();
+            // TODO: this may fail, whats a better way to test this?
+            assert_eq!(decimal_to_f64(Decimal::try_from(val).unwrap()), val);
+            assert_eq!(decimal_to_f64(Decimal::try_from(val * 10.0).unwrap()), val);
+        }
     }
 }

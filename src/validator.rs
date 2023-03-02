@@ -168,8 +168,8 @@ impl Validator {
         let fee_of_size: S = order.quantity().fee_portion(self.fee_taker);
 
         let price = match order.side() {
-            Side::Buy => &self.ask,
-            Side::Sell => &self.bid,
+            Side::Buy => self.ask,
+            Side::Sell => self.bid,
         };
         match self.futures_type {
             FuturesTypes::Linear => {
@@ -218,7 +218,7 @@ impl Validator {
             acc.position().size(),
             self.futures_type,
             acc.position().leverage(),
-            &self.fee_maker,
+            self.fee_maker,
         );
 
         // get the additional needed difference
@@ -230,7 +230,7 @@ impl Validator {
             diff
         );
 
-        S::PairedCurrency::new(diff)
+        diff
     }
 }
 

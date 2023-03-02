@@ -1,9 +1,6 @@
-use malachite::Rational;
-use serde::{Deserialize, Serialize};
-
 use crate::{quote, Currency, FuturesTypes, Leverage, QuoteCurrency};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default)]
 /// Describes the position information of the account
 pub struct Position<S>
 where S: Currency
@@ -69,8 +66,8 @@ where S: Currency
 
     /// Return the positions leverage
     #[inline(always)]
-    pub fn leverage(&self) -> &Leverage {
-        &self.leverage
+    pub fn leverage(&self) -> Leverage {
+        self.leverage
     }
 
     /// Return the positions unrealized profit and loss
@@ -107,8 +104,7 @@ where S: Currency
                 let size_abs = self.size.abs().inner();
                 let size_delta_abs = size_delta.abs().inner();
                 let entry_price = self.entry_price.inner();
-                let entry_price: Rational = ((size_abs * entry_price)
-                    + (size_delta_abs * price.inner()))
+                let entry_price = ((size_abs * entry_price) + (size_delta_abs * price.inner()))
                     / (size_abs + size_delta_abs);
                 self.entry_price = QuoteCurrency::new(entry_price);
             }
@@ -117,13 +113,13 @@ where S: Currency
         }
         self.size += size_delta.clone();
 
-        self.update_state(&price, futures_type);
+        self.update_state(price, futures_type);
     }
 
     /// Update the state to reflect price changes
     pub(crate) fn update_state(&mut self, price: QuoteCurrency, futures_type: FuturesTypes) {
         self.unrealized_pnl = if self.size != S::new_zero() {
-            futures_type.pnl(&self.entry_price, price, self.size)
+            futures_type.pnl(self.entry_price, price, self.size)
         } else {
             S::PairedCurrency::new_zero()
         };

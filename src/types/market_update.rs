@@ -1,7 +1,7 @@
 use crate::QuoteCurrency;
 
 /// Decribes the possible updates to the market state
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MarketUpdate {
     /// An update to the best bid and ask has occured
     Bba {

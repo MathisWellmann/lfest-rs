@@ -38,7 +38,7 @@ pub trait Currency:
 
     /// Create a new instance from a `Rational` value
     #[must_use]
-    fn new(val: Rational) -> Self;
+    fn new(val: Decimal) -> Self;
 
     /// Create a new instance from a `f64` value
     #[must_use]
@@ -81,12 +81,12 @@ mod tests {
 
     #[test]
     fn conversion() {
-        assert_eq!(base!(1.0).convert(&quote!(20_000.0)), quote!(20_000.0));
-        assert_eq!(base!(0.5).convert(&quote!(20_000.0)), quote!(10_000.0));
-        assert_eq!(base!(0.25).convert(&quote!(20_000.0)), quote!(5_000.0));
+        assert_eq!(base!(1.0).convert(quote!(20_000.0)), quote!(20_000.0));
+        assert_eq!(base!(0.5).convert(quote!(20_000.0)), quote!(10_000.0));
+        assert_eq!(base!(0.25).convert(quote!(20_000.0)), quote!(5_000.0));
 
-        assert_eq!(quote!(20_000.0).convert(&quote!(20_000.0)), base!(1.0));
-        assert_eq!(quote!(10_000.0).convert(&quote!(20_000.0)), base!(0.5));
-        assert_eq!(quote!(5_000.0).convert(&quote!(20_000.0)), base!(0.25));
+        assert_eq!(quote!(20_000.0).convert(quote!(20_000.0)), base!(1.0));
+        assert_eq!(quote!(10_000.0).convert(quote!(20_000.0)), base!(0.5));
+        assert_eq!(quote!(5_000.0).convert(quote!(20_000.0)), base!(0.25));
     }
 }
