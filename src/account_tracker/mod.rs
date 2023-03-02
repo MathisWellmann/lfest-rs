@@ -6,7 +6,7 @@ mod no_track;
 pub use full_track::{FullAccountTracker, ReturnsSource};
 pub use no_track::NoAccountTracker;
 
-use crate::{Currency, QuoteCurrency, Side};
+use crate::prelude::{Currency, QuoteCurrency, Side};
 
 /// Something that tracks the performance of the Account.
 /// This allows for greated flexibility over using the FullAccountTracker

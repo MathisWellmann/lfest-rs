@@ -39,7 +39,7 @@ Some of these metric may behave differently from what you would expect, so make 
 To use this crate in your project, add the following to your Cargo.toml:
 ```
 [dependencies]
-lfest = "0.24.0"
+lfest = "0.29.0"
 ```
 
 Then proceed to use it in your code.
@@ -47,18 +47,7 @@ For an example see [examples](examples/basic.rs)
 
 ### TODOs:
 - proper liquidations
-- add order filter configuration such as min_qty and qty_precision
-- add max_num_limit_orders to config
-- impl Display for Side and FuturesType
-- add optional order filtering such as
-  * PriceFilters:
-    * min_price
-    * max_price
-    * tick_size
-  * SizeFilters:
-    * min_size
-    * max_size
-    * step_size
+- Rework some internal components for greater clarity and simplicity
 
 ### Contributions
 If you find a bug or would like to help out, feel free to create a pull-request.

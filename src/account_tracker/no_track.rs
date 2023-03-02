@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
-use crate::{AccountTracker, Currency, QuoteCurrency};
+use crate::{
+    account_tracker::AccountTracker,
+    types::{Currency, QuoteCurrency, Side},
+};
 
 /// Performs no tracking of account performance
 #[derive(Default, Debug, Clone)]
@@ -21,7 +24,7 @@ where M: Currency
 
     fn log_limit_order_fill(&mut self) {}
 
-    fn log_trade(&mut self, _side: crate::Side, _price: QuoteCurrency, _size: M::PairedCurrency) {}
+    fn log_trade(&mut self, _side: Side, _price: QuoteCurrency, _size: M::PairedCurrency) {}
 }
 
 impl Display for NoAccountTracker {

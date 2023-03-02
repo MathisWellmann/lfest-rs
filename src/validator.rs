@@ -1,6 +1,12 @@
 use crate::{
-    limit_order_margin::order_margin, max, min, quote, Account, AccountTracker, Currency, Fee,
-    FuturesTypes, Order, OrderError, QuoteCurrency, Side,
+    account::Account,
+    account_tracker::AccountTracker,
+    errors::OrderError,
+    limit_order_margin::order_margin,
+    max, min,
+    orders::Order,
+    quote,
+    types::{Currency, Fee, FuturesTypes, QuoteCurrency, Side},
 };
 
 #[derive(Clone, Debug, Default)]

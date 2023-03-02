@@ -2,7 +2,7 @@ use std::{fmt::Formatter, str::FromStr};
 
 use crate::{
     errors::{Error, Result},
-    Currency, QuoteCurrency,
+    prelude::{Currency, QuoteCurrency},
 };
 
 /// Enumeration of different futures types
@@ -87,7 +87,7 @@ impl FuturesTypes {
 }
 
 impl FromStr for FuturesTypes {
-    type Err = crate::Error;
+    type Err = crate::errors::Error;
 
     fn from_str(s: &str) -> Result<Self> {
         if s.to_uppercase() == "LINEAR" {
@@ -103,7 +103,7 @@ impl FromStr for FuturesTypes {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{base, quote, BaseCurrency};
+    use crate::prelude::*;
 
     #[test]
     fn futures_type_pnl_linear() {

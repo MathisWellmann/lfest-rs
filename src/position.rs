@@ -129,7 +129,7 @@ where S: Currency
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{base, BaseCurrency};
+    use crate::prelude::*;
 
     #[test]
     fn position_change_size() {
