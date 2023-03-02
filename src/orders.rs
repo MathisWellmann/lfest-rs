@@ -1,9 +1,7 @@
-use serde::{Deserialize, Serialize};
-
 use crate::{Currency, OrderError, OrderType, QuoteCurrency, Side};
 
 /// Defines an order
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Order<S> {
     /// id will be filled in using exchange.submit_order()
     id: u64,
@@ -112,14 +110,14 @@ where S: Currency
 
     /// limit price of Order
     #[inline(always)]
-    pub fn limit_price(&self) -> &Option<QuoteCurrency> {
-        &self.limit_price
+    pub fn limit_price(&self) -> Option<QuoteCurrency> {
+        self.limit_price
     }
 
     /// Quantity of Order
     #[inline(always)]
-    pub fn quantity(&self) -> &S {
-        &self.quantity
+    pub fn quantity(&self) -> S {
+        self.quantity
     }
 
     /// Side of Order

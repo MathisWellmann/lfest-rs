@@ -40,9 +40,9 @@ impl FuturesTypes {
     #[inline]
     pub fn pnl<S>(
         &self,
-        entry_price: &QuoteCurrency,
-        exit_price: &QuoteCurrency,
-        contract_qty: &S,
+        entry_price: QuoteCurrency,
+        exit_price: QuoteCurrency,
+        contract_qty: S,
     ) -> S::PairedCurrency
     where
         S: Currency,

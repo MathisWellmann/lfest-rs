@@ -1,5 +1,7 @@
+use std::convert::TryFrom;
+
 use derive_more::Display;
-use malachite::Rational;
+use fpdec::Decimal;
 
 /// Allows the quick construction of `Leverage`
 #[macro_export]
@@ -10,22 +12,22 @@ macro_rules! leverage {
 }
 
 /// Leverage
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Display)]
-pub struct Leverage(Rational);
+#[derive(Default, Debug, Clone, Copy, PartialEq, Display)]
+pub struct Leverage(Decimal);
 
 impl Leverage {
     #[inline(always)]
-    pub(crate) fn new(val: Rational) -> Self {
+    pub(crate) fn new(val: Decimal) -> Self {
         Self(val)
     }
 
     #[inline]
     pub(crate) fn from_f64(val: f64) -> Self {
-        Self(Rational::try_from_float_simplest(val).expect("Unable to get Rational from float"))
+        Self(Decimal::try_from(val).expect("Unable to create Decimal from f64"))
     }
 
     #[inline(always)]
-    pub(crate) fn inner(&self) -> &Rational {
-        &self.0
+    pub(crate) fn inner(&self) -> Decimal {
+        self.0
     }
 }

@@ -64,9 +64,9 @@ where
     }
 
     /// Update the accounts state for the newest price data
-    pub(crate) fn update(&mut self, price: &QuoteCurrency, trade_timestamp: u64) {
+    pub(crate) fn update(&mut self, price: QuoteCurrency, trade_timestamp: u64) {
         let upnl = self.futures_type.pnl(self.position.entry_price(), price, self.position.size());
-        self.account_tracker.update(trade_timestamp, *price, upnl);
+        self.account_tracker.update(trade_timestamp, price, upnl);
 
         self.position.update_state(price, self.futures_type);
     }
@@ -194,14 +194,14 @@ where
 
     /// Cumulative open limit order size of buy orders
     #[inline(always)]
-    pub fn open_limit_buy_size(&self) -> &S {
-        &self.open_limit_buy_size
+    pub fn open_limit_buy_size(&self) -> S {
+        self.open_limit_buy_size
     }
 
     /// Cumulative
     #[inline(always)]
-    pub fn open_limit_sell_size(&self) -> &S {
-        &self.open_limit_sell_size
+    pub fn open_limit_sell_size(&self) -> S {
+        self.open_limit_sell_size
     }
 
     /// Append a new limit order as active order
@@ -319,7 +319,7 @@ where
     }
 
     /// Changes the position by a given delta while changing margin accordingly
-    pub(crate) fn change_position(&mut self, side: Side, size: &S, exec_price: &QuoteCurrency) {
+    pub(crate) fn change_position(&mut self, side: Side, size: S, exec_price: QuoteCurrency) {
         debug!(
             "account: change_position(side: {:?}, size: {}, exec_price: {})",
             side, size, exec_price
@@ -330,9 +330,9 @@ where
         };
         let rpnl = match side {
             Side::Buy => {
-                if self.position.size() < &S::new_zero() {
+                if self.position.size() < S::new_zero() {
                     // pnl needs to be realized
-                    if size > &self.position.size().abs() {
+                    if size > self.position.size().abs() {
                         self.futures_type.pnl(
                             self.position.entry_price(),
                             &exec_price,
@@ -350,7 +350,7 @@ where
                 }
             }
             Side::Sell => {
-                if self.position.size() > &S::new_zero() {
+                if self.position.size() > S::new_zero() {
                     // pnl needs to be realized
                     if size > self.position.size() {
                         self.futures_type.pnl(

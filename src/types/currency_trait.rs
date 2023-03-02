@@ -4,7 +4,7 @@ use crate::{Fee, QuoteCurrency};
 
 /// Every unit of account must implement this trait
 pub trait Currency:
-    Clone
+    Copy
     + Send
     + Sized
     + std::fmt::Debug
@@ -63,12 +63,12 @@ pub trait Currency:
     fn abs(self) -> Self;
 
     /// Compute the fee denoted in the currency
-    fn fee_portion(&self, fee: &Fee) -> Self;
+    fn fee_portion(&self, fee: Fee) -> Self;
 
     /// Convert this `Currency`'s value into its pair at the conversion `rate`.
     /// E.g:
     /// 1 BTC @ 20_000 USD means that 1 USD = 1 / 20_000 BTC
-    fn convert(&self, rate: &QuoteCurrency) -> Self::PairedCurrency;
+    fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency;
 
     /// Convert the Currency to a negative value
     fn into_negative(self) -> Self;

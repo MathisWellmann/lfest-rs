@@ -21,8 +21,7 @@ where M: Currency
 
     fn log_limit_order_fill(&mut self) {}
 
-    fn log_trade(&mut self, _side: crate::Side, _price: &QuoteCurrency, _size: &M::PairedCurrency) {
-    }
+    fn log_trade(&mut self, _side: crate::Side, _price: QuoteCurrency, _size: M::PairedCurrency) {}
 }
 
 impl Display for NoAccountTracker {

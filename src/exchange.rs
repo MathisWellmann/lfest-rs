@@ -1,3 +1,4 @@
+use fpdec::Decimal;
 use malachite::{num::basic::traits::Two, Rational};
 
 use crate::{
@@ -157,8 +158,8 @@ where
         self.check_orders();
 
         // TODO: pass through bid and ask, instead of the mid price
-        let mid_price = (self.bid.inner_ref() + self.ask.inner_ref()) / Rational::TWO;
-        self.user_account.update(&QuoteCurrency::from(mid_price), timestamp);
+        let mid_price = (self.bid + self.ask) / Decimal::TWO;
+        self.user_account.update(QuoteCurrency::from(mid_price), timestamp);
 
         self.step += 1;
 
@@ -205,7 +206,7 @@ where
     }
 
     /// Execute a market order
-    fn execute_market(&mut self, side: Side, amount: &S) {
+    fn execute_market(&mut self, side: Side, amount: S) {
         debug!("exchange: execute_market: side: {:?}, amount: {}", side, amount);
 
         let price = match side {
@@ -241,10 +242,10 @@ where
     fn liquidate(&mut self) {
         // TODO: better liquidate
         debug!("liquidating");
-        if self.user_account.position().size() > &S::new_zero() {
+        if self.user_account.position().size() > S::new_zero() {
             self.execute_market(Side::Sell, self.user_account.position().size());
         } else {
-            self.execute_market(Side::Buy, &self.user_account.position().size().abs());
+            self.execute_market(Side::Buy, self.user_account.position().size().abs());
         }
     }
 

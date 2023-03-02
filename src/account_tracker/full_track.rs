@@ -681,7 +681,7 @@ where M: Currency + Send
         self.num_filled_limit_orders += 1;
     }
 
-    fn log_trade(&mut self, side: Side, price: &QuoteCurrency, size: &M::PairedCurrency) {
+    fn log_trade(&mut self, side: Side, price: QuoteCurrency, size: M::PairedCurrency) {
         self.total_turnover += size.convert(price);
         self.num_trades += 1;
         match side {

@@ -21,10 +21,10 @@ use crate::{max, min, Currency, Fee, FuturesTypes, Leverage, Order, Side};
 /// TODO: rework this, its too complex
 pub(crate) fn order_margin<S>(
     orders: impl Iterator<Item = Order<S>>,
-    pos_size: &S,
+    pos_size: S,
     futures_type: FuturesTypes,
-    leverage: &Leverage,
-    fee_maker: &Fee,
+    leverage: Leverage,
+    fee_maker: Fee,
 ) -> S::PairedCurrency
 where
     S: Currency,
@@ -37,7 +37,7 @@ where
     let mut sell_side_fees = S::PairedCurrency::new_zero();
     for o in orders {
         let limit_price = o.limit_price().expect("Limit price must exist; qed");
-        let fee_margin = o.quantity().convert(&limit_price).fee_portion(fee_maker);
+        let fee_margin = o.quantity().convert(limit_price).fee_portion(fee_maker);
         let size = o.quantity();
         match o.side() {
             Side::Buy => {

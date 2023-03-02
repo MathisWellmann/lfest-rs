@@ -32,7 +32,7 @@ impl PriceFilter {
     pub(crate) fn validate_order<S>(
         &self,
         order: &Order<S>,
-        mark_price: &QuoteCurrency,
+        mark_price: QuoteCurrency,
     ) -> Result<(), OrderError>
     where
         S: Currency,

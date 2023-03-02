@@ -141,7 +141,7 @@ impl Validator {
                     order.quantity().clone(),
                 ),
             }
-        } else if pos_size > &S::new_zero() {
+        } else if pos_size > S::new_zero() {
             match order.side() {
                 Side::Buy => (S::new_zero(), order.quantity().clone()),
                 Side::Sell => (
@@ -165,7 +165,7 @@ impl Validator {
         debit = S::new(debit.inner() / l);
         credit = S::new(credit.inner() / l);
 
-        let fee_of_size: S = order.quantity().fee_portion(&self.fee_taker);
+        let fee_of_size: S = order.quantity().fee_portion(self.fee_taker);
 
         let price = match order.side() {
             Side::Buy => &self.ask,
@@ -175,18 +175,18 @@ impl Validator {
             FuturesTypes::Linear => {
                 // the values fee, debit and credit have to be converted from denoted in BASE
                 // currency to being denoted in QUOTE currency
-                let fee_margin = fee_of_size.convert(&price);
-                let debit = debit.convert(&price);
-                let credit = credit.convert(&price);
+                let fee_margin = fee_of_size.convert(price);
+                let debit = debit.convert(price);
+                let credit = credit.convert(price);
 
                 (debit, credit + fee_margin)
             }
             FuturesTypes::Inverse => {
                 // the values fee, debit and credit have to be converted from denoted in QUOTE
                 // currency to being denoted in BASE currency
-                let fee_margin = fee_of_size.convert(&price);
-                let debit = debit.convert(&price);
-                let credit = credit.convert(&price);
+                let fee_margin = fee_of_size.convert(price);
+                let debit = debit.convert(price);
+                let credit = credit.convert(price);
 
                 (debit, credit + fee_margin)
             }
@@ -222,7 +222,7 @@ impl Validator {
         );
 
         // get the additional needed difference
-        let diff = needed_order_margin.inner_ref() - acc.margin().order_margin().inner_ref();
+        let diff = needed_order_margin - acc.margin().order_margin();
         debug!(
             "needed_order_margin: {}, acc_om: {}, diff: {}",
             needed_order_margin,

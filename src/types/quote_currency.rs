@@ -21,6 +21,7 @@ macro_rules! quote {
     Default,
     Debug,
     Clone,
+    Copy,
     PartialEq,
     PartialOrd,
     Add,
@@ -47,7 +48,7 @@ impl Currency for QuoteCurrency {
 
     #[inline]
     fn from_f64(val: f64) -> Self {
-        Self(Decimal::try_from().expect("Unable to create Decimal from f64"))
+        Self(Decimal::try_from(val).expect("Unable to create Decimal from f64"))
     }
 
     #[inline(always)]
@@ -77,13 +78,13 @@ impl Currency for QuoteCurrency {
     }
 
     #[inline(always)]
-    fn fee_portion(&self, fee: &Fee) -> Self {
-        Self(&self.0 * fee.inner_ref())
+    fn fee_portion(&self, fee: Fee) -> Self {
+        Self(self.0 * fee)
     }
 
     #[inline(always)]
-    fn convert(&self, rate: &QuoteCurrency) -> Self::PairedCurrency {
-        BaseCurrency::new(&self.0 / rate.inner_ref())
+    fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency {
+        BaseCurrency::new(self.0 / rate)
     }
 
     #[inline(always)]

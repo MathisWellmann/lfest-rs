@@ -57,14 +57,14 @@ where S: Currency
 
     /// Return the position size
     #[inline(always)]
-    pub fn size(&self) -> &S {
-        &self.size
+    pub fn size(&self) -> S {
+        self.size
     }
 
     /// Return the entry price of the position
     #[inline(always)]
-    pub fn entry_price(&self) -> &QuoteCurrency {
-        &self.entry_price
+    pub fn entry_price(&self) -> QuoteCurrency {
+        self.entry_price
     }
 
     /// Return the positions leverage
@@ -77,15 +77,15 @@ where S: Currency
     /// denoted in QUOTE when using linear futures,
     /// denoted in BASE when using inverse futures
     #[inline(always)]
-    pub fn unrealized_pnl(&self) -> &S::PairedCurrency {
-        &self.unrealized_pnl
+    pub fn unrealized_pnl(&self) -> S::PairedCurrency {
+        self.unrealized_pnl
     }
 
     /// Change the position size by a given delta at a certain price
     pub(crate) fn change_size(
         &mut self,
-        size_delta: &S,
-        price: &QuoteCurrency,
+        size_delta: S,
+        price: QuoteCurrency,
         futures_type: FuturesTypes,
     ) {
         trace!("change_size({}, {}, {})", size_delta, price, futures_type);
@@ -121,9 +121,9 @@ where S: Currency
     }
 
     /// Update the state to reflect price changes
-    pub(crate) fn update_state(&mut self, price: &QuoteCurrency, futures_type: FuturesTypes) {
+    pub(crate) fn update_state(&mut self, price: QuoteCurrency, futures_type: FuturesTypes) {
         self.unrealized_pnl = if self.size != S::new_zero() {
-            futures_type.pnl(&self.entry_price, price, &self.size)
+            futures_type.pnl(&self.entry_price, price, self.size)
         } else {
             S::PairedCurrency::new_zero()
         };
