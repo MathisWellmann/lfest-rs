@@ -1,10 +1,10 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    convert::TryFrom,
+    ops::{Add, Div, Mul, Sub},
+};
 
 use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
-use malachite::{
-    num::{arithmetic::traits::Abs, basic::traits::Zero},
-    Rational,
-};
+use fpdec::Decimal;
 
 use crate::{Currency, Fee, QuoteCurrency};
 
@@ -23,8 +23,6 @@ macro_rules! base {
     Clone,
     PartialEq,
     PartialOrd,
-    Serialize,
-    Deserialize,
     Add,
     Sub,
     Mul,
@@ -37,29 +35,34 @@ macro_rules! base {
 )]
 #[mul(forward)]
 #[div(forward)]
-pub struct BaseCurrency(Rational);
+pub struct BaseCurrency(Decimal);
 
 impl Currency for BaseCurrency {
     type PairedCurrency = QuoteCurrency;
 
     #[inline(always)]
-    fn new(val: Rational) -> Self {
+    fn new(val: Decimal) -> Self {
         Self(val)
     }
 
     #[inline]
     fn from_f64(val: f64) -> Self {
-        Self(Rational::try_from_float_simplest(val).expect("Unable to get Rational from float"))
+        Self(Decimal::try_from(val).expect("Unable to create Decimal from f64"))
+    }
+
+    #[inline(always)]
+    fn inner(self) -> Decimal {
+        self.0
     }
 
     #[inline(always)]
     fn new_zero() -> Self {
-        Self::new(Rational::ZERO)
+        Self::new(Decimal::ZERO)
     }
 
     #[inline(always)]
     fn is_zero(&self) -> bool {
-        self.0.eq(&Rational::ZERO)
+        self.0.eq(&Decimal::ZERO)
     }
 
     #[inline(always)]
@@ -89,67 +92,35 @@ impl Currency for BaseCurrency {
     }
 }
 
-/// ### Arithmetic with `Rational` on the right hand side
-impl Add<Rational> for BaseCurrency {
+/// ### Arithmetic with `Decimal` on the right hand side
+impl Add<Decimal> for BaseCurrency {
     type Output = Self;
 
-    fn add(self, rhs: Rational) -> Self::Output {
+    fn add(self, rhs: Decimal) -> Self::Output {
         Self(self.0 + rhs)
     }
 }
 
-impl<'a> Add<&'a Rational> for BaseCurrency {
+impl Sub<Decimal> for BaseCurrency {
     type Output = Self;
 
-    fn add(self, rhs: &'a Rational) -> Self::Output {
-        Self(self.0 + rhs)
-    }
-}
-
-impl Sub<Rational> for BaseCurrency {
-    type Output = Self;
-
-    fn sub(self, rhs: Rational) -> Self::Output {
+    fn sub(self, rhs: Decimal) -> Self::Output {
         Self(self.0 - rhs)
     }
 }
 
-impl<'a> Sub<&'a Rational> for BaseCurrency {
+impl Mul<Decimal> for BaseCurrency {
     type Output = Self;
 
-    fn sub(self, rhs: &'a Rational) -> Self::Output {
-        Self(self.0 - rhs)
-    }
-}
-
-impl Mul<Rational> for BaseCurrency {
-    type Output = Self;
-
-    fn mul(self, rhs: Rational) -> Self::Output {
+    fn mul(self, rhs: Decimal) -> Self::Output {
         Self(self.0 * rhs)
     }
 }
 
-impl<'a> Mul<&'a Rational> for BaseCurrency {
+impl Div<Decimal> for BaseCurrency {
     type Output = Self;
 
-    fn mul(self, rhs: &'a Rational) -> Self::Output {
-        Self(self.0 * rhs)
-    }
-}
-
-impl Div<Rational> for BaseCurrency {
-    type Output = Self;
-
-    fn div(self, rhs: Rational) -> Self::Output {
-        Self(self.0 / rhs)
-    }
-}
-
-impl<'a> Div<&'a Rational> for BaseCurrency {
-    type Output = Self;
-
-    fn div(self, rhs: &'a Rational) -> Self::Output {
+    fn div(self, rhs: Decimal) -> Self::Output {
         Self(self.0 / rhs)
     }
 }
@@ -187,6 +158,7 @@ impl<'a> Div<&'a Self> for BaseCurrency {
     }
 }
 
+/// ### Arithmetic assignment with `&Self` on the right hand side
 impl<'a> std::ops::AddAssign<&'a Self> for BaseCurrency {
     fn add_assign(&mut self, rhs: &'a Self) {
         self.0 = &self.0 + &rhs.0;

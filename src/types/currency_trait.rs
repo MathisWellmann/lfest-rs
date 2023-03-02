@@ -1,4 +1,4 @@
-use malachite::Rational;
+use fpdec::Decimal;
 
 use crate::{Fee, QuoteCurrency};
 
@@ -15,10 +15,10 @@ pub trait Currency:
     + std::ops::Mul<Output = Self>
     + std::ops::Div<Output = Self>
     // Require to do arithmetic with `Rational` on the right hand side
-    + std::ops::Add<Rational, Output = Self>
-    + std::ops::Sub<Rational, Output = Self>
-    + std::ops::Mul<Rational, Output = Self>
-    + std::ops::Div<Rational, Output = Self>
+    + std::ops::Add<Decimal, Output = Self>
+    + std::ops::Sub<Decimal, Output = Self>
+    + std::ops::Mul<Decimal, Output = Self>
+    + std::ops::Div<Decimal, Output = Self>
     // Require to do arithmetic with `&Self` on the right hand side
     + for<'a> std::ops::Add<&'a Self, Output = Self>
     + for<'a> std::ops::Sub<&'a Self, Output = Self>
@@ -43,6 +43,9 @@ pub trait Currency:
     /// Create a new instance from a `f64` value
     #[must_use]
     fn from_f64(val: f64) -> Self;
+
+    /// Return the inner `Decimal`
+    fn inner(self) -> Decimal;
 
     /// Create a new currency instance with zero value
     #[must_use]

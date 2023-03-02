@@ -1,12 +1,6 @@
-use std::{convert::TryInto, fmt::Display};
+use std::fmt::Display;
 
-use malachite::{
-    num::{
-        arithmetic::traits::{CheckedSqrt, Pow},
-        basic::traits::One,
-    },
-    Rational,
-};
+use fpdec::Decimal;
 
 use crate::{
     cornish_fisher::cornish_fisher_value_at_risk, quote, AccountTracker, Currency, FuturesTypes,
@@ -47,8 +41,8 @@ pub struct FullAccountTracker<M> {
     num_filled_limit_orders: usize,
     num_trading_opportunities: usize,
     total_turnover: M,
-    max_drawdown_wallet_balance: Rational,
-    max_drawdown_total: Rational,
+    max_drawdown_wallet_balance: Decimal,
+    max_drawdown_total: Decimal,
     // historical daily absolute returns
     hist_returns_daily_acc: Vec<M>,
     hist_returns_daily_bnh: Vec<M>,
@@ -109,8 +103,8 @@ where M: Currency + Send
             num_filled_limit_orders: 0,
             num_trading_opportunities: 0,
             total_turnover: M::new_zero(),
-            max_drawdown_wallet_balance: Rational::from(0),
-            max_drawdown_total: Rational::from(0),
+            max_drawdown_wallet_balance: Decimal::from(0),
+            max_drawdown_total: Decimal::from(0),
             hist_returns_daily_acc: vec![],
             hist_returns_daily_bnh: vec![],
             hist_returns_hourly_acc: vec![],
@@ -167,8 +161,8 @@ where M: Currency + Send
 
     /// Ratio of cumulative trade profit over cumulative trade loss
     #[inline(always)]
-    pub fn profit_loss_ratio(&self) -> Rational {
-        self.total_profit.inner() / self.total_loss.inner()
+    pub fn profit_loss_ratio(&self) -> Decimal {
+        self.total_profit / self.total_loss
     }
 
     /// Cumulative fees paid to the exchange
