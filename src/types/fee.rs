@@ -16,8 +16,9 @@ macro_rules! fee {
 pub struct Fee(Decimal);
 
 impl Fee {
+    /// Create a new `Fee` instance from an `f64` value
     #[inline]
-    pub(crate) fn from_f64(val: f64) -> Self {
+    pub fn from_f64(val: f64) -> Self {
         Self(Decimal::try_from(val).expect("Unable to create Decimal from f64"))
     }
 

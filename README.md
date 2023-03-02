@@ -8,6 +8,17 @@ lfest-rs is a simulated futures exchange capable of leveraged positions.
   and check for order execution. For simplicity's sake (and performance) the exchange does not use an order book.
   Supported futures types are both linear and inverse futures.
 
+### Features:
+Some of the most notable features include:
+- Fixed point arithmetic using [fpdec](https://github.com/mamrhein/fpdec.rs) crate, which is a super fast implementation
+- Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct function IO.
+Examples include `BaseCurrency`, `QuoteCurrency`, `Fee` and `Leverage`. 
+This makes it impossible to mistakenly input for example a `USD` denoted value into a function that expects a `BTC` denoted value.
+- Flexible market data integration through the `MarketUpdate` type and associated macros.
+- Integrated performance tracking. Use the existing `FullTrack` or implement your own using the `AccountTracker` trait.
+- Broad test coverage, to get closer to ensured correctness.
+- Auditable due to its small and consice codebase.
+
 ### Order Types
 The supported order types are:
 - market        - aggressively execute against the best bid / ask

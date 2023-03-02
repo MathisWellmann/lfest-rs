@@ -1,6 +1,6 @@
 //! Test if a pure limit order strategy works correctly
 
-use lfest::*;
+use lfest::{account_tracker::NoAccountTracker, prelude::*};
 use log::*;
 
 #[test]
@@ -8,10 +8,10 @@ fn limit_orders_only() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         quote!(1000.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Linear,
         String::new(),
         true,
@@ -35,7 +35,7 @@ fn limit_orders_only() {
     let o = Order::limit(Side::Buy, quote!(100.0), base!(9.9)).unwrap();
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().margin().order_margin(), quote!(990.198));
-    assert_eq!(exchange.account().margin().available_balance().into_rounded(3), quote!(9.802));
+    assert_eq!(exchange.account().margin().available_balance(), quote!(9.802));
 
     let (exec_orders, liq) = exchange.update_state(
         1,
@@ -57,7 +57,7 @@ fn limit_orders_only() {
     assert_eq!(exchange.account().margin().wallet_balance(), quote!(999.802));
     assert_eq!(exchange.account().margin().position_margin(), quote!(990.0));
     assert_eq!(exchange.account().margin().order_margin(), quote!(0.0));
-    assert_eq!(exchange.account().margin().available_balance().into_rounded(3), quote!(9.802));
+    assert_eq!(exchange.account().margin().available_balance(), quote!(9.802));
 
     let o = Order::limit(Side::Sell, quote!(105.1), base!(9.9)).unwrap();
     exchange.submit_order(o).unwrap();
@@ -74,13 +74,10 @@ fn limit_orders_only() {
     assert!(!exec_orders.is_empty());
 
     assert_eq!(exchange.account().position().size(), base!(0.0));
-    assert_eq!(exchange.account().margin().wallet_balance().into_rounded(6), quote!(1050.083902));
+    assert_eq!(exchange.account().margin().wallet_balance(), quote!(1050.083902));
     assert_eq!(exchange.account().margin().position_margin(), quote!(0.0));
     assert_eq!(exchange.account().margin().order_margin(), quote!(0.0));
-    assert_eq!(
-        exchange.account().margin().available_balance().into_rounded(6),
-        quote!(1050.083902)
-    );
+    assert_eq!(exchange.account().margin().available_balance(), quote!(1050.083902));
 }
 
 #[test]
@@ -88,10 +85,10 @@ fn limit_orders_2() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         quote!(100.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Linear,
         String::new(),
         true,

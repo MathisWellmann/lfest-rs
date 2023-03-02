@@ -1,14 +1,14 @@
 //! Test file for the inverse futures mode of the exchange
 
-use lfest::*;
+use lfest::{account_tracker::NoAccountTracker, prelude::*};
 
 #[test]
 fn inv_long_market_win_full() {
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         base!(1.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Inverse,
         String::new(),
         true,
@@ -36,10 +36,7 @@ fn inv_long_market_win_full() {
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.0));
     assert_eq!(exchange.account().margin().wallet_balance(), base!(1.0) - fee_base1);
     assert_eq!(exchange.account().margin().position_margin(), base!(0.8));
-    assert_eq!(
-        exchange.account().margin().available_balance().into_rounded(4),
-        (base!(0.2) - fee_base1).into_rounded(4)
-    );
+    assert_eq!(exchange.account().margin().available_balance(), (base!(0.2) - fee_base1));
 
     let _ = exchange.update_state(1, bba!(quote!(2000.0), quote!(2000.0)));
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.4));
@@ -53,14 +50,11 @@ fn inv_long_market_win_full() {
 
     assert_eq!(exchange.account().position().size(), quote!(0.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.0));
-    assert_eq!(
-        exchange.account().margin().wallet_balance().into_rounded(5),
-        (base!(1.4) - fee_base1 - fee_asset2).into_rounded(5)
-    );
+    assert_eq!(exchange.account().margin().wallet_balance(), (base!(1.4) - fee_base1 - fee_asset2));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.0));
     assert_eq!(
-        exchange.account().margin().available_balance().into_rounded(5),
-        (base!(1.4) - fee_base1 - fee_asset2).into_rounded(5)
+        exchange.account().margin().available_balance(),
+        (base!(1.4) - fee_base1 - fee_asset2)
     );
 }
 
@@ -69,10 +63,10 @@ fn inv_long_market_loss_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         base!(1.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Inverse,
         String::new(),
         true,
@@ -92,7 +86,7 @@ fn inv_long_market_loss_full() {
     assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.0));
     assert_eq!(exchange.account().margin().wallet_balance(), base!(0.99952));
-    assert_eq!(exchange.account().margin().available_balance().into_rounded(2), base!(0.2));
+    assert_eq!(exchange.account().margin().available_balance(), base!(0.2));
     assert_eq!(exchange.account().margin().order_margin(), base!(0.0));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.8));
 
@@ -113,24 +107,18 @@ fn inv_long_market_loss_full() {
 
     assert_eq!(exchange.account().position().size(), quote!(0.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.0));
-    assert_eq!(
-        exchange.account().margin().wallet_balance().into_rounded(5),
-        (base!(0.8) - fee_combined).into_rounded(5)
-    );
+    assert_eq!(exchange.account().margin().wallet_balance(), (base!(0.8) - fee_combined));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.0));
-    assert_eq!(
-        exchange.account().margin().available_balance().into_rounded(5),
-        (base!(0.8) - fee_combined).into_rounded(5)
-    );
+    assert_eq!(exchange.account().margin().available_balance(), (base!(0.8) - fee_combined));
 }
 
 #[test]
 fn inv_short_market_win_full() {
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         base!(1.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Inverse,
         String::new(),
         true,
@@ -176,10 +164,10 @@ fn inv_short_market_win_full() {
 #[test]
 fn inv_short_market_loss_full() {
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         base!(1.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Inverse,
         String::new(),
         true,
@@ -224,24 +212,21 @@ fn inv_short_market_loss_full() {
 
     assert_eq!(exchange.account().position().size(), quote!(0.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.0));
-    assert_eq!(
-        exchange.account().margin().wallet_balance().into_rounded(5),
-        (base!(0.8) - fee_base1 - fee_base2).into_rounded(5)
-    );
+    assert_eq!(exchange.account().margin().wallet_balance(), (base!(0.8) - fee_base1 - fee_base2));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.0));
     assert_eq!(
-        exchange.account().margin().available_balance().into_rounded(5),
-        (base!(0.8) - fee_base1 - fee_base2).into_rounded(5)
+        exchange.account().margin().available_balance(),
+        (base!(0.8) - fee_base1 - fee_base2)
     );
 }
 
 #[test]
 fn inv_long_market_win_partial() {
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         base!(1.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Inverse,
         String::new(),
         true,
@@ -269,10 +254,7 @@ fn inv_long_market_win_partial() {
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.0));
     assert_eq!(exchange.account().margin().wallet_balance(), base!(1.0) - fee_base1);
     assert_eq!(exchange.account().margin().position_margin(), base!(0.8));
-    assert_eq!(
-        exchange.account().margin().available_balance().into_rounded(4),
-        (base!(0.2) - fee_base1).into_rounded(4)
-    );
+    assert_eq!(exchange.account().margin().available_balance(), (base!(0.2) - fee_base1));
 
     let _ = exchange.update_state(1, bba!(quote!(2000.0), quote!(2000.0)));
 
@@ -293,18 +275,18 @@ fn inv_long_market_win_partial() {
     assert_eq!(exchange.account().margin().wallet_balance(), base!(1.2) - fee_base1 - fee_base2);
     assert_eq!(exchange.account().margin().position_margin(), base!(0.4));
     assert_eq!(
-        exchange.account().margin().available_balance().into_rounded(5),
-        (base!(0.8) - fee_base1 - fee_base2).into_rounded(5)
+        exchange.account().margin().available_balance(),
+        (base!(0.8) - fee_base1 - fee_base2)
     );
 }
 
 #[test]
 fn inv_long_market_loss_partial() {
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         base!(1.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Inverse,
         String::new(),
         true,
@@ -340,24 +322,18 @@ fn inv_long_market_loss_partial() {
 
     assert_eq!(exchange.account().position().size(), quote!(400.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(-0.1));
-    assert_eq!(
-        exchange.account().margin().wallet_balance().into_rounded(6),
-        (base!(0.9) - fee_combined).into_rounded(6)
-    );
+    assert_eq!(exchange.account().margin().wallet_balance(), (base!(0.9) - fee_combined));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.4));
-    assert_eq!(
-        exchange.account().margin().available_balance().into_rounded(6),
-        (base!(0.5) - fee_combined).into_rounded(6)
-    );
+    assert_eq!(exchange.account().margin().available_balance(), (base!(0.5) - fee_combined));
 }
 
 #[test]
 fn inv_short_market_win_partial() {
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         base!(1.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Inverse,
         String::new(),
         true,
@@ -378,7 +354,7 @@ fn inv_short_market_win_partial() {
     assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.0));
     assert_eq!(exchange.account().margin().wallet_balance(), base!(0.99952));
-    assert_eq!(exchange.account().margin().available_balance().into_rounded(5), base!(0.19952));
+    assert_eq!(exchange.account().margin().available_balance(), base!(0.19952));
     assert_eq!(exchange.account().margin().order_margin(), base!(0.0));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.8));
 
@@ -400,24 +376,18 @@ fn inv_short_market_win_partial() {
 
     assert_eq!(exchange.account().position().size(), quote!(-400.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.1));
-    assert_eq!(
-        exchange.account().margin().wallet_balance().into_rounded(6),
-        (base!(1.1) - fee_combined).into_rounded(6)
-    );
+    assert_eq!(exchange.account().margin().wallet_balance(), (base!(1.1) - fee_combined));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.4));
-    assert_eq!(
-        exchange.account().margin().available_balance().into_rounded(6),
-        (base!(0.7) - fee_combined).into_rounded(6)
-    );
+    assert_eq!(exchange.account().margin().available_balance(), (base!(0.7) - fee_combined));
 }
 
 #[test]
 fn inv_short_market_loss_partial() {
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         base!(1.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Inverse,
         String::new(),
         true,
@@ -445,10 +415,7 @@ fn inv_short_market_loss_partial() {
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.0));
     assert_eq!(exchange.account().margin().wallet_balance(), base!(1.0) - fee_base1);
     assert_eq!(exchange.account().margin().position_margin(), base!(0.8));
-    assert_eq!(
-        exchange.account().margin().available_balance().into_rounded(4),
-        (base!(0.2) - fee_base1).into_rounded(4)
-    );
+    assert_eq!(exchange.account().margin().available_balance(), (base!(0.2) - fee_base1));
     let _ = exchange.update_state(1, bba!(quote!(2000.0), quote!(2000.0)));
 
     let size = quote!(400.0);
@@ -462,24 +429,21 @@ fn inv_short_market_loss_partial() {
 
     assert_eq!(exchange.account().position().size(), quote!(-400.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(-0.2));
-    assert_eq!(
-        exchange.account().margin().wallet_balance().into_rounded(5),
-        (base!(0.8) - fee_base1 - fee_base2).into_rounded(5)
-    );
+    assert_eq!(exchange.account().margin().wallet_balance(), (base!(0.8) - fee_base1 - fee_base2));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.4));
     assert_eq!(
-        exchange.account().margin().available_balance().into_rounded(2),
-        (base!(0.4) - fee_base1 - fee_base2).into_rounded(2)
+        exchange.account().margin().available_balance(),
+        (base!(0.4) - fee_base1 - fee_base2)
     );
 }
 
 #[test]
 fn inv_test_market_roundtrip() {
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         base!(1.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Inverse,
         String::new(),
         true,
@@ -531,7 +495,7 @@ fn inv_test_market_roundtrip() {
     assert_eq!(exchange.account().position().unrealized_pnl(), base!(0.0));
     assert!(exchange.account().margin().wallet_balance() < base!(1.0));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.05));
-    assert!(exchange.account().margin().available_balance() < 1.0.into());
+    assert!(exchange.account().margin().available_balance() < base!(1.0));
 }
 
 #[test]
@@ -539,10 +503,10 @@ fn inv_execute_limit() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         base!(1.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Inverse,
         String::new(),
         true,
@@ -585,8 +549,8 @@ fn inv_execute_limit() {
     assert_eq!(exchange.account().active_limit_orders().len(), 0);
     assert_eq!(exchange.account().position().size(), quote!(0.0));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.0));
-    assert_eq!(exchange.account().margin().wallet_balance().into_rounded(5), base!(1.04981));
-    assert_eq!(exchange.account().margin().available_balance().into_rounded(5), base!(1.04981));
+    assert_eq!(exchange.account().margin().wallet_balance(), base!(1.04981));
+    assert_eq!(exchange.account().margin().available_balance(), base!(1.04981));
 
     let o = Order::limit(Side::Sell, quote!(1200.0), quote!(600.0)).unwrap();
     exchange.submit_order(o).unwrap();
@@ -594,7 +558,7 @@ fn inv_execute_limit() {
 
     let _ = exchange.update_state(2, bba!(quote!(1200.1), quote!(1200.1)));
     assert_eq!(exchange.account().position().size(), quote!(-600.0));
-    assert_eq!(exchange.account().margin().position_margin().into_rounded(1), base!(0.5));
-    assert_eq!(exchange.account().margin().wallet_balance().into_rounded(2), base!(1.05));
-    assert_eq!(exchange.account().margin().available_balance().into_rounded(2), base!(0.55));
+    assert_eq!(exchange.account().margin().position_margin(), base!(0.5));
+    assert_eq!(exchange.account().margin().wallet_balance(), base!(1.05));
+    assert_eq!(exchange.account().margin().available_balance(), base!(0.55));
 }
