@@ -16,32 +16,28 @@ mod config;
 mod cornish_fisher;
 mod errors;
 mod exchange;
-mod futures_type;
 mod limit_order_margin;
 mod margin;
 mod order_filters;
-mod orders;
 mod position;
 mod types;
 mod utils;
 mod validator;
-
-pub(crate) use utils::{max, min};
-pub(crate) use validator::Validator;
 
 /// Exports common types
 pub mod prelude {
     pub use crate::{
         account::Account,
         account_tracker::AccountTracker,
+        base,
         config::Config,
         errors::{Error, OrderError, Result},
         exchange::Exchange,
-        futures_type::FuturesTypes,
+        fee, leverage,
         margin::Margin,
         order_filters::{PriceFilter, QuantityFilter},
-        orders::Order,
         position::Position,
+        quote,
         types::*,
     };
 }

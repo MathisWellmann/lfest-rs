@@ -1,6 +1,9 @@
 use fpdec::Decimal;
 
-use crate::{Currency, Order, OrderError, QuoteCurrency};
+use crate::{
+    prelude::OrderError,
+    types::{Currency, Order, QuoteCurrency},
+};
 
 /// The `PriceFilter` defines the price rules for a symbol
 #[derive(Debug, Clone)]

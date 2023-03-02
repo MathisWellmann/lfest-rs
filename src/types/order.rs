@@ -1,4 +1,7 @@
-use crate::{Currency, OrderError, OrderType, QuoteCurrency, Side};
+use crate::{
+    errors::OrderError,
+    types::{Currency, OrderType, QuoteCurrency, Side},
+};
 
 /// Defines an order
 #[derive(Debug, Clone, PartialEq)]

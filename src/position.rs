@@ -1,4 +1,7 @@
-use crate::{quote, Currency, FuturesTypes, Leverage, QuoteCurrency};
+use crate::{
+    quote,
+    types::{Currency, FuturesTypes, Leverage, QuoteCurrency},
+};
 
 #[derive(Debug, Clone, Default)]
 /// Describes the position information of the account

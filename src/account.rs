@@ -1,11 +1,14 @@
 use hashbrown::HashMap;
 
 use crate::{
+    account_tracker::AccountTracker,
+    errors::{Error, Result},
     limit_order_margin::order_margin,
+    margin::Margin,
+    position::Position,
     quote,
+    types::{Currency, Fee, FuturesTypes, Leverage, Order, QuoteCurrency, Side},
     utils::{max, min},
-    AccountTracker, Currency, Error, Fee, FuturesTypes, Leverage, Margin, Order, Position,
-    QuoteCurrency, Result, Side,
 };
 
 #[derive(Debug, Clone)]

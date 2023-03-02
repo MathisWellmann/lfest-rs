@@ -3,8 +3,11 @@ use std::fmt::Display;
 use fpdec::Decimal;
 
 use crate::{
-    cornish_fisher::cornish_fisher_value_at_risk, quote, utils::decimal_to_f64, AccountTracker,
-    Currency, FuturesTypes, QuoteCurrency, Side,
+    account_tracker::AccountTracker,
+    cornish_fisher::cornish_fisher_value_at_risk,
+    quote,
+    types::{Currency, FuturesTypes, QuoteCurrency, Side},
+    utils::decimal_to_f64,
 };
 
 const DAILY_NS: u64 = 86_400_000_000_000;

@@ -1,6 +1,6 @@
 use fpdec::Decimal;
 
-use crate::{Fee, QuoteCurrency};
+use crate::types::{Fee, QuoteCurrency};
 
 /// Every unit of account must implement this trait
 pub trait Currency:

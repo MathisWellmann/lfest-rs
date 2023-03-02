@@ -1,4 +1,4 @@
-use crate::QuoteCurrency;
+use crate::types::QuoteCurrency;
 
 /// Decribes the possible updates to the market state
 #[derive(Debug, Clone, PartialEq)]

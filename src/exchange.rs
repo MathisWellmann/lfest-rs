@@ -1,8 +1,13 @@
 use fpdec::Decimal;
 
 use crate::{
-    quote, Account, AccountTracker, Config, Currency, MarketUpdate, Order, OrderError, OrderType,
-    QuoteCurrency, Side, Validator,
+    account::Account,
+    account_tracker::AccountTracker,
+    config::Config,
+    errors::OrderError,
+    quote,
+    types::{Currency, MarketUpdate, Order, OrderType, QuoteCurrency, Side},
+    validator::Validator,
 };
 
 #[derive(Debug, Clone)]

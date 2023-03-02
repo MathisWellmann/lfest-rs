@@ -1,4 +1,7 @@
-use crate::{Currency, Error, Fee, FuturesTypes, Leverage, Result};
+use crate::{
+    errors::{Error, Result},
+    types::{Currency, Fee, FuturesTypes, Leverage},
+};
 
 #[derive(Debug, Clone)]
 /// Define the Exchange configuration

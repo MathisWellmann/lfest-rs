@@ -1,6 +1,6 @@
 //! This module contains order filtering related code
 
-use crate::Currency;
+use crate::types::Currency;
 
 /// The `SizeFilter` defines the quantity rules that each order needs to follow
 /// The generic currency `S` is always the `PairedCurrency` of the margin

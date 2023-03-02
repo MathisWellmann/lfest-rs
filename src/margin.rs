@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{Currency, Error, Result};
+use crate::{
+    errors::{Error, Result},
+    types::Currency,
+};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Describes the margin information of the account

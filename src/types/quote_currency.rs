@@ -6,7 +6,7 @@ use std::{
 use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
 use fpdec::Decimal;
 
-use crate::{BaseCurrency, Currency, Fee};
+use crate::types::{BaseCurrency, Currency, Fee};
 
 /// Allows the quick construction of `QuoteCurrency`
 #[macro_export]

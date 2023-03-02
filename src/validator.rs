@@ -3,10 +3,9 @@ use crate::{
     account_tracker::AccountTracker,
     errors::OrderError,
     limit_order_margin::order_margin,
-    max, min,
-    orders::Order,
     quote,
-    types::{Currency, Fee, FuturesTypes, QuoteCurrency, Side},
+    types::{Currency, Fee, FuturesTypes, Order, QuoteCurrency, Side},
+    utils::{max, min},
 };
 
 #[derive(Clone, Debug, Default)]

@@ -1,6 +1,9 @@
 use fpdec::Decimal;
 
-use crate::{max, min, Currency, Fee, FuturesTypes, Leverage, Order, Side};
+use crate::{
+    types::{Currency, Fee, FuturesTypes, Leverage, Order, Side},
+    utils::{max, min},
+};
 
 /// Compute the needed order margin with a newly added order
 ///
