@@ -55,7 +55,6 @@ pub trait Currency:
     fn is_zero(&self) -> bool;
 
     /// Check if the value is finite
-    #[deprecated] // TODO: See if this method can be removed
     fn is_finite(&self) -> bool;
 
     /// TODO: it may be smart to remove this here and use another type that can

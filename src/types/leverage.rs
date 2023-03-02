@@ -16,11 +16,6 @@ macro_rules! leverage {
 pub struct Leverage(Decimal);
 
 impl Leverage {
-    #[inline(always)]
-    pub(crate) fn new(val: Decimal) -> Self {
-        Self(val)
-    }
-
     #[inline]
     pub(crate) fn from_f64(val: f64) -> Self {
         Self(Decimal::try_from(val).expect("Unable to create Decimal from f64"))
