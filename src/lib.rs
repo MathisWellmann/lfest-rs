@@ -29,7 +29,7 @@ pub mod prelude {
     pub use crate::{
         account::Account,
         account_tracker::AccountTracker,
-        base,
+        base, bba,
         config::Config,
         errors::{Error, OrderError, Result},
         exchange::Exchange,
