@@ -4,7 +4,6 @@
 //! lfest - leveraged futures exchange for simulated trading
 //! aims to be a high performance exchange for backtesting
 
-extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 #[macro_use]

@@ -160,12 +160,7 @@ mod tests {
     use rand_distr::StandardNormal;
 
     use super::*;
-
-    /// round a value to a given precision of decimal places
-    /// used in tests
-    fn round(val: f64, prec: i32) -> f64 {
-        ((val * 10.0_f64.powi(prec)).round()) / 10.0_f64.powi(prec)
-    }
+    use crate::utils::tests::round;
 
     #[test]
     fn test_statistical_moments() {
