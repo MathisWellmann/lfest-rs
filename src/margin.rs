@@ -41,7 +41,6 @@ where M: Currency
     ///
     /// # Panics:
     /// In debug mode, if the input values don't make sense
-    #[must_use]
     #[inline]
     pub fn new(
         wallet_balance: M,

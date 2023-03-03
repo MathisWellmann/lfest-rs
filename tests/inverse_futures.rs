@@ -7,6 +7,8 @@ use lfest::{account_tracker::NoAccountTracker, prelude::*};
 
 #[test]
 fn inv_long_market_win_full() {
+    if let Err(_) = pretty_env_logger::try_init() {}
+
     let config = Config::new(
         fee!(0.0002),
         fee!(0.0006),
@@ -117,6 +119,8 @@ fn inv_long_market_loss_full() {
 
 #[test]
 fn inv_short_market_win_full() {
+    if let Err(_) = pretty_env_logger::try_init() {}
+
     let config = Config::new(
         fee!(0.0002),
         fee!(0.0006),
@@ -166,6 +170,8 @@ fn inv_short_market_win_full() {
 
 #[test]
 fn inv_short_market_loss_full() {
+    if let Err(_) = pretty_env_logger::try_init() {}
+
     let config = Config::new(
         fee!(0.0002),
         fee!(0.0006),
@@ -226,6 +232,8 @@ fn inv_short_market_loss_full() {
 
 #[test]
 fn inv_long_market_win_partial() {
+    if let Err(_) = pretty_env_logger::try_init() {}
+
     let config = Config::new(
         fee!(0.0002),
         fee!(0.0006),
@@ -287,6 +295,8 @@ fn inv_long_market_win_partial() {
 
 #[test]
 fn inv_long_market_loss_partial() {
+    if let Err(_) = pretty_env_logger::try_init() {}
+
     let config = Config::new(
         fee!(0.0002),
         fee!(0.0006),
@@ -334,6 +344,8 @@ fn inv_long_market_loss_partial() {
 
 #[test]
 fn inv_short_market_win_partial() {
+    if let Err(_) = pretty_env_logger::try_init() {}
+
     let config = Config::new(
         fee!(0.0002),
         fee!(0.0006),
@@ -388,6 +400,8 @@ fn inv_short_market_win_partial() {
 
 #[test]
 fn inv_short_market_loss_partial() {
+    if let Err(_) = pretty_env_logger::try_init() {}
+
     let config = Config::new(
         fee!(0.0002),
         fee!(0.0006),
@@ -444,6 +458,8 @@ fn inv_short_market_loss_partial() {
 
 #[test]
 fn inv_test_market_roundtrip() {
+    if let Err(_) = pretty_env_logger::try_init() {}
+
     let config = Config::new(
         fee!(0.0002),
         fee!(0.0006),

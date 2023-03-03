@@ -397,7 +397,7 @@ where M: Currency + Send
 
         // TODO: make work with `Decimal` type
         let cf_var = cornish_fisher_value_at_risk(
-            &ret_streaks.iter().map(|v| (*v).into()).collect::<Vec<f64>>(),
+            &ret_streaks,
             decimal_to_f64(self.wallet_balance_start.inner()),
             percentile,
         )
@@ -646,7 +646,7 @@ where M: Currency + Send
         // update max_drawdown_total
         let curr_dd = (self.wallet_balance_high - (self.wallet_balance_last + upnl))
             / self.wallet_balance_high;
-        let curr_dd = curr_dd.inner().clone();
+        let curr_dd = curr_dd.inner();
         if curr_dd > self.max_drawdown_total {
             self.max_drawdown_total = curr_dd;
         }
@@ -666,7 +666,7 @@ where M: Currency + Send
             self.wallet_balance_high = self.wallet_balance_last;
         }
         let dd = (self.wallet_balance_high - self.wallet_balance_last) / self.wallet_balance_high;
-        let dd = dd.inner().clone();
+        let dd = dd.inner();
         if dd > self.max_drawdown_wallet_balance {
             self.max_drawdown_wallet_balance = dd;
         }

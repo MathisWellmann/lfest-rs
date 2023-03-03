@@ -117,7 +117,7 @@ impl<'a> Add<&'a Self> for QuoteCurrency {
     type Output = Self;
 
     fn add(self, rhs: &'a Self) -> Self::Output {
-        Self(self.0 + &rhs.0)
+        Self(self.0 + rhs.0)
     }
 }
 
@@ -125,7 +125,7 @@ impl<'a> Sub<&'a Self> for QuoteCurrency {
     type Output = Self;
 
     fn sub(self, rhs: &'a Self) -> Self::Output {
-        Self(self.0 - &rhs.0)
+        Self(self.0 - rhs.0)
     }
 }
 
@@ -133,7 +133,7 @@ impl<'a> Mul<&'a Self> for QuoteCurrency {
     type Output = Self;
 
     fn mul(self, rhs: &'a Self) -> Self::Output {
-        Self(self.0 * &rhs.0)
+        Self(self.0 * rhs.0)
     }
 }
 
@@ -141,20 +141,20 @@ impl<'a> Div<&'a Self> for QuoteCurrency {
     type Output = Self;
 
     fn div(self, rhs: &'a Self) -> Self::Output {
-        Self(self.0 / &rhs.0)
+        Self(self.0 / rhs.0)
     }
 }
 
 /// ### Arithmetic assignment with `&Self` on the right hand side
 impl<'a> std::ops::AddAssign<&'a Self> for QuoteCurrency {
     fn add_assign(&mut self, rhs: &'a Self) {
-        self.0 = &self.0 + &rhs.0;
+        self.0 = self.0 + rhs.0;
     }
 }
 
 impl<'a> std::ops::SubAssign<&'a Self> for QuoteCurrency {
     fn sub_assign(&mut self, rhs: &'a Self) {
-        self.0 = &self.0 - &rhs.0;
+        self.0 = self.0 - rhs.0;
     }
 }
 

@@ -45,8 +45,8 @@ where
             config.futures_type(),
         );
         let validator = Validator::new(
-            config.fee_maker().clone(),
-            config.fee_taker().clone(),
+            config.fee_maker(),
+            config.fee_taker(),
             config.futures_type(),
             config.max_num_open_orders(),
         );
@@ -133,8 +133,8 @@ where
                 bid,
                 ask,
             } => {
-                self.bid = bid.clone();
-                self.ask = ask.clone();
+                self.bid = bid;
+                self.ask = ask;
                 self.high = ask;
                 self.low = bid;
             }
@@ -152,7 +152,7 @@ where
         }
         self.current_ts = timestamp as i64;
 
-        self.validator.update(self.bid.clone(), self.ask.clone());
+        self.validator.update(self.bid, self.ask);
 
         if self.check_liquidation() {
             self.liquidate();
@@ -163,7 +163,7 @@ where
 
         // TODO: pass through bid and ask, instead of the mid price
         let mid_price = (self.bid + self.ask) / Decimal::TWO;
-        self.user_account.update(QuoteCurrency::from(mid_price), timestamp);
+        self.user_account.update(mid_price, timestamp);
 
         self.step += 1;
 

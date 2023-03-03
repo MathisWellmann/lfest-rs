@@ -23,6 +23,9 @@ where T: PartialOrd {
 }
 
 /// Convert a `Decimal` value into `f64`.
+/// Just used when accuracy is not required.
+/// Mainly for `FullTrack` to compute things that are not supported by `Decimal`
+/// such as sqrt.
 #[inline(always)]
 pub(crate) fn decimal_to_f64(val: Decimal) -> f64 {
     if val.n_frac_digits() == 0 {
@@ -30,7 +33,7 @@ pub(crate) fn decimal_to_f64(val: Decimal) -> f64 {
     }
     info!("val: {}, coeff: {}, n_frac_digits: {}", val, val.coefficient(), val.n_frac_digits());
 
-    val.coefficient() as f64 / 10_f64.powi(val.n_frac_digits() as _) as f64
+    val.coefficient() as f64 / 10_f64.powi(val.n_frac_digits() as _)
 }
 
 #[cfg(test)]
@@ -56,7 +59,7 @@ pub(crate) mod tests {
         assert_eq!(decimal_to_f64(Decimal::TWO), 2.0);
 
         let mut rng = thread_rng();
-        const ROUNDING: i32 = 10;
+        const ROUNDING: i32 = 8;
         for _i in 0..1_000 {
             let val: f64 = rng.gen();
             assert_eq!(

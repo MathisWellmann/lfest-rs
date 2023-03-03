@@ -41,12 +41,12 @@ where
         let size = o.quantity();
         match o.side() {
             Side::Buy => {
-                buy_size += o.quantity().clone();
+                buy_size += o.quantity();
                 buy_price_weight += limit_price.inner() * size.inner();
                 buy_side_fees += fee_margin;
             }
             Side::Sell => {
-                sell_size += o.quantity().clone();
+                sell_size += o.quantity();
                 sell_price_weight += limit_price.inner() * size.inner();
                 sell_side_fees += fee_margin;
             }

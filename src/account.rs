@@ -239,7 +239,7 @@ where
 
         self.account_tracker.log_limit_order_submission();
         let order_id = order.id();
-        let user_order_id = order.user_order_id().clone();
+        let user_order_id = *order.user_order_id();
         match self.active_limit_orders.insert(order_id, order) {
             None => {}
             Some(_) => warn!(
@@ -329,7 +329,7 @@ where
             side, size, exec_price
         );
         let pos_size_delta = match side {
-            Side::Buy => size.clone(),
+            Side::Buy => size,
             Side::Sell => size.into_negative(),
         };
         let rpnl = match side {
@@ -372,8 +372,8 @@ where
         };
         if rpnl != S::PairedCurrency::new_zero() {
             // first free up existing position margin if any
-            let new_pos_margin = ((self.position().size().clone() + pos_size_delta).abs()
-                / S::new(self.position().leverage().inner().clone()))
+            let new_pos_margin = ((self.position().size() + pos_size_delta).abs()
+                / S::new(self.position().leverage().inner()))
             .convert(self.position.entry_price());
             self.margin.set_position_margin(new_pos_margin);
 
@@ -386,7 +386,7 @@ where
 
         // set position margin
         let pos_margin: S::PairedCurrency = (self.position.size().abs()
-            / S::new(self.position.leverage().inner().clone()))
+            / S::new(self.position.leverage().inner()))
         .convert(self.position.entry_price());
         self.margin.set_position_margin(pos_margin);
 
