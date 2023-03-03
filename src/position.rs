@@ -1,3 +1,5 @@
+use fpdec::Decimal;
+
 use crate::{
     quote,
     types::{Currency, FuturesTypes, Leverage, QuoteCurrency},

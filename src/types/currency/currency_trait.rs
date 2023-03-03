@@ -76,12 +76,12 @@ mod tests {
 
     #[test]
     fn conversion() {
-        assert_eq!(base!(1.0).convert(quote!(20_000.0)), quote!(20_000.0));
-        assert_eq!(base!(0.5).convert(quote!(20_000.0)), quote!(10_000.0));
-        assert_eq!(base!(0.25).convert(quote!(20_000.0)), quote!(5_000.0));
+        assert_eq!(base!(1.0).convert(quote!(200.0)), quote!(200.0));
+        assert_eq!(base!(0.5).convert(quote!(200.0)), quote!(100.0));
+        assert_eq!(base!(0.25).convert(quote!(200.0)), quote!(50.0));
 
-        assert_eq!(quote!(20_000.0).convert(quote!(20_000.0)), base!(1.0));
-        assert_eq!(quote!(10_000.0).convert(quote!(20_000.0)), base!(0.5));
-        assert_eq!(quote!(5_000.0).convert(quote!(20_000.0)), base!(0.25));
+        assert_eq!(quote!(200.0).convert(quote!(200.0)), base!(1.0));
+        assert_eq!(quote!(100.0).convert(quote!(200.0)), base!(0.5));
+        assert_eq!(quote!(50.0).convert(quote!(200.0)), base!(0.25));
     }
 }

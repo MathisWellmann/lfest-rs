@@ -6,6 +6,7 @@ use crate::{
     quote,
     types::{Currency, Fee, FuturesTypes, Order, QuoteCurrency, Side},
     utils::{max, min},
+    Decimal,
 };
 
 #[derive(Clone, Debug, Default)]
