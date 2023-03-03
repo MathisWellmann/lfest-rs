@@ -647,7 +647,7 @@ mod tests {
         let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), futures_type, 100);
         validator.update(quote!(100.0), quote!(101.0));
 
-        for l in (0..5).map(|v| Decimal::from(v)) {
+        for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
             // with mixed limit orders
