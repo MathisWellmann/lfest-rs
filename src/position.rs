@@ -137,7 +137,7 @@ mod tests {
     use crate::prelude::*;
 
     #[test]
-    fn position_change_size() {
+    fn position_change_size_inverse() {
         let mut pos = Position::new_init(leverage!(1.0));
         let futures_type = FuturesTypes::Inverse;
 
@@ -147,29 +147,47 @@ mod tests {
         assert_eq!(pos.leverage, leverage!(1.0));
         assert_eq!(pos.unrealized_pnl, base!(0.0));
 
-        pos.change_size(quote!(-50.0), quote!(150.0), futures_type);
+        pos.change_size(quote!(-50.0), quote!(125.0), futures_type);
         assert_eq!(pos.size, quote!(50.0));
         assert_eq!(pos.entry_price, quote!(100.0));
         assert_eq!(pos.leverage, leverage!(1.0));
-        assert_eq!(pos.unrealized_pnl, base!(0.17));
+        assert_eq!(pos.unrealized_pnl, base!(0.1));
+    }
 
-        pos.change_size(quote!(50.0), quote!(150.0), futures_type);
-        assert_eq!(pos.size, quote!(100.0));
+    #[test]
+    fn position_change_size_linear() {
+        let mut pos = Position::new_init(leverage!(1.0));
+        let futures_type = FuturesTypes::Linear;
+
+        pos.change_size(base!(1.0), quote!(100.0), futures_type);
+        assert_eq!(pos.size, base!(1.0));
+        assert_eq!(pos.entry_price, quote!(100.0));
+        assert_eq!(pos.leverage, leverage!(1.0));
+        assert_eq!(pos.unrealized_pnl, quote!(0.0));
+
+        pos.change_size(base!(-0.5), quote!(150.0), futures_type);
+        assert_eq!(pos.size, base!(0.5));
+        assert_eq!(pos.entry_price, quote!(100.0));
+        assert_eq!(pos.leverage, leverage!(1.0));
+        assert_eq!(pos.unrealized_pnl, quote!(25));
+
+        pos.change_size(base!(0.5), quote!(150.0), futures_type);
+        assert_eq!(pos.size, base!(1.0));
         assert_eq!(pos.entry_price, quote!(125.0));
         assert_eq!(pos.leverage, leverage!(1.0));
-        assert_eq!(pos.unrealized_pnl, base!(0.13));
+        assert_eq!(pos.unrealized_pnl, quote!(25));
 
-        pos.change_size(quote!(-150.0), quote!(150.0), futures_type);
-        assert_eq!(pos.size, quote!(-50.0));
+        pos.change_size(base!(-1.5), quote!(150.0), futures_type);
+        assert_eq!(pos.size, base!(-0.5));
         assert_eq!(pos.entry_price, quote!(150.0));
         assert_eq!(pos.leverage, leverage!(1.0));
-        assert_eq!(pos.unrealized_pnl, base!(0.0));
+        assert_eq!(pos.unrealized_pnl, quote!(0.0));
 
-        pos.change_size(quote!(50.0), quote!(150.0), futures_type);
-        assert_eq!(pos.size, quote!(0.0));
+        pos.change_size(base!(0.5), quote!(150.0), futures_type);
+        assert_eq!(pos.size, base!(0.0));
         assert_eq!(pos.entry_price, quote!(150.0));
         assert_eq!(pos.leverage, leverage!(1.0));
-        assert_eq!(pos.unrealized_pnl, base!(0.0));
+        assert_eq!(pos.unrealized_pnl, quote!(0.0));
     }
 
     #[test]
