@@ -25,6 +25,9 @@ mod validator;
 
 /// Exports common types
 pub mod prelude {
+    // Too make the macros work
+    pub use fpdec::Decimal;
+
     pub use crate::{
         account::Account,
         account_tracker::AccountTracker,

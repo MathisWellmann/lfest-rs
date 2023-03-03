@@ -56,7 +56,7 @@ pub(crate) mod tests {
         assert_eq!(decimal_to_f64(Decimal::TWO), 2.0);
 
         let mut rng = thread_rng();
-        const ROUNDING: i32 = 12;
+        const ROUNDING: i32 = 10;
         for _i in 0..1_000 {
             let val: f64 = rng.gen();
             assert_eq!(

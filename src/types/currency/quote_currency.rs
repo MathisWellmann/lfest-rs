@@ -1,7 +1,4 @@
-use std::{
-    convert::TryFrom,
-    ops::{Add, Div, Mul, Sub},
-};
+use std::ops::{Add, Div, Mul, Sub};
 
 use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
 use fpdec::Decimal;
@@ -11,8 +8,8 @@ use crate::types::{BaseCurrency, Currency, Fee};
 /// Allows the quick construction of `QuoteCurrency`
 #[macro_export]
 macro_rules! quote {
-    ( $a:expr ) => {{
-        QuoteCurrency::from_f64($a)
+    ( $a:literal ) => {{
+        QuoteCurrency::new(fpdec::Dec!($a))
     }};
 }
 
@@ -44,11 +41,6 @@ impl Currency for QuoteCurrency {
     #[inline(always)]
     fn new(val: Decimal) -> Self {
         Self(val)
-    }
-
-    #[inline]
-    fn from_f64(val: f64) -> Self {
-        Self(Decimal::try_from(val).expect("Unable to create Decimal from f64"))
     }
 
     #[inline(always)]

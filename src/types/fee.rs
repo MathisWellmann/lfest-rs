@@ -1,13 +1,11 @@
-use std::convert::TryFrom;
-
 use derive_more::Display;
 use fpdec::Decimal;
 
 /// Allows the quick construction of `Fee`
 #[macro_export]
 macro_rules! fee {
-    ( $a:expr ) => {{
-        Fee::from_f64($a)
+    ( $a:literal) => {{
+        Fee::new(fpdec::Dec!($a))
     }};
 }
 
@@ -16,10 +14,10 @@ macro_rules! fee {
 pub struct Fee(Decimal);
 
 impl Fee {
-    /// Create a new `Fee` instance from an `f64` value
-    #[inline]
-    pub fn from_f64(val: f64) -> Self {
-        Self(Decimal::try_from(val).expect("Unable to create Decimal from f64"))
+    /// Create a new instance from a `Decimal` value
+    #[inline(always)]
+    pub fn new(val: Decimal) -> Self {
+        Self(val)
     }
 
     #[inline(always)]

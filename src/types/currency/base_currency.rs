@@ -11,8 +11,8 @@ use crate::types::{Currency, Fee, QuoteCurrency};
 /// Allows the quick construction of `BaseCurrency`
 #[macro_export]
 macro_rules! base {
-    ( $a:expr ) => {{
-        BaseCurrency::from_f64($a)
+    ( $a:literal ) => {{
+        BaseCurrency::new(fpdec::Dec!($a))
     }};
 }
 
@@ -44,11 +44,6 @@ impl Currency for BaseCurrency {
     #[inline(always)]
     fn new(val: Decimal) -> Self {
         Self(val)
-    }
-
-    #[inline]
-    fn from_f64(val: f64) -> Self {
-        Self(Decimal::try_from(val).expect("Unable to create Decimal from f64"))
     }
 
     #[inline(always)]

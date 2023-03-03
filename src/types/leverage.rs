@@ -1,13 +1,11 @@
-use std::convert::TryFrom;
-
 use derive_more::Display;
 use fpdec::Decimal;
 
 /// Allows the quick construction of `Leverage`
 #[macro_export]
 macro_rules! leverage {
-    ( $a:expr ) => {{
-        Leverage::from_f64($a)
+    ( $a:literal ) => {{
+        Leverage::new(fpdec::Dec!($a))
     }};
 }
 
@@ -17,10 +15,10 @@ macro_rules! leverage {
 pub struct Leverage(Decimal);
 
 impl Leverage {
-    /// Create a new `Leverage` instance from an `f64` value
-    #[inline]
-    pub fn from_f64(val: f64) -> Self {
-        Self(Decimal::try_from(val).expect("Unable to create Decimal from f64"))
+    /// Create a new instance from a `Decimal` value
+    #[inline(always)]
+    pub fn new(val: Decimal) -> Self {
+        Self(val)
     }
 
     #[inline(always)]

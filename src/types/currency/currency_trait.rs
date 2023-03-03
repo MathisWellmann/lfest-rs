@@ -40,10 +40,6 @@ pub trait Currency:
     #[must_use]
     fn new(val: Decimal) -> Self;
 
-    /// Create a new instance from a `f64` value
-    #[must_use]
-    fn from_f64(val: f64) -> Self;
-
     /// Return the inner `Decimal`
     fn inner(self) -> Decimal;
 

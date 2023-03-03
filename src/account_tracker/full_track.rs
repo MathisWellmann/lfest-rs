@@ -291,7 +291,7 @@ where M: Currency + Send
 
     /// TODO: annualized depending on the `ReturnsSource`
     #[inline]
-    pub fn historical_value_at_risk(&self, returns_source: ReturnsSource, percentile: f64) -> M {
+    pub fn historical_value_at_risk(&self, returns_source: ReturnsSource, percentile: f64) -> f64 {
         let mut rets = match returns_source {
             ReturnsSource::Daily => self.hist_ln_returns_daily_acc.clone(),
             ReturnsSource::Hourly => self.hist_ln_returns_hourly_acc.clone(),
@@ -301,10 +301,10 @@ where M: Currency + Send
         let idx = (rets.len() as f64 * percentile) as usize;
         match rets.get(idx) {
             Some(r) => {
-                let r = M::from_f64(r.exp());
-                self.wallet_balance_start - (self.wallet_balance_start * r)
+                decimal_to_f64(self.wallet_balance_start.inner())
+                    - (decimal_to_f64(self.wallet_balance_start.inner()) * r.exp())
             }
-            None => M::new_zero(),
+            None => 0.0,
         }
     }
 
@@ -318,11 +318,11 @@ where M: Currency + Send
     /// n: number of hourly returns to use
     /// percentile: value between [0.0, 1.0], smaller value will return more
     /// worst case results
-    pub fn historical_value_at_risk_from_n_hourly_returns(&self, n: usize, percentile: f64) -> M {
+    pub fn historical_value_at_risk_from_n_hourly_returns(&self, n: usize, percentile: f64) -> f64 {
         let rets = &self.hist_ln_returns_hourly_acc;
         if rets.len() < n {
             debug!("not enough hourly returns to compute VaR for n={}", n);
-            return M::new_zero();
+            return 0.0;
         }
         let mut ret_streaks = Vec::with_capacity(rets.len() - n);
         for i in n..rets.len() {
@@ -336,8 +336,11 @@ where M: Currency + Send
         ret_streaks.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let idx = (ret_streaks.len() as f64 * percentile) as usize;
         match ret_streaks.get(idx) {
-            Some(r) => self.wallet_balance_start - (self.wallet_balance_start * M::from_f64(*r)),
-            None => M::new_zero(),
+            Some(r) => {
+                decimal_to_f64(self.wallet_balance_start.inner())
+                    - (decimal_to_f64(self.wallet_balance_start.inner()) * r.exp())
+            }
+            None => 0.0,
         }
     }
 
@@ -377,11 +380,11 @@ where M: Currency + Send
         &self,
         n: usize,
         percentile: f64,
-    ) -> M {
+    ) -> f64 {
         let rets = &self.hist_ln_returns_hourly_acc;
         if rets.len() < n {
             debug!("not enough hourly returns to compute CF-VaR for n={}", n);
-            return M::new_zero();
+            return 0.0;
         }
         let mut ret_streaks = Vec::with_capacity(rets.len() - n);
         for i in n..rets.len() {
@@ -392,15 +395,15 @@ where M: Currency + Send
             ret_streaks.push(r);
         }
 
-        let cf_var: M = M::from_f64(
-            cornish_fisher_value_at_risk(
-                &ret_streaks.iter().map(|v| (*v).into()).collect::<Vec<f64>>(),
-                decimal_to_f64(self.wallet_balance_start.inner()),
-                percentile,
-            )
-            .1,
-        );
-        self.wallet_balance_start - (self.wallet_balance_start * cf_var)
+        // TODO: make work with `Decimal` type
+        let cf_var = cornish_fisher_value_at_risk(
+            &ret_streaks.iter().map(|v| (*v).into()).collect::<Vec<f64>>(),
+            decimal_to_f64(self.wallet_balance_start.inner()),
+            percentile,
+        )
+        .1;
+        decimal_to_f64(self.wallet_balance_start.inner())
+            - (decimal_to_f64(self.wallet_balance_start.inner()) * cf_var)
     }
 
     /// Return the number of trading days
@@ -1241,11 +1244,8 @@ mod tests {
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(
-            acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.05),
-            quote!(1.173)
-        );
-        assert_eq!(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.01), quote!(2.54));
+        assert_eq!(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.05), 1.173);
+        assert_eq!(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.01), 2.54);
     }
 
     #[test]
@@ -1255,8 +1255,8 @@ mod tests {
         let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(at.historical_value_at_risk_from_n_hourly_returns(24, 0.05), quote!(3.835));
-        assert_eq!(at.historical_value_at_risk_from_n_hourly_returns(24, 0.01), quote!(6.061));
+        assert_eq!(at.historical_value_at_risk_from_n_hourly_returns(24, 0.05), 3.835);
+        assert_eq!(at.historical_value_at_risk_from_n_hourly_returns(24, 0.01), 6.061);
     }
 
     #[test]
@@ -1277,7 +1277,7 @@ mod tests {
         let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05), quote!(4.043));
-        assert_eq!(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01), quote!(5.358));
+        assert_eq!(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05), 4.043);
+        assert_eq!(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01), 5.358);
     }
 }
