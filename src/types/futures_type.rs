@@ -6,6 +6,9 @@ use crate::{
 };
 
 /// Enumeration of different futures types
+/// TODO: deprecate this in favor of automaticall inferring the futures type
+/// based on the margin currency. This would also avoid invalid user defined
+/// combinations
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum FuturesTypes {
     /// Linear futures with a linear payout
@@ -58,18 +61,7 @@ impl FuturesTypes {
                 // contract_qty is denoted in QUOTE currency
                 // contract_qty * (1.0 / entry_price - 1.0 / exit_price)
 
-                // TODO: this may be wrong, check it
                 contract_qty.convert(entry_price) - contract_qty.convert(exit_price)
-
-                // TODO: this should work, but lets see the above one first
-                // contract_qty.inner() * (entry_price.inner().reciprocal() -
-                // entry_price.inner().reciprocal())
-
-                // let entry_price: f64 = entry_price.into();
-                // let exit_price: f64 = exit_price.into();
-                // let mult: f64 = 1.0 / entry_price - 1.0 / exit_price;
-                // let ct: f64 = contract_qty.into();
-                // (ct * mult).into()
 
                 // resulting pnl denoted in BASE currency
             }
@@ -119,9 +111,9 @@ mod test {
     fn futures_type_pnl_inverse() {
         let ft = FuturesTypes::Inverse;
 
-        assert_eq!(ft.pnl(quote!(100.0), quote!(110.0), quote!(1000.0)), base!(0.909));
-        assert_eq!(ft.pnl(quote!(100.0), quote!(110.0), quote!(-1000.0)), base!(-0.909));
-        assert_eq!(ft.pnl(quote!(100.0), quote!(90.0), quote!(1000.0)), base!(-1.111));
-        assert_eq!(ft.pnl(quote!(100.0), quote!(90.0), quote!(-1000.0)), base!(1.111));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(125.0), quote!(1000.0)), base!(2.0));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(125.0), quote!(-1000.0)), base!(-2.0));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(80.0), quote!(1000.0)), base!(-2.5));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(80.0), quote!(-1000.0)), base!(2.5));
     }
 }

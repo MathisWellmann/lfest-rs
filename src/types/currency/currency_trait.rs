@@ -50,9 +50,6 @@ pub trait Currency:
     /// Check if the value is zero
     fn is_zero(&self) -> bool;
 
-    /// Check if the value is finite
-    fn is_finite(&self) -> bool;
-
     /// TODO: it may be smart to remove this here and use another type that can
     /// be negative Get the absolute value
     fn abs(self) -> Self;

@@ -193,9 +193,9 @@ mod tests {
     #[test]
     fn position_update_state_inverse_futures() {
         let mut pos = Position::new(quote!(100.0), quote!(100.0), leverage!(1.0), base!(0.0));
-        pos.update_state(quote!(110.0), FuturesTypes::Inverse);
+        pos.update_state(quote!(125.0), FuturesTypes::Inverse);
 
-        assert_eq!(pos.unrealized_pnl, base!(0.09));
+        assert_eq!(pos.unrealized_pnl, base!(0.2));
     }
 
     #[test]

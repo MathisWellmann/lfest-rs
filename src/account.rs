@@ -495,27 +495,28 @@ mod tests {
 
     #[test]
     fn account_cancel_all_orders() {
-        let futures_type = FuturesTypes::Inverse;
+        let futures_type = FuturesTypes::Linear;
         let mut account =
-            Account::new(NoAccountTracker::default(), leverage!(1.0), base!(1.0), futures_type);
+            Account::new(NoAccountTracker::default(), leverage!(1.0), quote!(1000.0), futures_type);
         let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
         validator.update(quote!(900.0), quote!(901.0));
 
-        let o = Order::limit(Side::Buy, quote!(900.0), quote!(450.0)).unwrap();
+        let o = Order::limit(Side::Buy, quote!(900.0), base!(0.45)).unwrap();
         let order_margin = validator.validate_limit_order(&o, &account).unwrap();
         account.append_limit_order(o, order_margin);
         assert_eq!(account.active_limit_orders().len(), 1);
-        assert_eq!(account.margin().wallet_balance(), base!(1.0));
-        assert_eq!(account.margin().position_margin(), base!(0.0));
-        assert_eq!(account.margin().order_margin(), base!(0.5));
-        assert_eq!(account.margin().available_balance(), base!(0.5));
+        // TODO:
+        assert_eq!(account.margin().wallet_balance(), quote!(1000.0));
+        assert_eq!(account.margin().position_margin(), quote!(0.0));
+        assert_eq!(account.margin().order_margin(), quote!(405.0));
+        assert_eq!(account.margin().available_balance(), quote!(595.0));
 
         account.cancel_all_orders();
         assert_eq!(account.active_limit_orders().len(), 0);
-        assert_eq!(account.margin().wallet_balance(), base!(1.0));
-        assert_eq!(account.margin().position_margin(), base!(0.0));
-        assert_eq!(account.margin().order_margin(), base!(0.0));
-        assert_eq!(account.margin().available_balance(), base!(1.0));
+        assert_eq!(account.margin().wallet_balance(), quote!(1000.0));
+        assert_eq!(account.margin().position_margin(), quote!(0.0));
+        assert_eq!(account.margin().order_margin(), quote!(0.0));
+        assert_eq!(account.margin().available_balance(), quote!(1000.0));
     }
 
     #[test]

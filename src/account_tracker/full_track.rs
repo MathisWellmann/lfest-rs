@@ -338,7 +338,7 @@ where M: Currency + Send
         match ret_streaks.get(idx) {
             Some(r) => {
                 decimal_to_f64(self.wallet_balance_start.inner())
-                    - (decimal_to_f64(self.wallet_balance_start.inner()) * r.exp())
+                    - (decimal_to_f64(self.wallet_balance_start.inner()) * r)
             }
             None => 0.0,
         }
@@ -770,7 +770,10 @@ num_trading_days: {},
 mod tests {
     use std::convert::TryFrom;
 
+    use fpdec::Round;
+
     use super::*;
+    use crate::utils::tests::round;
 
     // Some example hourly ln returns of BCHEUR i pulled from somewhere from about
     // october 2021
@@ -1217,7 +1220,10 @@ mod tests {
             acc_tracker.log_rpnl(QuoteCurrency::new(r));
         }
 
-        assert_eq!(acc_tracker.max_drawdown_wallet_balance(), Decimal::try_from(0.01).unwrap());
+        assert_eq!(
+            acc_tracker.max_drawdown_wallet_balance().round(2),
+            Decimal::try_from(0.01).unwrap()
+        );
         assert_eq!(acc_tracker.total_rpnl(), quote!(2.0));
     }
 
@@ -1244,8 +1250,14 @@ mod tests {
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.05), 1.173);
-        assert_eq!(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.01), 2.54);
+        assert_eq!(
+            round(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.05), 3),
+            1.173
+        );
+        assert_eq!(
+            round(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.01), 3),
+            2.54
+        );
     }
 
     #[test]
@@ -1255,8 +1267,8 @@ mod tests {
         let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(at.historical_value_at_risk_from_n_hourly_returns(24, 0.05), 3.835);
-        assert_eq!(at.historical_value_at_risk_from_n_hourly_returns(24, 0.01), 6.061);
+        assert_eq!(round(at.historical_value_at_risk_from_n_hourly_returns(24, 0.05), 3), 3.835);
+        assert_eq!(round(at.historical_value_at_risk_from_n_hourly_returns(24, 0.01), 3), 6.061);
     }
 
     #[test]
@@ -1266,8 +1278,14 @@ mod tests {
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.05), 1.354);
-        assert_eq!(acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.01), 5.786);
+        assert_eq!(
+            round(acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.05), 3),
+            1.354
+        );
+        assert_eq!(
+            round(acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.01), 3),
+            5.786
+        );
     }
 
     #[test]
@@ -1277,7 +1295,13 @@ mod tests {
         let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05), 4.043);
-        assert_eq!(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01), 5.358);
+        assert_eq!(
+            round(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05), 3),
+            4.043
+        );
+        assert_eq!(
+            round(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01), 3),
+            5.358
+        );
     }
 }

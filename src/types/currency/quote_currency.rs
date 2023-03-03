@@ -59,12 +59,6 @@ impl Currency for QuoteCurrency {
     }
 
     #[inline(always)]
-    fn is_finite(&self) -> bool {
-        // self.0.is_finite()
-        todo!()
-    }
-
-    #[inline(always)]
     fn abs(self) -> Self {
         Self(self.0.abs())
     }

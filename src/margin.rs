@@ -110,7 +110,6 @@ where M: Currency
     pub(crate) fn set_position_margin(&mut self, val: M) {
         trace!("set_position_margin({}), self: {:?}", val, self);
 
-        debug_assert!(val.is_finite());
         debug_assert!(val >= M::new_zero());
 
         self.position_margin = val;
