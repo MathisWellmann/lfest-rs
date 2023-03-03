@@ -1,3 +1,4 @@
+use fpdec::Decimal;
 use hashbrown::HashMap;
 
 use crate::{
@@ -278,7 +279,7 @@ where
                 .iter()
                 .filter(|(_, o)| o.side() == Side::Buy)
                 .map(|(_, o)| o.limit_price().unwrap())
-                .fold(quote!(f64::MAX), min)
+                .fold(QuoteCurrency::new(Decimal::MAX), min)
         };
         self.max_limit_sell_price = if self.active_limit_orders.is_empty() {
             quote!(0.0)
@@ -287,7 +288,7 @@ where
                 .iter()
                 .filter(|(_, o)| o.side() == Side::Sell)
                 .map(|(_, o)| o.limit_price().unwrap())
-                .fold(quote!(f64::MIN), max)
+                .fold(QuoteCurrency::new(Decimal::MIN), max)
         };
 
         // set this to 0.0 temporarily and it will be properly assigned at the end of

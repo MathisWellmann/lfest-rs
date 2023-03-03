@@ -516,7 +516,11 @@ mod tests {
                 base!(1.0),
                 futures_type,
             );
-            acc.change_position(Side::Sell, quote!(50.0 * l), quote!(100.0));
+            acc.change_position(
+                Side::Sell,
+                QuoteCurrency::new(Decimal::from(50) * l),
+                quote!(100.0),
+            );
 
             let o =
                 Order::limit(Side::Buy, quote!(100.0), QuoteCurrency::new(Decimal::from(99) * l))
@@ -653,7 +657,7 @@ mod tests {
                 futures_type,
             );
             let mut o =
-                Order::limit(Side::Buy, quote!(100.0), QuoteCurrency::new(Decimal::new(50) * l))
+                Order::limit(Side::Buy, quote!(100.0), QuoteCurrency::new(Decimal::from(50) * l))
                     .unwrap();
             o.set_id(1); // different id from test orders
             let order_margin = validator.validate_limit_order(&o, &acc).unwrap();
@@ -1147,7 +1151,7 @@ mod tests {
 
             let mut acc = Account::new(
                 NoAccountTracker::default(),
-                leverage!(l),
+                Leverage::new(l),
                 quote!(100.0),
                 futures_type,
             );

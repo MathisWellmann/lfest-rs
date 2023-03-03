@@ -1211,10 +1211,10 @@ mod tests {
 
     #[test]
     fn acc_tracker_log_rpnl() {
-        let rpnls: Vec<f64> = vec![1.0, -1.0, 1.0, 2.0, -1.0];
+        let rpnls: Vec<Decimal> = [1, -1, 1, 2, -1].iter().map(|v| Decimal::from(*v)).collect();
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         for r in rpnls {
-            acc_tracker.log_rpnl(quote!(r));
+            acc_tracker.log_rpnl(QuoteCurrency::new(r));
         }
 
         assert_eq!(acc_tracker.max_drawdown_wallet_balance(), Decimal::try_from(0.01).unwrap());

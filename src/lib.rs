@@ -23,6 +23,8 @@ mod types;
 mod utils;
 mod validator;
 
+use fpdec::Decimal;
+
 /// Exports common types
 pub mod prelude {
     // Too make the macros work
