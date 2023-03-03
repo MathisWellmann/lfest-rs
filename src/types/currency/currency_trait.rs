@@ -76,7 +76,7 @@ pub trait Currency:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{base, quote, BaseCurrency, QuoteCurrency};
+    use crate::prelude::*;
 
     #[test]
     fn conversion() {

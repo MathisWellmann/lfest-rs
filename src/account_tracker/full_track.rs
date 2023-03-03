@@ -765,8 +765,9 @@ num_trading_days: {},
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryFrom;
+
     use super::*;
-    use crate::utils::round;
 
     // Some example hourly ln returns of BCHEUR i pulled from somewhere from about
     // october 2021
@@ -1213,7 +1214,7 @@ mod tests {
             acc_tracker.log_rpnl(quote!(r));
         }
 
-        assert_eq!(round(acc_tracker.max_drawdown_wallet_balance(), 2), 0.01);
+        assert_eq!(acc_tracker.max_drawdown_wallet_balance(), Decimal::try_from(0.01).unwrap());
         assert_eq!(acc_tracker.total_rpnl(), quote!(2.0));
     }
 
@@ -1265,14 +1266,8 @@ mod tests {
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(
-            round(acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.05), 3),
-            1.354
-        );
-        assert_eq!(
-            round(acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.01), 3),
-            5.786
-        );
+        assert_eq!(acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.05), 1.354);
+        assert_eq!(acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.01), 5.786);
     }
 
     #[test]

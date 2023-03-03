@@ -8,7 +8,10 @@ extern crate log;
 
 use std::time::Instant;
 
-use lfest::*;
+use lfest::{
+    account_tracker::{FullAccountTracker, ReturnsSource},
+    prelude::*,
+};
 use load_trades::load_prices_from_csv;
 use rand::{thread_rng, Rng};
 
@@ -18,10 +21,10 @@ fn main() {
     let starting_wb = base!(1.0);
     let futures_type = FuturesTypes::Inverse;
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         starting_wb,
-        1.0,
+        leverage!(1.0),
         futures_type,
         String::new(),
         true,

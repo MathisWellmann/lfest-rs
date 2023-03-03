@@ -158,7 +158,7 @@ where S: Currency
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{base, quote, BaseCurrency, QuoteCurrency};
+    use crate::prelude::*;
 
     #[test]
     fn order_eq() {

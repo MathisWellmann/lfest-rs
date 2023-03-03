@@ -242,7 +242,7 @@ impl Validator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::*;
+    use crate::{account_tracker::NoAccountTracker, prelude::*};
 
     #[test]
     fn validate_inverse_futures_market_order_without_position() {

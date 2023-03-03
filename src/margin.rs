@@ -137,7 +137,7 @@ where M: Currency
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{base, BaseCurrency};
+    use crate::prelude::*;
 
     #[test]
     fn margin_set_order_margin() {
@@ -179,10 +179,10 @@ mod tests {
         assert_eq!(margin.available_balance, base!(1.05));
 
         margin.change_balance(base!(-0.1));
-        assert_eq!(margin.wallet_balance.into_rounded(2), base!(0.95));
+        assert_eq!(margin.wallet_balance, base!(0.95));
         assert_eq!(margin.position_margin, base!(0.0));
         assert_eq!(margin.order_margin, base!(0.0));
-        assert_eq!(margin.available_balance.into_rounded(2), base!(0.95));
+        assert_eq!(margin.available_balance, base!(0.95));
     }
 
     #[test]

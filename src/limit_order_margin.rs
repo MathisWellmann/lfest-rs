@@ -424,7 +424,7 @@ mod tests {
                 Order::limit(Side::Buy, quote!(100.0), quote!(100.0 * l)).unwrap(),
                 Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),
             ];
-            assert_eq!(order_margin(orders.into_iter(), p, ft, leverage!(), f_m), base!(1.0));
+            assert_eq!(order_margin(orders.into_iter(), p, ft, leverage!(l), f_m), base!(1.0));
 
             let orders = vec![
                 Order::limit(Side::Sell, quote!(100.0), quote!(100.0 * l)).unwrap(),

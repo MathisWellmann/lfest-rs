@@ -1,16 +1,16 @@
 //! Test file for the linear futures mode of the exchange
 
-use lfest::*;
+use lfest::{account_tracker::NoAccountTracker, prelude::*};
 
 #[test]
 fn lin_long_market_win_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
     let config = Config::new(
-        Fee(0.0002),
-        Fee(0.0006),
+        fee!(0.0002),
+        fee!(0.0006),
         quote!(1000.0),
-        1.0,
+        leverage!(1.0),
         FuturesTypes::Linear,
         String::new(),
         true,
@@ -42,7 +42,7 @@ fn lin_long_market_win_full() {
     assert_eq!(exchange.account().position().unrealized_pnl(), quote!(0.0));
     assert_eq!(exchange.account().margin().wallet_balance(), quote!(999.7));
     assert_eq!(exchange.account().margin().position_margin(), quote!(500.0));
-    assert_eq!(exchange.account().margin().available_balance().into_rounded(1), quote!(499.7));
+    assert_eq!(exchange.account().margin().available_balance(), quote!(499.7));
 
     let _ = exchange.update_state(
         0,
@@ -58,7 +58,7 @@ fn lin_long_market_win_full() {
     assert_eq!(exchange.account().position().size(), base!(0.0));
     assert_eq!(exchange.account().position().entry_price(), quote!(100.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), quote!(0.0));
-    assert_eq!(exchange.account().margin().wallet_balance().into_rounded(1), quote!(1499.1));
+    assert_eq!(exchange.account().margin().wallet_balance(), quote!(1499.1));
     assert_eq!(exchange.account().margin().position_margin(), quote!(0.0));
-    assert_eq!(exchange.account().margin().available_balance().into_rounded(1), quote!(1499.1));
+    assert_eq!(exchange.account().margin().available_balance(), quote!(1499.1));
 }

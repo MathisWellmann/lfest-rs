@@ -74,7 +74,7 @@ mod tests {
     use std::convert::TryFrom;
 
     use super::*;
-    use crate::{base, quote, BaseCurrency, Side};
+    use crate::prelude::*;
 
     #[test]
     fn price_filter() {

@@ -1,5 +1,8 @@
 //! Test file for the inverse futures mode of the exchange
 
+use std::convert::TryFrom;
+
+use fpdec::Decimal;
 use lfest::{account_tracker::NoAccountTracker, prelude::*};
 
 #[test]
@@ -180,7 +183,8 @@ fn inv_short_market_loss_full() {
     let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(0, bba!(quote!(1000.0), quote!(1000.0)));
 
-    let value: BaseCurrency = exchange.account().margin().available_balance() * 0.4_f64.into();
+    let value: BaseCurrency =
+        exchange.account().margin().available_balance() * Decimal::try_from(0.4).unwrap();
     let size = value.convert(exchange.ask());
     let o = Order::market(Side::Sell, size).unwrap();
     exchange.submit_order(o).unwrap();
@@ -239,7 +243,8 @@ fn inv_long_market_win_partial() {
     let mut exchange = Exchange::new(acc_tracker, config);
     let _ = exchange.update_state(0, bba!(quote!(1000.0), quote!(1000.0)));
 
-    let value: BaseCurrency = exchange.account().margin().available_balance() * 0.8_f64.into();
+    let value: BaseCurrency =
+        exchange.account().margin().available_balance() * Decimal::try_from(0.8).unwrap();
     let size = value.convert(exchange.ask());
     let o = Order::market(Side::Buy, size).unwrap();
     exchange.submit_order(o).unwrap();
