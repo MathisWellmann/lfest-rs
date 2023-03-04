@@ -6,17 +6,8 @@ use lfest::{account_tracker::NoAccountTracker, prelude::*};
 fn lin_long_market_win_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        quote!(1000.0),
-        leverage!(1.0),
-        FuturesTypes::Linear,
-        String::new(),
-        true,
-        100,
-    )
-    .unwrap();
+    let config =
+        Config::new(fee!(0.0002), fee!(0.0006), quote!(1000.0), leverage!(1.0), true, 100).unwrap();
 
     let acc_tracker = NoAccountTracker::default();
     let mut exchange = Exchange::new(acc_tracker, config);

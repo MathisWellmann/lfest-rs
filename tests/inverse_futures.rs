@@ -7,17 +7,8 @@ use lfest::{account_tracker::NoAccountTracker, prelude::*};
 fn inv_long_market_win_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        base!(1.0),
-        leverage!(1.0),
-        FuturesTypes::Inverse,
-        String::new(),
-        true,
-        100,
-    )
-    .unwrap();
+    let config =
+        Config::new(fee!(0.0002), fee!(0.0006), base!(1.0), leverage!(1.0), true, 100).unwrap();
 
     let fee_taker = config.fee_taker();
     let acc_tracker = NoAccountTracker::default();
@@ -65,17 +56,8 @@ fn inv_long_market_win_full() {
 fn inv_long_market_loss_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        base!(1.0),
-        leverage!(1.0),
-        FuturesTypes::Inverse,
-        String::new(),
-        true,
-        100,
-    )
-    .unwrap();
+    let config =
+        Config::new(fee!(0.0002), fee!(0.0006), base!(1.0), leverage!(1.0), true, 100).unwrap();
 
     let fee_taker = config.fee_taker();
     let acc_tracker = NoAccountTracker::default();
@@ -119,17 +101,8 @@ fn inv_long_market_loss_full() {
 fn inv_short_market_win_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        base!(1.0),
-        leverage!(1.0),
-        FuturesTypes::Inverse,
-        String::new(),
-        true,
-        100,
-    )
-    .unwrap();
+    let config =
+        Config::new(fee!(0.0002), fee!(0.0006), base!(1.0), leverage!(1.0), true, 100).unwrap();
 
     let fee_taker = config.fee_taker();
     let acc_tracker = NoAccountTracker::default();
@@ -170,17 +143,8 @@ fn inv_short_market_win_full() {
 fn inv_short_market_loss_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        base!(1.0),
-        leverage!(1.0),
-        FuturesTypes::Inverse,
-        String::new(),
-        true,
-        100,
-    )
-    .unwrap();
+    let config =
+        Config::new(fee!(0.0002), fee!(0.0006), base!(1.0), leverage!(1.0), true, 100).unwrap();
 
     let fee_taker = config.fee_taker();
     let acc_tracker = NoAccountTracker::default();
@@ -232,17 +196,8 @@ fn inv_short_market_loss_full() {
 fn inv_long_market_win_partial() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        base!(1.0),
-        leverage!(1.0),
-        FuturesTypes::Inverse,
-        String::new(),
-        true,
-        100,
-    )
-    .unwrap();
+    let config =
+        Config::new(fee!(0.0002), fee!(0.0006), base!(1.0), leverage!(1.0), true, 100).unwrap();
 
     let fee_taker = config.fee_taker();
     let acc_tracker = NoAccountTracker::default();
@@ -294,17 +249,8 @@ fn inv_long_market_win_partial() {
 fn inv_long_market_loss_partial() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        base!(1.0),
-        leverage!(1.0),
-        FuturesTypes::Inverse,
-        String::new(),
-        true,
-        100,
-    )
-    .unwrap();
+    let config =
+        Config::new(fee!(0.0002), fee!(0.0006), base!(1.0), leverage!(1.0), true, 100).unwrap();
 
     let fee_taker = config.fee_taker();
     let acc_tracker = NoAccountTracker::default();
@@ -343,17 +289,8 @@ fn inv_long_market_loss_partial() {
 fn inv_short_market_win_partial() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        base!(1.0),
-        leverage!(1.0),
-        FuturesTypes::Inverse,
-        String::new(),
-        true,
-        100,
-    )
-    .unwrap();
+    let config =
+        Config::new(fee!(0.0002), fee!(0.0006), base!(1.0), leverage!(1.0), true, 100).unwrap();
 
     let fee_taker = config.fee_taker();
     let acc_tracker = NoAccountTracker::default();
@@ -399,17 +336,8 @@ fn inv_short_market_win_partial() {
 fn inv_short_market_loss_partial() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        base!(1.0),
-        leverage!(1.0),
-        FuturesTypes::Inverse,
-        String::new(),
-        true,
-        100,
-    )
-    .unwrap();
+    let config =
+        Config::new(fee!(0.0002), fee!(0.0006), base!(1.0), leverage!(1.0), true, 100).unwrap();
 
     let fee_taker = config.fee_taker();
     let acc_tracker = NoAccountTracker::default();
@@ -457,17 +385,8 @@ fn inv_short_market_loss_partial() {
 fn inv_test_market_roundtrip() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        base!(1.0),
-        leverage!(1.0),
-        FuturesTypes::Inverse,
-        String::new(),
-        true,
-        100,
-    )
-    .unwrap();
+    let config =
+        Config::new(fee!(0.0002), fee!(0.0006), base!(1.0), leverage!(1.0), true, 100).unwrap();
 
     let fee_taker = config.fee_taker();
     let acc_tracker = NoAccountTracker::default();
@@ -520,17 +439,8 @@ fn inv_test_market_roundtrip() {
 fn inv_execute_limit() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        base!(1.0),
-        leverage!(1.0),
-        FuturesTypes::Inverse,
-        String::new(),
-        true,
-        100,
-    )
-    .unwrap();
+    let config =
+        Config::new(fee!(0.0002), fee!(0.0006), base!(1.0), leverage!(1.0), true, 100).unwrap();
 
     let acc_tracker = NoAccountTracker::default();
     let mut exchange = Exchange::new(acc_tracker, config.clone());

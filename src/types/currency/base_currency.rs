@@ -179,6 +179,7 @@ impl<'a> std::ops::SubAssign<&'a Self> for BaseCurrency {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prelude::*;
 
     #[test]
     fn base_display() {
@@ -187,11 +188,9 @@ mod tests {
 
     #[test]
     fn futures_type_pnl_inverse() {
-        let ft = FuturesTypes::Inverse;
-
-        assert_eq!(ft.pnl(quote!(100.0), quote!(125.0), quote!(1000.0)), base!(2.0));
-        assert_eq!(ft.pnl(quote!(100.0), quote!(125.0), quote!(-1000.0)), base!(-2.0));
-        assert_eq!(ft.pnl(quote!(100.0), quote!(80.0), quote!(1000.0)), base!(-2.5));
-        assert_eq!(ft.pnl(quote!(100.0), quote!(80.0), quote!(-1000.0)), base!(2.5));
+        assert_eq!(BaseCurrency::pnl(quote!(100.0), quote!(125.0), quote!(1000.0)), base!(2.0));
+        assert_eq!(BaseCurrency::pnl(quote!(100.0), quote!(125.0), quote!(-1000.0)), base!(-2.0));
+        assert_eq!(BaseCurrency::pnl(quote!(100.0), quote!(80.0), quote!(1000.0)), base!(-2.5));
+        assert_eq!(BaseCurrency::pnl(quote!(100.0), quote!(80.0), quote!(-1000.0)), base!(2.5));
     }
 }

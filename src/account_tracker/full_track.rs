@@ -1180,7 +1180,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_profit_loss_ratio() {
-        let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
+        let mut at = FullAccountTracker::new(quote!(100.0));
         at.total_profit = quote!(50.0);
         at.total_loss = quote!(25.0);
         assert_eq!(at.profit_loss_ratio(), Decimal::TWO);
@@ -1188,7 +1188,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_cumulative_fees() {
-        let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
+        let mut at = FullAccountTracker::new(quote!(100.0));
         at.log_fee(quote!(0.1));
         at.log_fee(quote!(0.2));
         assert_eq!(at.cumulative_fees(), quote!(0.3));
@@ -1196,7 +1196,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_buy_and_hold_return() {
-        let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
+        let mut at = FullAccountTracker::new(quote!(100.0));
         at.update(0, quote!(100.0), quote!(0.0));
         at.update(0, quote!(200.0), quote!(0.0));
         assert_eq!(at.buy_and_hold_return(), quote!(100.0));
@@ -1204,7 +1204,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_sell_and_hold_return() {
-        let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
+        let mut at = FullAccountTracker::new(quote!(100.0));
         at.update(0, quote!(100.0), quote!(0.0));
         at.update(0, quote!(50.0), quote!(0.0));
         assert_eq!(at.sell_and_hold_return(), quote!(50.0));
@@ -1213,7 +1213,7 @@ mod tests {
     #[test]
     fn acc_tracker_log_rpnl() {
         let rpnls: Vec<Decimal> = [1, -1, 1, 2, -1].iter().map(|v| Decimal::from(*v)).collect();
-        let mut acc_tracker = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
+        let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
         for r in rpnls {
             acc_tracker.log_rpnl(QuoteCurrency::new(r));
         }
@@ -1227,7 +1227,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_buy_and_hold() {
-        let mut acc_tracker = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
+        let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
         acc_tracker.update(0, quote!(100.0), quote!(0.0));
         acc_tracker.update(0, quote!(200.0), quote!(0.0));
         assert_eq!(acc_tracker.buy_and_hold_return(), quote!(100.0));
@@ -1235,7 +1235,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_sell_and_hold() {
-        let mut acc_tracker = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
+        let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
         acc_tracker.update(0, quote!(100.0), quote!(0.0));
         acc_tracker.update(0, quote!(200.0), quote!(0.0));
         assert_eq!(acc_tracker.sell_and_hold_return(), quote!(-100.0));
@@ -1245,7 +1245,7 @@ mod tests {
     fn acc_tracker_historical_value_at_risk() {
         if let Err(_e) = pretty_env_logger::try_init() {}
 
-        let mut acc_tracker = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
+        let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
@@ -1262,7 +1262,7 @@ mod tests {
     fn acc_tracker_historical_value_at_risk_from_n_hourly_returns() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
+        let mut at = FullAccountTracker::new(quote!(100.0));
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(round(at.historical_value_at_risk_from_n_hourly_returns(24, 0.05), 3), 3.835);
@@ -1273,7 +1273,7 @@ mod tests {
     fn acc_tracker_cornish_fisher_value_at_risk() {
         if let Err(_e) = pretty_env_logger::try_init() {}
 
-        let mut acc_tracker = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
+        let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
@@ -1290,7 +1290,7 @@ mod tests {
     fn acc_tracker_cornish_fisher_value_at_risk_from_n_hourly_returns() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let mut at = FullAccountTracker::new(quote!(100.0), FuturesTypes::Linear);
+        let mut at = FullAccountTracker::new(quote!(100.0));
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(

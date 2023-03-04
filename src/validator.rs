@@ -216,17 +216,11 @@ mod tests {
     fn validate_inverse_futures_market_order_without_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
-            let acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
 
             let o = Order::market(Side::Buy, QuoteCurrency::new(Decimal::from(40) * l)).unwrap();
             validator.validate_market_order(&o, &acc).unwrap();
@@ -246,20 +240,14 @@ mod tests {
     fn validate_inverse_futures_market_order_with_long_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("testing with leverage: {}", l);
 
             // with long position
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             acc.change_position(
                 Side::Buy,
                 QuoteCurrency::new(Decimal::from(50) * l),
@@ -284,20 +272,14 @@ mod tests {
     fn validate_inverse_futures_market_order_with_short_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
             // with short position
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             acc.change_position(
                 Side::Sell,
                 QuoteCurrency::new(Decimal::from(50) * l),
@@ -322,20 +304,14 @@ mod tests {
     fn validate_inverse_futures_market_order_with_open_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
             // with buy limit order
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             let mut o =
                 Order::limit(Side::Buy, quote!(100.0), QuoteCurrency::new(Decimal::from(50) * l))
                     .unwrap();
@@ -356,12 +332,7 @@ mod tests {
             assert!(validator.validate_market_order(&o, &acc).is_err());
 
             // with sell limit order
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             let mut o =
                 Order::limit(Side::Sell, quote!(100.0), QuoteCurrency::new(Decimal::from(50) * l))
                     .unwrap();
@@ -387,17 +358,11 @@ mod tests {
     fn validate_inverse_futures_limit_order_without_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
-            let acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
 
             let o =
                 Order::limit(Side::Buy, quote!(100.0), QuoteCurrency::new(Decimal::from(99) * l))
@@ -425,18 +390,12 @@ mod tests {
     fn validate_inverse_futures_limit_order_with_long_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             // with long position
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             acc.change_position(
                 Side::Buy,
                 QuoteCurrency::new(Decimal::from(50) * l),
@@ -470,18 +429,12 @@ mod tests {
     fn validate_inverse_futures_limit_order_with_short_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             // with short position
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             acc.change_position(
                 Side::Sell,
                 QuoteCurrency::new(Decimal::from(50) * l),
@@ -514,20 +467,14 @@ mod tests {
     fn validate_inverse_futures_limit_order_with_open_buy_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
             // with open buy order
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             let mut o =
                 Order::limit(Side::Buy, quote!(100.0), QuoteCurrency::new(Decimal::from(50) * l))
                     .unwrap();
@@ -561,20 +508,14 @@ mod tests {
     fn validate_inverse_futures_limit_order_with_open_sell_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
             // with open sell order
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             let mut o =
                 Order::limit(Side::Sell, quote!(101.0), QuoteCurrency::new(Decimal::from(50) * l))
                     .unwrap();
@@ -608,20 +549,14 @@ mod tests {
     fn validate_inverse_futures_limit_order_with_open_orders_mixed() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), 100);
         validator.update(quote!(100.0), quote!(101.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
             // with mixed limit orders
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             let mut o =
                 Order::limit(Side::Buy, quote!(100.0), QuoteCurrency::new(Decimal::from(50) * l))
                     .unwrap();
@@ -666,11 +601,9 @@ mod tests {
     fn validate_inverse_futures_limit_order_with_open_orders_mixed_panic() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0002), fee!(0.0006), 100);
         validator.update(quote!(100.0), quote!(101.0));
-        let mut acc =
-            Account::new(NoAccountTracker::default(), leverage!(1.0), base!(1.0), futures_type);
+        let mut acc = Account::new(NoAccountTracker::default(), leverage!(1.0), base!(1.0));
 
         for i in (0..100).step_by(2) {
             // with mixed limit orders
@@ -694,19 +627,13 @@ mod tests {
     fn linear_futures_limit_order_margin_cost_without_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                quote!(100.0),
-                futures_type,
-            );
+            let acc = Account::new(NoAccountTracker::default(), Leverage::new(l), quote!(100.0));
 
             let o = Order::limit(Side::Buy, quote!(100.0), BaseCurrency::new(l / Decimal::TWO))
                 .unwrap();
@@ -726,19 +653,14 @@ mod tests {
     fn linear_futures_limit_order_margin_cost_with_long_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                quote!(100.0),
-                futures_type,
-            );
+            let mut acc =
+                Account::new(NoAccountTracker::default(), Leverage::new(l), quote!(100.0));
             acc.change_position(Side::Buy, BaseCurrency::new(l / Decimal::TWO), quote!(100.0));
 
             let o = Order::limit(Side::Buy, quote!(100.0), BaseCurrency::new(l / Decimal::TWO))
@@ -759,19 +681,14 @@ mod tests {
     fn linear_futures_limit_order_margin_cost_with_short_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                quote!(100.0),
-                futures_type,
-            );
+            let mut acc =
+                Account::new(NoAccountTracker::default(), Leverage::new(l), quote!(100.0));
             acc.change_position(Side::Sell, BaseCurrency::new(l / Decimal::TWO), quote!(100.0));
 
             let o = Order::limit(Side::Buy, quote!(100.0), BaseCurrency::new(l / Decimal::TWO))
@@ -792,19 +709,14 @@ mod tests {
     fn linear_futures_limit_order_margin_cost_with_open_buy_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                quote!(100.0),
-                futures_type,
-            );
+            let mut acc =
+                Account::new(NoAccountTracker::default(), Leverage::new(l), quote!(100.0));
             let mut o = Order::limit(Side::Buy, quote!(100.0), BaseCurrency::new(l / Decimal::TWO))
                 .unwrap();
             o.set_id(1); // different id from test orders
@@ -829,19 +741,14 @@ mod tests {
     fn linear_futures_limit_order_margin_cost_with_open_sell_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                quote!(100.0),
-                futures_type,
-            );
+            let mut acc =
+                Account::new(NoAccountTracker::default(), Leverage::new(l), quote!(100.0));
             let mut o =
                 Order::limit(Side::Sell, quote!(100.0), BaseCurrency::new(l / Decimal::TWO))
                     .unwrap();
@@ -867,19 +774,14 @@ mod tests {
     fn linear_futures_limit_order_margin_cost_with_mixed_open_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                quote!(100.0),
-                futures_type,
-            );
+            let mut acc =
+                Account::new(NoAccountTracker::default(), Leverage::new(l), quote!(100.0));
             let mut o = Order::limit(Side::Buy, quote!(100.0), BaseCurrency::new(l / Decimal::TWO))
                 .unwrap();
             o.set_id(1); // different id from test orders
@@ -910,19 +812,14 @@ mod tests {
     fn linear_futures_limit_order_margin_cost_with_long_position_and_open_buy_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                quote!(100.0),
-                futures_type,
-            );
+            let mut acc =
+                Account::new(NoAccountTracker::default(), Leverage::new(l), quote!(100.0));
             acc.change_position(Side::Buy, BaseCurrency::new(l / Decimal::TWO), quote!(100.0));
             let mut o = Order::limit(Side::Buy, quote!(100.0), BaseCurrency::new(l / Decimal::TWO))
                 .unwrap();
@@ -948,19 +845,14 @@ mod tests {
     fn linear_futures_limit_order_margin_cost_with_long_position_and_open_sell_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                quote!(100.0),
-                futures_type,
-            );
+            let mut acc =
+                Account::new(NoAccountTracker::default(), Leverage::new(l), quote!(100.0));
             acc.change_position(Side::Buy, BaseCurrency::new(l / Decimal::TWO), quote!(100.0));
             let mut o =
                 Order::limit(Side::Sell, quote!(100.0), BaseCurrency::new(l / Decimal::TWO))
@@ -987,19 +879,14 @@ mod tests {
     fn linear_futures_limit_order_margin_cost_with_long_position_and_mixed_open_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                quote!(100.0),
-                futures_type,
-            );
+            let mut acc =
+                Account::new(NoAccountTracker::default(), Leverage::new(l), quote!(100.0));
             acc.change_position(Side::Buy, BaseCurrency::new(l / Decimal::TWO), quote!(100.0));
             let mut o =
                 Order::limit(Side::Sell, quote!(100.0), BaseCurrency::new(l / Decimal::TWO))
@@ -1031,19 +918,14 @@ mod tests {
     fn linear_futures_limit_order_margin_cost_with_short_position_and_open_buy_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                quote!(100.0),
-                futures_type,
-            );
+            let mut acc =
+                Account::new(NoAccountTracker::default(), Leverage::new(l), quote!(100.0));
             acc.change_position(Side::Sell, BaseCurrency::new(l / Decimal::TWO), quote!(100.0));
             let mut o = Order::limit(Side::Buy, quote!(100.0), BaseCurrency::new(l / Decimal::TWO))
                 .unwrap();
@@ -1069,19 +951,14 @@ mod tests {
     fn linear_futures_limit_order_margin_cost_with_short_position_and_open_sell_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                quote!(100.0),
-                futures_type,
-            );
+            let mut acc =
+                Account::new(NoAccountTracker::default(), Leverage::new(l), quote!(100.0));
             acc.change_position(Side::Sell, BaseCurrency::new(l / Decimal::TWO), quote!(100.0));
             let mut o =
                 Order::limit(Side::Sell, quote!(100.0), BaseCurrency::new(l / Decimal::TWO))
@@ -1108,19 +985,14 @@ mod tests {
     fn linear_futures_limit_order_margin_cost_with_short_position_and_mixed_open_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Linear;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                quote!(100.0),
-                futures_type,
-            );
+            let mut acc =
+                Account::new(NoAccountTracker::default(), Leverage::new(l), quote!(100.0));
             acc.change_position(Side::Sell, BaseCurrency::new(l / Decimal::TWO), quote!(100.0));
             let mut o =
                 Order::limit(Side::Sell, quote!(100.0), BaseCurrency::new(l / Decimal::TWO))
@@ -1153,19 +1025,13 @@ mod tests {
     fn inverse_futures_limit_order_margin_cost_without_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
 
             let o =
                 Order::limit(Side::Buy, quote!(100.0), QuoteCurrency::new(Decimal::from(50) * l))
@@ -1191,19 +1057,13 @@ mod tests {
     fn inverse_futures_limit_order_margin_cost_with_long_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             acc.change_position(
                 Side::Buy,
                 QuoteCurrency::new(Decimal::from(50) * l),
@@ -1234,19 +1094,13 @@ mod tests {
     fn inverse_futures_limit_order_margin_cost_with_short_position() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             acc.change_position(
                 Side::Sell,
                 QuoteCurrency::new(Decimal::from(50) * l),
@@ -1277,19 +1131,13 @@ mod tests {
     fn inverse_futures_limit_order_margin_cost_with_open_buy_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             let mut o =
                 Order::limit(Side::Buy, quote!(100.0), QuoteCurrency::new(Decimal::from(50) * l))
                     .unwrap();
@@ -1321,19 +1169,13 @@ mod tests {
     fn inverse_futures_limit_order_margin_cost_with_open_sell_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             let mut o =
                 Order::limit(Side::Sell, quote!(100.0), QuoteCurrency::new(Decimal::from(50) * l))
                     .unwrap();
@@ -1365,19 +1207,13 @@ mod tests {
     fn inverse_futures_limit_order_margin_cost_with_mixed_open_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             let mut o =
                 Order::limit(Side::Buy, quote!(100.0), QuoteCurrency::new(Decimal::from(50) * l))
                     .unwrap();
@@ -1415,19 +1251,13 @@ mod tests {
     fn inverse_futures_limit_order_margin_cost_with_long_position_and_open_buy_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             acc.change_position(
                 Side::Buy,
                 QuoteCurrency::new(Decimal::from(50) * l),
@@ -1464,19 +1294,13 @@ mod tests {
     fn inverse_futures_limit_order_margin_cost_with_long_position_and_open_sell_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             acc.change_position(
                 Side::Buy,
                 QuoteCurrency::new(Decimal::from(50) * l),
@@ -1513,19 +1337,13 @@ mod tests {
     fn inverse_futures_limit_order_margin_cost_with_long_position_and_mixed_open_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             acc.change_position(
                 Side::Buy,
                 QuoteCurrency::new(Decimal::from(50) * l),
@@ -1568,19 +1386,13 @@ mod tests {
     fn inverse_futures_limit_order_margin_cost_with_short_position_and_open_buy_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             acc.change_position(
                 Side::Sell,
                 QuoteCurrency::new(Decimal::from(50) * l),
@@ -1617,19 +1429,13 @@ mod tests {
     fn inverse_futures_limit_order_margin_cost_with_short_position_and_open_sell_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             acc.change_position(
                 Side::Sell,
                 QuoteCurrency::new(Decimal::from(50) * l),
@@ -1666,19 +1472,13 @@ mod tests {
     fn inverse_futures_limit_order_margin_cost_with_short_position_and_mixed_open_orders() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
-        let futures_type = FuturesTypes::Inverse;
-        let mut validator = Validator::new(fee!(0.0), fee!(0.0), futures_type, 100);
+        let mut validator = Validator::new(fee!(0.0), fee!(0.0), 100);
         validator.update(quote!(100.0), quote!(100.0));
 
         for l in (1..5).map(|v| Decimal::from(v)) {
             debug!("leverage: {}", l);
 
-            let mut acc = Account::new(
-                NoAccountTracker::default(),
-                Leverage::new(l),
-                base!(1.0),
-                futures_type,
-            );
+            let mut acc = Account::new(NoAccountTracker::default(), Leverage::new(l), base!(1.0));
             acc.change_position(
                 Side::Sell,
                 QuoteCurrency::new(Decimal::from(50) * l),

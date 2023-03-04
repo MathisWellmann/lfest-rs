@@ -19,20 +19,10 @@ fn main() {
     let t0 = Instant::now();
 
     let starting_wb = base!(1.0);
-    let futures_type = FuturesTypes::Inverse;
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        starting_wb,
-        leverage!(1.0),
-        futures_type,
-        String::new(),
-        true,
-        100,
-    )
-    .unwrap();
+    let config =
+        Config::new(fee!(0.0002), fee!(0.0006), starting_wb, leverage!(1.0), true, 100).unwrap();
 
-    let acc_tracker = FullAccountTracker::new(starting_wb, futures_type);
+    let acc_tracker = FullAccountTracker::new(starting_wb);
     let mut exchange = Exchange::new(acc_tracker, config);
 
     // load trades from csv file
@@ -86,7 +76,7 @@ fn main() {
 
 /// analyze the resulting performance metrics of the traded orders
 fn analyze_results<M>(acc_tracker: &FullAccountTracker<M>)
-where M: Currency + Send {
+where M: Currency + MarginCurrency + Send {
     let win_ratio = acc_tracker.win_ratio();
     let profit_loss_ratio = acc_tracker.profit_loss_ratio();
     let rpnl = acc_tracker.total_rpnl();
