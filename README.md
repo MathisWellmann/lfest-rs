@@ -9,7 +9,7 @@ For simplicity's sake (and performance) the exchange does not use an order book.
 
 ### Features:
 - :currency_exchange: Fixed point arithmetic using [fpdec](https://github.com/mamrhein/fpdec.rs) crate, for super fast and precise numeric calculations.
-- :brain: Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct function IO.   
+- :brain: Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct types at function boundaries.   
 Examples include `BaseCurrency`, `QuoteCurrency`, `Fee` and `Leverage`.   
 This makes it impossible to mistakenly input for example a `USD` denoted value into a function that expects a `BTC` denoted value.    
 - :satellite: Flexible market data integration through the `MarketUpdate` type and associated macros.   

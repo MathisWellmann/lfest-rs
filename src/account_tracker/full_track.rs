@@ -6,7 +6,7 @@ use crate::{
     account_tracker::AccountTracker,
     cornish_fisher::cornish_fisher_value_at_risk,
     quote,
-    types::{Currency, FuturesTypes, QuoteCurrency, Side},
+    types::{Currency, MarginCurrency, QuoteCurrency, Side},
     utils::decimal_to_f64,
 };
 
@@ -32,7 +32,6 @@ pub struct FullAccountTracker<M> {
     wallet_balance_last: M,  // last wallet balance recording
     wallet_balance_start: M, // wallet balance at start
     wallet_balance_high: M,  // maximum wallet balance observed
-    futures_type: FuturesTypes,
     total_rpnl: M,
     upnl: M,
     num_trades: i64,
@@ -86,17 +85,16 @@ pub struct FullAccountTracker<M> {
 /// TODO: create its own `risk` crate out of these implementations for better
 /// reusability and testability
 impl<M> FullAccountTracker<M>
-where M: Currency + Send
+where M: Currency + MarginCurrency + Send
 {
     #[must_use]
     #[inline]
     /// Create a new AccTracker struct
-    pub fn new(starting_wb: M, futures_type: FuturesTypes) -> Self {
+    pub fn new(starting_wb: M) -> Self {
         FullAccountTracker {
             wallet_balance_last: starting_wb,
             wallet_balance_start: starting_wb,
             wallet_balance_high: starting_wb,
-            futures_type,
             total_rpnl: M::new_zero(),
             upnl: M::new_zero(),
             num_trades: 0,
@@ -180,14 +178,14 @@ where M: Currency + Send
     #[inline(always)]
     pub fn buy_and_hold_return(&self) -> M {
         let qty = self.wallet_balance_start.convert(self.price_first);
-        self.futures_type.pnl(self.price_first, self.price_last, qty)
+        M::pnl(self.price_first, self.price_last, qty)
     }
 
     /// Would be return of sell and hold strategy
     #[inline(always)]
     pub fn sell_and_hold_return(&self) -> M {
         let qty = self.wallet_balance_start.convert(self.price_first);
-        self.futures_type.pnl(self.price_first, self.price_last, qty.into_negative())
+        M::pnl(self.price_first, self.price_last, qty.into_negative())
     }
 
     /// Return the sharpe ratio using the selected returns as source
@@ -545,7 +543,7 @@ where M: Currency + Send
 }
 
 impl<M> AccountTracker<M> for FullAccountTracker<M>
-where M: Currency + Send
+where M: Currency + MarginCurrency + Send
 {
     fn update(&mut self, timestamp: u64, price: QuoteCurrency, upnl: M) {
         self.price_last = price;
@@ -584,7 +582,7 @@ where M: Currency + Send
 
             // calculate daily return of buy_and_hold
             let bnh_qty = self.wallet_balance_start.convert(self.price_first);
-            let pnl_bnh = self.futures_type.pnl(self.price_a_day_ago, price, bnh_qty);
+            let pnl_bnh = M::pnl(self.price_a_day_ago, price, bnh_qty);
             self.hist_returns_daily_bnh.push(pnl_bnh);
 
             // calculate daily log return of market
@@ -612,7 +610,7 @@ where M: Currency + Send
 
             // calculate hourly return of buy_and_hold
             let bnh_qty = self.wallet_balance_start.convert(self.price_first);
-            let pnl_bnh = self.futures_type.pnl(self.price_an_hour_ago, price, bnh_qty);
+            let pnl_bnh = M::pnl(self.price_an_hour_ago, price, bnh_qty);
             self.hist_returns_hourly_bnh.push(pnl_bnh);
 
             // calculate hourly logarithmic return of buy_and_hold
@@ -634,7 +632,7 @@ where M: Currency + Send
         self.hist_ln_returns_tick_acc.push(ln_ret);
 
         let bnh_qty = self.wallet_balance_start.convert(self.price_first);
-        let pnl_bnh = self.futures_type.pnl(self.price_a_tick_ago, price, bnh_qty);
+        let pnl_bnh = M::pnl(self.price_a_tick_ago, price, bnh_qty);
         self.hist_returns_tick_bnh.push(pnl_bnh);
 
         let ln_ret = decimal_to_f64((price / self.price_a_tick_ago).inner()).ln();
@@ -703,7 +701,7 @@ where M: Currency + Send
 }
 
 impl<M> Display for FullAccountTracker<M>
-where M: Currency + Send
+where M: Currency + MarginCurrency + Send
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

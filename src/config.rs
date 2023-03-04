@@ -1,6 +1,6 @@
 use crate::{
     errors::{Error, Result},
-    types::{Currency, Fee, FuturesTypes, Leverage},
+    types::{Currency, Fee, Leverage},
 };
 
 #[derive(Debug, Clone)]
@@ -10,14 +10,15 @@ pub struct Config<M> {
     fee_maker: Fee,
     /// The taker fee as a fraction. e.g.: 10 basis points -> 0.0010
     fee_taker: Fee,
-    /// The starting balance of account
+    /// The starting balance of account (denoted in margin currency).
+    /// The concrete `Currency` here defines the futures type.
+    /// If `QuoteCurrency` is used as the margin currency,
+    /// then its a linear futures contract.
+    /// If `BaseCurrency` is used as the margin currency,
+    /// then its an inverse futures contract.
     starting_balance: M,
     /// The leverage used for the position
     leverage: Leverage,
-    /// The type of futures to simulate
-    futures_type: FuturesTypes,
-    /// To identify an exchange by a code
-    identification: String,
     /// Sets the order timestamps on submit_order() call, if enabled
     set_order_timestamps: bool,
     /// The maximum number of open orders the user can have at any given time
@@ -35,9 +36,6 @@ where M: Currency
     /// `starting_balance`: Initial Wallet Balance, denoted in QUOTE if using
     /// linear futures, denoted in BASE for inverse futures
     /// `leverage`: The positions leverage.
-    /// `futures_type`: The type of futures contract to
-    /// simulate.
-    /// `identification`: A way to identify an exchange
     /// `set_order_timestamps`: Whether the exchange should set order
     /// timestamps.
     /// `max_num_open_orders`: The maximum number of open ordes a user can have
@@ -51,21 +49,20 @@ where M: Currency
         fee_taker: Fee,
         starting_balance: M,
         leverage: Leverage,
-        futures_type: FuturesTypes,
-        identification: String,
         set_order_timestamps: bool,
         max_num_open_orders: usize,
     ) -> Result<Self> {
         if max_num_open_orders == 0 {
             return Err(Error::InvalidMaxNumOpenOrders);
         }
+        if starting_balance <= M::new_zero() {
+            return Err(Error::InvalidStartingBalance);
+        }
         Ok(Config {
             fee_maker,
             fee_taker,
             starting_balance,
             leverage,
-            futures_type,
-            identification,
             set_order_timestamps,
             max_num_open_orders,
         })
@@ -93,18 +90,6 @@ where M: Currency
     #[inline(always)]
     pub fn leverage(&self) -> Leverage {
         self.leverage
-    }
-
-    /// Return the FuturesType of the Config
-    #[inline(always)]
-    pub fn futures_type(&self) -> FuturesTypes {
-        self.futures_type
-    }
-
-    /// Return the exchange identification
-    #[inline(always)]
-    pub fn identification(&self) -> &str {
-        &self.identification
     }
 
     /// Return whether or not the Exchange is configured to set order timestamps

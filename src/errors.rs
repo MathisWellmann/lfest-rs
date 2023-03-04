@@ -60,6 +60,9 @@ pub enum Error {
 
     #[error("The max_num_open_orders must be > 0")]
     InvalidMaxNumOpenOrders,
+
+    #[error("The provided starting balance must be > 0")]
+    InvalidStartingBalance,
 }
 
 /// This is defined as a convenience.

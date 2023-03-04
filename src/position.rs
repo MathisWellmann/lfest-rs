@@ -2,7 +2,7 @@ use fpdec::Decimal;
 
 use crate::{
     quote,
-    types::{Currency, FuturesTypes, Leverage, QuoteCurrency},
+    types::{Currency, Leverage, MarginCurrency, QuoteCurrency},
 };
 
 #[derive(Debug, Clone, Default)]
@@ -21,7 +21,9 @@ where S: Currency
 }
 
 impl<S> Position<S>
-where S: Currency
+where
+    S: Currency,
+    S::PairedCurrency: MarginCurrency,
 {
     /// Create a new, initially neutral, position with a given leverage
     #[must_use]
@@ -84,13 +86,8 @@ where S: Currency
     }
 
     /// Change the position size by a given delta at a certain price
-    pub(crate) fn change_size(
-        &mut self,
-        size_delta: S,
-        price: QuoteCurrency,
-        futures_type: FuturesTypes,
-    ) {
-        trace!("change_size({}, {}, {})", size_delta, price, futures_type);
+    pub(crate) fn change_size(&mut self, size_delta: S, price: QuoteCurrency) {
+        trace!("change_size({}, {})", size_delta, price);
 
         if self.size > S::new_zero() {
             if self.size + size_delta < S::new_zero() {
@@ -118,16 +115,13 @@ where S: Currency
         }
         self.size += size_delta;
 
-        self.update_state(price, futures_type);
+        self.update_state(price);
     }
 
     /// Update the state to reflect price changes
-    pub(crate) fn update_state(&mut self, price: QuoteCurrency, futures_type: FuturesTypes) {
-        self.unrealized_pnl = if self.size != S::new_zero() {
-            futures_type.pnl(self.entry_price, price, self.size)
-        } else {
-            S::PairedCurrency::new_zero()
-        };
+    #[inline(always)]
+    pub(crate) fn update_state(&mut self, price: QuoteCurrency) {
+        self.unrealized_pnl = S::PairedCurrency::pnl(self.entry_price, price, self.size);
     }
 }
 

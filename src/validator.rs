@@ -4,7 +4,7 @@ use crate::{
     errors::OrderError,
     limit_order_margin::order_margin,
     quote,
-    types::{Currency, Fee, FuturesTypes, Order, QuoteCurrency, Side},
+    types::{Currency, Fee, MarginCurrency, Order, QuoteCurrency, Side},
     utils::{max, min},
     Decimal,
 };
@@ -16,25 +16,18 @@ pub(crate) struct Validator {
     fee_taker: Fee,
     bid: QuoteCurrency,
     ask: QuoteCurrency,
-    futures_type: FuturesTypes,
     max_num_open_orders: usize,
 }
 
 impl Validator {
     /// Create a new Validator with a given fee maker and taker
     #[inline]
-    pub(crate) fn new(
-        fee_maker: Fee,
-        fee_taker: Fee,
-        futures_type: FuturesTypes,
-        max_num_open_orders: usize,
-    ) -> Self {
+    pub(crate) fn new(fee_maker: Fee, fee_taker: Fee, max_num_open_orders: usize) -> Self {
         Self {
             fee_maker,
             fee_taker,
             bid: quote!(0.0),
             ask: quote!(0.0),
-            futures_type,
             max_num_open_orders,
         }
     }
@@ -61,6 +54,7 @@ impl Validator {
     where
         A: AccountTracker<S::PairedCurrency>,
         S: Currency,
+        S::PairedCurrency: MarginCurrency,
     {
         let (debit, credit) = self.order_cost_market(o, acc);
         debug!("validate_market_order debit: {}, credit: {}", debit, credit);
@@ -84,6 +78,7 @@ impl Validator {
     where
         A: AccountTracker<S::PairedCurrency>,
         S: Currency,
+        S::PairedCurrency: MarginCurrency,
     {
         if acc.num_active_limit_orders() >= self.max_num_open_orders {
             return Err(OrderError::MaxActiveOrders);
@@ -130,6 +125,7 @@ impl Validator {
     where
         A: AccountTracker<S::PairedCurrency>,
         S: Currency,
+        S::PairedCurrency: MarginCurrency,
     {
         debug!("order_cost_market: order: {:?},\nacc.position: {:?}", order, acc.position());
 
@@ -167,28 +163,7 @@ impl Validator {
             Side::Buy => self.ask,
             Side::Sell => self.bid,
         };
-        match self.futures_type {
-            FuturesTypes::Linear => {
-                // the values fee, debit and credit have to be converted from denoted in BASE
-                // currency to being denoted in QUOTE currency
-                let fee_margin = fee_of_size.convert(price);
-                let debit = debit.convert(price);
-                let credit = credit.convert(price);
-
-                (debit, credit + fee_margin)
-            }
-            FuturesTypes::Inverse => {
-                // the values fee, debit and credit have to be converted from denoted in QUOTE
-                // currency to being denoted in BASE currency
-                let fee_margin = fee_of_size.convert(price);
-                let debit = debit.convert(price);
-                let credit = credit.convert(price);
-
-                (debit, credit + fee_margin)
-            }
-        }
-
-        // (debit, credit + fee)
+        (debit.convert(price), credit.convert(price) + fee_of_size.convert(price))
     }
 
     /// Compute the order cost of a limit order
@@ -205,6 +180,7 @@ impl Validator {
     where
         A: AccountTracker<S::PairedCurrency>,
         S: Currency,
+        S::PairedCurrency: MarginCurrency,
     {
         let mut orders = acc.active_limit_orders().clone();
         debug!("limit_order_margin_cost: order: {:?}, active_limit_orders: {:?}", order, orders);
@@ -212,7 +188,6 @@ impl Validator {
         let needed_order_margin = order_margin(
             orders.values().cloned(),
             acc.position().size(),
-            self.futures_type,
             acc.position().leverage(),
             self.fee_maker,
         );

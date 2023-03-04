@@ -1,7 +1,7 @@
 use fpdec::Decimal;
 
 use crate::{
-    types::{Currency, Fee, FuturesTypes, Leverage, Order, Side},
+    types::{Currency, Fee, Leverage, Order, QuoteCurrency, Side},
     utils::{max, min},
 };
 
@@ -22,7 +22,6 @@ use crate::{
 pub(crate) fn order_margin<S>(
     orders: impl Iterator<Item = Order<S>>,
     pos_size: S,
-    futures_type: FuturesTypes,
     leverage: Leverage,
     fee_maker: Fee,
 ) -> S::PairedCurrency
@@ -66,22 +65,24 @@ where
         }
         fees = sell_side_fees;
 
-        let price_mult = match futures_type {
-            FuturesTypes::Linear => sell_price_weight / sell_size.inner(),
-            FuturesTypes::Inverse => Decimal::ONE / (sell_price_weight / sell_size.inner()),
-        };
-        ssd * price_mult
+        // let price_mult = match futures_type {
+        //     FuturesTypes::Linear => sell_price_weight / sell_size.inner(),
+        //     FuturesTypes::Inverse => Decimal::ONE / (sell_price_weight /
+        // sell_size.inner()), };
+        // TODO: is this correct?
+        ssd * sell_size.convert(QuoteCurrency::new(sell_price_weight)).inner()
     } else {
         if bsd == Decimal::ZERO {
             return S::PairedCurrency::new_zero();
         }
         fees = buy_side_fees;
 
-        let price_mult = match futures_type {
-            FuturesTypes::Linear => buy_price_weight / buy_size.inner(),
-            FuturesTypes::Inverse => Decimal::ONE / (buy_price_weight / buy_size.inner()),
-        };
-        bsd * price_mult
+        // let price_mult = match futures_type {
+        //     FuturesTypes::Linear => buy_price_weight / buy_size.inner(),
+        //     FuturesTypes::Inverse => Decimal::ONE / (buy_price_weight /
+        // buy_size.inner()), };
+        // TODO: is this correct?
+        bsd * buy_size.convert(QuoteCurrency::new(buy_price_weight)).inner()
     };
     debug!(
         "pos_size: {}, bsd: {}, ssd: {}, buy_price_weight {}, sell_price_weight {}, buy_size: {}, sell_size: {}, om: {}, buy_side_fees: {}, sell_side_fees: {}",

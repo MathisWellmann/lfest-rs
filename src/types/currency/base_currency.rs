@@ -3,6 +3,7 @@ use std::ops::{Add, Div, Mul, Sub};
 use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
 use fpdec::Decimal;
 
+use super::MarginCurrency;
 use crate::types::{Currency, Fee, QuoteCurrency};
 
 /// Allows the quick construction of `BaseCurrency`
@@ -76,6 +77,23 @@ impl Currency for BaseCurrency {
     #[inline(always)]
     fn into_negative(self) -> Self {
         Self(-self.0)
+    }
+}
+
+impl MarginCurrency for BaseCurrency {
+    /// This represents the pnl calculation for inverse futures contracts
+    fn pnl<S>(
+        entry_price: QuoteCurrency,
+        exit_price: QuoteCurrency,
+        quantity: S,
+    ) -> S::PairedCurrency
+    where
+        S: Currency,
+    {
+        if quantity.is_zero() {
+            return S::PairedCurrency::new_zero();
+        }
+        quantity.convert(entry_price) - quantity.convert(exit_price)
     }
 }
 
@@ -165,5 +183,15 @@ mod tests {
     #[test]
     fn base_display() {
         println!("{}", base!(0.5));
+    }
+
+    #[test]
+    fn futures_type_pnl_inverse() {
+        let ft = FuturesTypes::Inverse;
+
+        assert_eq!(ft.pnl(quote!(100.0), quote!(125.0), quote!(1000.0)), base!(2.0));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(125.0), quote!(-1000.0)), base!(-2.0));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(80.0), quote!(1000.0)), base!(-2.5));
+        assert_eq!(ft.pnl(quote!(100.0), quote!(80.0), quote!(-1000.0)), base!(2.5));
     }
 }

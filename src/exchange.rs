@@ -6,7 +6,7 @@ use crate::{
     config::Config,
     errors::OrderError,
     quote,
-    types::{Currency, MarketUpdate, Order, OrderType, QuoteCurrency, Side},
+    types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, QuoteCurrency, Side},
     validator::Validator,
 };
 
@@ -34,22 +34,14 @@ impl<A, S> Exchange<A, S>
 where
     A: AccountTracker<S::PairedCurrency>,
     S: Currency,
+    S::PairedCurrency: MarginCurrency,
 {
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
     pub fn new(account_tracker: A, config: Config<S::PairedCurrency>) -> Self {
-        let account = Account::new(
-            account_tracker,
-            config.leverage(),
-            config.starting_balance(),
-            config.futures_type(),
-        );
-        let validator = Validator::new(
-            config.fee_maker(),
-            config.fee_taker(),
-            config.futures_type(),
-            config.max_num_open_orders(),
-        );
+        let account = Account::new(account_tracker, config.leverage(), config.starting_balance());
+        let validator =
+            Validator::new(config.fee_maker(), config.fee_taker(), config.max_num_open_orders());
 
         Self {
             config,

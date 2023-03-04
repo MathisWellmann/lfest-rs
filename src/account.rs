@@ -8,7 +8,7 @@ use crate::{
     margin::Margin,
     position::Position,
     quote,
-    types::{Currency, Fee, FuturesTypes, Leverage, Order, QuoteCurrency, Side},
+    types::{Currency, Fee, Leverage, MarginCurrency, Order, QuoteCurrency, Side},
     utils::{max, min},
 };
 
@@ -22,7 +22,6 @@ pub struct Account<A, S>
 where S: Currency
 {
     account_tracker: A,
-    futures_type: FuturesTypes,
     margin: Margin<S::PairedCurrency>,
     position: Position<S>,
     active_limit_orders: HashMap<u64, Order<S>>,
@@ -40,6 +39,7 @@ impl<A, S> Account<A, S>
 where
     A: AccountTracker<S::PairedCurrency>,
     S: Currency,
+    S::PairedCurrency: MarginCurrency,
 {
     // TODO: make sure to eliminate the `futures_type`, to infer it based on the
     // starting_balance type
@@ -47,14 +47,12 @@ where
         account_tracker: A,
         leverage: Leverage,
         starting_balance: S::PairedCurrency,
-        futures_type: FuturesTypes,
     ) -> Self {
         let position = Position::new_init(leverage);
         let margin = Margin::new_init(starting_balance);
 
         Self {
             account_tracker,
-            futures_type,
             margin,
             position,
             active_limit_orders: HashMap::new(),
@@ -69,10 +67,10 @@ where
 
     /// Update the accounts state for the newest price data
     pub(crate) fn update(&mut self, price: QuoteCurrency, trade_timestamp: u64) {
-        let upnl = self.futures_type.pnl(self.position.entry_price(), price, self.position.size());
+        let upnl = S::PairedCurrency::pnl(self.position.entry_price(), price, self.position.size());
         self.account_tracker.update(trade_timestamp, price, upnl);
 
-        self.position.update_state(price, self.futures_type);
+        self.position.update_state(price);
     }
 
     /// The number of currently active limit orders
@@ -306,7 +304,6 @@ where
         let new_om = order_margin(
             self.active_limit_orders.values().cloned(),
             self.position.size(),
-            self.futures_type,
             self.position.leverage(),
             fee_maker,
         );
@@ -337,13 +334,13 @@ where
                 if self.position.size() < S::new_zero() {
                     // pnl needs to be realized
                     if size > self.position.size().abs() {
-                        self.futures_type.pnl(
+                        S::PairedCurrency::pnl(
                             self.position.entry_price(),
                             exec_price,
                             self.position.size(),
                         )
                     } else {
-                        self.futures_type.pnl(
+                        S::PairedCurrency::pnl(
                             self.position.entry_price(),
                             exec_price,
                             size.into_negative(),
@@ -357,13 +354,13 @@ where
                 if self.position.size() > S::new_zero() {
                     // pnl needs to be realized
                     if size > self.position.size() {
-                        self.futures_type.pnl(
+                        S::PairedCurrency::pnl(
                             self.position.entry_price(),
                             exec_price,
                             self.position.size(),
                         )
                     } else {
-                        self.futures_type.pnl(self.position.entry_price(), exec_price, size)
+                        S::PairedCurrency::pnl(self.position.entry_price(), exec_price, size)
                     }
                 } else {
                     S::PairedCurrency::new_zero()
@@ -382,7 +379,7 @@ where
         }
 
         // change position
-        self.position.change_size(pos_size_delta, exec_price, self.futures_type);
+        self.position.change_size(pos_size_delta, exec_price);
 
         // set position margin
         let pos_margin: S::PairedCurrency = (self.position.size().abs()

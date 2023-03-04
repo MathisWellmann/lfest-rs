@@ -3,6 +3,7 @@ use std::ops::{Add, Div, Mul, Sub};
 use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
 use fpdec::Decimal;
 
+use super::MarginCurrency;
 use crate::types::{BaseCurrency, Currency, Fee};
 
 /// Allows the quick construction of `QuoteCurrency`
@@ -76,6 +77,23 @@ impl Currency for QuoteCurrency {
     #[inline(always)]
     fn into_negative(self) -> Self {
         Self(-self.0)
+    }
+}
+
+impl MarginCurrency for QuoteCurrency {
+    /// This represents a linear futures contract pnl calculation
+    fn pnl<S>(
+        entry_price: QuoteCurrency,
+        exit_price: QuoteCurrency,
+        quantity: S,
+    ) -> S::PairedCurrency
+    where
+        S: Currency,
+    {
+        if quantity.is_zero() {
+            return S::PairedCurrency::new_zero();
+        }
+        quantity.convert(exit_price) - quantity.convert(entry_price)
     }
 }
 
@@ -166,5 +184,13 @@ mod tests {
     #[test]
     fn quote_display() {
         println!("{}", quote!(0.5));
+    }
+
+    #[test]
+    fn linear_futures_pnl() {
+        assert_eq!(QuoteCurrency::pnl(quote!(100.0), quote!(110.0), base!(10.0)), quote!(100.0));
+        assert_eq!(QuoteCurrency::pnl(quote!(100.0), quote!(110.0), base!(-10.0)), quote!(-100.0));
+        assert_eq!(QuoteCurrency::pnl(quote!(100.0), quote!(90.0), base!(10.0)), quote!(-100.0));
+        assert_eq!(QuoteCurrency::pnl(quote!(100.0), quote!(90.0), base!(-10.0)), quote!(100.0));
     }
 }
