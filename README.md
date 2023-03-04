@@ -3,10 +3,12 @@
 
 :warning: The results may not represent real trading results on any given exchange. 
 
-lfest-rs is a simulated futures exchange capable of leveraged positions.
- It gets fed external bid ask data to update the internal state
-  and check for order execution. For simplicity's sake (and performance) the exchange does not use an order book.
-  Supported futures types are both linear and inverse futures.
+lfest-rs is a simulated futures exchange capable of leveraged positions.    
+You fed it external market data through the `MarketUpdate` enum to update the internal state.  
+Where you either provide bid and ask price or information derived from a [candle](https://github.com/MathisWellmann/trade_aggregation-rs).
+Macros (`bba`, `candle`) make it easy to construct the concrete variant.   
+For simplicity's sake (and performance) the exchange does not use an order book.   
+The supported future types are both linear and inverse futures.
 
 ### Features:
 Some of the most notable features include:
@@ -27,9 +29,9 @@ The supported order types are:
 
 ### Performance Metrics:
 The following performance metrics are available when using the `FullTrack` `AccountTracker`,   
-but you may define any performance metric by implementing the `AccounrTracker` trait.
+but you may define any performance metric by implementing the `AccountTracker` trait.
 - `win_ratio`: # wins / # total_trades
-- profit_loss_ratio
+- `profit_loss_ratio`: 
 - total_rpnl
 - sharpe
 - sortino
