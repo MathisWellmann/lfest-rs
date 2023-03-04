@@ -54,17 +54,9 @@ where
     let ssd = cumulative_sell_value - max(pos_value, S::PairedCurrency::new_zero());
     dbg!(bsd, ssd);
 
-    let fees = if ssd > bsd {
-        sell_side_fees
-    } else if ssd < bsd {
-        buy_side_fees
-    } else {
-        S::PairedCurrency::new_zero()
-    };
+    let order_margin = max(bsd + buy_side_fees, ssd + sell_side_fees);
 
-    let order_margin = max(bsd, ssd);
-
-    order_margin / position.leverage().inner() + fees
+    order_margin / position.leverage().inner()
 }
 
 #[cfg(test)]
