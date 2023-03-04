@@ -86,8 +86,7 @@ pub struct FullAccountTracker<M> {
 /// TODO: create its own `risk` crate out of these implementations for better
 /// reusability and testability
 impl<M> FullAccountTracker<M>
-where
-    M: Currency + Send,
+where M: Currency + Send
 {
     #[must_use]
     #[inline]
@@ -546,8 +545,7 @@ where
 }
 
 impl<M> AccountTracker<M> for FullAccountTracker<M>
-where
-    M: Currency + Send,
+where M: Currency + Send
 {
     fn update(&mut self, timestamp: u64, price: QuoteCurrency, upnl: M) {
         self.price_last = price;
@@ -705,8 +703,7 @@ where
 }
 
 impl<M> Display for FullAccountTracker<M>
-where
-    M: Currency + Send,
+where M: Currency + Send
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

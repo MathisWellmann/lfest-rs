@@ -5,22 +5,22 @@
 
 lfest-rs is a simulated futures exchange capable of leveraged positions.    
 You fed it external market data through the `MarketUpdate` enum to update the internal state.  
-Where you either provide bid and ask price or information derived from a [candle](https://github.com/MathisWellmann/trade_aggregation-rs).
+Where you either provide bid and ask price or information derived from a [candle](https://github.com/MathisWellmann/trade_aggregation-rs).   
 Macros (`bba`, `candle`) make it easy to construct the concrete variant.   
 For simplicity's sake (and performance) the exchange does not use an order book.   
 The supported future types are both linear and inverse futures.
 
 ### Features:
 Some of the most notable features include:
-- Fixed point arithmetic using [fpdec](https://github.com/mamrhein/fpdec.rs) crate, for super fast and precise numeric calculations.
-- Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct function IO.   
+- :moneybag: Fixed point arithmetic using [fpdec](https://github.com/mamrhein/fpdec.rs) crate, for super fast and precise numeric calculations.
+- :brain: Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct function IO.   
 Examples include `BaseCurrency`, `QuoteCurrency`, `Fee` and `Leverage`.   
 This makes it impossible to mistakenly input for example a `USD` denoted value into a function that expects a `BTC` denoted value.    
-- Flexible market data integration through the `MarketUpdate` type and associated macros.   
-- Integrated performance tracking.    
+- :flex: Flexible market data integration through the `MarketUpdate` type and associated macros.   
+- :chart: Integrated performance tracking.    
 Use the existing `FullTrack` or implement your own using the `AccountTracker` trait.
-- Broad test coverage, to get closer to ensured correctness.
-- Auditable due to its small and consice codebase. < 8k LOC
+- :check: Broad test coverage, to get closer to ensured correctness.
+- :mag: Auditable due to its small and consice codebase. < 8k LOC
 
 ### Order Types
 The supported order types are:
