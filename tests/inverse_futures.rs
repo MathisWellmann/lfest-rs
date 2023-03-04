@@ -450,9 +450,9 @@ fn inv_execute_limit() {
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
     assert_eq!(exchange.account().margin().wallet_balance(), base!(1.0));
-    assert_eq!(exchange.account().margin().available_balance(), base!(0.499900000000000050));
+    assert_eq!(exchange.account().margin().available_balance(), base!(0.49990));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.0));
-    assert_eq!(exchange.account().margin().order_margin(), base!(0.500099999999999950)); // this includes the fee too
+    assert_eq!(exchange.account().margin().order_margin(), base!(0.5001)); // this includes the fee too
 
     let (exec_orders, liq) = exchange.update_state(1, bba!(quote!(750.0), quote!(750.0)));
     assert!(!liq);

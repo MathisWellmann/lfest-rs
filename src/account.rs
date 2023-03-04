@@ -41,8 +41,6 @@ where
     S: Currency,
     S::PairedCurrency: MarginCurrency,
 {
-    // TODO: make sure to eliminate the `futures_type`, to infer it based on the
-    // starting_balance type
     pub(crate) fn new(
         account_tracker: A,
         leverage: Leverage,
@@ -301,12 +299,8 @@ where
         self.account_tracker.log_limit_order_fill();
         self.executed_orders.push(exec_order);
 
-        let new_om = order_margin(
-            self.active_limit_orders.values().cloned(),
-            self.position.size(),
-            self.position.leverage(),
-            fee_maker,
-        );
+        let new_om =
+            order_margin(self.active_limit_orders.values().cloned(), &self.position, fee_maker);
         self.margin.set_order_margin(new_om);
     }
 
@@ -494,7 +488,7 @@ mod tests {
         let order_margin = validator.validate_limit_order(&o, &account).unwrap();
         account.append_limit_order(o, order_margin);
         assert_eq!(account.active_limit_orders().len(), 1);
-        // TODO:
+
         assert_eq!(account.margin().wallet_balance(), quote!(1000.0));
         assert_eq!(account.margin().position_margin(), quote!(0.0));
         assert_eq!(account.margin().order_margin(), quote!(405.0));

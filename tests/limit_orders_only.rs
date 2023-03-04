@@ -42,8 +42,9 @@ fn limit_orders_only() {
     assert_eq!(exchange.account().position().size(), base!(9.9));
     assert_eq!(exchange.account().position().entry_price(), quote!(100.0));
     // TODO: upnl uses mid price but should use the expected fill price, meaning it
-    // should be 0.99 not 0.495 assert_eq!(exchange.account().position().
-    // unrealized_pnl(), 0.0);
+    // should be 0.99 not 0.495.
+
+    // assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
 
     assert_eq!(exchange.account().margin().wallet_balance(), quote!(999.802));
     assert_eq!(exchange.account().margin().position_margin(), quote!(990.0));

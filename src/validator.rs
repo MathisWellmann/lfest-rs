@@ -185,12 +185,8 @@ impl Validator {
         let mut orders = acc.active_limit_orders().clone();
         debug!("limit_order_margin_cost: order: {:?}, active_limit_orders: {:?}", order, orders);
         orders.insert(order.id(), order.clone());
-        let needed_order_margin = order_margin(
-            orders.values().cloned(),
-            acc.position().size(),
-            acc.position().leverage(),
-            self.fee_maker,
-        );
+        let needed_order_margin =
+            order_margin(orders.values().cloned(), acc.position(), self.fee_maker);
 
         // get the additional needed difference
         let diff = needed_order_margin - acc.margin().order_margin();
