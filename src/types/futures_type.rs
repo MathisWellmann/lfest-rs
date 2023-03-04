@@ -64,7 +64,6 @@ impl FuturesTypes {
                 // contract_qty is denoted in QUOTE currency
                 // contract_qty * (1.0 / entry_price - 1.0 / exit_price)
 
-                dbg!(entry_price, exit_price, contract_qty);
                 contract_qty.convert(entry_price) - contract_qty.convert(exit_price)
 
                 // resulting pnl denoted in BASE currency
