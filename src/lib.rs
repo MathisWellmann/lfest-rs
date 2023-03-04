@@ -1,8 +1,8 @@
 #![deny(missing_docs, rustdoc::missing_crate_level_docs, unused_imports)]
 #![warn(clippy::all)]
+#![doc = include_str!("../README.md")]
 
 //! lfest - leveraged futures exchange for simulated trading
-//! aims to be a high performance exchange for backtesting
 
 #[macro_use]
 extern crate log;

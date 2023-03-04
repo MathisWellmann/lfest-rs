@@ -8,7 +8,6 @@ Macros (`bba`, `candle`) make it easy to construct the concrete variant.
 For simplicity's sake (and performance) the exchange does not use an order book.   
 
 ### Features:
-Some of the most notable features include:
 - :currency_exchange: Fixed point arithmetic using [fpdec](https://github.com/mamrhein/fpdec.rs) crate, for super fast and precise numeric calculations.
 - :brain: Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct function IO.   
 Examples include `BaseCurrency`, `QuoteCurrency`, `Fee` and `Leverage`.   
@@ -61,6 +60,7 @@ For an example see [examples](examples/basic.rs)
 ### TODOs:
 - proper liquidations
 - Rework some internal components for greater clarity and simplicity
+- Order filters (price and quantity)
 
 ### Contributions
 If you find a bug or would like to help out, feel free to create a pull-request.
