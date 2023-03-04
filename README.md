@@ -1,14 +1,11 @@
 # Leveraged Futures Exchange for Simulated Trading (LFEST)
-:warning: This is a personal project, use a your own risk. 
-
-:warning: The results may not represent real trading results on any given exchange. 
+:radioactive: This is a personal project, use a your own risk.   
 
 lfest-rs is a simulated futures exchange capable of leveraged positions.    
 You fed it external market data through the `MarketUpdate` enum to update the internal state.  
 Where you either provide bid and ask price or information derived from a [candle](https://github.com/MathisWellmann/trade_aggregation-rs).   
 Macros (`bba`, `candle`) make it easy to construct the concrete variant.   
 For simplicity's sake (and performance) the exchange does not use an order book.   
-The supported future types are both linear and inverse futures.
 
 ### Features:
 Some of the most notable features include:
@@ -21,6 +18,7 @@ This makes it impossible to mistakenly input for example a `USD` denoted value i
 Use the existing `FullTrack` or implement your own using the `AccountTracker` trait.
 - :heavy_check_mark: Broad test coverage, to get closer to ensured correctness.
 - :mag: Auditable due to its small and consice codebase. < 8k LOC
+- :page_with_curl: Supports both linear and inverse futures contracts.
 
 ### Order Types
 The supported order types are:
@@ -30,23 +28,23 @@ The supported order types are:
 ### Performance Metrics:
 The following performance metrics are available when using the `FullTrack` `AccountTracker`,   
 but you may define any performance metric by implementing the `AccountTracker` trait.
-- `win_ratio`: # wins / # total_trades
-- `profit_loss_ratio`: 
-- total_rpnl
-- sharpe
-- sortino
-- cumulative fees
-- max_drawdown_wallet_balance
-- max_drawdown_total
-- num_trades
-- turnover
-- trade_percentage
-- buy_ratio
-- limit_order_fill_ratio
-- limit_order_cancellation_ratio
-- historical_value_at_risk
-- cornish_fisher_value_at_risk
-- d_ratio
+- `win_ratio`: wins / total_trades
+- `profit_loss_ratio`: avg_win_amnt / avg_loss_amnt
+- `total_rpnl`: Total realized profit and loss
+- `sharpe`
+- `sortino`
+- `cumulative fees`: Sum total of fees payed to the exchange
+- `max_drawdown_wallet_balance`: Maximum fraction the wallet balance has decreased from its high.
+- `max_drawdown_total`: Drawdown including unrealized profit and loss
+- `num_trades`: The total number of trades executed
+- `turnover`: The total quantity executed 
+- `trade_percentage`: trades / total_trade_opportunities
+- `buy_ratio`: buys / total_trades
+- `limit_order_fill_ratio`
+- `limit_order_cancellation_ratio`
+- `historical_value_at_risk`
+- `cornish_fisher_value_at_risk`
+- `d_ratio`
 
 Some of these metric may behave differently from what you would expect, so make sure to take a look at the code.
 
