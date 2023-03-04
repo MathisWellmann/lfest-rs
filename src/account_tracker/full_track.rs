@@ -86,7 +86,8 @@ pub struct FullAccountTracker<M> {
 /// TODO: create its own `risk` crate out of these implementations for better
 /// reusability and testability
 impl<M> FullAccountTracker<M>
-where M: Currency + Send
+where
+    M: Currency + Send,
 {
     #[must_use]
     #[inline]
@@ -416,7 +417,7 @@ where M: Currency + Send
     /// algorithm It uses the Cornish-Fish Value at Risk (CF-VaR)
     /// It better captures the risk of the asset as it is not limited by the
     /// assumption of a gaussian distribution It it time-insensitive
-    /// from: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3927058
+    /// from: <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3927058>
     /// # Parameters
     /// returns_source: the sampling interval of pnl snapshots
     pub fn d_ratio(&self, returns_source: ReturnsSource) -> f64 {
@@ -545,7 +546,8 @@ where M: Currency + Send
 }
 
 impl<M> AccountTracker<M> for FullAccountTracker<M>
-where M: Currency + Send
+where
+    M: Currency + Send,
 {
     fn update(&mut self, timestamp: u64, price: QuoteCurrency, upnl: M) {
         self.price_last = price;
@@ -638,7 +640,7 @@ where M: Currency + Send
         self.hist_returns_tick_bnh.push(pnl_bnh);
 
         let ln_ret = decimal_to_f64((price / self.price_a_tick_ago).inner()).ln();
-        self.hist_ln_returns_tick_bnh.push(ln_ret.into());
+        self.hist_ln_returns_tick_bnh.push(ln_ret);
 
         self.last_tick_pnl = self.total_rpnl + upnl;
         self.price_a_tick_ago = price;
@@ -703,7 +705,8 @@ where M: Currency + Send
 }
 
 impl<M> Display for FullAccountTracker<M>
-where M: Currency + Send
+where
+    M: Currency + Send,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
