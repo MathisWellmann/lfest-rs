@@ -14,11 +14,11 @@ where S: Currency
 {
     /// Defines the minimum `quantity` of any order
     /// Disabled if 0
-    pub min_qty: S,
+    pub min_quantity: S,
 
     /// Defines the maximum `quantity` of any order
     /// Disabled if 0
-    pub max_qty: S,
+    pub max_quantity: S,
 
     /// Defines the intervals that a `quantity` can be increased / decreased by.
     /// For the filter to pass,
@@ -30,13 +30,13 @@ impl<S> QuantityFilter<S>
 where S: Currency
 {
     pub(crate) fn validate_order(&self, order: &Order<S>) -> Result<(), OrderError> {
-        if order.quantity() < self.min_qty {
+        if order.quantity() < self.min_quantity {
             return Err(OrderError::QuantityTooLow);
         }
-        if order.quantity() > self.max_qty {
+        if order.quantity() > self.max_quantity {
             return Err(OrderError::QuantityTooHigh);
         }
-        if ((order.quantity() - self.min_qty) % self.step_size) != S::new_zero() {
+        if ((order.quantity() - self.min_quantity) % self.step_size) != S::new_zero() {
             return Err(OrderError::InvalidQuantityStepSize);
         }
         Ok(())
@@ -51,8 +51,8 @@ mod tests {
     #[test]
     fn quantity_filter() {
         let filter = QuantityFilter {
-            min_qty: quote!(10),
-            max_qty: quote!(1000),
+            min_quantity: quote!(10),
+            max_quantity: quote!(1000),
             step_size: quote!(1),
         };
 
