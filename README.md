@@ -2,10 +2,11 @@
 :radioactive: This is a personal project, use a your own risk.   
 
 lfest-rs is a simulated futures exchange capable of leveraged positions.    
-You fed it external market data through the `MarketUpdate` enum to update the internal state.  
+You fed it external market data through the [`MarketUpdate`](https://docs.rs/lfest/0.31.0/lfest/prelude/enum.MarketUpdate.html) enum to update the internal state.  
 Where you either provide bid and ask price or information derived from a [candle](https://github.com/MathisWellmann/trade_aggregation-rs).   
-Macros (`bba`, `candle`) make it easy to construct the concrete variant.   
+Macros ([`bba`](https://docs.rs/lfest/0.31.0/lfest/macro.bba.html), [`candle`](https://docs.rs/lfest/0.31.0/lfest/macro.candle.html)) make it easy to construct the concrete variant.   
 For simplicity's sake (and performance) the exchange does not use an order book.   
+The exchange can be configured using [`Config`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.Config.html)
 
 ### Features:
 - :currency_exchange: Fixed point arithmetic using [`fpdec`](https://github.com/mamrhein/fpdec.rs) crate, for super fast and precise numeric calculations.
@@ -23,7 +24,9 @@ or implement your own using the [`AccountTracker`](https://docs.rs/lfest/0.31.0/
 - :heavy_check_mark: Broad test coverage, to get closer to ensured correctness.
 - :mag: Auditable due to its small and consice codebase. < 8k LOC
 - :page_with_curl: Supports both linear and inverse futures contracts.
-- :no_entry: Order filtering to make sure the price and quantity follow certain rules. See [`PriceFilter`]() and [`QuantityFilter`]()
+- :no_entry: Order filtering to make sure the price and quantity follow certain rules. 
+See [`PriceFilter`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.PriceFilter.html) and 
+[`QuantityFilter`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.QuantityFilter.html)
 
 ### Order Types
 The supported order types are:
