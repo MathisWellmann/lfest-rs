@@ -8,13 +8,18 @@ Macros (`bba`, `candle`) make it easy to construct the concrete variant.
 For simplicity's sake (and performance) the exchange does not use an order book.   
 
 ### Features:
-- :currency_exchange: Fixed point arithmetic using [fpdec](https://github.com/mamrhein/fpdec.rs) crate, for super fast and precise numeric calculations.
+- :currency_exchange: Fixed point arithmetic using [`fpdec`](https://github.com/mamrhein/fpdec.rs) crate, for super fast and precise numeric calculations.
 - :brain: Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct types at function boundaries.   
-Examples include `BaseCurrency`, `QuoteCurrency`, `Fee` and `Leverage`.   
+Examples include 
+[`BaseCurrency`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.BaseCurrency.html), 
+[`QuoteCurrency`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.QuoteCurrency.html), 
+[`Fee`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.Fee.html) and 
+[`Leverage`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.Leverage.html).   
 This makes it impossible to mistakenly input for example a `USD` denoted value into a function that expects a `BTC` denoted value.    
-- :satellite: Flexible market data integration through the `MarketUpdate` type and associated macros.   
+- :satellite: Flexible market data integration through the [`MarketUpdate`](https://docs.rs/lfest/0.31.0/lfest/prelude/enum.MarketUpdate.html) type and associated macros.   
 - :chart: Integrated performance tracking.    
-Use the existing `FullTrack` or implement your own using the `AccountTracker` trait.
+Use the existing [`FullAccountTracker`](https://docs.rs/lfest/0.31.0/lfest/account_tracker/struct.FullAccountTracker.html)  
+or implement your own using the [`AccountTracker`](https://docs.rs/lfest/0.31.0/lfest/account_tracker/trait.AccountTracker.html) trait.
 - :heavy_check_mark: Broad test coverage, to get closer to ensured correctness.
 - :mag: Auditable due to its small and consice codebase. < 8k LOC
 - :page_with_curl: Supports both linear and inverse futures contracts.
