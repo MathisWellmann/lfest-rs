@@ -1,5 +1,7 @@
 //! This module contains order filtering related code
 
+use fpdec::{Dec, Decimal};
+
 use crate::{
     prelude::OrderError,
     types::{Currency, Order},
@@ -26,14 +28,26 @@ where S: Currency
     pub step_size: S,
 }
 
+impl<S> Default for QuantityFilter<S>
+where S: Currency
+{
+    fn default() -> Self {
+        Self {
+            min_quantity: S::new_zero(),
+            max_quantity: S::new_zero(),
+            step_size: S::new(Dec!(1)),
+        }
+    }
+}
+
 impl<S> QuantityFilter<S>
 where S: Currency
 {
     pub(crate) fn validate_order(&self, order: &Order<S>) -> Result<(), OrderError> {
-        if order.quantity() < self.min_quantity {
+        if order.quantity() < self.min_quantity && self.min_quantity != S::new_zero() {
             return Err(OrderError::QuantityTooLow);
         }
-        if order.quantity() > self.max_quantity {
+        if order.quantity() > self.max_quantity && self.max_quantity != S::new_zero() {
             return Err(OrderError::QuantityTooHigh);
         }
         if ((order.quantity() - self.min_quantity) % self.step_size) != S::new_zero() {

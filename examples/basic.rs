@@ -19,8 +19,17 @@ fn main() {
     let t0 = Instant::now();
 
     let starting_wb = base!(1.0);
-    let config =
-        Config::new(fee!(0.0002), fee!(0.0006), starting_wb, leverage!(1.0), true, 100).unwrap();
+    let config = Config::new(
+        fee!(0.0002),
+        fee!(0.0006),
+        starting_wb,
+        leverage!(1.0),
+        true,
+        100,
+        PriceFilter::default(),
+        QuantityFilter::default(),
+    )
+    .unwrap();
 
     let acc_tracker = FullAccountTracker::new(starting_wb);
     let mut exchange = Exchange::new(acc_tracker, config);

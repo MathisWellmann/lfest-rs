@@ -118,8 +118,7 @@ where
         market_update: MarketUpdate,
     ) -> (Vec<Order<S>>, bool) {
         // TODO: enforce bid ask spread
-        // TODO: add price filters with precision, possibly by changing from f64 to some
-        // decimal lib
+        // TODO: enforce price filters here as well
         match market_update {
             MarketUpdate::Bba {
                 bid,
@@ -173,6 +172,10 @@ where
         if self.config.set_order_timestamps() {
             order.set_timestamp(self.current_ts);
         }
+
+        self.config.quantity_filter().validate_order(&order)?;
+        let mark_price = (self.bid + self.ask) / quote!(2);
+        self.config.price_filter().validate_order(&order, mark_price)?;
 
         match order.order_type() {
             OrderType::Market => {

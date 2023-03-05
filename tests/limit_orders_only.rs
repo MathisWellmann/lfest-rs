@@ -8,8 +8,17 @@ use log::*;
 fn limit_orders_only() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config =
-        Config::new(fee!(0.0002), fee!(0.0006), quote!(1000.0), leverage!(1.0), true, 100).unwrap();
+    let config = Config::new(
+        fee!(0.0002),
+        fee!(0.0006),
+        quote!(1000.0),
+        leverage!(1.0),
+        true,
+        100,
+        PriceFilter::default(),
+        QuantityFilter::default(),
+    )
+    .unwrap();
 
     let acc_tracker = NoAccountTracker::default();
     let mut exchange = Exchange::new(acc_tracker, config);
@@ -77,8 +86,27 @@ fn limit_orders_only() {
 fn limit_orders_2() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config =
-        Config::new(fee!(0.0002), fee!(0.0006), quote!(100.0), leverage!(1.0), true, 100).unwrap();
+    let config = Config::new(
+        fee!(0.0002),
+        fee!(0.0006),
+        quote!(100.0),
+        leverage!(1.0),
+        true,
+        100,
+        PriceFilter {
+            min_price: quote!(0),
+            max_price: quote!(0),
+            tick_size: quote!(0.1),
+            multiplier_up: Decimal::TWO,
+            multiplier_down: Decimal::ZERO,
+        },
+        QuantityFilter {
+            min_quantity: base!(0),
+            max_quantity: base!(0),
+            step_size: base!(0.05),
+        },
+    )
+    .unwrap();
 
     let acc_tracker = NoAccountTracker::default();
     let mut exchange = Exchange::new(acc_tracker, config);

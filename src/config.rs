@@ -1,11 +1,14 @@
 use crate::{
     errors::{Error, Result},
+    prelude::{PriceFilter, QuantityFilter},
     types::{Currency, Fee, Leverage},
 };
 
 #[derive(Debug, Clone)]
 /// Define the Exchange configuration
-pub struct Config<M> {
+pub struct Config<M>
+where M: Currency
+{
     /// The maker fee as a fraction. e.g.: 2.5 basis points rebate -> -0.00025
     fee_maker: Fee,
     /// The taker fee as a fraction. e.g.: 10 basis points -> 0.0010
@@ -23,6 +26,10 @@ pub struct Config<M> {
     set_order_timestamps: bool,
     /// The maximum number of open orders the user can have at any given time
     max_num_open_orders: usize,
+    /// Filters for limit order pricing
+    price_filter: PriceFilter,
+    /// Filters for order quantity
+    quantity_filter: QuantityFilter<M::PairedCurrency>,
 }
 
 impl<M> Config<M>
@@ -40,6 +47,8 @@ where M: Currency
     /// timestamps.
     /// `max_num_open_orders`: The maximum number of open ordes a user can have
     /// at any time.
+    /// `price_filter`: Filters for limit order pricing
+    /// `quantity_filter`: Filters for order quantities
     ///
     /// # Returns:
     /// Either a valid Config or an Error
@@ -51,6 +60,8 @@ where M: Currency
         leverage: Leverage,
         set_order_timestamps: bool,
         max_num_open_orders: usize,
+        price_filter: PriceFilter,
+        quantity_filter: QuantityFilter<M::PairedCurrency>,
     ) -> Result<Self> {
         if max_num_open_orders == 0 {
             return Err(Error::InvalidMaxNumOpenOrders);
@@ -65,6 +76,8 @@ where M: Currency
             leverage,
             set_order_timestamps,
             max_num_open_orders,
+            price_filter,
+            quantity_filter,
         })
     }
 
@@ -103,5 +116,17 @@ where M: Currency
     #[inline(always)]
     pub fn max_num_open_orders(&self) -> usize {
         self.max_num_open_orders
+    }
+
+    /// Return a reference to the `PriceFilter`
+    #[inline(always)]
+    pub fn price_filter(&self) -> &PriceFilter {
+        &self.price_filter
+    }
+
+    /// Return a reference to the `QuantityFilter`
+    #[inline(always)]
+    pub fn quantity_filter(&self) -> &QuantityFilter<M::PairedCurrency> {
+        &self.quantity_filter
     }
 }

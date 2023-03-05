@@ -2,16 +2,19 @@ use fpdec::Decimal;
 
 use crate::{
     prelude::OrderError,
+    quote,
     types::{Currency, Order, QuoteCurrency},
 };
 
 /// The `PriceFilter` defines the price rules for a symbol
 #[derive(Debug, Clone)]
 pub struct PriceFilter {
-    /// Defines the minimum price allowed. Disabled if `min_price` == 0
+    /// Defines the minimum price allowed.
+    /// Disabled if `min_price` == 0
     pub min_price: QuoteCurrency,
 
-    /// Defines the maximum price allowed. Disabled if `max_price` == 0
+    /// Defines the maximum price allowed.
+    /// Disabled if `max_price` == 0
     pub max_price: QuoteCurrency,
 
     /// Defines the intervals that a price can be increased / decreased by.
@@ -28,6 +31,19 @@ pub struct PriceFilter {
     /// To pass this filter,
     /// order.limit_price >= mark_price * multiplier_down
     pub multiplier_down: Decimal,
+}
+
+impl Default for PriceFilter {
+    fn default() -> Self {
+        Self {
+            min_price: quote!(0),
+            // disabled
+            max_price: quote!(0),
+            tick_size: quote!(1),
+            multiplier_up: Decimal::TWO,
+            multiplier_down: Decimal::ZERO,
+        }
+    }
 }
 
 impl PriceFilter {
