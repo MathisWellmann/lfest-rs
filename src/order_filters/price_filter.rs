@@ -48,10 +48,9 @@ impl PriceFilter {
                 if limit_price > self.max_price && self.max_price != QuoteCurrency::new_zero() {
                     return Err(OrderError::LimitPriceTooHigh);
                 }
-                // TODO:
-                // if ((limit_price - self.min_price) % self.tick_size) !=
-                // QuoteCurrency::new_zero() {     return
-                // Err(OrderError::InvalidOrderPriceStepSize); }
+                if ((limit_price - self.min_price) % self.tick_size) != QuoteCurrency::new_zero() {
+                    return Err(OrderError::InvalidOrderPriceStepSize);
+                }
                 if limit_price > mark_price * self.multiplier_up
                     && self.multiplier_up != Decimal::ZERO
                 {
@@ -71,45 +70,58 @@ impl PriceFilter {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryFrom;
+    use fpdec::Dec;
 
     use super::*;
     use crate::prelude::*;
 
     #[test]
-    #[ignore] // Price filter is not done yet
     fn price_filter() {
         let filter = PriceFilter {
             min_price: quote!(0.1),
             max_price: quote!(1000.0),
             tick_size: quote!(0.1),
-            multiplier_up: Decimal::try_from(1.2).unwrap(),
-            multiplier_down: Decimal::try_from(0.8).unwrap(),
+            multiplier_up: Dec!(1.2),
+            multiplier_down: Dec!(0.8),
         };
         let mark_price = quote!(100.0);
 
+        // Market orders should always pass as the price filter only concerns limit
+        // orders
         let order = Order::market(Side::Buy, base!(0.1)).unwrap();
         filter.validate_order(&order, mark_price).unwrap();
-
         let order = Order::market(Side::Sell, base!(0.1)).unwrap();
         filter.validate_order(&order, mark_price).unwrap();
 
+        // Some passing orders
         let order = Order::limit(Side::Buy, quote!(99.0), base!(0.1)).unwrap();
         filter.validate_order(&order, mark_price).unwrap();
-
         let order = Order::limit(Side::Sell, quote!(99.0), base!(0.1)).unwrap();
         filter.validate_order(&order, mark_price).unwrap();
 
+        // beyond max and min
         let order = Order::limit(Side::Buy, quote!(0.05), base!(0.1)).unwrap();
-        assert!(filter.validate_order(&order, mark_price).is_err());
+        assert_eq!(filter.validate_order(&order, mark_price), Err(OrderError::LimitPriceTooLow));
+        let order = Order::limit(Side::Buy, quote!(1001), base!(0.1)).unwrap();
+        assert_eq!(filter.validate_order(&order, mark_price), Err(OrderError::LimitPriceTooHigh));
 
-        let order = Order::limit(Side::Buy, quote!(1001.0), base!(0.1)).unwrap();
-        assert!(filter.validate_order(&order, mark_price).is_err());
+        // Test upper price band
+        let order = Order::limit(Side::Buy, quote!(120), base!(0.1)).unwrap();
+        filter.validate_order(&order, mark_price).unwrap();
+        let order = Order::limit(Side::Buy, quote!(121), base!(0.1)).unwrap();
+        assert_eq!(filter.validate_order(&order, mark_price), Err(OrderError::LimitPriceTooHigh));
 
+        // Test lower price band
+        let order = Order::limit(Side::Buy, quote!(80), base!(0.1)).unwrap();
+        filter.validate_order(&order, mark_price).unwrap();
+        let order = Order::limit(Side::Buy, quote!(79), base!(0.1)).unwrap();
+        assert_eq!(filter.validate_order(&order, mark_price), Err(OrderError::LimitPriceTooLow));
+
+        // Test step size
         let order = Order::limit(Side::Buy, quote!(100.05), base!(0.1)).unwrap();
-        assert!(filter.validate_order(&order, mark_price).is_err());
-
-        // TODO: more
-        todo!()
+        assert_eq!(
+            filter.validate_order(&order, mark_price),
+            Err(OrderError::InvalidOrderPriceStepSize)
+        );
     }
 }

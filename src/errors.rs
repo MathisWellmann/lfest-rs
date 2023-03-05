@@ -1,5 +1,5 @@
 /// Defines the possible order errors that can occur when submitting a new order
-#[derive(thiserror::Error, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(thiserror::Error, Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[allow(missing_docs)]
 pub enum OrderError {
     #[error("Maximum number of active orders reached")]

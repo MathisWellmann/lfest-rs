@@ -17,8 +17,7 @@ mod errors;
 mod exchange;
 mod limit_order_margin;
 mod margin;
-// TODO: finish the feature
-// mod order_filters;
+mod order_filters;
 mod position;
 mod types;
 mod utils;
@@ -34,16 +33,13 @@ pub mod prelude {
     pub use crate::{
         account::Account,
         account_tracker::AccountTracker,
-        base,
-        bba,
+        base, bba,
         config::Config,
         errors::{Error, OrderError, Result},
         exchange::Exchange,
-        fee,
-        leverage,
+        fee, leverage,
         margin::Margin,
-        // TODO: finish the feature
-        // order_filters::{PriceFilter, QuantityFilter},
+        order_filters::{PriceFilter, QuantityFilter},
         position::Position,
         quote,
         types::*,
