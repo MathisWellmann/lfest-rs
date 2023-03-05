@@ -18,6 +18,7 @@ Use the existing `FullTrack` or implement your own using the `AccountTracker` tr
 - :heavy_check_mark: Broad test coverage, to get closer to ensured correctness.
 - :mag: Auditable due to its small and consice codebase. < 8k LOC
 - :page_with_curl: Supports both linear and inverse futures contracts.
+- :no_entry: Order filtering to make sure the price and quantity follow certain rules. See [`PriceFilter`]() and [`QuantityFilter`]()
 
 ### Order Types
 The supported order types are:
