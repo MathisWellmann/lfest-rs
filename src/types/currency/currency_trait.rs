@@ -20,10 +20,12 @@ pub trait Currency:
     + std::ops::Mul<Decimal, Output = Self>
     + std::ops::Div<Decimal, Output = Self>
     // Require to do arithmetic with `&Self` on the right hand side
+    // TODO: remove as its not needed any more
     + for<'a> std::ops::Add<&'a Self, Output = Self>
     + for<'a> std::ops::Sub<&'a Self, Output = Self>
     + for<'a> std::ops::Mul<&'a Self, Output = Self>
     + for<'a> std::ops::Div<&'a Self, Output = Self>
+    + std::ops::Rem<Output = Self>
     + std::ops::AddAssign
     + std::ops::SubAssign
     + for<'a> std::ops::AddAssign<&'a Self>

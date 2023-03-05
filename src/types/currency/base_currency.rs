@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
 use fpdec::Decimal;
@@ -173,6 +173,14 @@ impl<'a> std::ops::AddAssign<&'a Self> for BaseCurrency {
 impl<'a> std::ops::SubAssign<&'a Self> for BaseCurrency {
     fn sub_assign(&mut self, rhs: &'a Self) {
         self.0 = self.0 - rhs.0;
+    }
+}
+
+impl Rem for BaseCurrency {
+    type Output = Self;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        Self(self.0 % rhs.0)
     }
 }
 

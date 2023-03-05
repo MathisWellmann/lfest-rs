@@ -28,6 +28,15 @@ pub enum OrderError {
 
     #[error("The account does not have enough available balance to submit the order")]
     NotEnoughAvailableBalance,
+
+    #[error("The order quantity is too low")]
+    QuantityTooLow,
+
+    #[error("The order quantity is too high")]
+    QuantityTooHigh,
+
+    #[error("The order quantity does not conform to the step size")]
+    InvalidQuantityStepSize,
 }
 
 /// Describes possible Errors that may occur when calling methods in this crate
