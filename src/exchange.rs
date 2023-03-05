@@ -111,7 +111,6 @@ where
     /// ### Returns:
     /// executed orders
     /// true if position has been liquidated
-    #[must_use]
     pub fn update_state(
         &mut self,
         timestamp: u64,

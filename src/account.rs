@@ -67,7 +67,7 @@ where
     pub(crate) fn update(&mut self, bid: QuoteCurrency, ask: QuoteCurrency, trade_timestamp: u64) {
         self.position.update_state(bid, ask);
         let upnl = self.position().unrealized_pnl();
-        let mid_price = (bid + ask) / quote!(0);
+        let mid_price = (bid + ask) / quote!(2);
         self.account_tracker.update(trade_timestamp, mid_price, upnl);
     }
 
