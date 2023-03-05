@@ -115,13 +115,18 @@ where
         }
         self.size += size_delta;
 
-        self.update_state(price);
+        self.unrealized_pnl = S::PairedCurrency::pnl(self.entry_price, price, self.size);
     }
 
     /// Update the state to reflect price changes
     #[inline(always)]
-    pub(crate) fn update_state(&mut self, price: QuoteCurrency) {
-        self.unrealized_pnl = S::PairedCurrency::pnl(self.entry_price, price, self.size);
+    pub(crate) fn update_state(&mut self, bid: QuoteCurrency, ask: QuoteCurrency) {
+        // The upnl is based on the possible fill price, not the mid-price
+        if self.size > S::new_zero() {
+            self.unrealized_pnl = S::PairedCurrency::pnl(self.entry_price, bid, self.size);
+        } else {
+            self.unrealized_pnl = S::PairedCurrency::pnl(self.entry_price, ask, self.size);
+        }
     }
 }
 
@@ -185,7 +190,7 @@ mod tests {
     #[test]
     fn position_update_state_inverse_futures() {
         let mut pos = Position::new(quote!(100.0), quote!(100.0), leverage!(1.0), base!(0.0));
-        pos.update_state(quote!(125.0));
+        pos.update_state(quote!(125.0), quote!(125.1));
 
         assert_eq!(pos.unrealized_pnl, base!(0.2));
     }
@@ -193,7 +198,7 @@ mod tests {
     #[test]
     fn position_update_state_linear_futures() {
         let mut pos = Position::new(base!(1.0), quote!(100.0), leverage!(1.0), quote!(0.0));
-        pos.update_state(quote!(110.0));
+        pos.update_state(quote!(110.0), quote!(110.1));
 
         assert_eq!(pos.unrealized_pnl, quote!(10.0));
     }

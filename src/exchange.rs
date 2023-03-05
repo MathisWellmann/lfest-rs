@@ -151,9 +151,7 @@ where
 
         self.check_orders();
 
-        // TODO: pass through bid and ask, instead of the mid price
-        let mid_price = (self.bid + self.ask) / Decimal::TWO;
-        self.user_account.update(mid_price, timestamp);
+        self.user_account.update(self.bid, self.ask, timestamp);
 
         self.step += 1;
 

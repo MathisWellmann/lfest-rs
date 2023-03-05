@@ -64,11 +64,11 @@ where
     }
 
     /// Update the accounts state for the newest price data
-    pub(crate) fn update(&mut self, price: QuoteCurrency, trade_timestamp: u64) {
-        let upnl = S::PairedCurrency::pnl(self.position.entry_price(), price, self.position.size());
-        self.account_tracker.update(trade_timestamp, price, upnl);
-
-        self.position.update_state(price);
+    pub(crate) fn update(&mut self, bid: QuoteCurrency, ask: QuoteCurrency, trade_timestamp: u64) {
+        self.position.update_state(bid, ask);
+        let upnl = self.position().unrealized_pnl();
+        let mid_price = (bid + ask) / quote!(0);
+        self.account_tracker.update(trade_timestamp, mid_price, upnl);
     }
 
     /// The number of currently active limit orders
