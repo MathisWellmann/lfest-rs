@@ -43,13 +43,15 @@ fn main() {
     for (i, p) in prices.iter().enumerate() {
         let price_decimal: Decimal = (*p).try_into().expect("Unable to convert f64 into Decimal");
         let spread: Decimal = Decimal::ONE / Decimal::from(10);
-        let (exec_orders, liq) = exchange.update_state(
-            i as u64,
-            MarketUpdate::Bba {
-                bid: QuoteCurrency::new(price_decimal),
-                ask: QuoteCurrency::new(price_decimal + spread),
-            },
-        );
+        let (exec_orders, liq) = exchange
+            .update_state(
+                i as u64,
+                MarketUpdate::Bba {
+                    bid: QuoteCurrency::new(price_decimal),
+                    ask: QuoteCurrency::new(price_decimal + spread),
+                },
+            )
+            .unwrap();
         if liq {
             // check liquidation
         }

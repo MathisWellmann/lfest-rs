@@ -72,6 +72,21 @@ pub enum Error {
 
     #[error("The provided starting balance must be > 0")]
     InvalidStartingBalance,
+
+    #[error("Some price in MarketUpdate is too low.")]
+    MarketUpdatePriceTooLow,
+
+    #[error("Some price in MarketUpdate is too high.")]
+    MarketUpdatePriceTooHigh,
+
+    #[error("Some price in MarketUpdate does not conform to the step size")]
+    MarketUpdatePriceStepSize,
+
+    #[error("The bid ask spread does not exist in this MarketUpdate.")]
+    InvalidMarketUpdateBidAskSpread,
+
+    #[error("An invalid price was provided in MarketUpdate")]
+    InvalidMarketUpdatePrice,
 }
 
 /// This is defined as a convenience.

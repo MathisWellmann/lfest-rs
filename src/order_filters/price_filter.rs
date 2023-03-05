@@ -1,9 +1,9 @@
 use fpdec::Decimal;
 
 use crate::{
-    prelude::OrderError,
+    prelude::{Error, OrderError},
     quote,
-    types::{Currency, Order, QuoteCurrency},
+    types::{Currency, MarketUpdate, Order, QuoteCurrency},
 };
 
 /// The `PriceFilter` defines the price rules for a symbol
@@ -82,6 +82,90 @@ impl PriceFilter {
             None => Ok(()),
         }
     }
+
+    /// Make sure the market update conforms to the `PriceFilter` rules
+    pub(crate) fn validate_market_update(&self, market_update: &MarketUpdate) -> Result<(), Error> {
+        match market_update {
+            MarketUpdate::Bba {
+                bid,
+                ask,
+            } => {
+                enforce_min_price(self.min_price, *bid)?;
+                enforce_min_price(self.min_price, *ask)?;
+                enforce_max_price(self.max_price, *bid)?;
+                enforce_max_price(self.max_price, *ask)?;
+                enforce_step_size(self.tick_size, *bid)?;
+                enforce_step_size(self.tick_size, *ask)?;
+                enforce_bid_ask_spread(*bid, *ask)?;
+            }
+            MarketUpdate::Candle {
+                bid,
+                ask,
+                low,
+                high,
+            } => {
+                enforce_min_price(self.min_price, *bid)?;
+                enforce_min_price(self.min_price, *ask)?;
+                enforce_min_price(self.min_price, *low)?;
+                enforce_min_price(self.min_price, *high)?;
+                enforce_max_price(self.max_price, *bid)?;
+                enforce_max_price(self.max_price, *ask)?;
+                enforce_max_price(self.max_price, *low)?;
+                enforce_max_price(self.max_price, *high)?;
+                enforce_step_size(self.tick_size, *bid)?;
+                enforce_step_size(self.tick_size, *ask)?;
+                enforce_step_size(self.tick_size, *low)?;
+                enforce_step_size(self.tick_size, *high)?;
+                enforce_bid_ask_spread(*bid, *ask)?;
+                enforce_bid_ask_spread(*low, *high)?;
+                if bid < low {
+                    return Err(Error::InvalidMarketUpdatePrice);
+                }
+                if ask > high {
+                    return Err(Error::InvalidMarketUpdatePrice);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Errors if there is no bid-ask spread
+#[inline]
+fn enforce_bid_ask_spread(bid: QuoteCurrency, ask: QuoteCurrency) -> Result<(), Error> {
+    if bid >= ask {
+        return Err(Error::InvalidMarketUpdateBidAskSpread);
+    }
+    Ok(())
+}
+
+/// Make sure the price is not too low
+/// Disabled if `min_price` == 0
+#[inline]
+fn enforce_min_price(min_price: QuoteCurrency, price: QuoteCurrency) -> Result<(), Error> {
+    if price < min_price && min_price != quote!(0) {
+        return Err(Error::MarketUpdatePriceTooLow);
+    }
+    Ok(())
+}
+
+/// Make sure the price is not too high
+/// Disabled if `max_price` == 0
+#[inline]
+fn enforce_max_price(max_price: QuoteCurrency, price: QuoteCurrency) -> Result<(), Error> {
+    if price > max_price && max_price != quote!(0) {
+        return Err(Error::MarketUpdatePriceTooHigh);
+    }
+    Ok(())
+}
+
+/// Make sure the price conforms to the step size
+#[inline]
+fn enforce_step_size(step_size: QuoteCurrency, price: QuoteCurrency) -> Result<(), Error> {
+    if (price % step_size) != QuoteCurrency::new_zero() {
+        return Err(Error::MarketUpdatePriceStepSize);
+    }
+    Ok(())
 }
 
 #[cfg(test)]

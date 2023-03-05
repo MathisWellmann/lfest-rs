@@ -188,7 +188,6 @@ fn inv_short_market_loss_full() {
     let _ = exchange.update_state(0, bba!(quote!(1000.0), quote!(1000.0)));
 
     let value: BaseCurrency = BaseCurrency::new(Dec!(0.4));
-    dbg!(value);
     let size = value.convert(exchange.ask());
     let o = Order::market(Side::Sell, size).unwrap();
     exchange.submit_order(o).unwrap();
@@ -240,21 +239,25 @@ fn inv_long_market_win_partial() {
         true,
         100,
         PriceFilter::default(),
-        QuantityFilter::default(),
+        QuantityFilter {
+            min_quantity: quote!(0.1),
+            max_quantity: quote!(0),
+            step_size: quote!(0.1),
+        },
     )
     .unwrap();
 
     let fee_taker = config.fee_taker();
     let acc_tracker = NoAccountTracker::default();
     let mut exchange = Exchange::new(acc_tracker, config);
-    let _ = exchange.update_state(0, bba!(quote!(1000.0), quote!(1000.0)));
+    let _ = exchange.update_state(0, bba!(quote!(999.0), quote!(1000.0))).unwrap();
 
     let value = BaseCurrency::new(Dec!(0.8));
     let size = value.convert(exchange.ask());
     let o = Order::market(Side::Buy, size).unwrap();
     exchange.submit_order(o).unwrap();
 
-    let _ = exchange.update_state(1, bba!(quote!(1000.0), quote!(1000.0)));
+    let _ = exchange.update_state(1, bba!(quote!(999.0), quote!(1000.0))).unwrap();
 
     let fee_quote = size.fee_portion(fee_taker);
     let fee_base1: BaseCurrency = fee_quote.convert(exchange.bid());
@@ -266,7 +269,7 @@ fn inv_long_market_win_partial() {
     assert_eq!(exchange.account().margin().position_margin().inner(), Dec!(0.8));
     assert_eq!(exchange.account().margin().available_balance().inner(), Dec!(0.19952));
 
-    let _ = exchange.update_state(1, bba!(quote!(2000.0), quote!(2000.0)));
+    let _ = exchange.update_state(1, bba!(quote!(2000.0), quote!(2001.0))).unwrap();
 
     let size = quote!(400.0);
     let fee_quote2 = size.fee_portion(fee_taker);
@@ -527,14 +530,20 @@ fn inv_execute_limit() {
         leverage!(1.0),
         true,
         100,
-        PriceFilter::default(),
+        PriceFilter {
+            min_price: quote!(0),
+            max_price: quote!(0),
+            tick_size: quote!(0.1),
+            multiplier_up: Decimal::TWO,
+            multiplier_down: Decimal::ZERO,
+        },
         QuantityFilter::default(),
     )
     .unwrap();
 
     let acc_tracker = NoAccountTracker::default();
     let mut exchange = Exchange::new(acc_tracker, config.clone());
-    let _ = exchange.update_state(0, bba!(quote!(1000.0), quote!(1000.0)));
+    let _ = exchange.update_state(0, bba!(quote!(1000.0), quote!(1001.0))).unwrap();
 
     let o = Order::limit(Side::Buy, quote!(900.0), quote!(450.0)).unwrap();
     exchange.submit_order(o).unwrap();
@@ -544,12 +553,12 @@ fn inv_execute_limit() {
     assert_eq!(exchange.account().margin().position_margin(), base!(0.0));
     assert_eq!(exchange.account().margin().order_margin(), base!(0.5001)); // this includes the fee too
 
-    let (exec_orders, liq) = exchange.update_state(1, bba!(quote!(750.0), quote!(750.0)));
+    let (exec_orders, liq) = exchange.update_state(1, bba!(quote!(750.0), quote!(751.0))).unwrap();
     assert!(!liq);
     assert_eq!(exec_orders.len(), 1);
 
     assert_eq!(exchange.bid(), quote!(750.0));
-    assert_eq!(exchange.ask(), quote!(750.0));
+    assert_eq!(exchange.ask(), quote!(751.0));
     assert_eq!(exchange.account().active_limit_orders().len(), 0);
     assert_eq!(exchange.account().position().size(), quote!(450.0));
     assert_eq!(exchange.account().position().entry_price(), quote!(900.0));
@@ -562,7 +571,7 @@ fn inv_execute_limit() {
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
 
-    let _ = exchange.update_state(1, bba!(quote!(1200.0), quote!(1200.0)));
+    let _ = exchange.update_state(1, bba!(quote!(1200.0), quote!(1201.0))).unwrap();
 
     assert_eq!(exchange.account().active_limit_orders().len(), 0);
     assert_eq!(exchange.account().position().size(), quote!(0.0));
@@ -574,7 +583,7 @@ fn inv_execute_limit() {
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
 
-    let _ = exchange.update_state(2, bba!(quote!(1200.1), quote!(1200.1)));
+    let _ = exchange.update_state(2, bba!(quote!(1200.1), quote!(1200.2))).unwrap();
     assert_eq!(exchange.account().position().size(), quote!(-600.0));
     assert_eq!(exchange.account().margin().position_margin(), base!(0.5));
     assert_eq!(exchange.account().margin().wallet_balance(), base!(1.04971));

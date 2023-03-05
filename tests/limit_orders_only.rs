@@ -23,13 +23,15 @@ fn limit_orders_only() {
     let acc_tracker = NoAccountTracker::default();
     let mut exchange = Exchange::new(acc_tracker, config);
 
-    let (exec_orders, liq) = exchange.update_state(
-        0,
-        MarketUpdate::Bba {
-            bid: quote!(100.0),
-            ask: quote!(100.1),
-        },
-    );
+    let (exec_orders, liq) = exchange
+        .update_state(
+            0,
+            MarketUpdate::Bba {
+                bid: quote!(100.0),
+                ask: quote!(100.1),
+            },
+        )
+        .unwrap();
     assert!(!liq);
     assert_eq!(exec_orders.len(), 0);
 
@@ -38,13 +40,15 @@ fn limit_orders_only() {
     assert_eq!(exchange.account().margin().order_margin(), quote!(990.198));
     assert_eq!(exchange.account().margin().available_balance(), quote!(9.802));
 
-    let (exec_orders, liq) = exchange.update_state(
-        1,
-        MarketUpdate::Bba {
-            bid: quote!(99.9),
-            ask: quote!(100.0),
-        },
-    );
+    let (exec_orders, liq) = exchange
+        .update_state(
+            1,
+            MarketUpdate::Bba {
+                bid: quote!(99.9),
+                ask: quote!(100.0),
+            },
+        )
+        .unwrap();
     assert!(!liq);
     assert_eq!(exec_orders.len(), 1);
     debug!("exec_orders: {:?}", exec_orders);
@@ -65,13 +69,15 @@ fn limit_orders_only() {
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().margin().order_margin(), quote!(0.0));
 
-    let (exec_orders, liq) = exchange.update_state(
-        2,
-        MarketUpdate::Bba {
-            bid: quote!(106.0),
-            ask: quote!(106.1),
-        },
-    );
+    let (exec_orders, liq) = exchange
+        .update_state(
+            2,
+            MarketUpdate::Bba {
+                bid: quote!(106.0),
+                ask: quote!(106.1),
+            },
+        )
+        .unwrap();
     assert!(!liq);
     assert!(!exec_orders.is_empty());
 
@@ -111,13 +117,15 @@ fn limit_orders_2() {
     let acc_tracker = NoAccountTracker::default();
     let mut exchange = Exchange::new(acc_tracker, config);
 
-    let (exec_orders, liq) = exchange.update_state(
-        0,
-        MarketUpdate::Bba {
-            bid: quote!(100.0),
-            ask: quote!(100.1),
-        },
-    );
+    let (exec_orders, liq) = exchange
+        .update_state(
+            0,
+            MarketUpdate::Bba {
+                bid: quote!(100.0),
+                ask: quote!(100.1),
+            },
+        )
+        .unwrap();
     assert!(!liq);
     assert!(exec_orders.is_empty());
 
@@ -127,13 +135,15 @@ fn limit_orders_2() {
     let o = Order::limit(Side::Buy, quote!(100.0), base!(0.5)).unwrap();
     exchange.submit_order(o).unwrap();
 
-    let (exec_orders, liq) = exchange.update_state(
-        1,
-        MarketUpdate::Bba {
-            bid: quote!(99.0),
-            ask: quote!(99.1),
-        },
-    );
+    let (exec_orders, liq) = exchange
+        .update_state(
+            1,
+            MarketUpdate::Bba {
+                bid: quote!(99.0),
+                ask: quote!(99.1),
+            },
+        )
+        .unwrap();
     assert!(!liq);
     assert_eq!(exec_orders.len(), 1);
 }

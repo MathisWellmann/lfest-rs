@@ -52,7 +52,6 @@ where
     };
     let bsd = cumulative_buy_value - min(pos_value, S::PairedCurrency::new_zero()).abs();
     let ssd = cumulative_sell_value - max(pos_value, S::PairedCurrency::new_zero());
-    dbg!(bsd, ssd);
 
     let order_margin = max(bsd + buy_side_fees, ssd + sell_side_fees);
 

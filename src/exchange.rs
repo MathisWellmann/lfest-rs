@@ -4,7 +4,7 @@ use crate::{
     account::Account,
     account_tracker::AccountTracker,
     config::Config,
-    errors::OrderError,
+    errors::{Error, OrderError},
     quote,
     types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, QuoteCurrency, Side},
     validator::Validator,
@@ -116,9 +116,8 @@ where
         &mut self,
         timestamp: u64,
         market_update: MarketUpdate,
-    ) -> (Vec<Order<S>>, bool) {
-        // TODO: enforce bid ask spread
-        // TODO: enforce price filters here as well
+    ) -> Result<(Vec<Order<S>>, bool), Error> {
+        self.config.price_filter().validate_market_update(&market_update)?;
         match market_update {
             MarketUpdate::Bba {
                 bid,
@@ -147,7 +146,7 @@ where
 
         if self.check_liquidation() {
             self.liquidate();
-            return (vec![], true);
+            return Ok((vec![], true));
         }
 
         self.check_orders();
@@ -158,7 +157,7 @@ where
 
         self.step += 1;
 
-        (self.user_account.executed_orders(), false)
+        Ok((self.user_account.executed_orders(), false))
     }
 
     /// Submit a new order to the exchange.
