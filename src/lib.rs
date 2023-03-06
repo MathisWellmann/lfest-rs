@@ -27,8 +27,8 @@ use fpdec::Decimal;
 
 /// Exports common types
 pub mod prelude {
-    // Too make the macros work
-    pub use fpdec::Decimal;
+    // To make the macros work
+    pub use fpdec::{Dec, Decimal};
 
     pub use crate::{
         account::Account,
