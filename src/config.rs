@@ -52,7 +52,7 @@ where M: Currency
     ///
     /// # Returns:
     /// Either a valid Config or an Error
-    #[inline]
+    #[allow(clippy::complexity)]
     pub fn new(
         fee_maker: Fee,
         fee_taker: Fee,

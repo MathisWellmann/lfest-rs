@@ -20,6 +20,7 @@ pub fn load_prices_from_csv(filename: &str) -> Result<Vec<f64>, Box<dyn std::err
     Ok(out)
 }
 
+#[allow(dead_code)]
 fn main() {
     let t0 = Instant::now();
     let trades = load_prices_from_csv("./data/Bitmex_XBTUSD_1M.csv").unwrap();

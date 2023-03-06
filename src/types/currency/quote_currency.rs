@@ -2,7 +2,6 @@ use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
 use fpdec::Decimal;
-use serde::{Deserialize, Serialize};
 
 use super::MarginCurrency;
 use crate::types::{BaseCurrency, Currency, Fee};
@@ -32,8 +31,6 @@ macro_rules! quote {
     Display,
     Into,
     From,
-    Serialize,
-    Deserialize,
 )]
 #[mul(forward)]
 #[div(forward)]
