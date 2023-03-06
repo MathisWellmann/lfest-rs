@@ -21,8 +21,9 @@ impl Leverage {
         Self(val)
     }
 
+    /// Get access to the inner `Decimal`
     #[inline(always)]
-    pub(crate) fn inner(&self) -> Decimal {
+    pub fn inner(&self) -> Decimal {
         self.0
     }
 }
