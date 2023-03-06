@@ -11,7 +11,7 @@ macro_rules! leverage {
 
 /// Leverage
 /// TODO: Change this to u8 type, as no fractional leverage should be possible
-#[derive(Default, Debug, Clone, Copy, PartialEq, Display)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Display, Serialize, Deserialize)]
 pub struct Leverage(Decimal);
 
 impl Leverage {

@@ -10,7 +10,7 @@ macro_rules! fee {
 }
 
 /// Fee as a fraction
-#[derive(Default, Debug, Clone, Copy, PartialEq, Display)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Display, Serialize, Deserialize)]
 pub struct Fee(Decimal);
 
 impl Fee {
