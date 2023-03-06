@@ -10,7 +10,7 @@ use crate::{
 /// The `SizeFilter` defines the quantity rules that each order needs to follow
 /// The generic currency `S` is always the `PairedCurrency` of the margin
 /// currency
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct QuantityFilter<S>
 where S: Currency
 {

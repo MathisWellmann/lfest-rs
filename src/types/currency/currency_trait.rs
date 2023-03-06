@@ -14,16 +14,14 @@ pub trait Currency:
     + std::ops::Sub<Output = Self>
     + std::ops::Mul<Output = Self>
     + std::ops::Div<Output = Self>
+    + std::ops::Rem<Output = Self>
     // Require to do arithmetic with `Rational` on the right hand side
     + std::ops::Add<Decimal, Output = Self>
     + std::ops::Sub<Decimal, Output = Self>
     + std::ops::Mul<Decimal, Output = Self>
     + std::ops::Div<Decimal, Output = Self>
-    + std::ops::Rem<Output = Self>
     + std::ops::AddAssign
     + std::ops::SubAssign
-    + for<'a> std::ops::AddAssign<&'a Self>
-    + for<'a> std::ops::SubAssign<&'a Self>
     + PartialEq
     + PartialOrd
 {
