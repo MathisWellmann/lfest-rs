@@ -165,6 +165,9 @@ where M: Currency + MarginCurrency + Send
     /// Ratio of cumulative trade profit over cumulative trade loss
     #[inline(always)]
     pub fn profit_loss_ratio(&self) -> Decimal {
+        if self.total_loss == M::new_zero() {
+            return Decimal::MAX;
+        }
         (self.total_profit / self.total_loss).inner()
     }
 
