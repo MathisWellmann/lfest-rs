@@ -1,13 +1,13 @@
 use std::fmt::Display;
 
-use fpdec::Decimal;
+use fpdec::{Dec, Decimal};
 
 use crate::{
     account_tracker::AccountTracker,
     cornish_fisher::cornish_fisher_value_at_risk,
     quote,
     types::{Currency, MarginCurrency, QuoteCurrency, Side},
-    utils::decimal_to_f64,
+    utils::{decimal_pow, decimal_sqrt, decimal_to_f64, variance},
 };
 
 const DAILY_NS: u64 = 86_400_000_000_000;
@@ -191,15 +191,17 @@ where M: Currency + MarginCurrency + Send
         M::pnl(self.price_first, self.price_last, qty.into_negative())
     }
 
-    /// Return the sharpe ratio using the selected returns as source
+    /// Return the annualized sharpe ratio using the selected returns as source.
     ///
     /// # Parameters:
     /// `returns_source`: the sampling interval of pnl snapshots
     /// `risk_free_is_buy_and_hold`: if true, it will use the market returns as
     /// the risk-free comparison     else risk-free rate is zero
-    ///
-    /// TODO: annualized depending on the `ReturnsSource`
-    pub fn sharpe(&self, returns_source: ReturnsSource, risk_free_is_buy_and_hold: bool) -> f64 {
+    pub fn sharpe(
+        &self,
+        returns_source: ReturnsSource,
+        risk_free_is_buy_and_hold: bool,
+    ) -> Decimal {
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
@@ -211,26 +213,18 @@ where M: Currency + MarginCurrency + Send
                 ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
                 ReturnsSource::TickByTick => &self.hist_returns_tick_bnh,
             };
-            let n = rets_acc.len() as f64;
             // compute the difference of returns of account and market
-            let diff_returns: Vec<f64> = rets_acc
-                .iter()
-                .zip(rets_bnh)
-                .map(|(a, b)| decimal_to_f64((*a - *b).inner()))
-                .collect();
-            let avg: f64 = diff_returns.iter().sum::<f64>() / n;
-            let variance: f64 = diff_returns.iter().map(|v| (v - avg).powi(2)).sum::<f64>() / n;
-            let std_dev = variance.sqrt();
+            let diff_returns: Vec<Decimal> =
+                rets_acc.iter().zip(rets_bnh).map(|(a, b)| (*a - *b).inner()).collect();
+            let var = variance(diff_returns);
+            let std_dev = decimal_sqrt(var);
 
-            decimal_to_f64(self.total_rpnl.inner() - self.buy_and_hold_return().inner()) / std_dev
+            self.total_rpnl.inner() - self.buy_and_hold_return().inner() / std_dev
         } else {
-            let n = rets_acc.len() as f64;
-            let avg: f64 = rets_acc.iter().map(|v| decimal_to_f64(v.inner())).sum::<f64>() / n;
-            let var: f64 =
-                rets_acc.iter().map(|v| (decimal_to_f64(v.inner()) - avg).powi(2)).sum::<f64>() / n;
-            let std_dev = var.sqrt();
+            let var = variance(rets_acc.iter().map(|v| v.inner()));
+            let std_dev = decimal_sqrt(var);
 
-            decimal_to_f64(self.total_rpnl.inner()) / std_dev
+            self.annualized_roi() / std_dev
         }
     }
 
@@ -464,10 +458,9 @@ where M: Currency + MarginCurrency + Send
     }
 
     /// Annualized return on investment as a factor, e.g.: 100% -> 2x
-    pub fn annualized_roi(&self) -> f64 {
-        let power: i32 = 365 / self.num_trading_days() as i32;
-        (1.0 + decimal_to_f64(self.total_rpnl.inner() / self.wallet_balance_start.inner()))
-            .powi(power)
+    pub fn annualized_roi(&self) -> Decimal {
+        let power: u32 = 365 / self.num_trading_days() as u32;
+        decimal_pow(Dec!(1) + self.total_rpnl.inner() / self.wallet_balance_start.inner(), power)
     }
 
     /// Maximum drawdown of the wallet balance
