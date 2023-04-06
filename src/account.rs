@@ -19,7 +19,8 @@ use crate::{
 /// S: The `Currency` representing the order quantity
 /// B: Balance type
 pub struct Account<A, S>
-where S: Currency
+where
+    S: Currency,
 {
     account_tracker: A,
     margin: Margin<S::PairedCurrency>,
@@ -68,7 +69,8 @@ where
         self.position.update_state(bid, ask);
         let upnl = self.position().unrealized_pnl();
         let mid_price = (bid + ask) / quote!(2);
-        self.account_tracker.update(trade_timestamp, mid_price, upnl);
+        self.account_tracker
+            .update(trade_timestamp, mid_price, upnl);
     }
 
     /// The number of currently active limit orders
@@ -206,7 +208,10 @@ where
 
     /// Append a new limit order as active order
     pub(crate) fn append_limit_order(&mut self, order: Order<S>, order_margin: S::PairedCurrency) {
-        debug!("append_limit_order: order: {:?}, order_margin: {}", order, order_margin);
+        debug!(
+            "append_limit_order: order: {:?}, order_margin: {}",
+            order, order_margin
+        );
 
         let limit_price = order.limit_price().unwrap();
         match order.side() {
@@ -246,7 +251,8 @@ where
         match user_order_id {
             None => {}
             Some(user_order_id) => {
-                self.lookup_id_from_user_order_id.insert(user_order_id, order_id);
+                self.lookup_id_from_user_order_id
+                    .insert(user_order_id, order_id);
             }
         };
     }
@@ -299,8 +305,11 @@ where
         self.account_tracker.log_limit_order_fill();
         self.executed_orders.push(exec_order);
 
-        let new_om =
-            order_margin(self.active_limit_orders.values().cloned(), &self.position, fee_maker);
+        let new_om = order_margin(
+            self.active_limit_orders.values().cloned(),
+            &self.position,
+            fee_maker,
+        );
         self.margin.set_order_margin(new_om);
     }
 

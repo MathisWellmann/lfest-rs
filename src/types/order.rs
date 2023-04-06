@@ -25,7 +25,8 @@ pub struct Order<S> {
 }
 
 impl<S> Order<S>
-where S: Currency
+where
+    S: Currency,
 {
     /// Create a new limit order
     ///

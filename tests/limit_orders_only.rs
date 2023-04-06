@@ -38,7 +38,10 @@ fn limit_orders_only() {
     let o = Order::limit(Side::Buy, quote!(100.0), base!(9.9)).unwrap();
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().margin().order_margin(), quote!(990.198));
-    assert_eq!(exchange.account().margin().available_balance(), quote!(9.802));
+    assert_eq!(
+        exchange.account().margin().available_balance(),
+        quote!(9.802)
+    );
 
     let (exec_orders, liq) = exchange
         .update_state(
@@ -60,10 +63,16 @@ fn limit_orders_only() {
 
     // assert_eq!(exchange.account().position().unrealized_pnl(), 0.0);
 
-    assert_eq!(exchange.account().margin().wallet_balance(), quote!(999.802));
+    assert_eq!(
+        exchange.account().margin().wallet_balance(),
+        quote!(999.802)
+    );
     assert_eq!(exchange.account().margin().position_margin(), quote!(990.0));
     assert_eq!(exchange.account().margin().order_margin(), quote!(0.0));
-    assert_eq!(exchange.account().margin().available_balance(), quote!(9.802));
+    assert_eq!(
+        exchange.account().margin().available_balance(),
+        quote!(9.802)
+    );
 
     let o = Order::limit(Side::Sell, quote!(105.1), base!(9.9)).unwrap();
     exchange.submit_order(o).unwrap();
@@ -82,10 +91,16 @@ fn limit_orders_only() {
     assert!(!exec_orders.is_empty());
 
     assert_eq!(exchange.account().position().size(), base!(0.0));
-    assert_eq!(exchange.account().margin().wallet_balance(), quote!(1050.083902));
+    assert_eq!(
+        exchange.account().margin().wallet_balance(),
+        quote!(1050.083902)
+    );
     assert_eq!(exchange.account().margin().position_margin(), quote!(0.0));
     assert_eq!(exchange.account().margin().order_margin(), quote!(0.0));
-    assert_eq!(exchange.account().margin().available_balance(), quote!(1050.083902));
+    assert_eq!(
+        exchange.account().margin().available_balance(),
+        quote!(1050.083902)
+    );
 }
 
 #[test]

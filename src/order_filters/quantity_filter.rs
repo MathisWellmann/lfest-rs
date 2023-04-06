@@ -12,7 +12,8 @@ use crate::{
 /// currency
 #[derive(Debug, Clone)]
 pub struct QuantityFilter<S>
-where S: Currency
+where
+    S: Currency,
 {
     /// Defines the minimum `quantity` of any order
     /// Disabled if 0
@@ -29,7 +30,8 @@ where S: Currency
 }
 
 impl<S> Default for QuantityFilter<S>
-where S: Currency
+where
+    S: Currency,
 {
     fn default() -> Self {
         Self {
@@ -41,7 +43,8 @@ where S: Currency
 }
 
 impl<S> QuantityFilter<S>
-where S: Currency
+where
+    S: Currency,
 {
     pub(crate) fn validate_order(&self, order: &Order<S>) -> Result<(), OrderError> {
         if order.quantity() < self.min_quantity && self.min_quantity != S::new_zero() {
@@ -74,12 +77,21 @@ mod tests {
         filter.validate_order(&order).unwrap();
 
         let order = Order::market(Side::Buy, quote!(5)).unwrap();
-        assert_eq!(filter.validate_order(&order), Err(OrderError::QuantityTooLow));
+        assert_eq!(
+            filter.validate_order(&order),
+            Err(OrderError::QuantityTooLow)
+        );
 
         let order = Order::market(Side::Buy, quote!(5000)).unwrap();
-        assert_eq!(filter.validate_order(&order), Err(OrderError::QuantityTooHigh));
+        assert_eq!(
+            filter.validate_order(&order),
+            Err(OrderError::QuantityTooHigh)
+        );
 
         let order = Order::market(Side::Buy, quote!(50.5)).unwrap();
-        assert_eq!(filter.validate_order(&order), Err(OrderError::InvalidQuantityStepSize));
+        assert_eq!(
+            filter.validate_order(&order),
+            Err(OrderError::InvalidQuantityStepSize)
+        );
     }
 }

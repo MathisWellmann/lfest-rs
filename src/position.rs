@@ -8,7 +8,8 @@ use crate::{
 #[derive(Debug, Clone, Default)]
 /// Describes the position information of the account
 pub struct Position<S>
-where S: Currency
+where
+    S: Currency,
 {
     /// The position size
     size: S,

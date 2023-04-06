@@ -25,5 +25,9 @@ fn main() {
     let t0 = Instant::now();
     let trades = load_prices_from_csv("./data/Bitmex_XBTUSD_1M.csv").unwrap();
     println!("last trades: {:?}", trades[trades.len() - 1]);
-    println!("loaded {} trades in {}ms", trades.len(), t0.elapsed().as_millis());
+    println!(
+        "loaded {} trades in {}ms",
+        trades.len(),
+        t0.elapsed().as_millis()
+    );
 }

@@ -27,10 +27,7 @@ pub enum MarketUpdate {
 #[macro_export]
 macro_rules! bba {
     ( $b:expr, $a:expr ) => {{
-        MarketUpdate::Bba {
-            bid: $b,
-            ask: $a,
-        }
+        MarketUpdate::Bba { bid: $b, ask: $a }
     }};
 }
 

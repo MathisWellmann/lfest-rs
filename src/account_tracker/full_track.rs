@@ -87,7 +87,8 @@ pub struct FullAccountTracker<M> {
 /// TODO: create its own `risk` crate out of these implementations for better
 /// reusability and testability
 impl<M> FullAccountTracker<M>
-where M: Currency + MarginCurrency + Send
+where
+    M: Currency + MarginCurrency + Send,
 {
     #[must_use]
     #[inline]
@@ -290,8 +291,11 @@ where M: Currency + MarginCurrency + Send
 
             annualization_mult * mean / std_dev
         } else {
-            let downside_rets: Vec<Decimal> =
-                rets_acc.iter().map(|v| v.inner()).filter(|v| *v < Dec!(0)).collect();
+            let downside_rets: Vec<Decimal> = rets_acc
+                .iter()
+                .map(|v| v.inner())
+                .filter(|v| *v < Dec!(0))
+                .collect();
             let n: Decimal = (downside_rets.len() as u64).into();
             let mean = decimal_sum(downside_rets.iter().cloned()) / n;
             let variance = variance(&downside_rets);
@@ -467,10 +471,14 @@ where M: Currency + MarginCurrency + Send
         let num_trading_days = self.num_trading_days() as f64;
 
         // compute annualized returns
-        let roi_acc =
-            rets_acc.iter().fold(1.0, |acc, x| acc * x.exp()).powf(365.0 / num_trading_days);
-        let roi_bnh =
-            rets_bnh.iter().fold(1.0, |acc, x| acc * x.exp()).powf(365.0 / num_trading_days);
+        let roi_acc = rets_acc
+            .iter()
+            .fold(1.0, |acc, x| acc * x.exp())
+            .powf(365.0 / num_trading_days);
+        let roi_bnh = rets_bnh
+            .iter()
+            .fold(1.0, |acc, x| acc * x.exp())
+            .powf(365.0 / num_trading_days);
 
         let rtv_acc = roi_acc / cf_var_acc;
         let rtv_bnh = roi_bnh / cf_var_bnh;
@@ -485,7 +493,10 @@ where M: Currency + MarginCurrency + Send
     /// Annualized return on investment as a factor, e.g.: 100% -> 2x
     pub fn annualized_roi(&self) -> Decimal {
         let power: u32 = 365 / self.num_trading_days() as u32;
-        decimal_pow(Dec!(1) + self.total_rpnl.inner() / self.wallet_balance_start.inner(), power)
+        decimal_pow(
+            Dec!(1) + self.total_rpnl.inner() / self.wallet_balance_start.inner(),
+            power,
+        )
     }
 
     /// Maximum drawdown of the wallet balance
@@ -564,7 +575,8 @@ where M: Currency + MarginCurrency + Send
 }
 
 impl<M> AccountTracker<M> for FullAccountTracker<M>
-where M: Currency + MarginCurrency + Send
+where
+    M: Currency + MarginCurrency + Send,
 {
     fn update(&mut self, timestamp: u64, price: QuoteCurrency, upnl: M) {
         self.price_last = price;
@@ -722,7 +734,8 @@ where M: Currency + MarginCurrency + Send
 }
 
 impl<M> Display for FullAccountTracker<M>
-where M: Currency + MarginCurrency + Send
+where
+    M: Currency + MarginCurrency + Send,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -1233,7 +1246,10 @@ mod tests {
 
     #[test]
     fn acc_tracker_log_rpnl() {
-        let rpnls: Vec<Decimal> = [1, -1, 1, 2, -1].iter().map(|v| Decimal::from(*v)).collect();
+        let rpnls: Vec<Decimal> = [1, -1, 1, 2, -1]
+            .iter()
+            .map(|v| Decimal::from(*v))
+            .collect();
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
         for r in rpnls {
             acc_tracker.log_rpnl(QuoteCurrency::new(r));
@@ -1270,11 +1286,17 @@ mod tests {
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
-            round(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.05), 3),
+            round(
+                acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.05),
+                3
+            ),
             1.173
         );
         assert_eq!(
-            round(acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.01), 3),
+            round(
+                acc_tracker.historical_value_at_risk(ReturnsSource::Hourly, 0.01),
+                3
+            ),
             2.54
         );
     }
@@ -1286,8 +1308,20 @@ mod tests {
         let mut at = FullAccountTracker::new(quote!(100.0));
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(round(at.historical_value_at_risk_from_n_hourly_returns(24, 0.05), 3), 3.835);
-        assert_eq!(round(at.historical_value_at_risk_from_n_hourly_returns(24, 0.01), 3), 6.061);
+        assert_eq!(
+            round(
+                at.historical_value_at_risk_from_n_hourly_returns(24, 0.05),
+                3
+            ),
+            3.835
+        );
+        assert_eq!(
+            round(
+                at.historical_value_at_risk_from_n_hourly_returns(24, 0.01),
+                3
+            ),
+            6.061
+        );
     }
 
     #[test]
@@ -1298,11 +1332,17 @@ mod tests {
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
-            round(acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.05), 3),
+            round(
+                acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.05),
+                3
+            ),
             1.354
         );
         assert_eq!(
-            round(acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.01), 3),
+            round(
+                acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.01),
+                3
+            ),
             5.786
         );
     }
@@ -1315,11 +1355,17 @@ mod tests {
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
-            round(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05), 3),
+            round(
+                at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05),
+                3
+            ),
             4.043
         );
         assert_eq!(
-            round(at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01), 3),
+            round(
+                at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01),
+                3
+            ),
             5.358
         );
     }

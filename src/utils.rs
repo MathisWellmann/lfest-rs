@@ -3,7 +3,9 @@ use fpdec::{Dec, Decimal};
 /// Return the minimum of two values
 #[inline(always)]
 pub(crate) fn min<T>(v0: T, v1: T) -> T
-where T: PartialOrd {
+where
+    T: PartialOrd,
+{
     if v0 < v1 {
         v0
     } else {
@@ -14,7 +16,9 @@ where T: PartialOrd {
 /// Return the maximum of two values
 #[inline(always)]
 pub(crate) fn max<T>(v0: T, v1: T) -> T
-where T: PartialOrd {
+where
+    T: PartialOrd,
+{
     if v0 > v1 {
         v0
     } else {
@@ -64,7 +68,9 @@ pub fn f64_to_decimal(price: f64, step_size: Decimal) -> Decimal {
 
 /// Sum an iterator of `Decimal` values.
 pub(crate) fn decimal_sum<I>(vals: I) -> Decimal
-where I: IntoIterator<Item = Decimal> {
+where
+    I: IntoIterator<Item = Decimal>,
+{
     let mut out = Dec!(0);
     for v in vals.into_iter() {
         out += v;
@@ -146,11 +152,17 @@ pub(crate) mod tests {
                 round(val, ROUNDING)
             );
             assert_eq!(
-                round(decimal_to_f64(Decimal::try_from(val * 10.0).unwrap()), ROUNDING),
+                round(
+                    decimal_to_f64(Decimal::try_from(val * 10.0).unwrap()),
+                    ROUNDING
+                ),
                 round(val * 10.0, ROUNDING)
             );
             assert_eq!(
-                round(decimal_to_f64(Decimal::try_from(val * 100.0).unwrap()), ROUNDING),
+                round(
+                    decimal_to_f64(Decimal::try_from(val * 100.0).unwrap()),
+                    ROUNDING
+                ),
                 round(val * 100.0, ROUNDING)
             );
         }

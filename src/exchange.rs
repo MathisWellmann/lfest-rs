@@ -13,7 +13,8 @@ use crate::{
 #[derive(Debug, Clone)]
 /// The main leveraged futures exchange for simulated trading
 pub struct Exchange<A, S>
-where S: Currency
+where
+    S: Currency,
 {
     config: Config<S::PairedCurrency>,
     user_account: Account<A, S>,
@@ -39,9 +40,16 @@ where
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
     pub fn new(account_tracker: A, config: Config<S::PairedCurrency>) -> Self {
-        let account = Account::new(account_tracker, config.leverage(), config.starting_balance());
-        let validator =
-            Validator::new(config.fee_maker(), config.fee_taker(), config.max_num_open_orders());
+        let account = Account::new(
+            account_tracker,
+            config.leverage(),
+            config.starting_balance(),
+        );
+        let validator = Validator::new(
+            config.fee_maker(),
+            config.fee_taker(),
+            config.max_num_open_orders(),
+        );
 
         Self {
             config,
@@ -116,12 +124,11 @@ where
         timestamp: u64,
         market_update: MarketUpdate,
     ) -> Result<(Vec<Order<S>>, bool), Error> {
-        self.config.price_filter().validate_market_update(&market_update)?;
+        self.config
+            .price_filter()
+            .validate_market_update(&market_update)?;
         match market_update {
-            MarketUpdate::Bba {
-                bid,
-                ask,
-            } => {
+            MarketUpdate::Bba { bid, ask } => {
                 self.bid = bid;
                 self.ask = ask;
                 self.high = ask;
@@ -171,21 +178,26 @@ where
 
         self.config.quantity_filter().validate_order(&order)?;
         let mark_price = (self.bid + self.ask) / quote!(2);
-        self.config.price_filter().validate_order(&order, mark_price)?;
+        self.config
+            .price_filter()
+            .validate_order(&order, mark_price)?;
 
         match order.order_type() {
             OrderType::Market => {
                 // immediately execute market order
-                self.validator.validate_market_order(&order, &self.user_account)?;
+                self.validator
+                    .validate_market_order(&order, &self.user_account)?;
                 self.execute_market(order.side(), order.quantity());
                 order.executed = true;
 
                 Ok(order)
             }
             _ => {
-                let order_margin =
-                    self.validator.validate_limit_order(&order, &self.user_account)?;
-                self.user_account.append_limit_order(order.clone(), order_margin);
+                let order_margin = self
+                    .validator
+                    .validate_limit_order(&order, &self.user_account)?;
+                self.user_account
+                    .append_limit_order(order.clone(), order_margin);
 
                 Ok(order)
             }
@@ -202,7 +214,10 @@ where
 
     /// Execute a market order
     fn execute_market(&mut self, side: Side, amount: S) {
-        debug!("exchange: execute_market: side: {:?}, amount: {}", side, amount);
+        debug!(
+            "exchange: execute_market: side: {:?}, amount: {}",
+            side, amount
+        );
 
         let price = match side {
             Side::Buy => self.ask,
@@ -222,15 +237,18 @@ where
 
         let price = o.limit_price().unwrap();
 
-        self.user_account.remove_executed_order_from_order_margin_calculation(&o);
+        self.user_account
+            .remove_executed_order_from_order_margin_calculation(&o);
 
-        self.user_account.change_position(o.side(), o.quantity(), price);
+        self.user_account
+            .change_position(o.side(), o.quantity(), price);
 
         let fee_of_size = o.quantity().fee_portion(self.config.fee_maker());
         let fee_margin = fee_of_size.convert(price);
 
         self.user_account.deduce_fees(fee_margin);
-        self.user_account.finalize_limit_order(o, self.config.fee_maker());
+        self.user_account
+            .finalize_limit_order(o, self.config.fee_maker());
     }
 
     /// Perform a liquidation of the account
@@ -247,8 +265,12 @@ where
     /// Check if any active orders have been triggered by the most recent price
     /// action method is called after new external data has been consumed
     fn check_orders(&mut self) {
-        let keys: Vec<u64> =
-            self.user_account.active_limit_orders().iter().map(|(i, _)| *i).collect();
+        let keys: Vec<u64> = self
+            .user_account
+            .active_limit_orders()
+            .iter()
+            .map(|(i, _)| *i)
+            .collect();
         for i in keys {
             self.handle_limit_order(i);
         }

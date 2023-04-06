@@ -7,7 +7,8 @@ use crate::{
 #[derive(Debug, Clone)]
 /// Define the Exchange configuration
 pub struct Config<M>
-where M: Currency
+where
+    M: Currency,
 {
     /// The maker fee as a fraction. e.g.: 2.5 basis points rebate -> -0.00025
     fee_maker: Fee,
@@ -33,7 +34,8 @@ where M: Currency
 }
 
 impl<M> Config<M>
-where M: Currency
+where
+    M: Currency,
 {
     /// Create a new Config.
     ///

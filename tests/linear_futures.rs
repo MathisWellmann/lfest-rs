@@ -30,7 +30,9 @@ fn lin_long_market_win_full() {
         )
         .unwrap();
 
-    exchange.submit_order(Order::market(Side::Buy, base!(5.0)).unwrap()).unwrap();
+    exchange
+        .submit_order(Order::market(Side::Buy, base!(5.0)).unwrap())
+        .unwrap();
     let _ = exchange
         .update_state(
             0,
@@ -46,7 +48,10 @@ fn lin_long_market_win_full() {
     assert_eq!(exchange.account().position().unrealized_pnl(), quote!(0.0));
     assert_eq!(exchange.account().margin().wallet_balance(), quote!(999.7));
     assert_eq!(exchange.account().margin().position_margin(), quote!(500.0));
-    assert_eq!(exchange.account().margin().available_balance(), quote!(499.7));
+    assert_eq!(
+        exchange.account().margin().available_balance(),
+        quote!(499.7)
+    );
 
     let _ = exchange
         .update_state(
@@ -57,14 +62,22 @@ fn lin_long_market_win_full() {
             },
         )
         .unwrap();
-    assert_eq!(exchange.account().position().unrealized_pnl(), quote!(500.0));
+    assert_eq!(
+        exchange.account().position().unrealized_pnl(),
+        quote!(500.0)
+    );
 
-    exchange.submit_order(Order::market(Side::Sell, base!(5.0)).unwrap()).unwrap();
+    exchange
+        .submit_order(Order::market(Side::Sell, base!(5.0)).unwrap())
+        .unwrap();
 
     assert_eq!(exchange.account().position().size(), base!(0.0));
     assert_eq!(exchange.account().position().entry_price(), quote!(100.0));
     assert_eq!(exchange.account().position().unrealized_pnl(), quote!(0.0));
     assert_eq!(exchange.account().margin().wallet_balance(), quote!(1499.1));
     assert_eq!(exchange.account().margin().position_margin(), quote!(0.0));
-    assert_eq!(exchange.account().margin().available_balance(), quote!(1499.1));
+    assert_eq!(
+        exchange.account().margin().available_balance(),
+        quote!(1499.1)
+    );
 }

@@ -13,7 +13,8 @@ use crate::prelude::{Currency, QuoteCurrency, Side};
 /// which can easily use more than 10GB of RAM due to storage of tick-by-tick
 /// returns
 pub trait AccountTracker<M>: Send
-where M: Currency
+where
+    M: Currency,
 {
     /// Update with each tick, using data provided in update_state method of
     /// Exchange.

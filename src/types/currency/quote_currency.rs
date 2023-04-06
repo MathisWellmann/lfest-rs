@@ -150,9 +150,21 @@ mod tests {
 
     #[test]
     fn linear_futures_pnl() {
-        assert_eq!(QuoteCurrency::pnl(quote!(100.0), quote!(110.0), base!(10.0)), quote!(100.0));
-        assert_eq!(QuoteCurrency::pnl(quote!(100.0), quote!(110.0), base!(-10.0)), quote!(-100.0));
-        assert_eq!(QuoteCurrency::pnl(quote!(100.0), quote!(90.0), base!(10.0)), quote!(-100.0));
-        assert_eq!(QuoteCurrency::pnl(quote!(100.0), quote!(90.0), base!(-10.0)), quote!(100.0));
+        assert_eq!(
+            QuoteCurrency::pnl(quote!(100.0), quote!(110.0), base!(10.0)),
+            quote!(100.0)
+        );
+        assert_eq!(
+            QuoteCurrency::pnl(quote!(100.0), quote!(110.0), base!(-10.0)),
+            quote!(-100.0)
+        );
+        assert_eq!(
+            QuoteCurrency::pnl(quote!(100.0), quote!(90.0), base!(10.0)),
+            quote!(-100.0)
+        );
+        assert_eq!(
+            QuoteCurrency::pnl(quote!(100.0), quote!(90.0), base!(-10.0)),
+            quote!(100.0)
+        );
     }
 }

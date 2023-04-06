@@ -21,7 +21,8 @@ pub struct Margin<M> {
 }
 
 impl<M> Margin<M>
-where M: Currency
+where
+    M: Currency,
 {
     /// Create a new margin account with an initial balance
     /// # Panics

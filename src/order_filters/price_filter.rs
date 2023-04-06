@@ -86,10 +86,7 @@ impl PriceFilter {
     /// Make sure the market update conforms to the `PriceFilter` rules
     pub(crate) fn validate_market_update(&self, market_update: &MarketUpdate) -> Result<(), Error> {
         match market_update {
-            MarketUpdate::Bba {
-                bid,
-                ask,
-            } => {
+            MarketUpdate::Bba { bid, ask } => {
                 enforce_min_price(self.min_price, *bid)?;
                 enforce_min_price(self.min_price, *ask)?;
                 enforce_max_price(self.max_price, *bid)?;
@@ -201,21 +198,33 @@ mod tests {
 
         // beyond max and min
         let order = Order::limit(Side::Buy, quote!(0.05), base!(0.1)).unwrap();
-        assert_eq!(filter.validate_order(&order, mark_price), Err(OrderError::LimitPriceTooLow));
+        assert_eq!(
+            filter.validate_order(&order, mark_price),
+            Err(OrderError::LimitPriceTooLow)
+        );
         let order = Order::limit(Side::Buy, quote!(1001), base!(0.1)).unwrap();
-        assert_eq!(filter.validate_order(&order, mark_price), Err(OrderError::LimitPriceTooHigh));
+        assert_eq!(
+            filter.validate_order(&order, mark_price),
+            Err(OrderError::LimitPriceTooHigh)
+        );
 
         // Test upper price band
         let order = Order::limit(Side::Buy, quote!(120), base!(0.1)).unwrap();
         filter.validate_order(&order, mark_price).unwrap();
         let order = Order::limit(Side::Buy, quote!(121), base!(0.1)).unwrap();
-        assert_eq!(filter.validate_order(&order, mark_price), Err(OrderError::LimitPriceTooHigh));
+        assert_eq!(
+            filter.validate_order(&order, mark_price),
+            Err(OrderError::LimitPriceTooHigh)
+        );
 
         // Test lower price band
         let order = Order::limit(Side::Buy, quote!(80), base!(0.1)).unwrap();
         filter.validate_order(&order, mark_price).unwrap();
         let order = Order::limit(Side::Buy, quote!(79), base!(0.1)).unwrap();
-        assert_eq!(filter.validate_order(&order, mark_price), Err(OrderError::LimitPriceTooLow));
+        assert_eq!(
+            filter.validate_order(&order, mark_price),
+            Err(OrderError::LimitPriceTooLow)
+        );
 
         // Test step size
         let order = Order::limit(Side::Buy, quote!(100.05), base!(0.1)).unwrap();

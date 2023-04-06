@@ -87,7 +87,9 @@ fn main() {
 
 /// analyze the resulting performance metrics of the traded orders
 fn analyze_results<M>(acc_tracker: &FullAccountTracker<M>)
-where M: Currency + MarginCurrency + Send {
+where
+    M: Currency + MarginCurrency + Send,
+{
     let win_ratio = acc_tracker.win_ratio();
     let profit_loss_ratio = acc_tracker.profit_loss_ratio();
     let rpnl = acc_tracker.total_rpnl();

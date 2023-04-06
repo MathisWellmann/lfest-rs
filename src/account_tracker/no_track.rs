@@ -10,7 +10,8 @@ use crate::{
 pub struct NoAccountTracker;
 
 impl<M> AccountTracker<M> for NoAccountTracker
-where M: Currency
+where
+    M: Currency,
 {
     fn update(&mut self, _timestamp: u64, _price: QuoteCurrency, _upnl: M) {}
 
