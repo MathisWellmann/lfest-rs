@@ -193,7 +193,7 @@ where M: Currency + MarginCurrency + Send
         M::pnl(self.price_first, self.price_last, qty.into_negative())
     }
 
-    /// Return the annualized sharpe ratio using the selected returns as source.
+    /// Return the annualized sharpe ratio using a specific sampling frequency.
     ///
     /// # Parameters:
     /// `returns_source`: the sampling interval of pnl snapshots
@@ -243,51 +243,61 @@ where M: Currency + MarginCurrency + Send
         }
     }
 
-    /// Return the Sortino ratio based on daily returns data
-    /// # Parameters:
-    /// returns_source: the sampling interval of pnl snapshots
-    /// risk_free_is_buy_and_hold: if true, it will use the market returns as
-    /// the risk-free comparison     else risk-free rate is zero
+    /// Return the annualized Sortino ratio based on a specific sampling
+    /// frequency.
     ///
-    /// TODO: annualized depending on the `ReturnsSource`
-    pub fn sortino(&self, returns_source: ReturnsSource, risk_free_is_buy_and_hold: bool) -> f64 {
+    /// # Parameters:
+    /// `returns_source`: the sampling interval of pnl snapshots
+    /// `risk_free_is_buy_and_hold`: if true, it will use the market returns as
+    /// the risk-free comparison     else risk-free rate is zero
+    pub fn sortino(
+        &self,
+        returns_source: ReturnsSource,
+        risk_free_is_buy_and_hold: bool,
+    ) -> Decimal {
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
             ReturnsSource::TickByTick => &self.hist_returns_tick_acc,
         };
+        let annualization_mult = match returns_source {
+            ReturnsSource::Daily => Dec!(19.10497),  // sqrt(365)
+            ReturnsSource::Hourly => Dec!(93.59487), // sqrt(365 * 24)
+            ReturnsSource::TickByTick => {
+                panic!("Unable to annualize returns with tick-by-tikr data")
+            }
+        };
+
         if risk_free_is_buy_and_hold {
             let rets_bnh = match returns_source {
                 ReturnsSource::Daily => &self.hist_returns_daily_bnh,
                 ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
                 ReturnsSource::TickByTick => &self.hist_returns_tick_bnh,
             };
+            let n: Decimal = (rets_bnh.len() as u64).into();
+            let mean_bnh_ret = decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n;
+
             // compute the difference of returns of account and market
-            let diff_returns: Vec<f64> = rets_acc
+            let diff_returns: Vec<Decimal> = rets_acc
                 .iter()
-                .zip(rets_bnh)
-                .map(|(a, b)| *a - *b)
-                .filter(|v| *v < M::new_zero())
-                .map(|v| decimal_to_f64(v.inner()))
+                .map(|v| v.inner() - mean_bnh_ret)
+                .filter(|v| *v < Dec!(0))
                 .collect();
-            let n = diff_returns.len() as f64;
-            let avg = diff_returns.iter().sum::<f64>() / n;
-            let variance = diff_returns.iter().map(|v| (*v - avg).powi(2)).sum::<f64>() / n;
-            let std_dev: f64 = variance.sqrt();
+            let n: Decimal = (diff_returns.len() as u64).into();
+            let mean = decimal_sum(diff_returns.iter().cloned()) / n;
+            let variance = variance(&diff_returns);
+            let std_dev = decimal_sqrt(variance);
 
-            decimal_to_f64(self.total_rpnl.inner() - self.buy_and_hold_return().inner()) / std_dev
+            annualization_mult * mean / std_dev
         } else {
-            let downside_rets: Vec<f64> = rets_acc
-                .iter()
-                .filter(|v| **v < M::new_zero())
-                .map(|v| decimal_to_f64(v.inner()))
-                .collect();
-            let n = downside_rets.len() as f64;
-            let avg = downside_rets.iter().sum::<f64>() / n;
-            let var = downside_rets.iter().map(|v| (v - avg).powi(2)).sum::<f64>() / n;
-            let std_dev = var.sqrt();
+            let downside_rets: Vec<Decimal> =
+                rets_acc.iter().map(|v| v.inner()).filter(|v| *v < Dec!(0)).collect();
+            let n: Decimal = (downside_rets.len() as u64).into();
+            let mean = decimal_sum(downside_rets.iter().cloned()) / n;
+            let variance = variance(&downside_rets);
+            let std_dev = decimal_sqrt(variance);
 
-            decimal_to_f64(self.total_rpnl.inner()) / std_dev
+            annualization_mult * mean / std_dev
         }
     }
 
