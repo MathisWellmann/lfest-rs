@@ -60,7 +60,7 @@ Some of these metric may behave differently from what you would expect, so make 
 To use this crate in your project, add the following to your Cargo.toml:
 ```ignore
 [dependencies]
-lfest = "0.32.0"
+lfest = "0.33.0"
 ```
 
 Then proceed to use it in your code.
@@ -68,8 +68,8 @@ For an example see [examples](examples/basic.rs)
 
 ### TODOs:
 - proper liquidations
+- More modular and testable `AccountTracker`
 - Rework some internal components for greater clarity and simplicity
-- Order filters (price and quantity)
 
 ### Contributions
 If you find a bug or would like to help out, feel free to create a pull-request.
