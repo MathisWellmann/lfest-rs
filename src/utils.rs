@@ -62,7 +62,7 @@ pub fn f64_to_decimal(price: f64, step_size: Decimal) -> Decimal {
     }
 }
 
-/// Sum uh an iterator of `Decimal` values.
+/// Sum an iterator of `Decimal` values.
 pub(crate) fn decimal_sum<I>(vals: I) -> Decimal
 where I: IntoIterator<Item = Decimal> {
     let mut out = Dec!(0);
@@ -89,12 +89,11 @@ pub(crate) fn decimal_sqrt(val: Decimal) -> Decimal {
     f64_to_decimal(decimal_to_f64(val).sqrt(), Dec!(0.0000001))
 }
 
-pub(crate) fn variance<I>(vals: I) -> Decimal
-where I: IntoIterator<Item = Decimal> {
-    let iter = vals.into_iter();
-    let n: Decimal = (iter.count() as u64).into();
-    let avg: Decimal = decimal_sum(iter) / n;
-    decimal_sum(iter.map(|v| (v - avg) * (v - avg))) / n
+/// Compute the variance of `Decimal` values
+pub(crate) fn variance(vals: &[Decimal]) -> Decimal {
+    let n: Decimal = (vals.len() as u64).into();
+    let avg: Decimal = decimal_sum(vals.iter().cloned()) / n;
+    decimal_sum(vals.iter().map(|v| (v - avg) * (v - avg))) / n
 }
 
 #[cfg(test)]
@@ -181,7 +180,7 @@ pub(crate) mod tests {
     #[test]
     fn test_decimal_sum() {
         let vals: Vec<Decimal> = (0..100).map(|v| v.into()).collect();
-        assert_eq!(decimal_sum(vals), Dec!(100));
+        assert_eq!(decimal_sum(vals), Dec!(4950));
     }
 
     #[test]
@@ -199,6 +198,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_variance() {
-        todo!()
+        let vals = &[Dec!(0.5), Dec!(-0.5), Dec!(0.5), Dec!(-0.5)];
+        assert_eq!(variance(vals), Dec!(0.25));
     }
 }

@@ -7,7 +7,7 @@ use crate::{
     cornish_fisher::cornish_fisher_value_at_risk,
     quote,
     types::{Currency, MarginCurrency, QuoteCurrency, Side},
-    utils::{decimal_pow, decimal_sqrt, decimal_to_f64, variance},
+    utils::{decimal_pow, decimal_sqrt, decimal_sum, decimal_to_f64, variance},
 };
 
 const DAILY_NS: u64 = 86_400_000_000_000;
@@ -21,6 +21,8 @@ pub enum ReturnsSource {
     /// Hourly sampled returns
     Hourly,
     /// Tick-by-tick sampled returns
+    /// Because this is hard to annualize, deprecate
+    #[deprecated]
     TickByTick,
 }
 
@@ -207,24 +209,37 @@ where M: Currency + MarginCurrency + Send
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
             ReturnsSource::TickByTick => &self.hist_returns_tick_acc,
         };
+        let annualization_mult = match returns_source {
+            ReturnsSource::Daily => Dec!(19.10497),  // sqrt(365)
+            ReturnsSource::Hourly => Dec!(93.59487), // sqrt(365 * 24)
+            ReturnsSource::TickByTick => {
+                panic!("Unable to annualize returns with tick-by-tikr data")
+            }
+        };
+        let n: Decimal = (rets_acc.len() as u64).into();
+        let mean_ret_acc: Decimal = decimal_sum(rets_acc.iter().map(|v| v.inner())) / n;
+
         if risk_free_is_buy_and_hold {
+            // Compute the mean buy and hold returns
             let rets_bnh = match returns_source {
                 ReturnsSource::Daily => &self.hist_returns_daily_bnh,
                 ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
                 ReturnsSource::TickByTick => &self.hist_returns_tick_bnh,
             };
+            let mean_bnh_ret = decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n;
+
             // compute the difference of returns of account and market
             let diff_returns: Vec<Decimal> =
-                rets_acc.iter().zip(rets_bnh).map(|(a, b)| (*a - *b).inner()).collect();
-            let var = variance(diff_returns);
+                rets_acc.iter().map(|v| v.inner() - mean_bnh_ret).collect();
+            let var = variance(&diff_returns);
             let std_dev = decimal_sqrt(var);
 
-            self.total_rpnl.inner() - self.buy_and_hold_return().inner() / std_dev
+            annualization_mult * mean_ret_acc / std_dev
         } else {
-            let var = variance(rets_acc.iter().map(|v| v.inner()));
+            let var = variance(&rets_acc.iter().map(|v| v.inner()).collect::<Vec<_>>());
             let std_dev = decimal_sqrt(var);
 
-            self.annualized_roi() / std_dev
+            annualization_mult * mean_ret_acc / std_dev
         }
     }
 
