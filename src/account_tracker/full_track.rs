@@ -43,6 +43,7 @@ pub struct FullAccountTracker<M> {
     total_turnover: M,
     max_drawdown_wallet_balance: Decimal,
     max_drawdown_total: Decimal,
+    max_drawdown_duration_hours: i64,
     // historical daily absolute returns
     hist_returns_daily_acc: Vec<M>,
     hist_returns_daily_bnh: Vec<M>,
@@ -100,6 +101,7 @@ where
             total_turnover: M::new_zero(),
             max_drawdown_wallet_balance: Decimal::from(0),
             max_drawdown_total: Decimal::from(0),
+            max_drawdown_duration_hours: 0,
             hist_returns_daily_acc: vec![],
             hist_returns_daily_bnh: vec![],
             hist_returns_hourly_acc: vec![],
@@ -131,6 +133,8 @@ where
     ///
     /// # Parameters:
     /// `source`: the sampling interval of pnl snapshots
+    ///
+    /// TODO: rename for greater clarity
     #[inline(always)]
     pub fn absolute_returns(&self, source: &ReturnsSource) -> &Vec<M> {
         match source {
@@ -177,8 +181,7 @@ where
     /// Would be return of sell and hold strategy
     #[inline(always)]
     pub fn sell_and_hold_return(&self) -> M {
-        let qty = self.wallet_balance_start.convert(self.price_first);
-        M::pnl(self.price_first, self.price_last, qty.into_negative())
+        self.buy_and_hold_return().into_negative()
     }
 
     /// Return the annualized sharpe ratio using a specific sampling frequency.
@@ -484,6 +487,13 @@ where
     #[inline(always)]
     pub fn max_drawdown_total(&self) -> Decimal {
         self.max_drawdown_total
+    }
+
+    /// The maximum duration the account balance was less than the high-water mark.
+    /// This does not include unrealized profit and loss.
+    /// The unit is hours.
+    pub fn max_drawdown_duration_in_hours(&self) -> i64 {
+        self.max_drawdown_duration_hours
     }
 
     /// Return the number of trades the account made

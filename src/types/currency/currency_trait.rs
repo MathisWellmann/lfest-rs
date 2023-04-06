@@ -57,6 +57,7 @@ pub trait Currency:
     fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency;
 
     /// Convert the Currency to a negative value
+    /// TODO: rename for greater clarity
     fn into_negative(self) -> Self;
 }
 
