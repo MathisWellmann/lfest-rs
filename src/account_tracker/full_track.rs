@@ -30,6 +30,7 @@ pub struct FullAccountTracker<M> {
     wallet_balance_last: M,  // last wallet balance recording
     wallet_balance_start: M, // wallet balance at start
     wallet_balance_high: M,  // maximum wallet balance observed
+    high_water_mark_ts: i64, // Timestamp of the maximum wallet balance
     total_rpnl: M,
     upnl: M,
     num_trades: i64,
@@ -88,6 +89,7 @@ where
             wallet_balance_last: starting_wb,
             wallet_balance_start: starting_wb,
             wallet_balance_high: starting_wb,
+            high_water_mark_ts: 0,
             total_rpnl: M::new_zero(),
             upnl: M::new_zero(),
             num_trades: 0,
@@ -292,7 +294,6 @@ where
     /// returns_source: the sampling interval of pnl snapshots
     /// percentile: value between [0.0, 1.0], smaller value will return more
     /// worst case results
-
     /// TODO: annualized depending on the `ReturnsSource`
     #[inline]
     pub fn historical_value_at_risk(&self, returns_source: ReturnsSource, percentile: f64) -> f64 {
@@ -492,6 +493,7 @@ where
     /// The maximum duration the account balance was less than the high-water mark.
     /// This does not include unrealized profit and loss.
     /// The unit is hours.
+    #[inline(always)]
     pub fn max_drawdown_duration_in_hours(&self) -> i64 {
         self.max_drawdown_duration_hours
     }
@@ -562,7 +564,7 @@ impl<M> AccountTracker<M> for FullAccountTracker<M>
 where
     M: Currency + MarginCurrency + Send,
 {
-    fn update(&mut self, timestamp: u64, price: QuoteCurrency, upnl: M) {
+    fn update(&mut self, timestamp_ns: u64, price: QuoteCurrency, upnl: M) {
         self.price_last = price;
         if self.price_a_day_ago.is_zero() {
             self.price_a_day_ago = price;
@@ -578,11 +580,11 @@ where
         }
         self.num_trading_opportunities += 1;
         if self.ts_first == 0 {
-            self.ts_first = timestamp;
+            self.ts_first = timestamp_ns;
         }
-        self.ts_last = timestamp;
-        if timestamp > self.next_daily_trigger_ts {
-            self.next_daily_trigger_ts = timestamp + DAILY_NS;
+        self.ts_last = timestamp_ns;
+        if timestamp_ns > self.next_daily_trigger_ts {
+            self.next_daily_trigger_ts = timestamp_ns + DAILY_NS;
 
             // calculate daily return of account
             let pnl = (self.total_rpnl + upnl) - self.last_daily_pnl;
@@ -609,8 +611,8 @@ where
             self.last_daily_pnl = self.total_rpnl + upnl;
             self.price_a_day_ago = price;
         }
-        if timestamp > self.next_hourly_trigger_ts {
-            self.next_hourly_trigger_ts = timestamp + HOURLY_NS;
+        if timestamp_ns > self.next_hourly_trigger_ts {
+            self.next_hourly_trigger_ts = timestamp_ns + HOURLY_NS;
 
             // calculate hourly return of account
             let pnl = (self.total_rpnl + upnl) - self.last_hourly_pnl;
@@ -648,9 +650,13 @@ where
         if curr_dd > self.max_drawdown_total {
             self.max_drawdown_total = curr_dd;
         }
+
+        // update max drawdown duration
+        self.max_drawdown_duration_hours =
+            (timestamp_ns as i64 - self.high_water_mark_ts) / HOURLY_NS as i64;
     }
 
-    fn log_rpnl(&mut self, rpnl: M) {
+    fn log_rpnl(&mut self, rpnl: M, ts_ns: i64) {
         self.total_rpnl += rpnl;
         self.wallet_balance_last += rpnl;
         if rpnl < M::new_zero() {
@@ -662,6 +668,7 @@ where
         }
         if self.wallet_balance_last > self.wallet_balance_high {
             self.wallet_balance_high = self.wallet_balance_last;
+            self.high_water_mark_ts = ts_ns;
         }
         let dd = (self.wallet_balance_high - self.wallet_balance_last) / self.wallet_balance_high;
         let dd = dd.inner();
@@ -1213,7 +1220,7 @@ mod tests {
             .collect();
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
         for r in rpnls {
-            acc_tracker.log_rpnl(QuoteCurrency::new(r));
+            acc_tracker.log_rpnl(QuoteCurrency::new(r), 0);
         }
 
         assert_eq!(

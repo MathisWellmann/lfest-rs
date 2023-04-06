@@ -269,6 +269,7 @@ mod tests {
                 Side::Buy,
                 QuoteCurrency::new(Decimal::from(50) * l),
                 quote!(101.0),
+                0,
             );
 
             let o = Order::market(Side::Buy, QuoteCurrency::new(Decimal::from(49) * l)).unwrap();
@@ -301,6 +302,7 @@ mod tests {
                 Side::Sell,
                 QuoteCurrency::new(Decimal::from(50) * l),
                 quote!(100.0),
+                0,
             );
 
             let o = Order::market(Side::Buy, QuoteCurrency::new(Decimal::from(149) * l)).unwrap();
@@ -435,6 +437,7 @@ mod tests {
                 Side::Buy,
                 QuoteCurrency::new(Decimal::from(50) * l),
                 quote!(101.0),
+                0,
             );
 
             let o = Order::limit(
@@ -486,6 +489,7 @@ mod tests {
                 Side::Sell,
                 QuoteCurrency::new(Decimal::from(50) * l),
                 quote!(100.0),
+                0,
             );
 
             let o = Order::limit(
@@ -780,6 +784,7 @@ mod tests {
                 Side::Buy,
                 BaseCurrency::new(l / Decimal::TWO),
                 quote!(100.0),
+                0,
             );
 
             let o = Order::limit(
@@ -820,6 +825,7 @@ mod tests {
                 Side::Sell,
                 BaseCurrency::new(l / Decimal::TWO),
                 quote!(100.0),
+                0,
             );
 
             let o = Order::limit(
@@ -1001,6 +1007,7 @@ mod tests {
                 Side::Buy,
                 BaseCurrency::new(l / Decimal::TWO),
                 quote!(100.0),
+                0,
             );
             let mut o = Order::limit(
                 Side::Buy,
@@ -1050,6 +1057,7 @@ mod tests {
                 Side::Buy,
                 BaseCurrency::new(l / Decimal::TWO),
                 quote!(100.0),
+                0,
             );
             let mut o = Order::limit(
                 Side::Sell,
@@ -1099,6 +1107,7 @@ mod tests {
                 Side::Buy,
                 BaseCurrency::new(l / Decimal::TWO),
                 quote!(100.0),
+                0,
             );
             let mut o = Order::limit(
                 Side::Sell,
@@ -1157,6 +1166,7 @@ mod tests {
                 Side::Sell,
                 BaseCurrency::new(l / Decimal::TWO),
                 quote!(100.0),
+                0,
             );
             let mut o = Order::limit(
                 Side::Buy,
@@ -1206,6 +1216,7 @@ mod tests {
                 Side::Sell,
                 BaseCurrency::new(l / Decimal::TWO),
                 quote!(100.0),
+                0,
             );
             let mut o = Order::limit(
                 Side::Sell,
@@ -1255,6 +1266,7 @@ mod tests {
                 Side::Sell,
                 BaseCurrency::new(l / Decimal::TWO),
                 quote!(100.0),
+                0,
             );
             let mut o = Order::limit(
                 Side::Sell,
@@ -1361,6 +1373,7 @@ mod tests {
                 Side::Buy,
                 QuoteCurrency::new(Decimal::from(50) * l),
                 quote!(100.0),
+                0,
             );
 
             let o = Order::limit(
@@ -1410,6 +1423,7 @@ mod tests {
                 Side::Sell,
                 QuoteCurrency::new(Decimal::from(50) * l),
                 quote!(100.0),
+                0,
             );
 
             let o = Order::limit(
@@ -1627,6 +1641,7 @@ mod tests {
                 Side::Buy,
                 QuoteCurrency::new(Decimal::from(50) * l),
                 quote!(100.0),
+                0,
             );
             let mut o = Order::limit(
                 Side::Buy,
@@ -1685,6 +1700,7 @@ mod tests {
                 Side::Buy,
                 QuoteCurrency::new(Decimal::from(50) * l),
                 quote!(100.0),
+                0,
             );
             let mut o = Order::limit(
                 Side::Sell,
@@ -1743,6 +1759,7 @@ mod tests {
                 Side::Buy,
                 QuoteCurrency::new(Decimal::from(50) * l),
                 quote!(100.0),
+                0,
             );
             let mut o = Order::limit(
                 Side::Sell,
@@ -1810,6 +1827,7 @@ mod tests {
                 Side::Sell,
                 QuoteCurrency::new(Decimal::from(50) * l),
                 quote!(100.0),
+                0,
             );
             let mut o = Order::limit(
                 Side::Buy,
@@ -1868,6 +1886,7 @@ mod tests {
                 Side::Sell,
                 QuoteCurrency::new(Decimal::from(50) * l),
                 quote!(100.0),
+                0,
             );
             let mut o = Order::limit(
                 Side::Sell,
@@ -1926,6 +1945,7 @@ mod tests {
                 Side::Sell,
                 QuoteCurrency::new(Decimal::from(50) * l),
                 quote!(100.0),
+                0,
             );
             let mut o = Order::limit(
                 Side::Sell,

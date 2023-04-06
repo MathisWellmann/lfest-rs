@@ -323,7 +323,13 @@ where
     }
 
     /// Changes the position by a given delta while changing margin accordingly
-    pub(crate) fn change_position(&mut self, side: Side, size: S, exec_price: QuoteCurrency) {
+    pub(crate) fn change_position(
+        &mut self,
+        side: Side,
+        size: S,
+        exec_price: QuoteCurrency,
+        ts_ns: i64,
+    ) {
         debug!(
             "account: change_position(side: {:?}, size: {}, exec_price: {})",
             side, size, exec_price
@@ -378,7 +384,7 @@ where
             self.margin.set_position_margin(new_pos_margin);
 
             self.margin.change_balance(rpnl);
-            self.account_tracker.log_rpnl(rpnl);
+            self.account_tracker.log_rpnl(rpnl, ts_ns);
         }
 
         // change position
@@ -515,7 +521,7 @@ mod tests {
     fn account_change_position_inverse_future() {
         let mut acc = Account::new(NoAccountTracker::default(), leverage!(1.0), base!(1.0));
 
-        acc.change_position(Side::Buy, quote!(100.0), quote!(200.0));
+        acc.change_position(Side::Buy, quote!(100.0), quote!(200.0), 0);
         assert_eq!(acc.margin().wallet_balance(), base!(1.0));
         assert_eq!(acc.margin().position_margin(), base!(0.5));
         assert_eq!(acc.margin().order_margin(), base!(0.0));
@@ -525,7 +531,7 @@ mod tests {
         assert_eq!(acc.position().leverage(), leverage!(1.0));
         assert_eq!(acc.position().unrealized_pnl(), base!(0.0));
 
-        acc.change_position(Side::Sell, quote!(100.0), quote!(200.0));
+        acc.change_position(Side::Sell, quote!(100.0), quote!(200.0), 0);
         assert_eq!(acc.position().size(), quote!(0.0));
         assert_eq!(acc.position().entry_price(), quote!(200.0));
         assert_eq!(acc.position().leverage(), leverage!(1.0));
@@ -535,7 +541,7 @@ mod tests {
         assert_eq!(acc.margin().order_margin(), base!(0.0));
         assert_eq!(acc.margin().available_balance(), base!(1.0));
 
-        acc.change_position(Side::Sell, quote!(100.0), quote!(200.0));
+        acc.change_position(Side::Sell, quote!(100.0), quote!(200.0), 0);
         assert_eq!(acc.margin().wallet_balance(), base!(1.0));
         assert_eq!(acc.margin().position_margin(), base!(0.5));
         assert_eq!(acc.margin().order_margin(), base!(0.0));
@@ -545,7 +551,7 @@ mod tests {
         assert_eq!(acc.position().leverage(), leverage!(1.0));
         assert_eq!(acc.position().unrealized_pnl(), base!(0.0));
 
-        acc.change_position(Side::Buy, quote!(150.0), quote!(200.0));
+        acc.change_position(Side::Buy, quote!(150.0), quote!(200.0), 0);
         assert_eq!(acc.margin().wallet_balance(), base!(1.0));
         assert_eq!(acc.margin().position_margin(), base!(0.25));
         assert_eq!(acc.margin().order_margin(), base!(0.0));
@@ -555,7 +561,7 @@ mod tests {
         assert_eq!(acc.position().leverage(), leverage!(1.0));
         assert_eq!(acc.position().unrealized_pnl(), base!(0.0));
 
-        acc.change_position(Side::Sell, quote!(25.0), quote!(200.0));
+        acc.change_position(Side::Sell, quote!(25.0), quote!(200.0), 0);
         assert_eq!(acc.margin().wallet_balance(), base!(1.0));
         assert_eq!(acc.margin().position_margin(), base!(0.125));
         assert_eq!(acc.margin().order_margin(), base!(0.0));
@@ -570,7 +576,7 @@ mod tests {
     fn account_change_position_linear_futures() {
         let mut acc = Account::new(NoAccountTracker::default(), leverage!(1.0), quote!(1000.0));
 
-        acc.change_position(Side::Buy, base!(0.5), quote!(100.0));
+        acc.change_position(Side::Buy, base!(0.5), quote!(100.0), 0);
         assert_eq!(acc.margin().wallet_balance(), quote!(1000.0));
         assert_eq!(acc.margin().position_margin(), quote!(50.0));
         assert_eq!(acc.margin().order_margin(), quote!(0.0));

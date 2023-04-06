@@ -20,13 +20,17 @@ where
     /// Exchange.
     ///
     /// # Arguments:
-    /// `timestamp`: timestamp of latest tick
+    /// `timestamp_ns`: timestamp of latest tick in nanoseconds
     /// `price`: price of latest tick
     /// `upnl`: unrealized profit and loss of account in current tick
-    fn update(&mut self, timestamp: u64, price: QuoteCurrency, upnl: M);
+    fn update(&mut self, timestamp_ns: u64, price: QuoteCurrency, upnl: M);
 
     /// Log a realized profit and loss event
-    fn log_rpnl(&mut self, rpnl: M);
+    ///
+    /// # Arguments:
+    /// `rpnl`: The realized profit and loss, denoted in margin currency.
+    /// `ts_ns`: The timestamp in nanoseconds of this event.
+    fn log_rpnl(&mut self, rpnl: M, ts_ns: i64);
 
     /// Log a fee, measured in the margin currency
     fn log_fee(&mut self, fee_in_margin: M);

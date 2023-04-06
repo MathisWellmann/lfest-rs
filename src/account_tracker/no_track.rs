@@ -15,7 +15,7 @@ where
 {
     fn update(&mut self, _timestamp: u64, _price: QuoteCurrency, _upnl: M) {}
 
-    fn log_rpnl(&mut self, _rpnl: M) {}
+    fn log_rpnl(&mut self, _rpnl: M, _ts_ns: i64) {}
 
     fn log_fee(&mut self, _fee: M) {}
 

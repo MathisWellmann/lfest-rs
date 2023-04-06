@@ -28,7 +28,8 @@ where
     step: u64, // used for synchronizing orders
     high: QuoteCurrency,
     low: QuoteCurrency,
-    current_ts: i64,
+    // The current timestamp in nanoseconds
+    current_ts_ns: i64,
 }
 
 impl<A, S> Exchange<A, S>
@@ -62,7 +63,7 @@ where
             step: 0,
             high: quote!(0.0),
             low: quote!(0.0),
-            current_ts: 0,
+            current_ts_ns: 0,
         }
     }
 
@@ -111,17 +112,16 @@ where
     /// Update the exchange state with new information
     ///
     /// ### Parameters:
-    /// timestamp: Is used in the AccountTracker A
+    /// `timestamp_ns`: Is used in the AccountTracker `A`
     ///     and if setting order timestamps is enabled in the config.
-    ///     So can be set to 0 if not required
-    /// market_update: Newest market information
+    /// `market_update`: Newest market information
     ///
     /// ### Returns:
     /// executed orders
     /// true if position has been liquidated
     pub fn update_state(
         &mut self,
-        timestamp: u64,
+        timestamp_ns: u64,
         market_update: MarketUpdate,
     ) -> Result<(Vec<Order<S>>, bool), Error> {
         self.config
@@ -146,7 +146,7 @@ where
                 self.low = low;
             }
         }
-        self.current_ts = timestamp as i64;
+        self.current_ts_ns = timestamp_ns as i64;
 
         self.validator.update(self.bid, self.ask);
 
@@ -157,7 +157,7 @@ where
 
         self.check_orders();
 
-        self.user_account.update(self.bid, self.ask, timestamp);
+        self.user_account.update(self.bid, self.ask, timestamp_ns);
 
         self.step += 1;
 
@@ -173,7 +173,7 @@ where
         order.set_id(self.next_order_id());
 
         if self.config.set_order_timestamps() {
-            order.set_timestamp(self.current_ts);
+            order.set_timestamp(self.current_ts_ns);
         }
 
         self.config.quantity_filter().validate_order(&order)?;
@@ -227,7 +227,8 @@ where
         let fee_of_size = amount.fee_portion(self.config.fee_taker());
         let fee_margin = fee_of_size.convert(price);
 
-        self.user_account.change_position(side, amount, price);
+        self.user_account
+            .change_position(side, amount, price, self.current_ts_ns);
         self.user_account.deduce_fees(fee_margin);
     }
 
@@ -241,7 +242,7 @@ where
             .remove_executed_order_from_order_margin_calculation(&o);
 
         self.user_account
-            .change_position(o.side(), o.quantity(), price);
+            .change_position(o.side(), o.quantity(), price, self.current_ts_ns);
 
         let fee_of_size = o.quantity().fee_portion(self.config.fee_maker());
         let fee_margin = fee_of_size.convert(price);
