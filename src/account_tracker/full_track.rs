@@ -20,10 +20,6 @@ pub enum ReturnsSource {
     Daily,
     /// Hourly sampled returns
     Hourly,
-    /// Tick-by-tick sampled returns
-    /// Because this is hard to annualize, deprecate
-    #[deprecated]
-    TickByTick,
 }
 
 /// Keep track of many possible Account performance statistics
@@ -53,19 +49,12 @@ pub struct FullAccountTracker<M> {
     // historical hourly absolute returns
     hist_returns_hourly_acc: Vec<M>,
     hist_returns_hourly_bnh: Vec<M>,
-    // historical tick by tick absolute returns
-    // TODO: if these tick-by-tick returns vectors get too large, disable it in live mode
-    hist_returns_tick_acc: Vec<M>,
-    hist_returns_tick_bnh: Vec<M>,
     // historical daily logarithmic returns
     hist_ln_returns_daily_acc: Vec<f64>,
     hist_ln_returns_daily_bnh: Vec<f64>,
     // historical hourly logarithmic returns
     hist_ln_returns_hourly_acc: Vec<f64>,
     hist_ln_returns_hourly_bnh: Vec<f64>,
-    // historical tick by tick logarithmic returns
-    hist_ln_returns_tick_acc: Vec<f64>,
-    hist_ln_returns_tick_bnh: Vec<f64>,
     // timestamps for when to trigger the next pnl snapshots
     next_daily_trigger_ts: u64,
     next_hourly_trigger_ts: u64,
@@ -115,14 +104,10 @@ where
             hist_returns_daily_bnh: vec![],
             hist_returns_hourly_acc: vec![],
             hist_returns_hourly_bnh: vec![],
-            hist_returns_tick_acc: vec![],
-            hist_returns_tick_bnh: vec![],
             hist_ln_returns_daily_acc: vec![],
             hist_ln_returns_daily_bnh: vec![],
             hist_ln_returns_hourly_acc: vec![],
             hist_ln_returns_hourly_bnh: vec![],
-            hist_ln_returns_tick_acc: vec![],
-            hist_ln_returns_tick_bnh: vec![],
             next_daily_trigger_ts: 0,
             next_hourly_trigger_ts: 0,
             last_daily_pnl: M::new_zero(),
@@ -142,26 +127,28 @@ where
     }
 
     /// Vector of absolute returns the account has generated, including
-    /// unrealized pnl # Parameters
-    /// source: the sampling interval of pnl snapshots
+    /// unrealized pnl.
+    ///
+    /// # Parameters:
+    /// `source`: the sampling interval of pnl snapshots
     #[inline(always)]
     pub fn absolute_returns(&self, source: &ReturnsSource) -> &Vec<M> {
         match source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
-            ReturnsSource::TickByTick => &self.hist_returns_tick_acc,
         }
     }
 
     /// Vector of natural logarithmic returns the account has generated,
-    /// including unrealized pnl # Parameters
-    /// source: the sampling interval of pnl snapshots
+    /// including unrealized pnl
+    ///
+    /// # Parameters:
+    /// `source`: the sampling interval of pnl snapshots
     #[inline(always)]
     pub fn ln_returns(&self, source: &ReturnsSource) -> &Vec<f64> {
         match source {
             ReturnsSource::Daily => &self.hist_ln_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_ln_returns_hourly_acc,
-            ReturnsSource::TickByTick => &self.hist_ln_returns_tick_acc,
         }
     }
 
@@ -208,14 +195,10 @@ where
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
-            ReturnsSource::TickByTick => &self.hist_returns_tick_acc,
         };
         let annualization_mult = match returns_source {
             ReturnsSource::Daily => Dec!(19.10497),  // sqrt(365)
             ReturnsSource::Hourly => Dec!(93.59487), // sqrt(365 * 24)
-            ReturnsSource::TickByTick => {
-                panic!("Unable to annualize returns with tick-by-tikr data")
-            }
         };
         let n: Decimal = (rets_acc.len() as u64).into();
         let mean_ret_acc: Decimal = decimal_sum(rets_acc.iter().map(|v| v.inner())) / n;
@@ -225,7 +208,6 @@ where
             let rets_bnh = match returns_source {
                 ReturnsSource::Daily => &self.hist_returns_daily_bnh,
                 ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
-                ReturnsSource::TickByTick => &self.hist_returns_tick_bnh,
             };
             let mean_bnh_ret = decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n;
 
@@ -259,21 +241,16 @@ where
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
-            ReturnsSource::TickByTick => &self.hist_returns_tick_acc,
         };
         let annualization_mult = match returns_source {
             ReturnsSource::Daily => Dec!(19.10497),  // sqrt(365)
             ReturnsSource::Hourly => Dec!(93.59487), // sqrt(365 * 24)
-            ReturnsSource::TickByTick => {
-                panic!("Unable to annualize returns with tick-by-tikr data")
-            }
         };
 
         if risk_free_is_buy_and_hold {
             let rets_bnh = match returns_source {
                 ReturnsSource::Daily => &self.hist_returns_daily_bnh,
                 ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
-                ReturnsSource::TickByTick => &self.hist_returns_tick_bnh,
             };
             let n: Decimal = (rets_bnh.len() as u64).into();
             let mean_bnh_ret = decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n;
@@ -319,7 +296,6 @@ where
         let mut rets = match returns_source {
             ReturnsSource::Daily => self.hist_ln_returns_daily_acc.clone(),
             ReturnsSource::Hourly => self.hist_ln_returns_hourly_acc.clone(),
-            ReturnsSource::TickByTick => self.hist_ln_returns_tick_acc.clone(),
         };
         rets.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let idx = (rets.len() as f64 * percentile) as usize;
@@ -381,7 +357,6 @@ where
         let rets = match returns_source {
             ReturnsSource::Daily => &self.hist_ln_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_ln_returns_hourly_acc,
-            ReturnsSource::TickByTick => &self.hist_ln_returns_tick_acc,
         };
         cornish_fisher_value_at_risk(
             rets,
@@ -441,18 +416,17 @@ where
     /// It better captures the risk of the asset as it is not limited by the
     /// assumption of a gaussian distribution It it time-insensitive
     /// from: <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3927058>
-    /// # Parameters
-    /// returns_source: the sampling interval of pnl snapshots
+    ///
+    /// # Parameters:
+    /// `returns_source`: The sampling interval of pnl snapshots
     pub fn d_ratio(&self, returns_source: ReturnsSource) -> f64 {
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_ln_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_ln_returns_hourly_acc,
-            ReturnsSource::TickByTick => &self.hist_ln_returns_tick_acc,
         };
         let rets_bnh = match returns_source {
             ReturnsSource::Daily => &self.hist_ln_returns_daily_bnh,
             ReturnsSource::Hourly => &self.hist_ln_returns_hourly_bnh,
-            ReturnsSource::TickByTick => &self.hist_ln_returns_tick_bnh,
         };
 
         let cf_var_bnh = cornish_fisher_value_at_risk(
@@ -653,23 +627,6 @@ where
             self.last_hourly_pnl = self.total_rpnl + upnl;
             self.price_an_hour_ago = price;
         }
-        // compute tick-by-tick return statistics
-        let pnl = (self.total_rpnl + upnl) - self.last_tick_pnl;
-        self.hist_returns_tick_acc.push(pnl);
-
-        let ln_ret: f64 = decimal_to_f64(
-            ((self.wallet_balance_last + upnl) / (self.wallet_balance_start + self.last_tick_pnl))
-                .inner(),
-        )
-        .ln();
-        self.hist_ln_returns_tick_acc.push(ln_ret);
-
-        let bnh_qty = self.wallet_balance_start.convert(self.price_first);
-        let pnl_bnh = M::pnl(self.price_a_tick_ago, price, bnh_qty);
-        self.hist_returns_tick_bnh.push(pnl_bnh);
-
-        let ln_ret = decimal_to_f64((price / self.price_a_tick_ago).inner()).ln();
-        self.hist_ln_returns_tick_bnh.push(ln_ret);
 
         self.last_tick_pnl = self.total_rpnl + upnl;
         self.price_a_tick_ago = price;
@@ -745,10 +702,8 @@ rpnl: {},
 annualized_roi: {},
 sharpe_daily_returns: {},
 sharpe_hourly_returns: {},
-sharpe_tick_returns: {},
 sortino_daily_returns: {},
 sortino_hourly_returns: {},
-sortino_tick_returns: {},
 drawdown_wallet_balance: {},
 drawdown_total: {},
 historical_value_at_risk_daily: {},
@@ -757,7 +712,6 @@ cornish_fisher_value_at_risk_daily: {},
 cornish_fisher_value_at_risk_daily_from_hourly_returns: {},
 d_ratio_daily: {},
 d_ratio_hourly: {},
-d_ratio_tick: {},
 num_trades: {},
 buy_ratio: {},
 turnover: {},
@@ -772,10 +726,8 @@ num_trading_days: {},
             self.annualized_roi(),
             self.sharpe(ReturnsSource::Daily, true),
             self.sharpe(ReturnsSource::Hourly, true),
-            self.sharpe(ReturnsSource::TickByTick, true),
             self.sortino(ReturnsSource::Daily, true),
             self.sortino(ReturnsSource::Hourly, true),
-            self.sortino(ReturnsSource::TickByTick, true),
             self.max_drawdown_wallet_balance(),
             self.max_drawdown_total(),
             self.historical_value_at_risk(ReturnsSource::Daily, 0.01),
@@ -784,7 +736,6 @@ num_trading_days: {},
             self.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01),
             self.d_ratio(ReturnsSource::Daily),
             self.d_ratio(ReturnsSource::Hourly),
-            self.d_ratio(ReturnsSource::TickByTick),
             self.num_trades(),
             self.buy_ratio(),
             self.turnover(),
