@@ -20,6 +20,7 @@ macro_rules! quote {
     Debug,
     Clone,
     Copy,
+    Eq,
     PartialEq,
     PartialOrd,
     Add,

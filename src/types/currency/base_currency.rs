@@ -20,6 +20,7 @@ macro_rules! base {
     Debug,
     Clone,
     Copy,
+    Eq,
     PartialEq,
     PartialOrd,
     Add,
