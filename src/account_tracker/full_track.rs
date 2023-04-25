@@ -504,6 +504,12 @@ where
         self.num_trades
     }
 
+    /// Return the number of submitted limit orders.
+    #[inline(always)]
+    pub fn num_submitted_limit_orders(&self) -> usize {
+        self.num_submitted_limit_orders
+    }
+
     /// Return the ratio of executed trades vs total trading opportunities
     /// Higher values means a more active trading agent
     #[inline(always)]
