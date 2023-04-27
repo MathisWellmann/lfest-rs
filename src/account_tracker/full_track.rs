@@ -470,7 +470,12 @@ where
 
     /// Annualized return on investment as a factor, e.g.: 100% -> 2x
     pub fn annualized_roi(&self) -> Decimal {
-        let power: u32 = 365 / self.num_trading_days() as u32;
+        let num_trading_days = if self.num_trading_days() == 0 {
+            1
+        } else {
+            self.num_trading_days() as u32
+        };
+        let power: u32 = 365 / num_trading_days;
         decimal_pow(
             Dec!(1) + self.total_rpnl.inner() / self.wallet_balance_start.inner(),
             power,
