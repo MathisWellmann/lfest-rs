@@ -39,7 +39,8 @@ pub struct FullAccountTracker<M> {
     num_losses: usize,
     num_submitted_limit_orders: usize,
     num_cancelled_limit_orders: usize,
-    num_filled_limit_orders: usize,
+    num_limit_order_fills: usize,
+    num_market_order_fills: usize,
     num_trading_opportunities: usize,
     total_turnover: M,
     max_drawdown_wallet_balance: Decimal,
@@ -98,7 +99,8 @@ where
             num_losses: 0,
             num_submitted_limit_orders: 0,
             num_cancelled_limit_orders: 0,
-            num_filled_limit_orders: 0,
+            num_limit_order_fills: 0,
+            num_market_order_fills: 0,
             num_trading_opportunities: 0,
             total_turnover: M::new_zero(),
             max_drawdown_wallet_balance: Decimal::from(0),
@@ -579,7 +581,7 @@ where
     /// orders
     #[inline(always)]
     pub fn limit_order_fill_ratio(&self) -> f64 {
-        self.num_filled_limit_orders as f64 / self.num_submitted_limit_orders as f64
+        self.num_limit_order_fills as f64 / self.num_submitted_limit_orders as f64
     }
 
     /// Return the ratio of limit order cancellations vs number of submitted
@@ -587,6 +589,12 @@ where
     #[inline(always)]
     pub fn limit_order_cancellation_ratio(&self) -> f64 {
         self.num_cancelled_limit_orders as f64 / self.num_submitted_limit_orders as f64
+    }
+
+    /// The ratio of market order fills relative to total trades.
+    #[inline(always)]
+    pub fn market_order_trade_ratio(&self) -> f64 {
+        self.num_market_order_fills as f64 / self.num_trades as f64
     }
 }
 
@@ -724,15 +732,19 @@ where
 
     #[inline(always)]
     fn log_limit_order_fill(&mut self) {
-        self.num_filled_limit_orders += 1;
+        self.num_limit_order_fills += 1;
+    }
+
+    #[inline(always)]
+    fn log_market_order_fill(&mut self) {
+        self.num_market_order_fills += 1;
     }
 
     fn log_trade(&mut self, side: Side, price: QuoteCurrency, size: M::PairedCurrency) {
         self.total_turnover += size.convert(price);
         self.num_trades += 1;
-        match side {
-            Side::Buy => self.num_buys += 1,
-            Side::Sell => {}
+        if let Side::Buy = side {
+            self.num_buys += 1
         }
     }
 }

@@ -230,6 +230,9 @@ where
         self.user_account
             .change_position(side, amount, price, self.current_ts_ns);
         self.user_account.deduce_fees(fee_margin);
+        self.user_account
+            .account_tracker_mut()
+            .log_market_order_fill();
     }
 
     /// Execute a limit order, once triggered

@@ -41,8 +41,11 @@ where
     /// Log a limit order cancellation event
     fn log_limit_order_cancellation(&mut self);
 
-    /// Log a limit order fill event
+    /// Log a limit order fill event.
     fn log_limit_order_fill(&mut self);
+
+    /// Log a market order fill event.
+    fn log_market_order_fill(&mut self);
 
     /// Log a trade event where some order got filled and the position changed
     fn log_trade(&mut self, side: Side, price: QuoteCurrency, size: M::PairedCurrency);

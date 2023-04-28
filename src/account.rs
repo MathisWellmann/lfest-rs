@@ -126,6 +126,12 @@ where
         &self.account_tracker
     }
 
+    /// Return a mutable reference to acc_tracker struct
+    #[inline(always)]
+    pub fn account_tracker_mut(&mut self) -> &mut A {
+        &mut self.account_tracker
+    }
+
     /// Cancel an active order
     /// returns Some order if successful with given order_id
     pub fn cancel_order(&mut self, order_id: u64) -> Result<Order<S>> {
