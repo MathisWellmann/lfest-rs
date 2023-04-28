@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, iter::FromIterator};
 
 use fpdec::{Dec, Decimal};
 
@@ -261,11 +261,12 @@ where
             let mean_bnh_ret = decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n;
 
             // compute the difference of returns of account and market
-            let diff_returns: Vec<Decimal> = rets_acc
-                .iter()
-                .map(|v| v.inner() - mean_bnh_ret)
-                .filter(|v| *v < Dec!(0))
-                .collect();
+            let diff_returns = Vec::<Decimal>::from_iter(
+                rets_acc
+                    .iter()
+                    .map(|v| v.inner() - mean_bnh_ret)
+                    .filter(|v| *v < Dec!(0)),
+            );
             let n: Decimal = (diff_returns.len() as u64).into();
             let mean = decimal_sum(diff_returns.iter().cloned()) / n;
             let variance = variance(&diff_returns);
@@ -285,6 +286,24 @@ where
 
             annualization_mult * mean / std_dev
         }
+    }
+
+    /// Return the theoretical kelly leverage that would maximize the compounded growth rate,
+    /// assuming the returns are normally distributed.
+    /// WHICH THEY ARE NOT!
+    /// I'd consider using the kelly leverage outright as "leveraging to the tits".
+    /// Essentially: kelly f* = mean return / variance
+    pub fn kelly_leverage(&self, returns_source: ReturnsSource) -> Decimal {
+        let rets_acc = match returns_source {
+            ReturnsSource::Daily => &self.hist_returns_daily_acc,
+            ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
+        };
+        let n: Decimal = (rets_acc.len() as u64).into();
+        let mean_return = decimal_sum(rets_acc.iter().map(|v| v.inner())) / n;
+        let rets_dec = Vec::<Decimal>::from_iter(rets_acc.iter().map(|v| v.inner()));
+        let variance = variance(&rets_dec);
+
+        mean_return / variance
     }
 
     /// Calculate the value at risk using the percentile method on daily returns
