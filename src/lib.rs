@@ -15,15 +15,11 @@ mod config;
 mod cornish_fisher;
 mod errors;
 mod exchange;
-mod limit_order_margin;
 mod margin;
 mod order_filters;
 mod position;
 mod types;
 mod utils;
-mod validator;
-
-use fpdec::Decimal;
 
 /// Exports common types
 pub mod prelude {

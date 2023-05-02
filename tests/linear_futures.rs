@@ -45,7 +45,13 @@ fn lin_long_market_win_full() {
 
     assert_eq!(exchange.account().position().size(), base!(5.0));
     assert_eq!(exchange.account().position().entry_price(), quote!(100.0));
-    assert_eq!(exchange.account().position().unrealized_pnl(), quote!(0.0));
+    assert_eq!(
+        exchange
+            .account()
+            .position()
+            .unrealized_pnl(quote!(100), quote!(101)),
+        quote!(0.0)
+    );
     assert_eq!(exchange.account().margin().wallet_balance(), quote!(999.7));
     assert_eq!(exchange.account().margin().position_margin(), quote!(500.0));
     assert_eq!(
@@ -57,13 +63,16 @@ fn lin_long_market_win_full() {
         .update_state(
             0,
             MarketUpdate::Bba {
-                bid: quote!(200.0),
-                ask: quote!(201.0),
+                bid: quote!(200),
+                ask: quote!(201),
             },
         )
         .unwrap();
     assert_eq!(
-        exchange.account().position().unrealized_pnl(),
+        exchange
+            .account()
+            .position()
+            .unrealized_pnl(quote!(200), quote!(201)),
         quote!(500.0)
     );
 
@@ -73,7 +82,13 @@ fn lin_long_market_win_full() {
 
     assert_eq!(exchange.account().position().size(), base!(0.0));
     assert_eq!(exchange.account().position().entry_price(), quote!(100.0));
-    assert_eq!(exchange.account().position().unrealized_pnl(), quote!(0.0));
+    assert_eq!(
+        exchange
+            .account()
+            .position()
+            .unrealized_pnl(quote!(200), quote!(201)),
+        quote!(0.0)
+    );
     assert_eq!(exchange.account().margin().wallet_balance(), quote!(1499.1));
     assert_eq!(exchange.account().margin().position_margin(), quote!(0.0));
     assert_eq!(

@@ -87,6 +87,18 @@ pub enum Error {
 
     #[error("An invalid price was provided in MarketUpdate")]
     InvalidMarketUpdatePrice,
+
+    #[error("The Account does not have enough available balance.")]
+    NotEnoughAvailableBalance,
+
+    #[error("Not enough order margin available")]
+    NotEnoughOrderMargin,
+
+    #[error("Not enough position margin available")]
+    NotEnoughPositionMargin,
+
+    #[error("The provided amount it invalid")]
+    InvalidAmount,
 }
 
 /// This is defined as a convenience.

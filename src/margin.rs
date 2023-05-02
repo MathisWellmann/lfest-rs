@@ -16,8 +16,6 @@ pub struct Margin<M> {
     position_margin: M,
     /// The order margin of account, same denotation as wallet_balance
     order_margin: M,
-    /// The available balance of account, same denotation as wallet_balance
-    available_balance: M,
 }
 
 impl<M> Margin<M>
@@ -34,36 +32,23 @@ where
             wallet_balance: init_balance,
             position_margin: M::new_zero(),
             order_margin: M::new_zero(),
-            available_balance: init_balance,
         }
     }
 
-    /// Create a new Margin with all fields custom.
-    ///
-    /// # Panics:
-    /// In debug mode, if the input values don't make sense
+    /// Create a new Margin with all custom fields.
     #[inline]
-    pub fn new(
-        wallet_balance: M,
-        position_margin: M,
-        order_margin: M,
-        available_balance: M,
-    ) -> Result<Self> {
+    pub fn new(wallet_balance: M, position_margin: M, order_margin: M) -> Result<Self> {
         if position_margin > wallet_balance {
             return Err(Error::InvalidPositionMargin);
         }
         if order_margin > wallet_balance {
             return Err(Error::InvalidOrderMargin);
         }
-        if available_balance > wallet_balance {
-            return Err(Error::InvalidAvailableBalance);
-        }
 
         Ok(Margin {
             wallet_balance,
             position_margin,
             order_margin,
-            available_balance,
         })
     }
 
@@ -90,105 +75,60 @@ where
     /// wallet_balance
     #[inline(always)]
     pub fn available_balance(&self) -> M {
-        self.available_balance
+        self.wallet_balance - self.order_margin - self.position_margin
     }
 
-    /// Set a new order margin
-    pub(crate) fn set_order_margin(&mut self, om: M) {
-        trace!("set_order_margin: om: {}, self: {:?}", om, self);
+    /// Locks some balance as order collateral.
+    pub(crate) fn lock_as_order_collateral(&mut self, amount: M) -> Result<()> {
+        let ab = self.available_balance();
+        if amount > ab {
+            return Err(Error::NotEnoughAvailableBalance);
+        }
 
-        debug_assert!(om >= M::new_zero());
-
-        self.order_margin = om;
-        self.available_balance = self.wallet_balance - self.position_margin - self.order_margin;
-
-        debug_assert!(self.available_balance >= M::new_zero());
+        self.order_margin += amount;
+        Ok(())
     }
 
-    /// Set the position margin by a given delta and adjust available balance
-    /// accordingly
-    pub(crate) fn set_position_margin(&mut self, val: M) {
-        trace!("set_position_margin({}), self: {:?}", val, self);
+    /// Locks some balance as position collateral.
+    pub(crate) fn lock_as_position_collateral(&mut self, amount: M) -> Result<()> {
+        let ab = self.available_balance();
+        if amount > ab {
+            return Err(Error::NotEnoughAvailableBalance);
+        }
 
-        debug_assert!(val >= M::new_zero());
-
-        self.position_margin = val;
-        self.available_balance = self.wallet_balance - self.order_margin - self.position_margin;
-
-        debug_assert!(self.position_margin >= M::new_zero());
-        debug_assert!(self.position_margin <= self.wallet_balance);
-        debug_assert!(self.available_balance >= M::new_zero());
-        debug_assert!(self.available_balance <= self.wallet_balance);
+        self.position_margin += amount;
+        Ok(())
     }
 
-    /// Change the balance by a given delta e.g. from realizing profit or loss
-    pub(crate) fn change_balance(&mut self, delta: M) {
-        debug!("change_balance: delta: {}, self: {:?}", delta, self);
-
-        self.wallet_balance += delta;
-        self.available_balance += delta;
-
-        debug_assert!(self.wallet_balance >= M::new_zero());
-        debug_assert!(self.available_balance >= M::new_zero());
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::prelude::*;
-
-    #[test]
-    fn margin_set_order_margin() {
-        let mut margin = Margin::new_init(base!(1.0));
-        margin.set_order_margin(base!(1.0));
-        assert_eq!(margin.wallet_balance, base!(1.0));
-        assert_eq!(margin.position_margin, base!(0.0));
-        assert_eq!(margin.order_margin, base!(1.0));
-        assert_eq!(margin.available_balance, base!(0.0));
+    /// Entirely frees the order margin.
+    #[inline(always)]
+    pub(crate) fn clear_order_margin(&mut self) {
+        self.order_margin = M::new_zero();
     }
 
-    #[test]
-    #[should_panic]
-    fn margin_set_order_margin_panic_0() {
-        let mut margin = Margin::new_init(base!(1.0));
-        margin.set_order_margin(base!(1.01));
+    /// Entirely frees the position margin.
+    #[inline(always)]
+    pub(crate) fn clear_position_margin(&mut self) {
+        self.position_margin = M::new_zero();
     }
 
-    #[test]
-    #[should_panic]
-    fn margin_set_order_margin_panic_1() {
-        let mut margin = Margin::new_init(base!(1.0));
-        margin.set_order_margin(base!(-0.1));
+    /// Unlocks a specific `amount` of order margin.
+    pub(crate) fn unlock_order_margin(&mut self, amount: M) -> Result<()> {
+        if amount > self.order_margin {
+            return Err(Error::NotEnoughOrderMargin);
+        }
+        self.order_margin -= amount;
+
+        Ok(())
     }
 
-    #[test]
-    fn margin_set_position_margin() {
-        // TODO:
-    }
+    /// Unlocks a specific `amount` of position margin.
+    pub(crate) fn free_position_margin(&mut self, amount: M) -> Result<()> {
+        if amount > self.position_margin {
+            return Err(Error::NotEnoughOrderMargin);
+        }
+        self.position_margin -= amount;
 
-    #[test]
-    fn margin_change_balance() {
-        let mut margin = Margin::new_init(base!(1.0));
-
-        margin.change_balance(base!(0.05));
-        assert_eq!(margin.wallet_balance, base!(1.05));
-        assert_eq!(margin.position_margin, base!(0.0));
-        assert_eq!(margin.order_margin, base!(0.0));
-        assert_eq!(margin.available_balance, base!(1.05));
-
-        margin.change_balance(base!(-0.1));
-        assert_eq!(margin.wallet_balance, base!(0.95));
-        assert_eq!(margin.position_margin, base!(0.0));
-        assert_eq!(margin.order_margin, base!(0.0));
-        assert_eq!(margin.available_balance, base!(0.95));
-    }
-
-    #[test]
-    #[should_panic]
-    fn margin_change_balance_panic_0() {
-        let mut margin = Margin::new_init(base!(1.0));
-
-        margin.change_balance(base!(-1.01));
+        Ok(())
     }
 }
