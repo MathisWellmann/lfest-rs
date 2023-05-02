@@ -97,8 +97,11 @@ pub enum Error {
     #[error("Not enough position margin available")]
     NotEnoughPositionMargin,
 
-    #[error("The provided amount it invalid")]
+    #[error("The provided amount is invalid.")]
     InvalidAmount,
+
+    #[error("The provided price is invalid.")]
+    InvalidPrice,
 }
 
 /// This is defined as a convenience.

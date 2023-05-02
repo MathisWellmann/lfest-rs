@@ -8,11 +8,8 @@ use crate::{
 
 #[derive(Debug, Clone, Default)]
 /// Describes the position information of the account
-pub struct Position<S>
-where
-    S: Currency + Default,
-{
-    /// The position size
+pub struct Position<S> {
+    /// The number of futures contracts making up the position.
     size: S,
     /// The entry price of the position
     entry_price: QuoteCurrency,
@@ -20,21 +17,9 @@ where
 
 impl<S> Position<S>
 where
-    S: Currency + Default,
+    S: Currency,
     S::PairedCurrency: MarginCurrency,
 {
-    /// Create a new position with all fields custom.
-    /// NOTE: not usually called, but for advanced use cases
-    ///
-    /// # Panics:
-    /// In debug mode, if inputs don't make sense
-    #[must_use]
-    pub fn new(size: S, entry_price: QuoteCurrency) -> Self {
-        debug_assert!(entry_price >= quote!(0.0));
-
-        Position { size, entry_price }
-    }
-
     /// Return the position size
     #[inline(always)]
     pub fn size(&self) -> S {
@@ -60,15 +45,25 @@ where
         }
     }
 
-    #[inline]
-    pub(crate) fn open_position(&mut self, amount: S, price: QuoteCurrency) {
-        self.size = amount;
+    /// Create a new position with all fields custom.
+    ///
+    /// # Arguments:
+    /// `size`: The position size, negative denoting a negative position.
+    /// `entry_price`: The price at which the position was entered.
+    ///
+    pub(crate) fn open_position(&mut self, size: S, price: QuoteCurrency) -> Result<()> {
+        if price <= quote!(0) {
+            return Err(Error::InvalidPrice);
+        }
+        self.size = size;
         self.entry_price = price;
+
+        Ok(())
     }
 
-    /// Add to a position
-    pub(crate) fn increase_position(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
-        if amount <= S::new_zero() {
+    /// Add to a position.
+    pub(crate) fn increase_long_position(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
+        if amount < S::new_zero() {
             return Err(Error::InvalidAmount);
         }
         let new_size = self.size + amount;
@@ -82,8 +77,42 @@ where
         Ok(())
     }
 
-    /// Reduce the position
-    pub(crate) fn decrease_position(&mut self, amount: S, price: QuoteCurrency) {
+    /// Reduce a long position.
+    ///
+    /// # Arguments:
+    /// `amount`: The amount to decrease the position by, must be smaller or equal to the position size.
+    /// `price`: The price at which it is sold.
+    ///
+    /// # Returns:
+    /// If Ok, the net realized profit and loss for that specific futures contract.
+    pub(crate) fn decrease_long_position(
+        &mut self,
+        amount: S,
+        price: QuoteCurrency,
+    ) -> Result<S::PairedCurrency> {
+        if amount < S::new_zero() || amount > self.size {
+            return Err(Error::InvalidAmount);
+        }
+        self.size = self.size - amount;
+
+        Ok(S::PairedCurrency::pnl(self.entry_price, price, amount))
+    }
+
+    /// Increase a short position
+    pub(crate) fn increase_short_position(
+        &mut self,
+        amount: S,
+        price: QuoteCurrency,
+    ) -> Result<()> {
+        todo!()
+    }
+
+    /// Reduce a short position
+    pub(crate) fn decrease_short_position(
+        &mut self,
+        amount: S,
+        price: QuoteCurrency,
+    ) -> Result<()> {
         todo!()
     }
 }
@@ -94,11 +123,25 @@ mod tests {
     use crate::prelude::*;
 
     #[test]
-    fn increase_position() {
+    fn increase_long_position() {
         let mut pos = Position::default();
-        pos.open_position(quote!(100), quote!(100));
-        pos.increase_position(quote!(150), quote!(120)).unwrap();
+        pos.open_position(quote!(100), quote!(100)).unwrap();
+        pos.increase_long_position(quote!(150), quote!(120))
+            .unwrap();
         assert_eq!(pos.size, quote!(250));
         assert_eq!(pos.entry_price, quote!(112));
+    }
+
+    #[test]
+    fn decrease_long_position() {
+        let mut pos = Position::default();
+        pos.open_position(base!(1), quote!(150)).unwrap();
+        assert!(pos.decrease_long_position(base!(1.1), quote!(150)).is_err());
+        assert_eq!(
+            pos.decrease_long_position(base!(0.5), quote!(160)).unwrap(),
+            quote!(5)
+        );
+        assert_eq!(pos.entry_price, quote!(150));
+        assert_eq!(pos.size, base!(0.5));
     }
 }
