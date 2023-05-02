@@ -1,6 +1,9 @@
 use fpdec::Decimal;
 
-use crate::types::{Fee, QuoteCurrency};
+use crate::{
+    prelude::Leverage,
+    types::{Fee, QuoteCurrency},
+};
 
 /// Every unit of account must implement this trait
 pub trait Currency:
@@ -15,11 +18,12 @@ pub trait Currency:
     + std::ops::Mul<Output = Self>
     + std::ops::Div<Output = Self>
     + std::ops::Rem<Output = Self>
-    // Require to do arithmetic with `Rational` on the right hand side
+    // Require to do arithmetic with `Decimal` on the right hand side
     + std::ops::Add<Decimal, Output = Self>
     + std::ops::Sub<Decimal, Output = Self>
     + std::ops::Mul<Decimal, Output = Self>
     + std::ops::Div<Decimal, Output = Self>
+    + std::ops::Div<Leverage, Output = Self>
     + std::ops::AddAssign
     + std::ops::SubAssign
     + PartialEq

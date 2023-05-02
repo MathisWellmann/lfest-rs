@@ -199,14 +199,33 @@ where
     fn handle_market_order(&mut self, order: Order<S>) -> Result<Order<S>, OrderError> {
         match order.side() {
             Side::Buy => {
-                // TODO: check if position is increased, decreased of crosses
+                if self.account().position().size() >= S::new_zero() {
+                    // increase_long (try reserve margin)
+                    let margin_req = order.quantity().convert(self.ask) / self.config.leverage();
+                    self.account()
+                        .margin()
+                        .lock_as_position_collateral(margin_req)
+                        .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
+                    self.account()
+                        .position()
+                        .increase_long_position(order.quantity(), self.ask)
+                        .expect("Increasing a position here must work; qed");
+                } else {
+                    // TODO: decrease_short (realize pnl)
+                    // TODO: potentially increase_long (try reserve margin)
+                }
                 todo!()
             }
-            Side::Sell => todo!(),
+            Side::Sell => {
+                if self.account().position().size() >= S::new_zero() {
+                    // TODO: decrease_long (realize pnl)
+                    // TODO: potentially increase_short (try reserve margin)
+                } else {
+                    // TODO: increase_short (try reserve margin)
+                }
+                todo!()
+            }
         }
-        // TODO: case 0: No position, pays fee using
-        // TODO: case 1: Has position, reduces it. requires no additional margin, pays fee from the profit
-        todo!()
     }
 
     fn handle_new_limit_order(&mut self, order: Order<S>) -> Result<Order<S>, OrderError> {

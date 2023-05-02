@@ -78,7 +78,7 @@ where
         self.wallet_balance - self.order_margin - self.position_margin
     }
 
-    /// Locks some balance as order collateral.
+    /// Try locking some balance as order collateral.
     pub(crate) fn lock_as_order_collateral(&mut self, amount: M) -> Result<()> {
         let ab = self.available_balance();
         if amount > ab {
@@ -86,10 +86,11 @@ where
         }
 
         self.order_margin += amount;
+
         Ok(())
     }
 
-    /// Locks some balance as position collateral.
+    /// Try locking some balance as position collateral.
     pub(crate) fn lock_as_position_collateral(&mut self, amount: M) -> Result<()> {
         let ab = self.available_balance();
         if amount > ab {
@@ -97,6 +98,7 @@ where
         }
 
         self.position_margin += amount;
+
         Ok(())
     }
 

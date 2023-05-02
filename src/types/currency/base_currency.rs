@@ -4,7 +4,10 @@ use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign}
 use fpdec::Decimal;
 
 use super::MarginCurrency;
-use crate::types::{Currency, Fee, QuoteCurrency};
+use crate::{
+    prelude::Leverage,
+    types::{Currency, Fee, QuoteCurrency},
+};
 
 /// Allows the quick construction of `BaseCurrency`
 #[macro_export]
@@ -136,6 +139,14 @@ impl Rem for BaseCurrency {
 
     fn rem(self, rhs: Self) -> Self::Output {
         Self(self.0 % rhs.0)
+    }
+}
+
+impl Div<Leverage> for BaseCurrency {
+    type Output = Self;
+
+    fn div(self, rhs: Leverage) -> Self::Output {
+        Self(self.0 / rhs.inner())
     }
 }
 
