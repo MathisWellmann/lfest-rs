@@ -40,7 +40,7 @@ pub enum OrderError {
 }
 
 /// Describes possible Errors that may occur when calling methods in this crate
-#[derive(thiserror::Error, Debug, Clone)]
+#[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
 #[allow(missing_docs)]
 pub enum Error {
     #[error("Wrong leverage provided")]

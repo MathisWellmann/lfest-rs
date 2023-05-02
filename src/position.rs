@@ -93,6 +93,9 @@ where
         amount: S,
         price: QuoteCurrency,
     ) -> Result<S::PairedCurrency> {
+        if self.size < S::new_zero() {
+            return Err(Error::OpenShort);
+        }
         if amount < S::new_zero() || amount > self.size {
             return Err(Error::InvalidAmount);
         }
@@ -141,10 +144,19 @@ where
         amount: S,
         price: QuoteCurrency,
     ) -> Result<S::PairedCurrency> {
+        if self.size > S::new_zero() {
+            return Err(Error::OpenLong);
+        }
         if amount < S::new_zero() || amount.into_negative() < self.size {
             return Err(Error::InvalidAmount);
         }
-        todo!()
+        self.size = self.size + amount;
+
+        Ok(S::PairedCurrency::pnl(
+            self.entry_price,
+            price,
+            amount.into_negative(),
+        ))
     }
 }
 
@@ -158,8 +170,19 @@ mod tests {
         let mut pos = Position::default();
         pos.increase_long_position(quote!(150), quote!(120))
             .unwrap();
-        assert_eq!(pos.size, quote!(250));
-        assert_eq!(pos.entry_price, quote!(112));
+        assert_eq!(pos.size, quote!(150));
+        assert_eq!(pos.entry_price, quote!(120));
+
+        pos.increase_long_position(quote!(50), quote!(110)).unwrap();
+        assert_eq!(pos.size, quote!(200));
+        assert_eq!(pos.entry_price, quote!(117.5));
+
+        // Make sure it does not work if a short position is set.
+        pos.size = quote!(-250);
+        assert_eq!(
+            pos.increase_long_position(quote!(150), quote!(120)),
+            Err(Error::OpenShort)
+        );
     }
 
     #[test]
@@ -173,6 +196,13 @@ mod tests {
         );
         assert_eq!(pos.entry_price, quote!(150));
         assert_eq!(pos.size, base!(0.5));
+
+        // Make sure it does not work when a short is set
+        pos.size = base!(-1);
+        assert_eq!(
+            pos.decrease_long_position(base!(0.5), quote!(100)),
+            Err(Error::InvalidAmount)
+        );
     }
 
     #[test]
@@ -181,10 +211,27 @@ mod tests {
         pos.increase_short_position(base!(1), quote!(100)).unwrap();
         assert_eq!(pos.size, base!(-1));
         assert_eq!(pos.entry_price, quote!(100));
+
+        // Make sure it does not work with a long posiion
+        pos.size = base!(1);
+        assert_eq!(
+            pos.increase_short_position(base!(1), quote!(100)),
+            Err(Error::OpenLong)
+        );
     }
 
     #[test]
     fn decrease_short_position() {
-        todo!()
+        let mut pos = Position::default();
+        assert_eq!(
+            pos.decrease_short_position(base!(1), quote!(100)),
+            Err(Error::InvalidAmount)
+        );
+
+        pos.open_position(base!(-1), quote!(100)).unwrap();
+        assert_eq!(
+            pos.decrease_short_position(base!(0.5), quote!(90)).unwrap(),
+            quote!(5)
+        );
     }
 }
