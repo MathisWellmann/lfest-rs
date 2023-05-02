@@ -102,6 +102,12 @@ pub enum Error {
 
     #[error("The provided price is invalid.")]
     InvalidPrice,
+
+    #[error("The long position needs to be closed first.")]
+    OpenLong,
+
+    #[error("The short position needs to be closed first.")]
+    OpenShort,
 }
 
 /// This is defined as a convenience.

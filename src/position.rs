@@ -66,6 +66,9 @@ where
         if amount < S::new_zero() {
             return Err(Error::InvalidAmount);
         }
+        if self.size < S::new_zero() {
+            return Err(Error::OpenShort);
+        }
         let new_size = self.size + amount;
         self.entry_price = QuoteCurrency::new(
             (self.entry_price * self.size.inner() + price * amount.inner()).inner()
@@ -98,21 +101,49 @@ where
         Ok(S::PairedCurrency::pnl(self.entry_price, price, amount))
     }
 
-    /// Increase a short position
+    /// Increase a short position.
+    ///
+    /// # Arguments:
+    /// `amount`: An absolute amount.
+    /// `price`: The entry price.
     pub(crate) fn increase_short_position(
         &mut self,
         amount: S,
         price: QuoteCurrency,
     ) -> Result<()> {
-        todo!()
+        if amount < S::new_zero() {
+            return Err(Error::InvalidAmount);
+        }
+        if self.size > S::new_zero() {
+            return Err(Error::OpenLong);
+        }
+
+        let new_size = self.size - amount;
+        self.entry_price = QuoteCurrency::new(
+            (self.entry_price * self.size.inner().abs() + price * amount.inner()).inner()
+                / new_size.inner().abs(),
+        );
+        self.size = new_size;
+
+        Ok(())
     }
 
     /// Reduce a short position
+    ///
+    /// # Arguments:
+    /// `amount`: An absolute amount.
+    /// `price`: The entry price.
+    ///
+    /// # Returns:
+    /// If Ok, the net realized profit and loss for that specific futures contract.
     pub(crate) fn decrease_short_position(
         &mut self,
         amount: S,
         price: QuoteCurrency,
-    ) -> Result<()> {
+    ) -> Result<S::PairedCurrency> {
+        if amount < S::new_zero() || amount.into_negative() < self.size {
+            return Err(Error::InvalidAmount);
+        }
         todo!()
     }
 }
@@ -125,7 +156,6 @@ mod tests {
     #[test]
     fn increase_long_position() {
         let mut pos = Position::default();
-        pos.open_position(quote!(100), quote!(100)).unwrap();
         pos.increase_long_position(quote!(150), quote!(120))
             .unwrap();
         assert_eq!(pos.size, quote!(250));
@@ -143,5 +173,18 @@ mod tests {
         );
         assert_eq!(pos.entry_price, quote!(150));
         assert_eq!(pos.size, base!(0.5));
+    }
+
+    #[test]
+    fn increase_short_position() {
+        let mut pos = Position::default();
+        pos.increase_short_position(base!(1), quote!(100)).unwrap();
+        assert_eq!(pos.size, base!(-1));
+        assert_eq!(pos.entry_price, quote!(100));
+    }
+
+    #[test]
+    fn decrease_short_position() {
+        todo!()
     }
 }
