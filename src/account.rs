@@ -23,6 +23,7 @@ where
     account_tracker: A,
     margin: Margin<S::PairedCurrency>,
     position: Position<S>,
+    leverage: Leverage,
     active_limit_orders: HashMap<u64, Order<S>>,
     lookup_id_from_user_order_id: HashMap<u64, u64>,
     executed_orders: Vec<Order<S>>,
@@ -46,6 +47,7 @@ where
             account_tracker,
             margin,
             position,
+            leverage,
             active_limit_orders: HashMap::new(),
             lookup_id_from_user_order_id: HashMap::new(),
             executed_orders: vec![],
@@ -199,6 +201,46 @@ where
         //     fee_maker,
         // );
         // self.margin.set_order_margin(new_om);
+    }
+
+    /// Tries to increase a long (or neutral) position of the account.
+    ///
+    /// # Arguments:
+    /// `amount`: The absolute amount by which to incrase.
+    /// `price`: The execution price.
+    ///
+    /// # Returns:
+    /// If Err, then there was not enough available balance.
+    /// Ok if successfull.
+    pub(crate) fn try_increase_long(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
+        // increase_long (try reserve margin)
+        let margin_req = amount.convert(price) / self.leverage;
+        self.margin.lock_as_position_collateral(margin_req)?;
+        self.position
+            .increase_long_position(amount, price)
+            .expect("Increasing a position here must work; qed");
+
+        Ok(())
+    }
+
+    /// Tries to increase a short (or neutral) position of the account.
+    ///
+    /// # Arguments:
+    /// `amount`: The absolute amount by which to incrase.
+    /// `price`: The execution price.
+    ///
+    /// # Returns:
+    /// If Err, then there was not enough available balance.
+    /// Ok if successfull.
+    pub(crate) fn try_increase_short(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
+        // increase_short (try reserve margin)
+        let margin_req = amount.convert(price) / self.leverage;
+        self.margin.lock_as_position_collateral(margin_req)?;
+        self.position
+            .increase_short_position(amount, price)
+            .expect("Increasing a position here must work; qed");
+
+        Ok(())
     }
 }
 

@@ -200,16 +200,9 @@ where
         match order.side() {
             Side::Buy => {
                 if self.account().position().size() >= S::new_zero() {
-                    // increase_long (try reserve margin)
-                    let margin_req = order.quantity().convert(self.ask) / self.config.leverage();
-                    self.account()
-                        .margin()
-                        .lock_as_position_collateral(margin_req)
+                    self.user_account
+                        .try_increase_long(order.quantity(), self.ask)
                         .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
-                    self.account()
-                        .position()
-                        .increase_long_position(order.quantity(), self.ask)
-                        .expect("Increasing a position here must work; qed");
                 } else {
                     // TODO: decrease_short (realize pnl)
                     // TODO: potentially increase_long (try reserve margin)
@@ -221,7 +214,9 @@ where
                     // TODO: decrease_long (realize pnl)
                     // TODO: potentially increase_short (try reserve margin)
                 } else {
-                    // TODO: increase_short (try reserve margin)
+                    self.user_account
+                        .try_increase_long(order.quantity(), self.bid)
+                        .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
                 }
                 todo!()
             }
