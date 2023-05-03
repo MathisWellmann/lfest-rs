@@ -27,6 +27,7 @@ where
     active_limit_orders: HashMap<u64, Order<S>>,
     lookup_id_from_user_order_id: HashMap<u64, u64>,
     executed_orders: Vec<Order<S>>,
+    taker_fee: Fee,
 }
 
 impl<A, S> Account<A, S>
@@ -39,6 +40,7 @@ where
         account_tracker: A,
         leverage: Leverage,
         starting_balance: S::PairedCurrency,
+        taker_fee: Fee,
     ) -> Self {
         let position = Position::default();
         let margin = Margin::new_init(starting_balance);
@@ -51,6 +53,7 @@ where
             active_limit_orders: HashMap::new(),
             lookup_id_from_user_order_id: HashMap::new(),
             executed_orders: vec![],
+            taker_fee,
         }
     }
 
@@ -214,17 +217,62 @@ where
     /// Ok if successfull.
     pub(crate) fn try_increase_long(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
         if amount < S::new_zero() {
-            return Err(Error::NonPositive);
+            return Err(Error::InvalidAmount);
         }
         if price < quote!(0) {
-            return Err(Error::NonPositive);
+            return Err(Error::InvalidPrice);
+        }
+        if self.position.size() < S::new_zero() {
+            return Err(Error::OpenShort);
         }
 
-        let margin_req = amount.convert(price) / self.leverage;
-        self.margin.lock_as_position_collateral(margin_req)?;
+        let value = amount.convert(price);
+        let margin_req = value / self.leverage;
+        let margin_with_fee = margin_req + value * self.taker_fee;
+        self.margin.lock_as_position_collateral(margin_with_fee)?;
         self.position
             .increase_long(amount, price)
             .expect("Increasing a position here must work; qed");
+
+        Ok(())
+    }
+
+    /// Decrease a long position, realizing pnl while doing so.
+    ///
+    /// # Arguments:
+    /// `amount`: The absolute amount to decrease by, must be smaller or equal to the existing long `size`.
+    /// `price`: The execution price, determines the pnl.
+    ///
+    /// # Returns:
+    /// If Err the transaction failed, but due to the atomic nature of this call nothing happens.
+    pub(crate) fn try_decrease_long(
+        &mut self,
+        amount: S,
+        price: QuoteCurrency,
+        fee: Fee,
+        ts_ns: i64,
+    ) -> Result<()> {
+        if amount <= S::new_zero() {
+            return Err(Error::InvalidAmount);
+        }
+        if price < quote!(0) {
+            return Err(Error::InvalidPrice);
+        }
+        if self.position.size() <= S::new_zero() {
+            return Err(Error::OpenShort);
+        }
+
+        let value = amount.convert(price);
+        let margin_to_unlock = value / self.leverage;
+        let pnl = self.position.decrease_long(amount, price)?;
+        self.margin
+            .unlock_position_margin(margin_to_unlock)
+            .expect("Margin must have been locked and is now freed; qed");
+
+        let fees = value * fee;
+        // Fee just vanishes as there is no one to benefit from the fee.
+        let net_pnl = pnl - fees;
+        self.realize_pnl(net_pnl, ts_ns);
 
         Ok(())
     }
@@ -240,10 +288,10 @@ where
     /// Ok if successfull.
     pub(crate) fn try_increase_short(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
         if amount < S::new_zero() {
-            return Err(Error::NonPositive);
+            return Err(Error::InvalidAmount);
         }
         if price < quote!(0) {
-            return Err(Error::NonPositive);
+            return Err(Error::InvalidPrice);
         }
 
         let margin_req = amount.convert(price) / self.leverage;
@@ -251,40 +299,6 @@ where
         self.position
             .increase_short(amount, price)
             .expect("Increasing a position here must work; qed");
-
-        Ok(())
-    }
-
-    /// Decrease a long position, realizing pnl while doing so.
-    ///
-    /// # Arguments:
-    /// `amount`: The absolute amount to decrease by, must be smaller or equal to the existing long `size`.
-    /// `price`: The execution price, determines the pnl.
-    ///
-    /// # Returns:
-    /// If Err the transaction failed, but due to the atomic nature of this call nothing happens.
-    pub(crate) fn decrease_long(
-        &mut self,
-        amount: S,
-        price: QuoteCurrency,
-        fee: Fee,
-        ts_ns: i64,
-    ) -> Result<()> {
-        if amount <= S::new_zero() {
-            return Err(Error::NonPositive);
-        }
-        if price < quote!(0) {
-            return Err(Error::NonPositive);
-        }
-        if self.position.size() <= S::new_zero() {
-            return Err(Error::OpenShort);
-        }
-
-        let pnl = self.position.decrease_long(amount, price)?;
-        let fees = amount.convert(price) * fee;
-        // Fee just vanishes as there is no one to benefit from the fee.
-        let net_pnl = pnl - fees;
-        self.realize_pnl(net_pnl, ts_ns);
 
         Ok(())
     }
@@ -297,7 +311,7 @@ where
     ///
     /// # Returns:
     /// If Err the transaction failed, but due to the atomic nature of this call nothing happens.
-    pub(crate) fn decrease_short(
+    pub(crate) fn try_decrease_short(
         &mut self,
         amount: S,
         price: QuoteCurrency,
@@ -305,10 +319,10 @@ where
         ts_ns: i64,
     ) -> Result<()> {
         if amount <= S::new_zero() {
-            return Err(Error::NonPositive);
+            return Err(Error::InvalidAmount);
         }
         if price < quote!(0) {
-            return Err(Error::NonPositive);
+            return Err(Error::InvalidPrice);
         }
         if self.position.size() >= S::new_zero() {
             return Err(Error::OpenLong);
@@ -335,7 +349,7 @@ where
     /// 0. ensuring there is enough balance, all things considered.
     /// 1. reducing the *existing* long position.
     /// 2. entering a new short
-    pub(crate) fn turn_around_long(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
+    pub(crate) fn try_turn_around_long(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
         if amount < S::new_zero() {
             return Err(Error::NonPositive);
         }
@@ -350,7 +364,7 @@ where
     /// 0. ensuring there is enough balance, all things considered.
     /// 1. reducing the *existing* long position.
     /// 2. entering a new short
-    pub(crate) fn turn_around_short(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
+    pub(crate) fn try_turn_around_short(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
         if amount < S::new_zero() {
             return Err(Error::NonPositive);
         }
@@ -365,18 +379,75 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{account_tracker::NoAccountTracker, base, leverage, prelude::BaseCurrency};
+    use crate::{account_tracker::NoAccountTracker, base, fee, leverage, prelude::BaseCurrency};
 
+    /// Create a new mock account for testing.
     fn mock_account() -> Account<NoAccountTracker, BaseCurrency> {
-        Account::new(NoAccountTracker::default(), leverage!(1), quote!(1000))
+        Account::new(
+            NoAccountTracker::default(),
+            leverage!(1),
+            quote!(1000),
+            fee!(0.001),
+        )
     }
 
     #[test]
     fn account_try_increase_long() {
         let mut acc = mock_account();
-        acc.try_increase_long(base!(1), quote!(100)).unwrap();
+        assert_eq!(
+            acc.try_increase_long(base!(-1), quote!(100)),
+            Err(Error::InvalidAmount)
+        );
+        assert_eq!(
+            acc.try_increase_long(base!(1), quote!(-100)),
+            Err(Error::InvalidPrice)
+        );
 
-        todo!()
+        acc.try_increase_long(base!(1), quote!(100)).unwrap();
+        assert_eq!(
+            acc.margin,
+            // + taker fee locked as position margin
+            Margin::new(quote!(1000), quote!(100) + quote!(0.1), quote!(0)).unwrap()
+        );
+        assert_eq!(acc.position, Position::new(base!(1), quote!(100)),);
+
+        // make sure it does not work with a short position
+        acc.position = Position::new(base!(-1), quote!(100));
+        assert_eq!(
+            acc.try_increase_long(base!(0.5), quote!(100)),
+            Err(Error::OpenShort)
+        );
+    }
+
+    #[test]
+    fn account_try_decrease_long() {
+        let mut acc = mock_account();
+        let fee = fee!(0.001);
+        let ts_ns = 0;
+
+        assert_eq!(
+            acc.try_decrease_long(base!(-1), quote!(100), fee, ts_ns),
+            Err(Error::InvalidAmount)
+        );
+        assert_eq!(
+            acc.try_decrease_long(base!(1), quote!(-100), fee, ts_ns),
+            Err(Error::InvalidPrice)
+        );
+
+        acc.try_increase_long(base!(1), quote!(100)).unwrap();
+        assert_eq!(
+            acc.try_decrease_long(base!(1.1), quote!(100), fee, ts_ns),
+            Err(Error::InvalidAmount)
+        );
+
+        acc.try_decrease_long(base!(1), quote!(110), fee, ts_ns)
+            .unwrap();
+        assert_eq!(
+            acc.margin,
+            // - fee
+            Margin::new(quote!(1010) - quote!(0.11), quote!(0), quote!(0)).unwrap()
+        );
+        assert_eq!(acc.position, Position::new(base!(0), quote!(100)));
     }
 
     #[test]

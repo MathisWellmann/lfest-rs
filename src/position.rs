@@ -6,7 +6,7 @@ use crate::{
     types::{Currency, MarginCurrency, QuoteCurrency},
 };
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 /// Describes the position information of the account
 pub struct Position<S> {
     /// The number of futures contracts making up the position.
@@ -20,6 +20,11 @@ where
     S: Currency,
     S::PairedCurrency: MarginCurrency,
 {
+    #[cfg(test)]
+    pub(crate) fn new(size: S, entry_price: QuoteCurrency) -> Self {
+        Self { size, entry_price }
+    }
+
     /// Return the position size
     #[inline(always)]
     pub fn size(&self) -> S {

@@ -41,6 +41,7 @@ where
             account_tracker,
             config.leverage(),
             config.starting_balance(),
+            config.fee_taker(),
         );
 
         Self {
@@ -207,12 +208,12 @@ where
                 } else {
                     if order.quantity() > self.account().position().size().abs() {
                         self.user_account
-                            .turn_around_short(order.quantity(), price)
+                            .try_turn_around_short(order.quantity(), price)
                             .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
                     } else {
                         // decrease short and realize pnl.
                         self.user_account
-                            .decrease_short(
+                            .try_decrease_short(
                                 order.quantity(),
                                 price,
                                 self.config.fee_taker(),
@@ -227,12 +228,12 @@ where
                 if self.account().position().size() >= S::new_zero() {
                     if order.quantity() > self.user_account.position().size() {
                         self.user_account
-                            .turn_around_long(order.quantity(), price)
+                            .try_turn_around_long(order.quantity(), price)
                             .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
                     } else {
                         // decrease_long and realize pnl.
                         self.user_account
-                            .decrease_long(
+                            .try_decrease_long(
                                 order.quantity(),
                                 price,
                                 self.config.fee_taker(),

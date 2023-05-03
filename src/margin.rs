@@ -5,7 +5,7 @@ use crate::{
     types::Currency,
 };
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
 /// Describes the margin information of the account
 pub struct Margin<M> {
     /// The wallet balance of account
@@ -125,7 +125,7 @@ where
     }
 
     /// Unlocks a specific `amount` of position margin.
-    pub(crate) fn free_position_margin(&mut self, amount: M) -> Result<()> {
+    pub(crate) fn unlock_position_margin(&mut self, amount: M) -> Result<()> {
         if amount > self.position_margin {
             return Err(Error::NotEnoughOrderMargin);
         }
