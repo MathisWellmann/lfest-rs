@@ -26,3 +26,12 @@ impl Fee {
         self.0
     }
 }
+
+/// The two types of fees in the maker-taker model.
+#[derive(Debug, Clone)]
+pub enum FeeType {
+    /// The fee limit orders pay.
+    Maker(Fee),
+    /// The fee market orders pay.
+    Taker(Fee),
+}

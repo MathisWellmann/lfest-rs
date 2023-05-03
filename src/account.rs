@@ -6,6 +6,7 @@ use crate::{
     errors::{Error, Result},
     margin::Margin,
     position::Position,
+    prelude::FeeType,
     quote,
     types::{Currency, Fee, Leverage, MarginCurrency, Order, QuoteCurrency},
 };
@@ -213,7 +214,6 @@ where
     /// If Err, then there was not enough available balance.
     /// Ok if successfull.
     pub(crate) fn try_increase_long(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
-        // increase_long (try reserve margin)
         let margin_req = amount.convert(price) / self.leverage;
         self.margin.lock_as_position_collateral(margin_req)?;
         self.position
@@ -233,7 +233,6 @@ where
     /// If Err, then there was not enough available balance.
     /// Ok if successfull.
     pub(crate) fn try_increase_short(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
-        // increase_short (try reserve margin)
         let margin_req = amount.convert(price) / self.leverage;
         self.margin.lock_as_position_collateral(margin_req)?;
         self.position
@@ -241,6 +240,65 @@ where
             .expect("Increasing a position here must work; qed");
 
         Ok(())
+    }
+
+    /// Decrease a long position, realizing pnl while doing so.
+    ///
+    /// # Arguments:
+    /// `amount`: The absolute amount to decrease by, must be smaller or equal to the existing long `size`.
+    /// `price`: The execution price, determines the pnl.
+    ///
+    /// # Returns:
+    /// If Ok, the realized pnl net of transaction fee.
+    /// Else some provided argument is invalid.
+    pub(crate) fn decrease_long(
+        &mut self,
+        amount: S,
+        price: QuoteCurrency,
+        fee_type: FeeType,
+    ) -> Result<S::PairedCurrency> {
+        todo!()
+    }
+
+    /// Decrease a short position, realizing pnl while doing so.
+    ///
+    /// # Arguments:
+    /// `amount`: The absolute amount to decrease by, must be smaller or equal to the existing long `size`.
+    /// `price`: The execution price, determines the pnl.
+    ///
+    /// # Returns:
+    /// If Ok, the realized pnl net of transaction fee.
+    /// Else some provided argument is invalid.
+    pub(crate) fn decrease_short(
+        &mut self,
+        amount: S,
+        price: QuoteCurrency,
+        fee_type: FeeType,
+    ) -> Result<S::PairedCurrency> {
+        todo!()
+    }
+
+    /// Realize profit and loss, denoted in the margin currency.
+    #[inline(always)]
+    pub(crate) fn realize_pnl(&mut self, pnl: S::PairedCurrency) {
+        // TODO: log in `AccountTracker`
+        self.margin.realize_pnl(pnl)
+    }
+
+    /// Turn a long position into a short one by,
+    /// 0. ensuring there is enough balance, all things considered.
+    /// 1. reducing the *existing* long position.
+    /// 2. entering a new short
+    pub(crate) fn turn_around_long(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
+        todo!()
+    }
+
+    /// Turn a short position into a long one by,
+    /// 0. ensuring there is enough balance, all things considered.
+    /// 1. reducing the *existing* long position.
+    /// 2. entering a new short
+    pub(crate) fn turn_around_short(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
+        todo!()
     }
 }
 

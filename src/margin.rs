@@ -133,4 +133,10 @@ where
 
         Ok(())
     }
+
+    /// Realize a profit and loss, denoted in the margin currency.
+    #[inline(always)]
+    pub(crate) fn realize_pnl(&mut self, pnl: M) {
+        self.wallet_balance += pnl;
+    }
 }

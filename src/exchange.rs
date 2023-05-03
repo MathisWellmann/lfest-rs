@@ -5,7 +5,7 @@ use crate::{
     account_tracker::AccountTracker,
     config::Config,
     errors::{Error, OrderError},
-    prelude::Side,
+    prelude::{FeeType, Side},
     quote,
     types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, QuoteCurrency},
 };
@@ -196,31 +196,63 @@ where
         }
     }
 
-    fn handle_market_order(&mut self, order: Order<S>) -> Result<Order<S>, OrderError> {
+    fn handle_market_order(&mut self, mut order: Order<S>) -> Result<Order<S>, OrderError> {
         match order.side() {
             Side::Buy => {
+                let price = self.ask;
                 if self.account().position().size() >= S::new_zero() {
                     self.user_account
-                        .try_increase_long(order.quantity(), self.ask)
+                        .try_increase_long(order.quantity(), price)
                         .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
                 } else {
-                    // TODO: decrease_short (realize pnl)
-                    // TODO: potentially increase_long (try reserve margin)
+                    if order.quantity() > self.account().position().size().abs() {
+                        self.user_account
+                            .turn_around_short(order.quantity(), price)
+                            .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
+                    } else {
+                        // decrease short and realize pnl.
+                        let net_pnl = self
+                            .user_account
+                            .decrease_short(
+                                order.quantity(),
+                                price,
+                                FeeType::Taker(self.config.fee_taker()),
+                            )
+                            .expect("Must be valid; qed");
+                        self.user_account.realize_pnl(net_pnl);
+                    }
                 }
-                todo!()
             }
             Side::Sell => {
+                let price = self.bid;
                 if self.account().position().size() >= S::new_zero() {
-                    // TODO: decrease_long (realize pnl)
-                    // TODO: potentially increase_short (try reserve margin)
+                    if order.quantity() > self.user_account.position().size() {
+                        self.user_account
+                            .turn_around_long(order.quantity(), price)
+                            .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
+                    } else {
+                        // decrease_long and realize pnl.
+                        let net_pnl = self
+                            .user_account
+                            .decrease_long(
+                                order.quantity(),
+                                price,
+                                FeeType::Taker(self.config.fee_taker()),
+                            )
+                            .expect("All inputs are valid; qed");
+                        self.user_account.realize_pnl(net_pnl);
+                    }
                 } else {
                     self.user_account
-                        .try_increase_long(order.quantity(), self.bid)
+                        .try_increase_short(order.quantity(), price)
                         .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
                 }
                 todo!()
             }
         }
+        order.mark_executed();
+
+        Ok(order)
     }
 
     fn handle_new_limit_order(&mut self, order: Order<S>) -> Result<Order<S>, OrderError> {
