@@ -62,7 +62,7 @@ where
     }
 
     /// Add to a position.
-    pub(crate) fn increase_long_position(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
+    pub(crate) fn increase_long(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
         if amount < S::new_zero() {
             return Err(Error::InvalidAmount);
         }
@@ -135,7 +135,7 @@ where
     ///
     /// # Returns:
     /// If Ok, the net realized profit and loss for that specific futures contract.
-    pub(crate) fn decrease_short_position(
+    pub(crate) fn decrease_short(
         &mut self,
         amount: S,
         price: QuoteCurrency,
@@ -164,19 +164,18 @@ mod tests {
     #[test]
     fn increase_long_position() {
         let mut pos = Position::default();
-        pos.increase_long_position(quote!(150), quote!(120))
-            .unwrap();
+        pos.increase_long(quote!(150), quote!(120)).unwrap();
         assert_eq!(pos.size, quote!(150));
         assert_eq!(pos.entry_price, quote!(120));
 
-        pos.increase_long_position(quote!(50), quote!(110)).unwrap();
+        pos.increase_long(quote!(50), quote!(110)).unwrap();
         assert_eq!(pos.size, quote!(200));
         assert_eq!(pos.entry_price, quote!(117.5));
 
         // Make sure it does not work if a short position is set.
         pos.size = quote!(-250);
         assert_eq!(
-            pos.increase_long_position(quote!(150), quote!(120)),
+            pos.increase_long(quote!(150), quote!(120)),
             Err(Error::OpenShort)
         );
     }
@@ -220,13 +219,13 @@ mod tests {
     fn decrease_short_position() {
         let mut pos = Position::default();
         assert_eq!(
-            pos.decrease_short_position(base!(1), quote!(100)),
+            pos.decrease_short(base!(1), quote!(100)),
             Err(Error::InvalidAmount)
         );
 
         pos.open_position(base!(-1), quote!(100)).unwrap();
         assert_eq!(
-            pos.decrease_short_position(base!(0.5), quote!(90)).unwrap(),
+            pos.decrease_short(base!(0.5), quote!(90)).unwrap(),
             quote!(5)
         );
     }

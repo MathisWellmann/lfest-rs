@@ -223,7 +223,7 @@ where
         let margin_req = amount.convert(price) / self.leverage;
         self.margin.lock_as_position_collateral(margin_req)?;
         self.position
-            .increase_long_position(amount, price)
+            .increase_long(amount, price)
             .expect("Increasing a position here must work; qed");
 
         Ok(())
@@ -262,14 +262,14 @@ where
     /// `price`: The execution price, determines the pnl.
     ///
     /// # Returns:
-    /// If Ok, the realized pnl net of transaction fee.
-    /// Else some provided argument is invalid.
+    /// If Err the transaction failed, but due to the atomic nature of this call nothing happens.
     pub(crate) fn decrease_long(
         &mut self,
         amount: S,
         price: QuoteCurrency,
         fee: Fee,
-    ) -> Result<S::PairedCurrency> {
+        ts_ns: i64,
+    ) -> Result<()> {
         if amount <= S::new_zero() {
             return Err(Error::NonPositive);
         }
@@ -282,9 +282,11 @@ where
 
         let pnl = self.position.decrease_long(amount, price)?;
         let fees = amount.convert(price) * fee;
+        // Fee just vanishes as there is no one to benefit from the fee.
         let net_pnl = pnl - fees;
+        self.realize_pnl(net_pnl, ts_ns);
 
-        todo!()
+        Ok(())
     }
 
     /// Decrease a short position, realizing pnl while doing so.
@@ -294,14 +296,14 @@ where
     /// `price`: The execution price, determines the pnl.
     ///
     /// # Returns:
-    /// If Ok, the realized pnl net of transaction fee.
-    /// Else some provided argument is invalid.
+    /// If Err the transaction failed, but due to the atomic nature of this call nothing happens.
     pub(crate) fn decrease_short(
         &mut self,
         amount: S,
         price: QuoteCurrency,
         fee: Fee,
-    ) -> Result<S::PairedCurrency> {
+        ts_ns: i64,
+    ) -> Result<()> {
         if amount <= S::new_zero() {
             return Err(Error::NonPositive);
         }
@@ -312,14 +314,21 @@ where
             return Err(Error::OpenLong);
         }
 
-        todo!()
+        let pnl = self.position.decrease_short(amount, price)?;
+        let fees = amount.convert(price) * fee;
+        // Fee just vanishes as there is no one to benefit from the fee.
+        let net_pnl = pnl - fees;
+        self.realize_pnl(net_pnl, ts_ns);
+
+        Ok(())
     }
 
     /// Realize profit and loss, denoted in the margin currency.
+    /// Note the rpnl event.
     #[inline(always)]
-    pub(crate) fn realize_pnl(&mut self, pnl: S::PairedCurrency) {
-        // TODO: log in `AccountTracker`
-        self.margin.realize_pnl(pnl)
+    pub(crate) fn realize_pnl(&mut self, pnl: S::PairedCurrency, ts_ns: i64) {
+        self.margin.realize_pnl(pnl);
+        self.account_tracker.log_rpnl(pnl, ts_ns);
     }
 
     /// Turn a long position into a short one by,

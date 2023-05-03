@@ -211,11 +211,14 @@ where
                             .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
                     } else {
                         // decrease short and realize pnl.
-                        let net_pnl = self
-                            .user_account
-                            .decrease_short(order.quantity(), price, self.config.fee_taker())
+                        self.user_account
+                            .decrease_short(
+                                order.quantity(),
+                                price,
+                                self.config.fee_taker(),
+                                self.current_ts_ns,
+                            )
                             .expect("Must be valid; qed");
-                        self.user_account.realize_pnl(net_pnl);
                     }
                 }
             }
@@ -228,11 +231,14 @@ where
                             .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
                     } else {
                         // decrease_long and realize pnl.
-                        let net_pnl = self
-                            .user_account
-                            .decrease_long(order.quantity(), price, self.config.fee_taker())
+                        self.user_account
+                            .decrease_long(
+                                order.quantity(),
+                                price,
+                                self.config.fee_taker(),
+                                self.current_ts_ns,
+                            )
                             .expect("All inputs are valid; qed");
-                        self.user_account.realize_pnl(net_pnl);
                     }
                 } else {
                     self.user_account
