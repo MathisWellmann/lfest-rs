@@ -5,7 +5,7 @@ use crate::{
     account_tracker::AccountTracker,
     config::Config,
     errors::{Error, OrderError},
-    prelude::{FeeType, Side},
+    prelude::Side,
     quote,
     types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, QuoteCurrency},
 };
@@ -213,11 +213,7 @@ where
                         // decrease short and realize pnl.
                         let net_pnl = self
                             .user_account
-                            .decrease_short(
-                                order.quantity(),
-                                price,
-                                FeeType::Taker(self.config.fee_taker()),
-                            )
+                            .decrease_short(order.quantity(), price, self.config.fee_taker())
                             .expect("Must be valid; qed");
                         self.user_account.realize_pnl(net_pnl);
                     }
@@ -234,11 +230,7 @@ where
                         // decrease_long and realize pnl.
                         let net_pnl = self
                             .user_account
-                            .decrease_long(
-                                order.quantity(),
-                                price,
-                                FeeType::Taker(self.config.fee_taker()),
-                            )
+                            .decrease_long(order.quantity(), price, self.config.fee_taker())
                             .expect("All inputs are valid; qed");
                         self.user_account.realize_pnl(net_pnl);
                     }

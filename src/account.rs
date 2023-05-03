@@ -6,7 +6,6 @@ use crate::{
     errors::{Error, Result},
     margin::Margin,
     position::Position,
-    prelude::FeeType,
     quote,
     types::{Currency, Fee, Leverage, MarginCurrency, Order, QuoteCurrency},
 };
@@ -214,6 +213,13 @@ where
     /// If Err, then there was not enough available balance.
     /// Ok if successfull.
     pub(crate) fn try_increase_long(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
+        if amount < S::new_zero() {
+            return Err(Error::NonPositive);
+        }
+        if price < quote!(0) {
+            return Err(Error::NonPositive);
+        }
+
         let margin_req = amount.convert(price) / self.leverage;
         self.margin.lock_as_position_collateral(margin_req)?;
         self.position
@@ -233,10 +239,17 @@ where
     /// If Err, then there was not enough available balance.
     /// Ok if successfull.
     pub(crate) fn try_increase_short(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
+        if amount < S::new_zero() {
+            return Err(Error::NonPositive);
+        }
+        if price < quote!(0) {
+            return Err(Error::NonPositive);
+        }
+
         let margin_req = amount.convert(price) / self.leverage;
         self.margin.lock_as_position_collateral(margin_req)?;
         self.position
-            .increase_short_position(amount, price)
+            .increase_short(amount, price)
             .expect("Increasing a position here must work; qed");
 
         Ok(())
@@ -255,8 +268,22 @@ where
         &mut self,
         amount: S,
         price: QuoteCurrency,
-        fee_type: FeeType,
+        fee: Fee,
     ) -> Result<S::PairedCurrency> {
+        if amount <= S::new_zero() {
+            return Err(Error::NonPositive);
+        }
+        if price < quote!(0) {
+            return Err(Error::NonPositive);
+        }
+        if self.position.size() <= S::new_zero() {
+            return Err(Error::OpenShort);
+        }
+
+        let pnl = self.position.decrease_long(amount, price)?;
+        let fees = amount.convert(price) * fee;
+        let net_pnl = pnl - fees;
+
         todo!()
     }
 
@@ -273,8 +300,18 @@ where
         &mut self,
         amount: S,
         price: QuoteCurrency,
-        fee_type: FeeType,
+        fee: Fee,
     ) -> Result<S::PairedCurrency> {
+        if amount <= S::new_zero() {
+            return Err(Error::NonPositive);
+        }
+        if price < quote!(0) {
+            return Err(Error::NonPositive);
+        }
+        if self.position.size() >= S::new_zero() {
+            return Err(Error::OpenLong);
+        }
+
         todo!()
     }
 
@@ -290,6 +327,13 @@ where
     /// 1. reducing the *existing* long position.
     /// 2. entering a new short
     pub(crate) fn turn_around_long(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
+        if amount < S::new_zero() {
+            return Err(Error::NonPositive);
+        }
+        if price < quote!(0) {
+            return Err(Error::NonPositive);
+        }
+
         todo!()
     }
 
@@ -298,12 +342,34 @@ where
     /// 1. reducing the *existing* long position.
     /// 2. entering a new short
     pub(crate) fn turn_around_short(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
+        if amount < S::new_zero() {
+            return Err(Error::NonPositive);
+        }
+        if price < quote!(0) {
+            return Err(Error::NonPositive);
+        }
+
         todo!()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::{account_tracker::NoAccountTracker, base, leverage, prelude::BaseCurrency};
+
+    fn mock_account() -> Account<NoAccountTracker, BaseCurrency> {
+        Account::new(NoAccountTracker::default(), leverage!(1), quote!(1000))
+    }
+
+    #[test]
+    fn account_try_increase_long() {
+        let mut acc = mock_account();
+        acc.try_increase_long(base!(1), quote!(100)).unwrap();
+
+        todo!()
+    }
+
     #[test]
     fn account_append_limit_order() {
         if let Err(_) = pretty_env_logger::try_init() {}

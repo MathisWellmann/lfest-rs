@@ -24,6 +24,7 @@ pub trait Currency:
     + std::ops::Mul<Decimal, Output = Self>
     + std::ops::Div<Decimal, Output = Self>
     + std::ops::Div<Leverage, Output = Self>
+    + std::ops::Mul<Fee, Output = Self>
     + std::ops::AddAssign
     + std::ops::SubAssign
     + PartialEq

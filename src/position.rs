@@ -88,7 +88,7 @@ where
     ///
     /// # Returns:
     /// If Ok, the net realized profit and loss for that specific futures contract.
-    pub(crate) fn decrease_long_position(
+    pub(crate) fn decrease_long(
         &mut self,
         amount: S,
         price: QuoteCurrency,
@@ -109,11 +109,7 @@ where
     /// # Arguments:
     /// `amount`: An absolute amount.
     /// `price`: The entry price.
-    pub(crate) fn increase_short_position(
-        &mut self,
-        amount: S,
-        price: QuoteCurrency,
-    ) -> Result<()> {
+    pub(crate) fn increase_short(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
         if amount < S::new_zero() {
             return Err(Error::InvalidAmount);
         }
@@ -189,9 +185,9 @@ mod tests {
     fn decrease_long_position() {
         let mut pos = Position::default();
         pos.open_position(base!(1), quote!(150)).unwrap();
-        assert!(pos.decrease_long_position(base!(1.1), quote!(150)).is_err());
+        assert!(pos.decrease_long(base!(1.1), quote!(150)).is_err());
         assert_eq!(
-            pos.decrease_long_position(base!(0.5), quote!(160)).unwrap(),
+            pos.decrease_long(base!(0.5), quote!(160)).unwrap(),
             quote!(5)
         );
         assert_eq!(pos.entry_price, quote!(150));
@@ -200,7 +196,7 @@ mod tests {
         // Make sure it does not work when a short is set
         pos.size = base!(-1);
         assert_eq!(
-            pos.decrease_long_position(base!(0.5), quote!(100)),
+            pos.decrease_long(base!(0.5), quote!(100)),
             Err(Error::InvalidAmount)
         );
     }
@@ -208,14 +204,14 @@ mod tests {
     #[test]
     fn increase_short_position() {
         let mut pos = Position::default();
-        pos.increase_short_position(base!(1), quote!(100)).unwrap();
+        pos.increase_short(base!(1), quote!(100)).unwrap();
         assert_eq!(pos.size, base!(-1));
         assert_eq!(pos.entry_price, quote!(100));
 
         // Make sure it does not work with a long posiion
         pos.size = base!(1);
         assert_eq!(
-            pos.increase_short_position(base!(1), quote!(100)),
+            pos.increase_short(base!(1), quote!(100)),
             Err(Error::OpenLong)
         );
     }

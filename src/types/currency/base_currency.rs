@@ -150,6 +150,14 @@ impl Div<Leverage> for BaseCurrency {
     }
 }
 
+impl Mul<Fee> for BaseCurrency {
+    type Output = Self;
+
+    fn mul(self, rhs: Fee) -> Self::Output {
+        Self(self.0 * rhs.inner())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

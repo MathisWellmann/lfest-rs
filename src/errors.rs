@@ -108,6 +108,9 @@ pub enum Error {
 
     #[error("The short position needs to be closed first.")]
     OpenShort,
+
+    #[error("The provided value is not positive")]
+    NonPositive,
 }
 
 /// This is defined as a convenience.
