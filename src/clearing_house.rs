@@ -1,12 +1,11 @@
 //! A clearinghouse clears and settles all trades and collects margin
 
-use fpdec::{Dec, Decimal};
+use fpdec::Decimal;
 
 use crate::{
-    account_tracker::NoAccountTracker,
-    leverage,
     prelude::{Account, AccountTracker},
-    types::{Currency, Leverage, MarginCurrency, QuoteCurrency},
+    risk_engine::RiskEngine,
+    types::{Currency, MarginCurrency, QuoteCurrency},
 };
 
 /// A clearing house acts as an intermediary in futures transactions.
@@ -19,31 +18,32 @@ use crate::{
 /// house. If there has been a gain on the transactions, the account receives
 /// variation margin from the clearing house.
 #[derive(Debug, Clone)]
-pub struct ClearingHouse<A, S>
+pub struct ClearingHouse<A, S, R>
 where
     S: Currency,
+    S::PairedCurrency: MarginCurrency,
 {
+    /// Manages the risk if positions.
+    risk_engine: R,
+    /// Keeps track of all trades of the `Account`.
+    account_tracker: A,
     /// The actual user of the exchange
-    user_account: Account<A, S>,
-    /// Just used to have an infinitely liquid counterparty for every transaction.
-    counterparty: Account<NoAccountTracker, S>,
+    user_account: Account<S>,
 }
 
-impl<A, S> ClearingHouse<A, S>
+impl<A, S, R> ClearingHouse<A, S, R>
 where
     A: AccountTracker<S::PairedCurrency>,
     S: Currency,
     S::PairedCurrency: MarginCurrency,
+    R: RiskEngine<S::PairedCurrency>,
 {
     /// Create a new instance with a user account
-    pub(crate) fn new(account: Account<A, S>) -> Self {
+    pub(crate) fn new(risk_engine: R, account_tracker: A, user_account: Account<S>) -> Self {
         Self {
-            user_account: account,
-            counterparty: Account::new(
-                NoAccountTracker::default(),
-                leverage!(1),
-                account.margin().wallet_balance() * Dec!(100),
-            ),
+            risk_engine,
+            account_tracker,
+            user_account,
         }
     }
 
@@ -69,7 +69,7 @@ where
 
     /// Get a reference to the user account
     #[inline(always)]
-    pub(crate) fn user_account(&self) -> &Account<A, S> {
+    pub(crate) fn user_account(&self) -> &Account<S> {
         &self.user_account
     }
 }

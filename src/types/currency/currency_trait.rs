@@ -8,6 +8,7 @@ use crate::{
 /// Every unit of account must implement this trait
 pub trait Currency:
     Copy
+    + Default
     + Send
     + Sized
     + std::fmt::Debug

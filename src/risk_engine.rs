@@ -14,6 +14,7 @@
 
 use crate::{
     contract_specification::ContractSpecification,
+    prelude::Account,
     types::{Currency, MarginCurrency},
 };
 
@@ -34,7 +35,7 @@ where
 {
     fn check_required_margin(
         &self,
-        trader: &Trader,
+        trader: &Account<M::PairedCurrency>,
         notional_value: M,
     ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError>;
 }
@@ -46,18 +47,15 @@ where
     contract_spec: ContractSpecification<S>,
 }
 
-impl<S> RiskEngine<S::PairedCurrency> for IsolatedMarginRiskEngine<S>
+impl<M> RiskEngine<M> for IsolatedMarginRiskEngine<M>
 where
-    S: Currency,
+    M: Currency + MarginCurrency,
 {
     fn check_required_margin(
         &self,
-        trader: &Trader,
-        notional_value: S::PairedCurrency,
-    ) -> Result<(
-        InitialMargin<S::PairedCurrency>,
-        MaintenanceMargin<S::PairedCurrency>,
-    )> {
+        trader: &Account<M::PairedCurrency>,
+        notional_value: M::PairedCurrency,
+    ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError> {
         todo!()
     }
 }

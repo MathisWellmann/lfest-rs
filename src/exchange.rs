@@ -3,10 +3,12 @@ use fpdec::Decimal;
 use crate::{
     account::Account,
     account_tracker::AccountTracker,
+    clearing_house::ClearingHouse,
     config::Config,
     errors::{Error, OrderError},
     prelude::Side,
     quote,
+    risk_engine::IsolatedMarginRiskEngine,
     types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, QuoteCurrency},
 };
 
@@ -14,10 +16,12 @@ use crate::{
 /// The main leveraged futures exchange for simulated trading
 pub struct Exchange<A, S>
 where
-    S: Currency + Default,
+    S: Currency,
+    S::PairedCurrency: MarginCurrency,
 {
     config: Config<S::PairedCurrency>,
-    user_account: Account<A, S>,
+    clearing_house: ClearingHouse<A, S, IsolatedMarginRiskEngine<S>>,
+    user_account: Account<S>,
     bid: QuoteCurrency,
     ask: QuoteCurrency,
     next_order_id: u64,
@@ -31,7 +35,7 @@ where
 impl<A, S> Exchange<A, S>
 where
     A: AccountTracker<S::PairedCurrency>,
-    S: Currency + Default,
+    S: Currency,
     S::PairedCurrency: MarginCurrency,
 {
     /// Create a new Exchange with the desired config and whether to use candles
@@ -83,13 +87,13 @@ where
 
     /// Return a reference to Account
     #[inline(always)]
-    pub fn account(&self) -> &Account<A, S> {
+    pub fn account(&self) -> &Account<S> {
         &self.user_account
     }
 
     /// Return a mutable reference to Account
     #[inline(always)]
-    pub fn account_mut(&mut self) -> &mut Account<A, S> {
+    pub fn account_mut(&mut self) -> &mut Account<S> {
         &mut self.user_account
     }
 
@@ -168,19 +172,6 @@ where
             OrderType::Market => self.handle_market_order(order),
             OrderType::Limit => self.handle_new_limit_order(order),
         }
-    }
-
-    /// Check if a liquidation event should occur
-    fn check_liquidation(&mut self) -> bool {
-        // TODO: check_liquidation
-        // TODO: test check_liquidation
-
-        false
-    }
-
-    /// Perform a liquidation of the account
-    fn liquidate(&mut self) {
-        todo!()
     }
 
     /// Check if any active orders have been triggered by the most recent price

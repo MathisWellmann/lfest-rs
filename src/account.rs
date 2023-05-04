@@ -4,54 +4,43 @@ use hashbrown::HashMap;
 use crate::{
     account_tracker::AccountTracker,
     errors::{Error, Result},
-    margin::Margin,
     position::Position,
     quote,
-    types::{Currency, Fee, Leverage, MarginCurrency, Order, QuoteCurrency},
+    types::{Currency, Fee, MarginCurrency, Order, QuoteCurrency},
 };
 
 #[derive(Debug, Clone)]
 /// The users account
 /// Generic over:
-/// A: AccountTracker,
 /// S: The `Currency` representing the order quantity
-/// B: Balance type
-pub struct Account<A, S>
+pub struct Account<S>
 where
-    S: Currency + Default,
+    S: Currency,
+    S::PairedCurrency: MarginCurrency,
 {
-    account_tracker: A,
     wallet_balance: S::PairedCurrency,
     position: Position<S::PairedCurrency>,
-    leverage: Leverage,
     active_limit_orders: HashMap<u64, Order<S>>,
-    lookup_id_from_user_order_id: HashMap<u64, u64>,
+    // Maps the `user_order_id` to the internal order nonce
+    lookup_order_nonce_from_user_order_id: HashMap<u64, u64>,
     executed_orders: Vec<Order<S>>,
     taker_fee: Fee,
 }
 
-impl<A, S> Account<A, S>
+impl<S> Account<S>
 where
-    A: AccountTracker<S::PairedCurrency>,
     S: Currency + Default,
     S::PairedCurrency: MarginCurrency,
 {
-    pub(crate) fn new(
-        account_tracker: A,
-        leverage: Leverage,
-        starting_balance: S::PairedCurrency,
-        taker_fee: Fee,
-    ) -> Self {
+    /// Create a new [`Account`] instance.
+    pub(crate) fn new(starting_balance: S::PairedCurrency, taker_fee: Fee) -> Self {
         let position = Position::default();
-        let margin = Margin::new_init(starting_balance);
 
         Self {
-            account_tracker,
             wallet_balance: starting_balance,
             position,
-            leverage,
             active_limit_orders: HashMap::new(),
-            lookup_id_from_user_order_id: HashMap::new(),
+            lookup_order_nonce_from_user_order_id: HashMap::new(),
             executed_orders: vec![],
             taker_fee,
         }
@@ -73,27 +62,14 @@ where
 
     /// Set a new position manually, be sure that you know what you are doing
     #[inline(always)]
-    pub fn set_position(&mut self, position: Position<S>) {
+    pub fn set_position(&mut self, position: Position<S::PairedCurrency>) {
         self.position = position;
     }
 
-    /// Return a reference to position
+    /// Return a reference to the accounts position.
     #[inline(always)]
-    pub fn position(&self) -> &Position<S> {
+    pub fn position(&self) -> &Position<S::PairedCurrency> {
         &self.position
-    }
-
-    /// Set a new margin manually, be sure that you know what you are doing when
-    /// using this method Returns true if successful
-    #[inline(always)]
-    pub fn set_margin(&mut self, margin: Margin<S::PairedCurrency>) {
-        self.margin = margin;
-    }
-
-    /// Return a reference to margin
-    #[inline(always)]
-    pub fn margin(&self) -> &Margin<S::PairedCurrency> {
-        &self.margin
     }
 
     /// Return recently executed orders
@@ -109,18 +85,6 @@ where
     #[inline(always)]
     pub fn active_limit_orders(&self) -> &HashMap<u64, Order<S>> {
         &self.active_limit_orders
-    }
-
-    /// Return a reference to acc_tracker struct
-    #[inline(always)]
-    pub fn account_tracker(&self) -> &A {
-        &self.account_tracker
-    }
-
-    /// Return a mutable reference to acc_tracker struct
-    #[inline(always)]
-    pub fn account_tracker_mut(&mut self) -> &mut A {
-        &mut self.account_tracker
     }
 
     /// Cancel an active order
@@ -144,7 +108,10 @@ where
     /// not found
     pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Result<Order<S>> {
         debug!("cancel_order_by_user_id: user_order_id: {}", user_order_id);
-        let id: u64 = match self.lookup_id_from_user_order_id.remove(&user_order_id) {
+        let id: u64 = match self
+            .lookup_order_nonce_from_user_order_id
+            .remove(&user_order_id)
+        {
             None => return Err(Error::UserOrderIdNotFound),
             Some(id) => id,
         };
@@ -182,7 +149,7 @@ where
         match user_order_id {
             None => {}
             Some(user_order_id) => {
-                self.lookup_id_from_user_order_id
+                self.lookup_order_nonce_from_user_order_id
                     .insert(user_order_id, order_id);
             }
         };
@@ -379,16 +346,15 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{account_tracker::NoAccountTracker, base, fee, leverage, prelude::BaseCurrency};
+    use crate::{
+        account_tracker::NoAccountTracker,
+        base, fee, leverage,
+        prelude::{BaseCurrency, Leverage},
+    };
 
     /// Create a new mock account for testing.
-    fn mock_account() -> Account<NoAccountTracker, BaseCurrency> {
-        Account::new(
-            NoAccountTracker::default(),
-            leverage!(1),
-            quote!(1000),
-            fee!(0.001),
-        )
+    fn mock_account() -> Account<BaseCurrency> {
+        Account::new(quote!(1000), fee!(0.001))
     }
 
     #[test]
