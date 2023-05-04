@@ -9,9 +9,14 @@ use crate::{
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 /// Describes the position information of the account.
 /// It assumes isolated margining mechanism, because the margin is directly associated with the position.
-pub struct Position<M> {
+pub struct Position<M>
+where
+    M: Currency + MarginCurrency,
+{
     /// The number of futures contracts making up the position.
-    size: i64,
+    /// Denoted in the currency in which the size is valued.
+    /// e.g.: XBTUSD has a contract size of 1 USD, so `M::PairedCurrency` is USD.
+    size: M::PairedCurrency,
     /// The entry price of the position
     entry_price: QuoteCurrency,
     /// The position margin of account, same denotation as wallet_balance
@@ -64,8 +69,11 @@ where
     }
 
     /// Returns the implied leverage of the position based on the position value and the collateral backing it.
+    /// It is computed by dividing the total value of the position by the amount of margin required to hold that position.
+    #[inline]
     pub fn implied_leverage(&self, price: QuoteCurrency) -> f64 {
-        todo!()
+        let value = self.size.convert(price);
+        value / self.position_margin
     }
 
     /// Return the positions unrealized profit and loss
@@ -199,7 +207,7 @@ mod tests {
     use crate::prelude::*;
 
     #[test]
-    fn increase_long_position() {
+    fn increase_long() {
         let mut pos = Position::default();
         pos.increase_long(quote!(150), quote!(120)).unwrap();
         assert_eq!(pos.size, quote!(150));
@@ -218,7 +226,7 @@ mod tests {
     }
 
     #[test]
-    fn decrease_long_position() {
+    fn decrease_long() {
         let mut pos = Position::default();
         pos.open_position(base!(1), quote!(150)).unwrap();
         assert!(pos.decrease_long(base!(1.1), quote!(150)).is_err());
@@ -238,7 +246,7 @@ mod tests {
     }
 
     #[test]
-    fn increase_short_position() {
+    fn increase_short() {
         let mut pos = Position::default();
         pos.increase_short(base!(1), quote!(100)).unwrap();
         assert_eq!(pos.size, base!(-1));
@@ -253,7 +261,7 @@ mod tests {
     }
 
     #[test]
-    fn decrease_short_position() {
+    fn decrease_short() {
         let mut pos = Position::default();
         assert_eq!(
             pos.decrease_short(base!(1), quote!(100)),
@@ -265,5 +273,13 @@ mod tests {
             pos.decrease_short(base!(0.5), quote!(90)).unwrap(),
             quote!(5)
         );
+    }
+
+    #[test]
+    fn position_implied_leverage() {
+        let mut pos = Position::default();
+        pos.size = 200;
+        pos.position_margin = base!(1);
+        assert_eq!(pos.implied_leverage(quote!(100)), 2);
     }
 }
