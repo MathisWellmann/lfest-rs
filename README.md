@@ -27,6 +27,7 @@ or implement your own using the [`AccountTracker`](https://docs.rs/lfest/0.31.0/
 - :no_entry: Order filtering to make sure the price and quantity follow certain rules. 
 See [`PriceFilter`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.PriceFilter.html) and 
 [`QuantityFilter`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.QuantityFilter.html)
+- Isolated margining
 
 ### Order Types
 The supported order types are:

@@ -8,26 +8,33 @@ use crate::{
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 /// Describes the position information of the account
-pub struct Position<S> {
+pub struct Position<M> {
     /// The number of futures contracts making up the position.
-    size: S,
+    size: i64,
     /// The entry price of the position
     entry_price: QuoteCurrency,
+    /// The position margin of account, same denotation as wallet_balance
+    position_margin: M,
+    /// The order margin of account, same denotation as wallet_balance
+    order_margin: M,
 }
 
-impl<S> Position<S>
+impl<M> Position<M>
 where
-    S: Currency,
-    S::PairedCurrency: MarginCurrency,
+    M: Currency + MarginCurrency,
 {
     #[cfg(test)]
-    pub(crate) fn new(size: S, entry_price: QuoteCurrency) -> Self {
-        Self { size, entry_price }
+    pub(crate) fn new(size: i64, entry_price: QuoteCurrency, position_margin: M) -> Self {
+        Self {
+            size,
+            entry_price,
+            position_margin,
+        }
     }
 
     /// Return the position size
     #[inline(always)]
-    pub fn size(&self) -> S {
+    pub fn size(&self) -> u64 {
         self.size
     }
 
@@ -41,12 +48,12 @@ where
     /// denoted in QUOTE when using linear futures,
     /// denoted in BASE when using inverse futures
     #[inline(always)]
-    pub fn unrealized_pnl(&self, bid: QuoteCurrency, ask: QuoteCurrency) -> S::PairedCurrency {
+    pub fn unrealized_pnl(&self, bid: QuoteCurrency, ask: QuoteCurrency) -> M {
         // The upnl is based on the possible fill price, not the mid-price
-        if self.size > S::new_zero() {
-            S::PairedCurrency::pnl(self.entry_price, bid, self.size)
+        if self.size > 0 {
+            M::pnl(self.entry_price, bid, self.size)
         } else {
-            S::PairedCurrency::pnl(self.entry_price, ask, self.size)
+            M::pnl(self.entry_price, ask, self.size)
         }
     }
 
@@ -55,8 +62,14 @@ where
     /// # Arguments:
     /// `size`: The position size, negative denoting a negative position.
     /// `entry_price`: The price at which the position was entered.
+    /// `position_margin`: The collateral backing this position.
     ///
-    pub(crate) fn open_position(&mut self, size: S, price: QuoteCurrency) -> Result<()> {
+    pub(crate) fn open_position(
+        &mut self,
+        size: u64,
+        price: QuoteCurrency,
+        position_margin: M,
+    ) -> Result<()> {
         if price <= quote!(0) {
             return Err(Error::InvalidPrice);
         }
@@ -67,11 +80,11 @@ where
     }
 
     /// Add to a position.
-    pub(crate) fn increase_long(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
-        if amount < S::new_zero() {
+    pub(crate) fn increase_long(&mut self, amount: u64, price: QuoteCurrency) -> Result<()> {
+        if amount <= 0 {
             return Err(Error::InvalidAmount);
         }
-        if self.size < S::new_zero() {
+        if self.size < 0 {
             return Err(Error::OpenShort);
         }
         let new_size = self.size + amount;
@@ -95,18 +108,18 @@ where
     /// If Ok, the net realized profit and loss for that specific futures contract.
     pub(crate) fn decrease_long(
         &mut self,
-        amount: S,
+        amount: u64,
         price: QuoteCurrency,
     ) -> Result<S::PairedCurrency> {
-        if self.size < S::new_zero() {
+        if self.size < 0 {
             return Err(Error::OpenShort);
         }
-        if amount < S::new_zero() || amount > self.size {
+        if amount <= 0 || amount as _ > self.size {
             return Err(Error::InvalidAmount);
         }
-        self.size = self.size - amount;
+        self.size -= amount as _;
 
-        Ok(S::PairedCurrency::pnl(self.entry_price, price, amount))
+        Ok(M::pnl(self.entry_price, price, amount))
     }
 
     /// Increase a short position.
@@ -114,18 +127,17 @@ where
     /// # Arguments:
     /// `amount`: An absolute amount.
     /// `price`: The entry price.
-    pub(crate) fn increase_short(&mut self, amount: S, price: QuoteCurrency) -> Result<()> {
-        if amount < S::new_zero() {
+    pub(crate) fn increase_short(&mut self, amount: u64, price: QuoteCurrency) -> Result<()> {
+        if amount <= 0 {
             return Err(Error::InvalidAmount);
         }
-        if self.size > S::new_zero() {
+        if self.size > 0 {
             return Err(Error::OpenLong);
         }
 
-        let new_size = self.size - amount;
+        let new_size = self.size - amount as _;
         self.entry_price = QuoteCurrency::new(
-            (self.entry_price * self.size.inner().abs() + price * amount.inner()).inner()
-                / new_size.inner().abs(),
+            (self.entry_price * self.size.abs() + price * amount).inner() / new_size.inner().abs(),
         );
         self.size = new_size;
 
@@ -142,22 +154,18 @@ where
     /// If Ok, the net realized profit and loss for that specific futures contract.
     pub(crate) fn decrease_short(
         &mut self,
-        amount: S,
+        amount: u64,
         price: QuoteCurrency,
     ) -> Result<S::PairedCurrency> {
-        if self.size > S::new_zero() {
+        if self.size >= 0 {
             return Err(Error::OpenLong);
         }
-        if amount < S::new_zero() || amount.into_negative() < self.size {
+        if amount <= 0 || amount.into_negative() < self.size {
             return Err(Error::InvalidAmount);
         }
         self.size = self.size + amount;
 
-        Ok(S::PairedCurrency::pnl(
-            self.entry_price,
-            price,
-            amount.into_negative(),
-        ))
+        Ok(M::pnl(self.entry_price, price, amount.into_negative()))
     }
 }
 

@@ -12,12 +12,13 @@ extern crate serde;
 mod account;
 pub mod account_tracker;
 mod config;
+mod contract_specification;
 mod cornish_fisher;
 mod errors;
 mod exchange;
-mod margin;
 mod order_filters;
 mod position;
+mod risk_engine;
 mod types;
 mod utils;
 
@@ -31,10 +32,10 @@ pub mod prelude {
         account_tracker::AccountTracker,
         base, bba,
         config::Config,
+        contract_specification::*,
         errors::{Error, OrderError, Result},
         exchange::Exchange,
         fee, leverage,
-        margin::Margin,
         order_filters::{PriceFilter, QuantityFilter},
         position::Position,
         quote,

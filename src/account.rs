@@ -21,8 +21,8 @@ where
     S: Currency + Default,
 {
     account_tracker: A,
-    margin: Margin<S::PairedCurrency>,
-    position: Position<S>,
+    wallet_balance: S::PairedCurrency,
+    position: Position<S::PairedCurrency>,
     leverage: Leverage,
     active_limit_orders: HashMap<u64, Order<S>>,
     lookup_id_from_user_order_id: HashMap<u64, u64>,
@@ -47,7 +47,7 @@ where
 
         Self {
             account_tracker,
-            margin,
+            wallet_balance: starting_balance,
             position,
             leverage,
             active_limit_orders: HashMap::new(),
