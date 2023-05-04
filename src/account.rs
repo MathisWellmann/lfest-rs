@@ -2,7 +2,6 @@ use fpdec::Decimal;
 use hashbrown::HashMap;
 
 use crate::{
-    account_tracker::AccountTracker,
     errors::{Error, Result},
     position::Position,
     quote,
@@ -44,14 +43,6 @@ where
             executed_orders: vec![],
             taker_fee,
         }
-    }
-
-    /// Update the accounts state for the newest price data
-    pub(crate) fn update(&mut self, bid: QuoteCurrency, ask: QuoteCurrency, trade_timestamp: u64) {
-        let upnl = self.position().unrealized_pnl(bid, ask);
-        let mid_price = (bid + ask) / quote!(2);
-        self.account_tracker
-            .update(trade_timestamp, mid_price, upnl);
     }
 
     /// The number of currently active limit orders
@@ -96,7 +87,7 @@ where
             Some(o) => o,
         };
 
-        self.account_tracker.log_limit_order_cancellation();
+        // self.account_tracker.log_limit_order_cancellation();
 
         Ok(removed_order)
     }
@@ -118,14 +109,6 @@ where
         self.cancel_order(id)
     }
 
-    /// Cancel all active orders
-    pub fn cancel_all_orders(&mut self) {
-        debug!("cancel_all_orders");
-
-        self.margin.clear_order_margin();
-        self.active_limit_orders.clear();
-    }
-
     /// Append a new limit order as active order
     #[deprecated]
     pub(crate) fn append_limit_order(&mut self, order: Order<S>, order_margin: S::PairedCurrency) {
@@ -134,9 +117,10 @@ where
             order, order_margin
         );
 
-        self.margin.lock_as_order_collateral(order_margin);
+        todo!("margining for orders");
+        // self.margin.lock_as_order_collateral(order_margin);
 
-        self.account_tracker.log_limit_order_submission();
+        // self.account_tracker.log_limit_order_submission();
         let order_id = order.id();
         let user_order_id = *order.user_order_id();
         match self.active_limit_orders.insert(order_id, order) {
@@ -160,7 +144,7 @@ where
     pub(crate) fn finalize_limit_order(&mut self, mut exec_order: Order<S>, fee_maker: Fee) {
         exec_order.mark_executed();
 
-        self.account_tracker.log_limit_order_fill();
+        // self.account_tracker.log_limit_order_fill();
         self.executed_orders.push(exec_order);
 
         todo!()
@@ -194,9 +178,7 @@ where
         }
 
         let value = amount.convert(price);
-        let margin_req = value / self.leverage;
-        let margin_with_fee = margin_req + value * self.taker_fee;
-        self.margin.lock_as_position_collateral(margin_with_fee)?;
+        todo!("margin?");
         self.position
             .increase_long(amount, price)
             .expect("Increasing a position here must work; qed");
@@ -230,16 +212,13 @@ where
         }
 
         let value = amount.convert(price);
-        let margin_to_unlock = value / self.leverage;
         let pnl = self.position.decrease_long(amount, price)?;
-        self.margin
-            .unlock_position_margin(margin_to_unlock)
-            .expect("Margin must have been locked and is now freed; qed");
 
         let fees = value * fee;
         // Fee just vanishes as there is no one to benefit from the fee.
         let net_pnl = pnl - fees;
-        self.realize_pnl(net_pnl, ts_ns);
+        todo!("realize pnl or return it");
+        // self.realize_pnl(net_pnl, ts_ns);
 
         Ok(())
     }
@@ -261,8 +240,7 @@ where
             return Err(Error::InvalidPrice);
         }
 
-        let margin_req = amount.convert(price) / self.leverage;
-        self.margin.lock_as_position_collateral(margin_req)?;
+        todo!("margin");
         self.position
             .increase_short(amount, price)
             .expect("Increasing a position here must work; qed");
@@ -299,17 +277,10 @@ where
         let fees = amount.convert(price) * fee;
         // Fee just vanishes as there is no one to benefit from the fee.
         let net_pnl = pnl - fees;
-        self.realize_pnl(net_pnl, ts_ns);
+        todo!("realize profit");
+        // self.realize_pnl(net_pnl, ts_ns);
 
         Ok(())
-    }
-
-    /// Realize profit and loss, denoted in the margin currency.
-    /// Note the rpnl event.
-    #[inline(always)]
-    pub(crate) fn realize_pnl(&mut self, pnl: S::PairedCurrency, ts_ns: i64) {
-        self.margin.realize_pnl(pnl);
-        self.account_tracker.log_rpnl(pnl, ts_ns);
     }
 
     /// Turn a long position into a short one by,
@@ -346,11 +317,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        account_tracker::NoAccountTracker,
-        base, fee, leverage,
-        prelude::{BaseCurrency, Leverage},
-    };
+    use crate::{base, fee, prelude::BaseCurrency};
 
     /// Create a new mock account for testing.
     fn mock_account() -> Account<BaseCurrency> {

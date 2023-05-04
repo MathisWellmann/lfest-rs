@@ -20,8 +20,9 @@ where
     S::PairedCurrency: MarginCurrency,
 {
     config: Config<S::PairedCurrency>,
-    clearing_house: ClearingHouse<A, S, IsolatedMarginRiskEngine<S>>,
+    clearing_house: ClearingHouse<A, S, IsolatedMarginRiskEngine<S::PairedCurrency>>,
     user_account: Account<S>,
+    // TODO: encapsulate all of the market state into `MarketState` or similar.
     bid: QuoteCurrency,
     ask: QuoteCurrency,
     next_order_id: u64,
@@ -41,12 +42,10 @@ where
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
     pub fn new(account_tracker: A, config: Config<S::PairedCurrency>) -> Self {
-        let account = Account::new(
-            account_tracker,
-            config.leverage(),
-            config.starting_balance(),
-            config.fee_taker(),
-        );
+        let account = Account::new(config.starting_balance(), config.fee_taker());
+        let risk_engine =
+            IsolatedMarginRiskEngine::<S>::new(config.contract_specification().clone());
+        let clearing_house = ClearingHouse::new(risk_engine, account_tracker, account);
 
         Self {
             config,
@@ -58,6 +57,7 @@ where
             high: quote!(0.0),
             low: quote!(0.0),
             current_ts_ns: 0,
+            clearing_house,
         }
     }
 

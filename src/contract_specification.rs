@@ -2,6 +2,7 @@ use fpdec::Decimal;
 
 use crate::prelude::{Currency, PriceFilter, QuantityFilter};
 
+#[derive(Debug, Clone)]
 pub struct ContractSpecification<S>
 where
     S: Currency,
@@ -10,11 +11,11 @@ where
     initial_margin: Decimal,
     maintenance_margin: Decimal,
     mark_method: MarkMethod,
-    contract_size: S,
     price_filter: PriceFilter,
     quantity_filter: QuantityFilter<S>,
 }
 
+#[derive(Debug, Clone)]
 pub enum MarkMethod {
     LastPrice,
     FairPrice,

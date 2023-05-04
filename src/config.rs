@@ -1,7 +1,8 @@
 use crate::{
+    contract_specification::ContractSpecification,
     errors::{Error, Result},
     prelude::{PriceFilter, QuantityFilter},
-    types::{Currency, Fee, Leverage},
+    types::{Currency, Fee},
 };
 
 #[derive(Debug, Clone)]
@@ -21,16 +22,14 @@ where
     /// If `BaseCurrency` is used as the margin currency,
     /// then its an inverse futures contract.
     starting_balance: M,
-    /// The leverage used for the position
-    leverage: Leverage,
-    /// Sets the order timestamps on submit_order() call, if enabled
-    set_order_timestamps: bool,
     /// The maximum number of open orders the user can have at any given time
     max_num_open_orders: usize,
     /// Filters for limit order pricing
     price_filter: PriceFilter,
     /// Filters for order quantity
     quantity_filter: QuantityFilter<M::PairedCurrency>,
+    /// The contract specification.
+    contract_specification: ContractSpecification<M::PairedCurrency>,
 }
 
 impl<M> Config<M>
@@ -44,13 +43,11 @@ where
     /// `fee_taker`: The taker fee as fraction
     /// `starting_balance`: Initial Wallet Balance, denoted in QUOTE if using
     /// linear futures, denoted in BASE for inverse futures
-    /// `leverage`: The positions leverage.
-    /// `set_order_timestamps`: Whether the exchange should set order
-    /// timestamps.
     /// `max_num_open_orders`: The maximum number of open ordes a user can have
     /// at any time.
     /// `price_filter`: Filters for limit order pricing
     /// `quantity_filter`: Filters for order quantities
+    /// `contract_specification`: More details on the actual contract traded.
     ///
     /// # Returns:
     /// Either a valid Config or an Error
@@ -59,11 +56,10 @@ where
         fee_maker: Fee,
         fee_taker: Fee,
         starting_balance: M,
-        leverage: Leverage,
-        set_order_timestamps: bool,
         max_num_open_orders: usize,
         price_filter: PriceFilter,
         quantity_filter: QuantityFilter<M::PairedCurrency>,
+        contract_specification: ContractSpecification<M::PairedCurrency>,
     ) -> Result<Self> {
         if max_num_open_orders == 0 {
             return Err(Error::InvalidMaxNumOpenOrders);
@@ -75,11 +71,10 @@ where
             fee_maker,
             fee_taker,
             starting_balance,
-            leverage,
-            set_order_timestamps,
             max_num_open_orders,
             price_filter,
             quantity_filter,
+            contract_specification,
         })
     }
 
@@ -101,19 +96,6 @@ where
         self.starting_balance
     }
 
-    /// Return the leverage of the Config
-    #[inline(always)]
-    pub fn leverage(&self) -> Leverage {
-        self.leverage
-    }
-
-    /// Return whether or not the Exchange is configured to set order timestamps
-    /// in submit_order method
-    #[inline(always)]
-    pub fn set_order_timestamps(&self) -> bool {
-        self.set_order_timestamps
-    }
-
     /// Returns the maximum number of open orders that are allowed
     #[inline(always)]
     pub fn max_num_open_orders(&self) -> usize {
@@ -130,5 +112,11 @@ where
     #[inline(always)]
     pub fn quantity_filter(&self) -> &QuantityFilter<M::PairedCurrency> {
         &self.quantity_filter
+    }
+
+    /// Return a reference to the `ContractSpecification`
+    #[inline(always)]
+    pub fn contract_specification(&self) -> &ContractSpecification<M::PairedCurrency> {
+        &self.contract_specification
     }
 }

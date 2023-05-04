@@ -40,11 +40,21 @@ where
     ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError>;
 }
 
-pub(crate) struct IsolatedMarginRiskEngine<S>
+#[derive(Debug, Clone)]
+pub(crate) struct IsolatedMarginRiskEngine<M>
 where
-    S: Currency,
+    M: Currency + MarginCurrency,
 {
-    contract_spec: ContractSpecification<S>,
+    contract_spec: ContractSpecification<M::PairedCurrency>,
+}
+
+impl<M> IsolatedMarginRiskEngine<M>
+where
+    M: Currency + MarginCurrency,
+{
+    pub(crate) fn new(contract_spec: ContractSpecification<M::PairedCurrency>) -> Self {
+        Self { contract_spec }
+    }
 }
 
 impl<M> RiskEngine<M> for IsolatedMarginRiskEngine<M>
@@ -54,7 +64,7 @@ where
     fn check_required_margin(
         &self,
         trader: &Account<M::PairedCurrency>,
-        notional_value: M::PairedCurrency,
+        notional_value: M,
     ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError> {
         todo!()
     }
