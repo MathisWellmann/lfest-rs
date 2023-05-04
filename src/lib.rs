@@ -11,6 +11,7 @@ extern crate serde;
 
 mod account;
 pub mod account_tracker;
+mod clearing_house;
 mod config;
 mod contract_specification;
 mod cornish_fisher;

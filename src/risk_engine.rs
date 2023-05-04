@@ -12,15 +12,18 @@
 //! The risk engine enforces position limits on each futures contract to prevent excessive speculation and manipulation of prices.
 //! Position limits are set by the exchange and restrict the maximum number of contracts that any trader can hold for a particular futures contract.
 
-use crate::{contract_specification::ContractSpecification, types::{Currency, MarginCurrency}};
+use crate::{
+    contract_specification::ContractSpecification,
+    types::{Currency, MarginCurrency},
+};
 
-pub(crate) trait RiskEngine<M> 
+pub(crate) trait RiskEngine<M>
 where
-    M: Currency + MarginCurrency, 
+    M: Currency + MarginCurrency,
 {
     fn calculate_initial_margin(&self, trader: &Trader, notional_value: M) -> Result<M>;
 
-    fn calculate_maintenance_margin(&self, trader: &Trader, notional_value: M) -> Result<M> 
+    fn calculate_maintenance_margin(&self, trader: &Trader, notional_value: M) -> Result<M>;
 }
 
 pub(crate) struct IsolatedMarginRiskEngine<S>
@@ -34,11 +37,19 @@ impl<S> RiskEngine<S::PairedCurrency> for IsolatedMarginRiskEngine<S>
 where
     S: Currency,
 {
-    fn calculate_initial_margin(&self, trader: &Trader, notional_value: S::PairedCurrency) -> Result<S::PairedCurrency> {
+    fn calculate_initial_margin(
+        &self,
+        trader: &Trader,
+        notional_value: S::PairedCurrency,
+    ) -> Result<S::PairedCurrency> {
         todo!()
     }
 
-    fn calculate_maintenance_margin(&self, trader: &Trader, notional_value: S::PairedCurrency) -> Result<S::PairedCurrency> {
+    fn calculate_maintenance_margin(
+        &self,
+        trader: &Trader,
+        notional_value: S::PairedCurrency,
+    ) -> Result<S::PairedCurrency> {
         todo!()
     }
 }
