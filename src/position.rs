@@ -7,7 +7,8 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
-/// Describes the position information of the account
+/// Describes the position information of the account.
+/// It assumes isolated margining mechanism, because the margin is directly associated with the position.
 pub struct Position<M> {
     /// The number of futures contracts making up the position.
     size: i64,
@@ -24,11 +25,17 @@ where
     M: Currency + MarginCurrency,
 {
     #[cfg(test)]
-    pub(crate) fn new(size: i64, entry_price: QuoteCurrency, position_margin: M) -> Self {
+    pub(crate) fn new(
+        size: i64,
+        entry_price: QuoteCurrency,
+        position_margin: M,
+        order_margin: M,
+    ) -> Self {
         Self {
             size,
             entry_price,
             position_margin,
+            order_margin,
         }
     }
 
@@ -44,12 +51,28 @@ where
         self.entry_price
     }
 
+    /// Return the collateral backing this position
+    #[inline(always)]
+    pub fn position_margin(&self) -> M {
+        self.position_margin
+    }
+
+    /// Return the locked order margin
+    #[inline(always)]
+    pub fn order_margin(&self) -> M {
+        self.order_margin
+    }
+
+    /// Returns the implied leverage of the position based on the position value and the collateral backing it.
+    pub fn implied_leverage(&self, price: QuoteCurrency) -> f64 {
+        todo!()
+    }
+
     /// Return the positions unrealized profit and loss
     /// denoted in QUOTE when using linear futures,
     /// denoted in BASE when using inverse futures
-    #[inline(always)]
     pub fn unrealized_pnl(&self, bid: QuoteCurrency, ask: QuoteCurrency) -> M {
-        // The upnl is based on the possible fill price, not the mid-price
+        // The upnl is based on the possible fill price, not the mid-price, which is more conservative
         if self.size > 0 {
             M::pnl(self.entry_price, bid, self.size)
         } else {
@@ -61,6 +84,7 @@ where
     ///
     /// # Arguments:
     /// `size`: The position size, negative denoting a negative position.
+    ///     The `size` must have been approved by the `RiskEngine`.
     /// `entry_price`: The price at which the position was entered.
     /// `position_margin`: The collateral backing this position.
     ///
@@ -79,7 +103,13 @@ where
         Ok(())
     }
 
-    /// Add to a position.
+    /// Increase a long (or neutral) position.
+    ///
+    /// # Arguments:
+    /// `amount`: The absolute amount to increase the position by.
+    ///     The `amount` must have been approved by the `RiskEngine`.
+    /// `price`: The price at which it is sold.
+    ///
     pub(crate) fn increase_long(&mut self, amount: u64, price: QuoteCurrency) -> Result<()> {
         if amount <= 0 {
             return Err(Error::InvalidAmount);
@@ -106,11 +136,7 @@ where
     ///
     /// # Returns:
     /// If Ok, the net realized profit and loss for that specific futures contract.
-    pub(crate) fn decrease_long(
-        &mut self,
-        amount: u64,
-        price: QuoteCurrency,
-    ) -> Result<S::PairedCurrency> {
+    pub(crate) fn decrease_long(&mut self, amount: u64, price: QuoteCurrency) -> Result<M> {
         if self.size < 0 {
             return Err(Error::OpenShort);
         }
@@ -125,7 +151,8 @@ where
     /// Increase a short position.
     ///
     /// # Arguments:
-    /// `amount`: An absolute amount.
+    /// `amount`: The absolute amount to increase the short position by.
+    ///     The `amount` must have been approved by the `RiskEngine`.
     /// `price`: The entry price.
     pub(crate) fn increase_short(&mut self, amount: u64, price: QuoteCurrency) -> Result<()> {
         if amount <= 0 {
@@ -147,16 +174,13 @@ where
     /// Reduce a short position
     ///
     /// # Arguments:
-    /// `amount`: An absolute amount.
+    /// `amount`: The absolute amount to decrease the short position by.
+    ///     Must be smaller or equal to the open position size.
     /// `price`: The entry price.
     ///
     /// # Returns:
     /// If Ok, the net realized profit and loss for that specific futures contract.
-    pub(crate) fn decrease_short(
-        &mut self,
-        amount: u64,
-        price: QuoteCurrency,
-    ) -> Result<S::PairedCurrency> {
+    pub(crate) fn decrease_short(&mut self, amount: u64, price: QuoteCurrency) -> Result<M> {
         if self.size >= 0 {
             return Err(Error::OpenLong);
         }

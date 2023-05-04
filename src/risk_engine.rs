@@ -17,13 +17,26 @@ use crate::{
     types::{Currency, MarginCurrency},
 };
 
+pub(crate) struct InitialMargin<M>(M);
+
+pub(crate) struct MaintenanceMargin<M>(M);
+
+/// The error that the `RiskEngine` outputs, if any.
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum RiskError {
+    #[error("The `Trader` does not have enough balance.")]
+    NotEnoughAvailableBalance,
+}
+
 pub(crate) trait RiskEngine<M>
 where
     M: Currency + MarginCurrency,
 {
-    fn calculate_initial_margin(&self, trader: &Trader, notional_value: M) -> Result<M>;
-
-    fn calculate_maintenance_margin(&self, trader: &Trader, notional_value: M) -> Result<M>;
+    fn check_required_margin(
+        &self,
+        trader: &Trader,
+        notional_value: M,
+    ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError>;
 }
 
 pub(crate) struct IsolatedMarginRiskEngine<S>
@@ -37,19 +50,14 @@ impl<S> RiskEngine<S::PairedCurrency> for IsolatedMarginRiskEngine<S>
 where
     S: Currency,
 {
-    fn calculate_initial_margin(
+    fn check_required_margin(
         &self,
         trader: &Trader,
         notional_value: S::PairedCurrency,
-    ) -> Result<S::PairedCurrency> {
-        todo!()
-    }
-
-    fn calculate_maintenance_margin(
-        &self,
-        trader: &Trader,
-        notional_value: S::PairedCurrency,
-    ) -> Result<S::PairedCurrency> {
+    ) -> Result<(
+        InitialMargin<S::PairedCurrency>,
+        MaintenanceMargin<S::PairedCurrency>,
+    )> {
         todo!()
     }
 }
