@@ -6,7 +6,7 @@ use crate::{
     prelude::{Account, AccountTracker, OrderError},
     quote,
     risk_engine::RiskEngine,
-    types::{Currency, MarginCurrency, Order, OrderType, QuoteCurrency},
+    types::{Currency, MarginCurrency, Order, OrderType, QuoteCurrency, Side},
 };
 
 /// A clearing house acts as an intermediary in futures transactions.
@@ -46,6 +46,7 @@ where
             risk_engine,
             account_tracker,
             user_account,
+            next_order_id: 0,
         }
     }
 
@@ -61,6 +62,7 @@ where
     /// `mark_value` is denoted in the margin currency.
     /// If the funding rate is positive, longs pay shorts.
     /// Else its the otherway around.
+    /// TODO: not used but may be in the future.
     pub(crate) fn settle_funding_period(
         &mut self,
         mark_value: S::PairedCurrency,
@@ -80,6 +82,7 @@ where
     pub fn account_mut(&mut self) -> &mut Account<S> {
         &mut self.user_account
     }
+
     /// Submit a new order to the exchange.
     /// Returns the order with timestamp and id filled in or OrderError
     pub fn submit_order(&mut self, mut order: Order<S>) -> Result<Order<S>, OrderError> {
@@ -120,12 +123,12 @@ where
         match order.side() {
             Side::Buy => {
                 let price = self.ask;
-                if self.account().position().size() >= S::new_zero() {
+                if self.user_account.position().size() >= S::new_zero() {
                     self.user_account
                         .try_increase_long(order.quantity(), price)
                         .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
                 } else {
-                    if order.quantity() > self.account().position().size().abs() {
+                    if order.quantity() > self.user_account.position().size().abs() {
                         self.user_account
                             .try_turn_around_short(order.quantity(), price)
                             .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
@@ -144,7 +147,7 @@ where
             }
             Side::Sell => {
                 let price = self.bid;
-                if self.account().position().size() >= S::new_zero() {
+                if self.user_account.position().size() >= S::new_zero() {
                     if order.quantity() > self.user_account.position().size() {
                         self.user_account
                             .try_turn_around_long(order.quantity(), price)
