@@ -1,15 +1,13 @@
-use fpdec::Decimal;
-
 use crate::{
     account::Account,
     account_tracker::AccountTracker,
     clearing_house::ClearingHouse,
     config::Config,
     errors::Error,
+    market_state::MarketState,
     prelude::OrderError,
-    quote,
     risk_engine::IsolatedMarginRiskEngine,
-    types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, QuoteCurrency, Side},
+    types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, Side},
 };
 
 #[derive(Debug, Clone)]
@@ -20,19 +18,12 @@ where
     S::PairedCurrency: MarginCurrency,
 {
     config: Config<S::PairedCurrency>,
+    market_state: MarketState,
     /// The actual user of the exchange
     user_account: Account<S>,
     risk_engine: IsolatedMarginRiskEngine<S::PairedCurrency>,
     clearing_house: ClearingHouse<A, S::PairedCurrency>,
     next_order_id: u64,
-    // TODO: encapsulate all of the market state into `MarketState` or similar.
-    bid: QuoteCurrency,
-    ask: QuoteCurrency,
-    step: u64, // used for synchronizing orders
-    high: QuoteCurrency,
-    low: QuoteCurrency,
-    // The current timestamp in nanoseconds
-    current_ts_ns: i64,
 }
 
 impl<A, S> Exchange<A, S>
@@ -44,6 +35,7 @@ where
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
     pub fn new(account_tracker: A, config: Config<S::PairedCurrency>) -> Self {
+        let market_state = MarketState::new(config.price_filter().clone());
         let account = Account::new(config.starting_balance(), config.fee_taker());
         let risk_engine = IsolatedMarginRiskEngine::<S::PairedCurrency>::new(
             config.contract_specification().clone(),
@@ -52,12 +44,7 @@ where
 
         Self {
             config,
-            bid: quote!(0.0),
-            ask: quote!(0.0),
-            step: 0,
-            high: quote!(0.0),
-            low: quote!(0.0),
-            current_ts_ns: 0,
+            market_state,
             clearing_house,
             risk_engine,
             user_account: account,
@@ -69,24 +56,6 @@ where
     #[inline(always)]
     pub fn config(&self) -> &Config<S::PairedCurrency> {
         &self.config
-    }
-
-    /// Return the bid price
-    #[inline(always)]
-    pub fn bid(&self) -> QuoteCurrency {
-        self.bid
-    }
-
-    /// Return the ask price
-    #[inline(always)]
-    pub fn ask(&self) -> QuoteCurrency {
-        self.ask
-    }
-
-    /// Return the current time step
-    #[inline(always)]
-    pub fn current_step(&self) -> u64 {
-        self.step
     }
 
     /// Return a reference to Account
@@ -116,40 +85,11 @@ where
         timestamp_ns: u64,
         market_update: MarketUpdate,
     ) -> Result<(Vec<Order<S>>, bool), Error> {
-        self.config
-            .price_filter()
-            .validate_market_update(&market_update)?;
-        match market_update {
-            MarketUpdate::Bba { bid, ask } => {
-                self.bid = bid;
-                self.ask = ask;
-                self.high = ask;
-                self.low = bid;
-            }
-            MarketUpdate::Candle {
-                bid,
-                ask,
-                high,
-                low,
-            } => {
-                self.bid = bid;
-                self.ask = ask;
-                self.high = high;
-                self.low = low;
-            }
-        }
-        self.current_ts_ns = timestamp_ns as i64;
-
-        todo!("risk engine checks margin");
-
-        self.check_orders();
-
-        // self.user_account.update(self.bid, self.ask, timestamp_ns);
-
-        self.step += 1;
-
-        Ok((self.user_account.executed_orders(), false))
+        self.market_state.update_state(timestamp_ns, market_update);
+        todo!("risk engine checks for liquidation");
+        todo!("check for order executions");
     }
+
     /// Submit a new order to the exchange.
     /// Returns the order with timestamp and id filled in or OrderError
     pub fn submit_order(&mut self, mut order: Order<S>) -> Result<Order<S>, OrderError> {
@@ -157,14 +97,13 @@ where
 
         // Basic checks
         self.config.quantity_filter().validate_order(&order)?;
-        let mark_price = (self.bid + self.ask) / quote!(2);
         self.config
             .price_filter()
-            .validate_order(&order, mark_price)?;
+            .validate_order(&order, self.market_state.mid_price())?;
 
         // assign unique order id
         order.set_id(self.next_order_id());
-        order.set_timestamp(self.current_ts_ns);
+        order.set_timestamp(self.market_state.current_timestamp_ns());
 
         match order.order_type() {
             OrderType::Market => self.handle_market_order(order),
@@ -189,7 +128,7 @@ where
     fn handle_market_order(&mut self, mut order: Order<S>) -> Result<Order<S>, OrderError> {
         match order.side() {
             Side::Buy => {
-                let price = self.ask;
+                let price = self.market_state.ask();
                 if self.user_account.position().size() >= S::new_zero() {
                     self.user_account
                         .try_increase_long(order.quantity(), price)
@@ -206,14 +145,14 @@ where
                                 order.quantity(),
                                 price,
                                 self.config.fee_taker(),
-                                self.current_ts_ns,
+                                self.market_state.current_timestamp_ns(),
                             )
                             .expect("Must be valid; qed");
                     }
                 }
             }
             Side::Sell => {
-                let price = self.bid;
+                let price = self.market_state.bid();
                 if self.user_account.position().size() >= S::new_zero() {
                     if order.quantity() > self.user_account.position().size() {
                         self.user_account
@@ -226,7 +165,7 @@ where
                                 order.quantity(),
                                 price,
                                 self.config.fee_taker(),
-                                self.current_ts_ns,
+                                self.market_state.current_timestamp_ns(),
                             )
                             .expect("All inputs are valid; qed");
                     }

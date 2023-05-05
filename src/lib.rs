@@ -17,6 +17,7 @@ mod contract_specification;
 mod cornish_fisher;
 mod errors;
 mod exchange;
+mod market_state;
 mod order_filters;
 mod position;
 mod risk_engine;
