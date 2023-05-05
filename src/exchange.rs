@@ -6,6 +6,7 @@ use crate::{
     errors::Error,
     execution_engine::ExecutionEngine,
     market_state::MarketState,
+    matching_engine::MatchingEngine,
     prelude::OrderError,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType},
@@ -22,6 +23,7 @@ where
     market_state: MarketState,
     user_account: Account<S>,
     risk_engine: IsolatedMarginRiskEngine<S::PairedCurrency>,
+    matching_engine: MatchingEngine<S>,
     execution_engine: ExecutionEngine<S>,
     clearing_house: ClearingHouse<A, S::PairedCurrency>,
     next_order_id: u64,
@@ -48,6 +50,7 @@ where
             market_state,
             clearing_house,
             risk_engine,
+            matching_engine: MatchingEngine::default(),
             execution_engine: ExecutionEngine::default(),
             user_account: account,
             next_order_id: 0,
@@ -96,9 +99,12 @@ where
             todo!("liquidate position");
             return Err(e.into());
         };
-        self.handle_resting_orders();
 
-        todo!("check for order executions");
+        let exec_orders = self
+            .matching_engine
+            .handle_resting_orders(&self.market_state);
+
+        todo!("handle order executions");
     }
 
     /// Submit a new order to the exchange.
@@ -117,22 +123,14 @@ where
         order.set_timestamp(self.market_state.current_timestamp_ns());
 
         match order.order_type() {
-            OrderType::Market => self.execution_engine.execute_market_order(order),
-            OrderType::Limit => self.handle_new_limit_order(order),
-        }
-    }
-
-    /// Check if any active orders have been triggered by the most recent price
-    /// action method is called after new external data has been consumed
-    fn handle_resting_orders(&mut self) {
-        let keys = Vec::from_iter(
-            self.user_account
-                .active_limit_orders()
-                .iter()
-                .map(|(i, _)| *i),
-        );
-        for i in keys {
-            self.handle_limit_order(i);
+            OrderType::Market => {
+                todo!("risk engine checks");
+                self.execution_engine.execute_market_order(order);
+            }
+            OrderType::Limit => {
+                todo!("risk engine checks");
+                todo!("If passing, place into orderbook of matching engine");
+            }
         }
     }
 

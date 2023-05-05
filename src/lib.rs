@@ -19,6 +19,7 @@ mod errors;
 mod exchange;
 mod execution_engine;
 mod market_state;
+mod matching_engine;
 mod order_filters;
 mod position;
 mod risk_engine;
