@@ -4,10 +4,11 @@ use crate::{
     clearing_house::ClearingHouse,
     config::Config,
     errors::Error,
+    execution_engine::ExecutionEngine,
     market_state::MarketState,
     prelude::OrderError,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
-    types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, Side},
+    types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType},
 };
 
 #[derive(Debug, Clone)]
@@ -21,6 +22,7 @@ where
     market_state: MarketState,
     user_account: Account<S>,
     risk_engine: IsolatedMarginRiskEngine<S::PairedCurrency>,
+    execution_engine: ExecutionEngine<S>,
     clearing_house: ClearingHouse<A, S::PairedCurrency>,
     next_order_id: u64,
 }
@@ -46,6 +48,7 @@ where
             market_state,
             clearing_house,
             risk_engine,
+            execution_engine: ExecutionEngine::default(),
             user_account: account,
             next_order_id: 0,
         }
@@ -93,6 +96,8 @@ where
             todo!("liquidate position");
             return Err(e.into());
         };
+        self.handle_resting_orders();
+
         todo!("check for order executions");
     }
 
@@ -112,14 +117,14 @@ where
         order.set_timestamp(self.market_state.current_timestamp_ns());
 
         match order.order_type() {
-            OrderType::Market => self.handle_market_order(order),
+            OrderType::Market => self.execution_engine.execute_market_order(order),
             OrderType::Limit => self.handle_new_limit_order(order),
         }
     }
 
     /// Check if any active orders have been triggered by the most recent price
     /// action method is called after new external data has been consumed
-    fn check_orders(&mut self) {
+    fn handle_resting_orders(&mut self) {
         let keys = Vec::from_iter(
             self.user_account
                 .active_limit_orders()
@@ -129,100 +134,6 @@ where
         for i in keys {
             self.handle_limit_order(i);
         }
-    }
-
-    fn handle_market_order(&mut self, mut order: Order<S>) -> Result<Order<S>, OrderError> {
-        match order.side() {
-            Side::Buy => {
-                let price = self.market_state.ask();
-                if self.user_account.position().size() >= S::new_zero() {
-                    self.user_account
-                        .try_increase_long(order.quantity(), price)
-                        .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
-                } else {
-                    if order.quantity() > self.user_account.position().size().abs() {
-                        self.user_account
-                            .try_turn_around_short(order.quantity(), price)
-                            .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
-                    } else {
-                        // decrease short and realize pnl.
-                        self.user_account
-                            .try_decrease_short(
-                                order.quantity(),
-                                price,
-                                self.config.fee_taker(),
-                                self.market_state.current_timestamp_ns(),
-                            )
-                            .expect("Must be valid; qed");
-                    }
-                }
-            }
-            Side::Sell => {
-                let price = self.market_state.bid();
-                if self.user_account.position().size() >= S::new_zero() {
-                    if order.quantity() > self.user_account.position().size() {
-                        self.user_account
-                            .try_turn_around_long(order.quantity(), price)
-                            .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
-                    } else {
-                        // decrease_long and realize pnl.
-                        self.user_account
-                            .try_decrease_long(
-                                order.quantity(),
-                                price,
-                                self.config.fee_taker(),
-                                self.market_state.current_timestamp_ns(),
-                            )
-                            .expect("All inputs are valid; qed");
-                    }
-                } else {
-                    self.user_account
-                        .try_increase_short(order.quantity(), price)
-                        .map_err(|_| OrderError::NotEnoughAvailableBalance)?;
-                }
-                todo!()
-            }
-        }
-        order.mark_executed();
-
-        Ok(order)
-    }
-
-    fn handle_new_limit_order(&mut self, order: Order<S>) -> Result<Order<S>, OrderError> {
-        if self.user_account.num_active_limit_orders() >= self.config.max_num_open_orders() {
-            return Err(OrderError::MaxActiveOrders);
-        }
-        // self.handle_limit_order(order_id);
-        todo!()
-    }
-
-    /// Handle limit order trigger and execution
-    fn handle_limit_order(&mut self, order_id: u64) -> Result<(), OrderError> {
-        todo!()
-        // let o: Order<S> = self
-        //     .user_account
-        //     .active_limit_orders()
-        //     .get(&order_id)
-        //     .expect("This order should be in HashMap for active limit orders; qed")
-        //     .clone();
-        // debug!("handle_limit_order: o: {:?}", o);
-        // let limit_price = o.limit_price().unwrap();
-        // match o.side() {
-        //     Side::Buy => {
-        //         // use candle information to specify execution
-        //         if self.low < limit_price {
-        //             // this would be a guaranteed fill no matter the queue position in orderbook
-        //             self.execute_limit(o)
-        //         }
-        //     }
-        //     Side::Sell => {
-        //         // use candle information to specify execution
-        //         if self.high > limit_price {
-        //             // this would be a guaranteed fill no matter the queue position in orderbook
-        //             self.execute_limit(o)
-        //         }
-        //     }
-        // }
     }
 
     #[inline(always)]
