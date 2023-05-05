@@ -21,8 +21,6 @@ where
     entry_price: QuoteCurrency,
     /// The position margin of account, same denotation as wallet_balance
     position_margin: M,
-    /// The order margin of account, same denotation as wallet_balance
-    order_margin: M,
 }
 
 impl<M> Position<M>
@@ -34,13 +32,11 @@ where
         size: M::PairedCurrency,
         entry_price: QuoteCurrency,
         position_margin: M,
-        order_margin: M,
     ) -> Self {
         Self {
             size,
             entry_price,
             position_margin,
-            order_margin,
         }
     }
 
@@ -60,12 +56,6 @@ where
     #[inline(always)]
     pub fn position_margin(&self) -> M {
         self.position_margin
-    }
-
-    /// Return the locked order margin
-    #[inline(always)]
-    pub fn order_margin(&self) -> M {
-        self.order_margin
     }
 
     /// Returns the implied leverage of the position based on the position value and the collateral backing it.
@@ -107,6 +97,7 @@ where
         }
         self.size = size;
         self.entry_price = price;
+        self.position_margin = position_margin;
 
         Ok(())
     }
@@ -117,18 +108,20 @@ where
     /// `amount`: The absolute amount to increase the position by.
     ///     The `amount` must have been approved by the `RiskEngine`.
     /// `price`: The price at which it is sold.
+    /// `additional_margin`: The additional margin deposited as collateral.
     ///
     pub(crate) fn increase_long(
         &mut self,
         amount: M::PairedCurrency,
         price: QuoteCurrency,
-    ) -> Result<()> {
-        if amount <= M::PairedCurrency::new_zero() {
-            return Err(Error::InvalidAmount);
-        }
-        if self.size < M::PairedCurrency::new_zero() {
-            return Err(Error::OpenShort);
-        }
+        additional_margin: M,
+    ) {
+        debug_assert!(
+            amount > M::PairedCurrency::new_zero(),
+            "`amount` must be positive"
+        );
+        debug_assert!(self.size > M::PairedCurrency::new_zero(), "Short is open");
+
         let new_size = self.size + amount;
         self.entry_price = QuoteCurrency::new(
             (self.entry_price * self.size.inner() + price * amount.inner()).inner()
@@ -136,8 +129,6 @@ where
         );
 
         self.size = new_size;
-
-        Ok(())
     }
 
     /// Reduce a long position.
@@ -170,17 +161,22 @@ where
     /// `amount`: The absolute amount to increase the short position by.
     ///     The `amount` must have been approved by the `RiskEngine`.
     /// `price`: The entry price.
+    /// `additional_margin`: The additional margin deposited as collateral.
+    ///
     pub(crate) fn increase_short(
         &mut self,
         amount: M::PairedCurrency,
         price: QuoteCurrency,
-    ) -> Result<()> {
-        if amount <= M::PairedCurrency::new_zero() {
-            return Err(Error::InvalidAmount);
-        }
-        if self.size > M::PairedCurrency::new_zero() {
-            return Err(Error::OpenLong);
-        }
+        additional_margin: M,
+    ) {
+        debug_assert!(
+            amount > M::PairedCurrency::new_zero(),
+            "Amount must be positive; qed"
+        );
+        debug_assert!(
+            self.size <= M::PairedCurrency::new_zero(),
+            "Position must not be long; qed"
+        );
 
         let new_size = self.size - amount;
         self.entry_price = QuoteCurrency::new(
@@ -188,8 +184,6 @@ where
                 / new_size.inner().abs(),
         );
         self.size = new_size;
-
-        Ok(())
     }
 
     /// Reduce a short position
@@ -206,12 +200,15 @@ where
         amount: M::PairedCurrency,
         price: QuoteCurrency,
     ) -> Result<M> {
-        if self.size >= M::PairedCurrency::new_zero() {
-            return Err(Error::OpenLong);
-        }
-        if amount <= M::PairedCurrency::new_zero() || amount.into_negative() < self.size {
-            return Err(Error::InvalidAmount);
-        }
+        debug_assert!(
+            amount > M::PairedCurrency::new_zero(),
+            "Amount must be positive; qed"
+        );
+        debug_assert!(
+            amount.into_negative() < self.size,
+            "Amount must be smaller than net short position; qed"
+        );
+
         self.size = self.size + amount;
 
         Ok(M::pnl(self.entry_price, price, amount.into_negative()))
@@ -226,26 +223,19 @@ mod tests {
     #[test]
     fn increase_long() {
         let mut pos = Position::default();
-        pos.increase_long(quote!(150), quote!(120)).unwrap();
+        pos.increase_long(quote!(150), quote!(120));
         assert_eq!(pos.size, quote!(150));
         assert_eq!(pos.entry_price, quote!(120));
 
-        pos.increase_long(quote!(50), quote!(110)).unwrap();
+        pos.increase_long(quote!(50), quote!(110));
         assert_eq!(pos.size, quote!(200));
         assert_eq!(pos.entry_price, quote!(117.5));
-
-        // Make sure it does not work if a short position is set.
-        pos.size = quote!(-250);
-        assert_eq!(
-            pos.increase_long(quote!(150), quote!(120)),
-            Err(Error::OpenShort)
-        );
     }
 
     #[test]
     fn decrease_long() {
         let mut pos = Position::default();
-        pos.open_position(base!(1), quote!(150)).unwrap();
+        pos.open_position(base!(1), quote!(150));
         assert!(pos.decrease_long(base!(1.1), quote!(150)).is_err());
         assert_eq!(
             pos.decrease_long(base!(0.5), quote!(160)).unwrap(),
@@ -265,16 +255,9 @@ mod tests {
     #[test]
     fn increase_short() {
         let mut pos = Position::default();
-        pos.increase_short(base!(1), quote!(100)).unwrap();
+        pos.increase_short(base!(1), quote!(100));
         assert_eq!(pos.size, base!(-1));
         assert_eq!(pos.entry_price, quote!(100));
-
-        // Make sure it does not work with a long posiion
-        pos.size = base!(1);
-        assert_eq!(
-            pos.increase_short(base!(1), quote!(100)),
-            Err(Error::OpenLong)
-        );
     }
 
     #[test]
