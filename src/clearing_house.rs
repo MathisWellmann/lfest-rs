@@ -3,9 +3,9 @@
 use fpdec::Decimal;
 
 use crate::{
-    errors::{Error, Result},
     prelude::{Account, AccountTracker},
-    types::{Currency, MarginCurrency, QuoteCurrency},
+    quote,
+    types::{Currency, Fee, MarginCurrency, QuoteCurrency},
 };
 
 /// A clearing house acts as an intermediary in futures transactions.
@@ -65,7 +65,7 @@ where
     pub(crate) fn try_increase_long(
         &mut self,
         account: &mut Account<M::PairedCurrency>,
-        amount: S,
+        amount: M::PairedCurrency,
         price: QuoteCurrency,
     ) {
         let value = amount.convert(price);
@@ -88,20 +88,13 @@ where
     pub(crate) fn try_decrease_long(
         &mut self,
         account: &mut Account<M::PairedCurrency>,
-        amount: S,
+        amount: M::PairedCurrency,
         price: QuoteCurrency,
         fee: Fee,
         ts_ns: i64,
     ) {
-        if amount <= S::new_zero() {
-            return Err(Error::InvalidAmount);
-        }
-        if price < quote!(0) {
-            return Err(Error::InvalidPrice);
-        }
-        if self.position.size() <= S::new_zero() {
-            return Err(Error::OpenShort);
-        }
+        debug_assert!(amount > M::PairedCurrency::new_zero());
+        debug_assert!(price > quote!(0));
 
         let value = amount.convert(price);
         let pnl = self.position.decrease_long(amount, price)?;
@@ -111,8 +104,6 @@ where
         let net_pnl = pnl - fees;
         todo!("realize pnl or return it");
         // self.realize_pnl(net_pnl, ts_ns);
-
-        Ok(())
     }
 
     /// Tries to increase a short (or neutral) position of the account.
@@ -127,22 +118,16 @@ where
     pub(crate) fn try_increase_short(
         &mut self,
         account: &mut Account<M::PairedCurrency>,
-        amount: S,
+        amount: M::PairedCurrency,
         price: QuoteCurrency,
     ) {
-        if amount < S::new_zero() {
-            return Err(Error::InvalidAmount);
-        }
-        if price < quote!(0) {
-            return Err(Error::InvalidPrice);
-        }
+        debug_assert!(amount > M::PairedCurrency::new_zero());
+        debug_assert!(price > quote!(0));
 
         todo!("margin");
         self.position
             .increase_short(amount, price)
             .expect("Increasing a position here must work; qed");
-
-        Ok(())
     }
 
     /// Decrease a short position, realizing pnl while doing so.
@@ -156,20 +141,13 @@ where
     pub(crate) fn try_decrease_short(
         &mut self,
         account: &mut Account<M::PairedCurrency>,
-        amount: S,
+        amount: M::PairedCurrency,
         price: QuoteCurrency,
         fee: Fee,
         ts_ns: i64,
     ) {
-        if amount <= S::new_zero() {
-            return Err(Error::InvalidAmount);
-        }
-        if price < quote!(0) {
-            return Err(Error::InvalidPrice);
-        }
-        if self.position.size() >= S::new_zero() {
-            return Err(Error::OpenLong);
-        }
+        debug_assert!(amount > M::PairedCurrency::new_zero());
+        debug_assert!(price > quote!(0));
 
         let pnl = self.position.decrease_short(amount, price)?;
         let fees = amount.convert(price) * fee;
@@ -177,8 +155,6 @@ where
         let net_pnl = pnl - fees;
         todo!("realize profit");
         // self.realize_pnl(net_pnl, ts_ns);
-
-        Ok(())
     }
 
     /// Turn a long position into a short one by,
@@ -188,15 +164,11 @@ where
     pub(crate) fn try_turn_around_long(
         &mut self,
         account: &mut Account<M::PairedCurrency>,
-        amount: S,
+        amount: M::PairedCurrency,
         price: QuoteCurrency,
     ) {
-        if amount < S::new_zero() {
-            return Err(Error::NonPositive);
-        }
-        if price < quote!(0) {
-            return Err(Error::NonPositive);
-        }
+        debug_assert!(amount > M::PairedCurrency::new_zero());
+        debug_assert!(price > quote!(0));
 
         todo!()
     }
@@ -208,15 +180,11 @@ where
     pub(crate) fn try_turn_around_short(
         &mut self,
         account: &mut Account<M::PairedCurrency>,
-        amount: S,
+        amount: M::PairedCurrency,
         price: QuoteCurrency,
     ) {
-        if amount < S::new_zero() {
-            return Err(Error::NonPositive);
-        }
-        if price < quote!(0) {
-            return Err(Error::NonPositive);
-        }
+        debug_assert!(amount > M::PairedCurrency::new_zero());
+        debug_assert!(price > quote!(0));
 
         todo!()
     }
