@@ -1,7 +1,8 @@
 use crate::{
+    clearing_house::ClearingHouse,
     errors::Result,
     market_state::MarketState,
-    prelude::Account,
+    prelude::{Account, AccountTracker},
     types::{Currency, MarginCurrency, Order, QuoteCurrency, Side},
 };
 
@@ -11,20 +12,28 @@ use crate::{
 /// the ExecutionEngine takes over and executes the trade by sending the relevant trade details to the `ClearingHosue`,
 /// which **guarantees** the settlement of the trade.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct ExecutionEngine<S> {
-    __marker: std::marker::PhantomData<S>,
+pub(crate) struct ExecutionEngine<A, S> {
+    __marker: std::marker::PhantomData<(A, S)>,
 }
 
-impl<S> ExecutionEngine<S>
+impl<A, S> ExecutionEngine<A, S>
 where
+    A: AccountTracker<S::PairedCurrency>,
     S: Currency,
     S::PairedCurrency: MarginCurrency,
 {
+    pub(crate) fn new() -> Self {
+        Self {
+            __marker: std::marker::PhantomData,
+        }
+    }
+
     pub(crate) fn execute_market_order(
         &mut self,
         account: &mut Account<S>,
         market_state: &MarketState,
         mut order: Order<S>,
+        clearing_house: &ClearingHouse<A, S::PairedCurrency>,
     ) -> Result<Order<S>> {
         match order.side() {
             Side::Buy => {

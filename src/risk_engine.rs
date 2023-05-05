@@ -16,7 +16,7 @@ use crate::{
     contract_specification::ContractSpecification,
     market_state::MarketState,
     prelude::Account,
-    types::{Currency, MarginCurrency},
+    types::{Currency, Leverage, MarginCurrency},
 };
 
 pub(crate) struct InitialMargin<M>(M);
@@ -37,10 +37,15 @@ pub(crate) trait RiskEngine<M>
 where
     M: Currency + MarginCurrency,
 {
+    /// Checks if the account it able to satisfy the margin requirements.
+    ///
+    /// # Returns:
+    /// If Err, the account cannot satisfy the margin requirements.
     fn check_required_margin(
         &self,
-        trader: &Account<M::PairedCurrency>,
+        account: &Account<M::PairedCurrency>,
         notional_value: M,
+        leverage: Leverage,
     ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError>;
 
     /// Ensure the account has enough maintenance margin, to keep the position open.
@@ -83,8 +88,9 @@ where
 {
     fn check_required_margin(
         &self,
-        trader: &Account<M::PairedCurrency>,
+        account: &Account<M::PairedCurrency>,
         notional_value: M,
+        leverage: Leverage,
     ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError> {
         todo!()
     }

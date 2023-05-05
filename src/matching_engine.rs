@@ -2,6 +2,7 @@ use hashbrown::HashMap;
 
 use crate::{
     errors::Result,
+    market_state::MarketState,
     prelude::Error,
     types::{Currency, Order},
 };
@@ -13,6 +14,7 @@ pub struct MatchingEngine<S> {
     // Maps the `user_order_id` to the internal order nonce
     lookup_order_nonce_from_user_order_id: HashMap<u64, u64>,
     executed_orders: Vec<Order<S>>,
+    next_order_id: u64,
 }
 
 impl<S> MatchingEngine<S>
@@ -49,9 +51,6 @@ where
             "append_limit_order: order: {:?}, order_margin: {}",
             order, order_margin
         );
-
-        todo!("margining for orders");
-        // self.margin.lock_as_order_collateral(order_margin);
 
         // self.account_tracker.log_limit_order_submission();
         let order_id = order.id();
@@ -103,15 +102,29 @@ where
 
     /// Check if any active orders have been triggered by the most recent price
     /// action method is called after new external data has been consumed
-    pub(crate) fn handle_resting_orders(&mut self) {
-        let keys = Vec::from_iter(
-            self.user_account
-                .active_limit_orders()
-                .iter()
-                .map(|(i, _)| *i),
-        );
+    pub(crate) fn handle_resting_orders(&mut self, market_state: &MarketState) {
+        let keys = Vec::from_iter(self.active_limit_orders().iter().map(|(i, _)| *i));
         for i in keys {
-            self.handle_limit_order(i);
+            self.handle_limit_order();
         }
+    }
+
+    fn handle_limit_order(&mut self) {
+        todo!()
+    }
+
+    #[inline(always)]
+    fn next_order_id(&mut self) -> u64 {
+        self.next_order_id += 1;
+        self.next_order_id - 1
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn matching_engine_assigns_order_ids() {
+        todo!()
     }
 }
