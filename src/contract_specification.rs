@@ -25,8 +25,8 @@ where
 /// Which price to use in `mark-to-market` calculations
 #[derive(Debug, Clone)]
 pub enum MarkMethod {
-    /// Take the last market price.
-    LastPrice,
+    /// Take the last mid price of the market.
+    MidPrice,
     /// Use Fair Price Marking to avoid unnecessary liquidations in highly leveraged products.
     /// Without this system, unnecessary liquidations may occur if the market is being manipulated,
     /// is illiquid, or the Mark Price swings unnecessarily relative to its Index Price.

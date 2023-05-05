@@ -6,7 +6,7 @@ use crate::{
     errors::Error,
     market_state::MarketState,
     prelude::OrderError,
-    risk_engine::IsolatedMarginRiskEngine,
+    risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, Side},
 };
 
@@ -19,7 +19,6 @@ where
 {
     config: Config<S::PairedCurrency>,
     market_state: MarketState,
-    /// The actual user of the exchange
     user_account: Account<S>,
     risk_engine: IsolatedMarginRiskEngine<S::PairedCurrency>,
     clearing_house: ClearingHouse<A, S::PairedCurrency>,
@@ -85,8 +84,15 @@ where
         timestamp_ns: u64,
         market_update: MarketUpdate,
     ) -> Result<(Vec<Order<S>>, bool), Error> {
-        self.market_state.update_state(timestamp_ns, market_update);
-        todo!("risk engine checks for liquidation");
+        self.market_state
+            .update_state(timestamp_ns, market_update)?;
+        if let Err(e) = self
+            .risk_engine
+            .check_maintenance_margin(&self.market_state, &self.user_account)
+        {
+            todo!("liquidate position");
+            return Err(e.into());
+        };
         todo!("check for order executions");
     }
 

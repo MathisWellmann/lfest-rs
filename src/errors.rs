@@ -1,5 +1,7 @@
+use crate::risk_engine::RiskError;
+
 /// Defines the possible order errors that can occur when submitting a new order
-#[derive(thiserror::Error, Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(thiserror::Error, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum OrderError {
     #[error("Maximum number of active orders reached")]
@@ -111,6 +113,12 @@ pub enum Error {
 
     #[error("The provided value is not positive")]
     NonPositive,
+
+    #[error(transparent)]
+    OrderError(#[from] OrderError),
+
+    #[error(transparent)]
+    RiskError(#[from] RiskError),
 }
 
 /// This is defined as a convenience.

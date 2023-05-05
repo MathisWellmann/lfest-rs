@@ -14,6 +14,7 @@
 
 use crate::{
     contract_specification::ContractSpecification,
+    market_state::MarketState,
     prelude::Account,
     types::{Currency, MarginCurrency},
 };
@@ -23,10 +24,13 @@ pub(crate) struct InitialMargin<M>(M);
 pub(crate) struct MaintenanceMargin<M>(M);
 
 /// The error that the `RiskEngine` outputs, if any.
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
 pub enum RiskError {
     #[error("The `Trader` does not have enough balance.")]
     NotEnoughAvailableBalance,
+
+    #[error("The position will be liquidated!")]
+    Liquidate,
 }
 
 pub(crate) trait RiskEngine<M>
@@ -38,6 +42,22 @@ where
         trader: &Account<M::PairedCurrency>,
         notional_value: M,
     ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError>;
+
+    /// Ensure the account has enough maintenance margin, to keep the position open.
+    /// The maintenance margin is the minimum amount of funds that must be maintained in a trader's account
+    /// to ensure that they can meet any losses that may occur due to adverse price movements in the futures contract.
+    ///
+    /// # Arguments:
+    /// `market_state`: The current market information.
+    /// `account`: The user account.
+    ///
+    /// # Returns:
+    /// If Err, the account must be liquidated.
+    fn check_maintenance_margin(
+        &self,
+        market_state: &MarketState,
+        account: &Account<M::PairedCurrency>,
+    ) -> Result<(), RiskError>;
 }
 
 #[derive(Debug, Clone)]
@@ -67,5 +87,18 @@ where
         notional_value: M,
     ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError> {
         todo!()
+    }
+
+    fn check_maintenance_margin(
+        &self,
+        market_state: &MarketState,
+        account: &Account<<M as Currency>::PairedCurrency>,
+    ) -> Result<(), RiskError> {
+        let pos_value = account.position().size().convert(market_state.mid_price());
+        if pos_value < account.position().position_margin() {
+            return Err(RiskError::Liquidate);
+        }
+
+        Ok(())
     }
 }
