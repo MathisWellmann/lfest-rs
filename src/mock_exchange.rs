@@ -1,6 +1,8 @@
+//! Convenince function used in tests.
+
 use fpdec::{Dec, Decimal};
 
-use crate::prelude::*;
+use crate::{account_tracker::NoAccountTracker, prelude::*};
 
 /// Constructs a mock exchange for testing.
 pub fn mock_exchange() -> Exchange<NoAccountTracker, BaseCurrency> {
@@ -14,8 +16,8 @@ pub fn mock_exchange() -> Exchange<NoAccountTracker, BaseCurrency> {
         quantity_filter: QuantityFilter::default(),
     };
     let config = Config::new(
-        fee!(0.001),
-        fee!(0.001),
+        fee!(0.0002),
+        fee!(0.0006),
         quote!(1000),
         200,
         contract_specification,

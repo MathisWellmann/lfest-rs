@@ -161,13 +161,8 @@ where
 
 #[cfg(test)]
 mod tests {
-
-    use super::*;
-    use crate::mock_exchange;
-
     #[test]
     fn submit_order() {
-        let mut exchange = mock_exchange();
         todo!()
     }
 }

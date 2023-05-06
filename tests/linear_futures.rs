@@ -1,25 +1,12 @@
 //! Test file for the linear futures mode of the exchange
 
-use lfest::{account_tracker::NoAccountTracker, prelude::*};
+use lfest::{mock_exchange, prelude::*};
 
 #[test]
 fn lin_long_market_win_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        quote!(1000.0),
-        leverage!(1.0),
-        true,
-        100,
-        PriceFilter::default(),
-        QuantityFilter::default(),
-    )
-    .unwrap();
-
-    let acc_tracker = NoAccountTracker::default();
-    let mut exchange = Exchange::new(acc_tracker, config);
+    let mut exchange = mock_exchange();
     let _ = exchange
         .update_state(
             0,

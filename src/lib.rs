@@ -19,13 +19,14 @@ mod exchange;
 mod execution_engine;
 mod market_state;
 mod matching_engine;
-#[cfg(test)]
 mod mock_exchange;
 mod order_filters;
 mod position;
 mod risk_engine;
 mod types;
 mod utils;
+
+pub use mock_exchange::mock_exchange;
 
 /// Exports common types
 pub mod prelude {
