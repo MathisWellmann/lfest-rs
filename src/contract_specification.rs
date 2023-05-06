@@ -9,17 +9,17 @@ where
     S: Currency,
 {
     /// Identifying ticker symbol
-    ticker: String,
+    pub ticker: String,
     /// The initial margin as a fraction.
-    initial_margin: Decimal,
+    pub initial_margin: Decimal,
     /// The required maintenance margin as a fraction.
-    maintenance_margin: Decimal,
+    pub maintenance_margin: Decimal,
     /// The methods for computing `mark-to-market`
-    mark_method: MarkMethod,
+    pub mark_method: MarkMethod,
     /// Pricing rules
-    price_filter: PriceFilter,
+    pub price_filter: PriceFilter,
     /// Quantity rules
-    quantity_filter: QuantityFilter<S>,
+    pub quantity_filter: QuantityFilter<S>,
 }
 
 /// Which price to use in `mark-to-market` calculations

@@ -36,7 +36,7 @@ where
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
     pub fn new(account_tracker: A, config: Config<S::PairedCurrency>) -> Self {
-        let market_state = MarketState::new(config.price_filter().clone());
+        let market_state = MarketState::new(config.contract_specification().price_filter.clone());
         let account = Account::new(config.starting_balance());
         let risk_engine = IsolatedMarginRiskEngine::<S::PairedCurrency>::new(
             config.contract_specification().clone(),
@@ -118,9 +118,13 @@ where
         trace!("submit_order: {:?}", order);
 
         // Basic checks
-        self.config.quantity_filter().validate_order(&order)?;
         self.config
-            .price_filter()
+            .contract_specification()
+            .quantity_filter
+            .validate_order(&order)?;
+        self.config
+            .contract_specification()
+            .price_filter
             .validate_order(&order, self.market_state.mid_price())?;
 
         order.set_timestamp(self.market_state.current_timestamp_ns());
@@ -158,35 +162,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use fpdec::{Dec, Decimal};
 
     use super::*;
-    use crate::{
-        account_tracker::NoAccountTracker, contract_specification::ContractSpecification, fee,
-        quote, types::BaseCurrency,
-    };
-
-    fn mock_exchange() -> Exchange<NoAccountTracker, BaseCurrency> {
-        let acc_tracker = NoAccountTracker::default();
-        let contract_specification = ContractSpecification {
-            ticker: "TESTUSD".to_string(),
-            initial_margin: Dec!(0.01),
-            maintenance_margin: Dec!(0.02),
-            mark_method: todo!(),
-            price_filter: todo!(),
-            quantity_filter: todo!(),
-        };
-        let config = Config {
-            fee_maker: fee!(0.001),
-            fee_taker: fee!(0.001),
-            starting_balance: quote!(1000),
-            max_num_open_orders: 200,
-            price_filter: PriceFilter::default(),
-            quantity_filter: QuantityFilter::default(),
-            contract_specification,
-        };
-        Exchange::new(acc_tracker, config)
-    }
 
     #[test]
     fn submit_order() {

@@ -1,7 +1,6 @@
 use crate::{
     contract_specification::ContractSpecification,
     errors::{Error, Result},
-    prelude::{PriceFilter, QuantityFilter},
     types::{Currency, Fee},
 };
 
@@ -24,10 +23,6 @@ where
     starting_balance: M,
     /// The maximum number of open orders the user can have at any given time
     max_num_open_orders: usize,
-    /// Filters for limit order pricing
-    price_filter: PriceFilter,
-    /// Filters for order quantity
-    quantity_filter: QuantityFilter<M::PairedCurrency>,
     /// The contract specification.
     contract_specification: ContractSpecification<M::PairedCurrency>,
 }
@@ -57,8 +52,6 @@ where
         fee_taker: Fee,
         starting_balance: M,
         max_num_open_orders: usize,
-        price_filter: PriceFilter,
-        quantity_filter: QuantityFilter<M::PairedCurrency>,
         contract_specification: ContractSpecification<M::PairedCurrency>,
     ) -> Result<Self> {
         if max_num_open_orders == 0 {
@@ -67,13 +60,12 @@ where
         if starting_balance <= M::new_zero() {
             return Err(Error::InvalidStartingBalance);
         }
+
         Ok(Config {
             fee_maker,
             fee_taker,
             starting_balance,
             max_num_open_orders,
-            price_filter,
-            quantity_filter,
             contract_specification,
         })
     }
@@ -100,18 +92,6 @@ where
     #[inline(always)]
     pub fn max_num_open_orders(&self) -> usize {
         self.max_num_open_orders
-    }
-
-    /// Return a reference to the `PriceFilter`
-    #[inline(always)]
-    pub fn price_filter(&self) -> &PriceFilter {
-        &self.price_filter
-    }
-
-    /// Return a reference to the `QuantityFilter`
-    #[inline(always)]
-    pub fn quantity_filter(&self) -> &QuantityFilter<M::PairedCurrency> {
-        &self.quantity_filter
     }
 
     /// Return a reference to the `ContractSpecification`
