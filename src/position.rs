@@ -123,19 +123,19 @@ where
     ///
     pub(crate) fn increase_long(
         &mut self,
-        amount: M::PairedCurrency,
+        quantity: M::PairedCurrency,
         price: QuoteCurrency,
         additional_margin: M,
     ) {
         debug_assert!(
-            amount > M::PairedCurrency::new_zero(),
+            quantity > M::PairedCurrency::new_zero(),
             "`amount` must be positive"
         );
         debug_assert!(self.size >= M::PairedCurrency::new_zero(), "Short is open");
 
-        let new_size = self.size + amount;
+        let new_size = self.size + quantity;
         self.entry_price = QuoteCurrency::new(
-            (self.entry_price * self.size.inner() + price * amount.inner()).inner()
+            (self.entry_price * self.size.inner() + price * quantity.inner()).inner()
                 / new_size.inner(),
         );
 
@@ -153,18 +153,18 @@ where
     /// If Ok, the net realized profit and loss for that specific futures contract.
     pub(crate) fn decrease_long(
         &mut self,
-        amount: M::PairedCurrency,
+        quantity: M::PairedCurrency,
         price: QuoteCurrency,
     ) -> Result<M> {
         if self.size < M::PairedCurrency::new_zero() {
             return Err(Error::OpenShort);
         }
-        if amount <= M::PairedCurrency::new_zero() || amount > self.size {
+        if quantity <= M::PairedCurrency::new_zero() || quantity > self.size {
             return Err(Error::InvalidAmount);
         }
-        self.size = self.size - amount;
+        self.size = self.size - quantity;
 
-        Ok(M::pnl(self.entry_price, price, amount))
+        Ok(M::pnl(self.entry_price, price, quantity))
     }
 
     /// Increase a short position.
@@ -177,12 +177,12 @@ where
     ///
     pub(crate) fn increase_short(
         &mut self,
-        amount: M::PairedCurrency,
+        quantity: M::PairedCurrency,
         price: QuoteCurrency,
         additional_margin: M,
     ) {
         debug_assert!(
-            amount > M::PairedCurrency::new_zero(),
+            quantity > M::PairedCurrency::new_zero(),
             "Amount must be positive; qed"
         );
         debug_assert!(
@@ -190,9 +190,9 @@ where
             "Position must not be long; qed"
         );
 
-        let new_size = self.size - amount;
+        let new_size = self.size - quantity;
         self.entry_price = QuoteCurrency::new(
-            (self.entry_price.inner() * self.size.inner().abs() + price.inner() * amount.inner())
+            (self.entry_price.inner() * self.size.inner().abs() + price.inner() * quantity.inner())
                 / new_size.inner().abs(),
         );
         self.size = new_size;
@@ -210,20 +210,20 @@ where
     /// If Ok, the net realized profit and loss for that specific futures contract.
     pub(crate) fn decrease_short(
         &mut self,
-        amount: M::PairedCurrency,
+        quantity: M::PairedCurrency,
         price: QuoteCurrency,
     ) -> Result<M> {
         debug_assert!(
-            amount > M::PairedCurrency::new_zero(),
+            quantity > M::PairedCurrency::new_zero(),
             "Amount must be positive; qed"
         );
         debug_assert!(
-            amount.into_negative() < self.size,
+            quantity.into_negative() < self.size,
             "Amount must be smaller than net short position; qed"
         );
 
-        self.size = self.size + amount;
+        self.size = self.size + quantity;
 
-        Ok(M::pnl(self.entry_price, price, amount.into_negative()))
+        Ok(M::pnl(self.entry_price, price, quantity.into_negative()))
     }
 }

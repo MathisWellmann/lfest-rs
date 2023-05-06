@@ -74,7 +74,7 @@ where
         if quantity > M::PairedCurrency::new_zero() {
             self.settle_buy_order(account, quantity, fill_price, req_margin, fee);
         } else {
-            self.settle_sell_order(account, quantity, fill_price, req_margin, fee);
+            self.settle_sell_order(account, quantity.abs(), fill_price, req_margin, fee);
         }
     }
 
@@ -113,6 +113,8 @@ where
             account
                 .position
                 .increase_short(quantity, fill_price, req_margin);
+            let fee = quantity.convert(fill_price) * fee;
+            account.wallet_balance -= fee;
         }
     }
 }

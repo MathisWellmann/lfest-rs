@@ -97,6 +97,19 @@ where
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
     ) -> Result<M, RiskError> {
+        if account.position.size() <= M::PairedCurrency::new_zero() {
+            let notional_value = order.quantity().convert(fill_price);
+            let margin_req = notional_value / account.desired_leverage;
+            if margin_req > account.available_balance() {
+                return Err(RiskError::NotEnoughAvailableBalance);
+            }
+            return Ok(margin_req);
+        }
+        // Else its a long position which needs to be reduced
+        if order.quantity() <= account.position.size() {
+            // The order strictly reduces the position, so no additional margin is required.
+            return Ok(M::new_zero());
+        }
         todo!("handle_market_sell_order")
     }
 

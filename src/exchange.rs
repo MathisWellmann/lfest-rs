@@ -171,7 +171,17 @@ mod tests {
     use crate::{mock_exchange_base, prelude::*};
 
     #[test]
-    fn submit_order() {
+    fn submit_market_buy_order_reject() {
+        todo!()
+    }
+
+    #[test]
+    fn submit_market_sell_order_reject() {
+        todo!()
+    }
+
+    #[test]
+    fn submit_market_buy_order() {
         let mut exchange = mock_exchange_base();
         assert_eq!(
             exchange
@@ -197,8 +207,33 @@ mod tests {
             // - fee
             quote!(495) - quote!(0.303)
         );
+    }
 
-        // TODO: test more
-        todo!()
+    #[test]
+    fn submit_market_sell_order() {
+        let mut exchange = mock_exchange_base();
+        assert_eq!(
+            exchange
+                .update_state(0, bba!(quote!(100), quote!(101)))
+                .unwrap(),
+            vec![]
+        );
+
+        let order = Order::market(Side::Sell, base!(5)).unwrap();
+        exchange.submit_order(order).unwrap();
+        // make sure its excuted immediately
+        assert_eq!(
+            exchange.account().position,
+            Position {
+                size: base!(-5),
+                entry_price: quote!(100),
+                position_margin: quote!(500),
+            }
+        );
+        assert_eq!(
+            exchange.account().available_balance(),
+            // - fee
+            quote!(500) - quote!(0.3)
+        );
     }
 }
