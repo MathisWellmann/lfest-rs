@@ -159,6 +159,7 @@ where
                     quantity,
                     fill_price,
                     self.config.contract_specification().fee_taker,
+                    self.market_state.current_timestamp_ns(),
                 );
                 order.mark_executed();
 

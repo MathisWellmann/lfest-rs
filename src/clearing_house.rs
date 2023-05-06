@@ -63,37 +63,41 @@ where
     /// `fee`: The fee fraction for this type of order settlement.
     ///
     pub(crate) fn settle_filled_order(
-        &self,
+        &mut self,
         account: &mut Account<M>,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
         fee: Fee,
+        ts_ns: i64,
     ) {
         if quantity > M::PairedCurrency::new_zero() {
-            self.settle_buy_order(account, quantity, fill_price, fee);
+            self.settle_buy_order(account, quantity, fill_price, fee, ts_ns);
         } else {
-            self.settle_sell_order(account, quantity.abs(), fill_price, fee);
+            self.settle_sell_order(account, quantity.abs(), fill_price, fee, ts_ns);
         }
     }
 
     fn settle_buy_order(
-        &self,
+        &mut self,
         account: &mut Account<M>,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
         fee: Fee,
+        ts_ns: i64,
     ) {
+        let notional_value = quantity.convert(fill_price);
+        let fee = notional_value * fee;
+        account.wallet_balance -= fee;
+        self.account_tracker.log_fee(fee);
+
         if account.position.size() >= M::PairedCurrency::new_zero() {
             account.position.increase_long(quantity, fill_price);
-            let fee = quantity.convert(fill_price) * fee;
-            account.wallet_balance -= fee;
         } else {
             if quantity.into_negative() >= account.position.size {
                 // Strictly decrease the short position
                 let rpnl = account.position.decrease_short(quantity, fill_price);
-                let fee = quantity.convert(fill_price) * fee;
-                let net_rpnl = rpnl - fee;
-                account.wallet_balance += net_rpnl;
+                self.account_tracker.log_rpnl(rpnl, ts_ns);
+                account.wallet_balance += rpnl;
             } else {
                 let new_long_size = quantity - account.position.size().abs();
 
@@ -102,9 +106,8 @@ where
                     .position
                     .decrease_short(account.position.size().abs(), fill_price);
                 // Realize the profit without transaction fees
-                let fee = quantity.convert(fill_price) * fee;
-                let net_rpnl = rpnl - fee;
-                account.wallet_balance += net_rpnl;
+                account.wallet_balance += rpnl;
+                self.account_tracker.log_rpnl(rpnl, ts_ns);
 
                 // also open a long
                 account.position.open_position(new_long_size, fill_price);
@@ -113,20 +116,24 @@ where
     }
 
     fn settle_sell_order(
-        &self,
+        &mut self,
         account: &mut Account<M>,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
         fee: Fee,
+        ts_ns: i64,
     ) {
+        let notional_value = quantity.convert(fill_price);
+        let fee = notional_value * fee;
+        account.wallet_balance -= fee;
+        self.account_tracker.log_fee(fee);
+
         if account.position.size() > M::PairedCurrency::new_zero() {
             if quantity <= account.position.size() {
                 // Decrease the long only
-                let notional_value = quantity.convert(fill_price);
                 let rpnl = account.position.decrease_long(quantity, fill_price);
-                let fee = notional_value * fee;
-                let net_rpnl = rpnl - fee;
-                account.wallet_balance += net_rpnl;
+                account.wallet_balance += rpnl;
+                self.account_tracker.log_rpnl(rpnl, ts_ns);
             } else {
                 let new_short_size = quantity - account.position.size();
 
@@ -136,9 +143,8 @@ where
                     .decrease_long(account.position.size(), fill_price);
 
                 // Realize the profit without transaction fees
-                let fee = quantity.convert(fill_price) * fee;
-                let net_rpnl = rpnl - fee;
-                account.wallet_balance += net_rpnl;
+                account.wallet_balance += rpnl;
+                self.account_tracker.log_rpnl(rpnl, ts_ns);
 
                 // Open a short as well
                 account
@@ -148,8 +154,6 @@ where
         } else {
             // Increase short position
             account.position.increase_short(quantity, fill_price);
-            let fee = quantity.convert(fill_price) * fee;
-            account.wallet_balance -= fee;
         }
     }
 }
