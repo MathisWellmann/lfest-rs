@@ -15,7 +15,6 @@ mod clearing_house;
 mod config;
 mod contract_specification;
 mod cornish_fisher;
-mod errors;
 mod exchange;
 mod execution_engine;
 mod market_state;
@@ -39,7 +38,6 @@ pub mod prelude {
         base, bba,
         config::Config,
         contract_specification::*,
-        errors::{Error, OrderError, Result},
         exchange::Exchange,
         fee, leverage,
         order_filters::{PriceFilter, QuantityFilter},

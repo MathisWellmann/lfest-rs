@@ -1,4 +1,5 @@
 mod currency;
+mod errors;
 mod fee;
 mod leverage;
 mod market_update;
@@ -7,6 +8,7 @@ mod order_type;
 mod side;
 
 pub use currency::{BaseCurrency, Currency, MarginCurrency, QuoteCurrency};
+pub use errors::*;
 pub use fee::{Fee, FeeType};
 pub use leverage::Leverage;
 pub use market_update::MarketUpdate;

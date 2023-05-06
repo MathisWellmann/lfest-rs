@@ -1,7 +1,6 @@
 use crate::{
     contract_specification::ContractSpecification,
-    errors::{Error, Result},
-    types::{Currency, Fee},
+    types::{Currency, Error, Fee, Result},
 };
 
 #[derive(Debug, Clone)]

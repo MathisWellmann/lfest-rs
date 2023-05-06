@@ -3,12 +3,11 @@ use crate::{
     account_tracker::AccountTracker,
     clearing_house::ClearingHouse,
     config::Config,
-    errors::Result,
     execution_engine::ExecutionEngine,
     market_state::MarketState,
     matching_engine::MatchingEngine,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
-    types::{Currency, Leverage, MarginCurrency, MarketUpdate, Order, OrderType, Side},
+    types::{Currency, Leverage, MarginCurrency, MarketUpdate, Order, OrderType, Result, Side},
 };
 
 #[derive(Debug, Clone)]

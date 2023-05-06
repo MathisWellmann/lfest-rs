@@ -1,9 +1,8 @@
 use fpdec::Decimal;
 
 use crate::{
-    errors::{Error, Result},
     quote,
-    types::{Currency, MarginCurrency, QuoteCurrency},
+    types::{Currency, Error, MarginCurrency, QuoteCurrency, Result},
 };
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]

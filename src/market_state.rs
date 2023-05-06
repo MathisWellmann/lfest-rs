@@ -1,10 +1,9 @@
 use fpdec::Decimal;
 
 use crate::{
-    errors::Result,
     prelude::PriceFilter,
     quote,
-    types::{Currency, MarketUpdate, QuoteCurrency},
+    types::{Currency, MarketUpdate, QuoteCurrency, Result},
 };
 
 #[derive(Debug, Clone)]

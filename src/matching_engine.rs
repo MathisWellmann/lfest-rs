@@ -1,10 +1,9 @@
 use hashbrown::HashMap;
 
 use crate::{
-    errors::Result,
     market_state::MarketState,
     prelude::Error,
-    types::{Currency, Order},
+    types::{Currency, Order, Result},
 };
 
 /// Super crude `MatchingEngine` that only holds orders for a single user account.
