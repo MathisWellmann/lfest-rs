@@ -23,6 +23,8 @@ mod mock_exchange;
 mod order_filters;
 mod position;
 mod risk_engine;
+#[cfg(test)]
+mod tests;
 mod types;
 mod utils;
 
