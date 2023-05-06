@@ -39,6 +39,14 @@ where
         &self.position
     }
 
+    /// Return the available balance of the `Account`
+    #[inline(always)]
+    pub fn available_balance(&self) -> M {
+        // TODO - order_margin
+        warn!("order_margin not included in `available_balance` calculation!");
+        self.wallet_balance - self.position.position_margin
+    }
+
     /// Allows the user to update their desired leverage.
     /// This will deposit or release variation margin from the position if any.
     ///

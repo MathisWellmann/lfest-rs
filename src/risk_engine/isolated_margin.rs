@@ -3,7 +3,7 @@ use crate::{
     contract_specification::ContractSpecification,
     market_state::MarketState,
     prelude::Account,
-    types::{Currency, MarginCurrency, Order, OrderType},
+    types::{Currency, MarginCurrency, Order, OrderType, Side},
 };
 
 #[derive(Debug, Clone)]
@@ -34,8 +34,8 @@ where
         order: &Order<M::PairedCurrency>,
     ) -> Result<M, RiskError> {
         match order.order_type() {
-            OrderType::Market => todo!(),
-            OrderType::Limit => todo!(),
+            OrderType::Market => self.handle_market_order(market_state, account, order),
+            OrderType::Limit => self.handle_limit_order(market_state, account, order),
         }
     }
 
@@ -50,5 +50,83 @@ where
         }
 
         Ok(())
+    }
+}
+
+impl<M> IsolatedMarginRiskEngine<M>
+where
+    M: Currency + MarginCurrency,
+{
+    fn handle_market_order(
+        &self,
+        market_state: &MarketState,
+        account: &Account<M>,
+        order: &Order<M::PairedCurrency>,
+    ) -> Result<M, RiskError> {
+        match order.side() {
+            Side::Buy => self.handle_market_buy_order(market_state, account, order),
+            Side::Sell => self.handle_market_sell_order(market_state, account, order),
+        }
+    }
+
+    fn handle_market_buy_order(
+        &self,
+        market_state: &MarketState,
+        account: &Account<M>,
+        order: &Order<M::PairedCurrency>,
+    ) -> Result<M, RiskError> {
+        if account.position.size() >= M::PairedCurrency::new_zero() {
+            let notional_value = order.quantity().convert(market_state.ask());
+            let margin_req = notional_value / account.desired_leverage;
+            if margin_req > account.available_balance() {
+                return Err(RiskError::NotEnoughAvailableBalance);
+            }
+            return Ok(margin_req);
+        }
+        // Else its a short position which needs to be reduced
+        if order.quantity().into_negative() <= account.position.size() {
+            // The order strictly reduces the position, so no additional margin is required.
+            return Ok(M::new_zero());
+        }
+        todo!("The order reduces the short and puts on a long")
+    }
+
+    fn handle_market_sell_order(
+        &self,
+        market_state: &MarketState,
+        account: &Account<M>,
+        order: &Order<M::PairedCurrency>,
+    ) -> Result<M, RiskError> {
+        todo!("handle_market_sell_order")
+    }
+
+    fn handle_limit_order(
+        &self,
+        market_state: &MarketState,
+        account: &Account<M>,
+        order: &Order<M::PairedCurrency>,
+    ) -> Result<M, RiskError> {
+        match order.side() {
+            Side::Buy => self.handle_limit_buy_order(market_state, account, order),
+            Side::Sell => self.handle_limit_sell_order(market_state, account, order),
+        }
+    }
+
+    fn handle_limit_buy_order(
+        &self,
+        market_state: &MarketState,
+        account: &Account<M>,
+        order: &Order<M::PairedCurrency>,
+    ) -> Result<M, RiskError> {
+        todo!("handle_limit_buy_order")
+    }
+
+    fn handle_limit_sell_order(
+        &self,
+        market_state: &MarketState,
+        account: &Account<M>,
+        order: &Order<M::PairedCurrency>,
+    ) -> Result<M, RiskError> {
+        todo!("handle_limit_sell_order")
     }
 }
