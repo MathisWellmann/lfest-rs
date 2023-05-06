@@ -13,9 +13,6 @@ where
 {
     pub(crate) wallet_balance: M,
     pub(crate) position: Position<M>,
-    /// Because the `Account` only holds 1 `Position`, the `desired_leverage` is stored here,
-    /// but its closely coupled with the value and margin of the position.
-    pub(crate) desired_leverage: Leverage,
 }
 
 impl<M> Account<M>
@@ -23,13 +20,12 @@ where
     M: Currency + MarginCurrency,
 {
     /// Create a new [`Account`] instance.
-    pub(crate) fn new(starting_balance: M, desired_leverage: Leverage) -> Self {
-        let position = Position::default();
+    pub(crate) fn new(starting_balance: M, leverage: Leverage) -> Self {
+        let position = Position::new(leverage);
 
         Self {
             wallet_balance: starting_balance,
             position,
-            desired_leverage,
         }
     }
 

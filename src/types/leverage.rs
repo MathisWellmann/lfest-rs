@@ -9,7 +9,7 @@ macro_rules! leverage {
 }
 
 /// Leverage
-#[derive(Default, Debug, Clone, Copy, PartialEq, Display)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Display, Eq)]
 pub struct Leverage(u8);
 
 impl Leverage {

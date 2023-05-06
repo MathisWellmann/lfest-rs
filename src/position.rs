@@ -2,7 +2,7 @@ use fpdec::Decimal;
 
 use crate::{
     quote,
-    types::{Currency, Error, MarginCurrency, QuoteCurrency, Result},
+    types::{Currency, Error, Leverage, MarginCurrency, QuoteCurrency, Result},
 };
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
@@ -20,22 +20,18 @@ where
     pub(crate) entry_price: QuoteCurrency,
     /// The position margin of account, same denotation as wallet_balance
     pub(crate) position_margin: M,
+    /// The position leverage,
+    pub(crate) leverage: Leverage,
 }
 
 impl<M> Position<M>
 where
     M: Currency + MarginCurrency,
 {
-    #[cfg(test)]
-    pub(crate) fn new(
-        size: M::PairedCurrency,
-        entry_price: QuoteCurrency,
-        position_margin: M,
-    ) -> Self {
+    pub(crate) fn new(leverage: Leverage) -> Self {
         Self {
-            size,
-            entry_price,
-            position_margin,
+            leverage,
+            ..Default::default()
         }
     }
 
@@ -151,20 +147,20 @@ where
     ///
     /// # Returns:
     /// If Ok, the net realized profit and loss for that specific futures contract.
-    pub(crate) fn decrease_long(
-        &mut self,
-        quantity: M::PairedCurrency,
-        price: QuoteCurrency,
-    ) -> Result<M> {
-        if self.size < M::PairedCurrency::new_zero() {
-            return Err(Error::OpenShort);
-        }
-        if quantity <= M::PairedCurrency::new_zero() || quantity > self.size {
-            return Err(Error::InvalidAmount);
-        }
+    #[must_use]
+    pub(crate) fn decrease_long(&mut self, quantity: M::PairedCurrency, price: QuoteCurrency) -> M {
+        debug_assert!(
+            self.size > M::PairedCurrency::new_zero(),
+            "Open short or no position"
+        );
+        debug_assert!(quantity > M::PairedCurrency::new_zero());
+        debug_assert!(quantity <= self.size, "Quantity larger than position size");
+
         self.size = self.size - quantity;
 
-        Ok(M::pnl(self.entry_price, price, quantity))
+        self.position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
+
+        M::pnl(self.entry_price, price, quantity)
     }
 
     /// Increase a short position.

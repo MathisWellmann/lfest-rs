@@ -77,7 +77,7 @@ where
     ) -> Result<M, RiskError> {
         if account.position.size() >= M::PairedCurrency::new_zero() {
             let notional_value = order.quantity().convert(fill_price);
-            let margin_req = notional_value / account.desired_leverage;
+            let margin_req = notional_value / account.position.leverage;
             let fee = notional_value * self.contract_spec.fee_taker;
             if margin_req + fee > account.available_balance() {
                 return Err(RiskError::NotEnoughAvailableBalance);
@@ -100,7 +100,7 @@ where
     ) -> Result<M, RiskError> {
         if account.position.size() <= M::PairedCurrency::new_zero() {
             let notional_value = order.quantity().convert(fill_price);
-            let margin_req = notional_value / account.desired_leverage;
+            let margin_req = notional_value / account.position.leverage;
             let fee = notional_value * self.contract_spec.fee_taker;
             if margin_req + fee > account.available_balance() {
                 return Err(RiskError::NotEnoughAvailableBalance);

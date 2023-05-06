@@ -107,9 +107,20 @@ where
         fee: Fee,
     ) {
         if account.position.size() > M::PairedCurrency::new_zero() {
-            // TODO: decrease long position (maybe open short)
-            todo!()
+            if quantity <= account.position.size() {
+                // Decrease the long only
+                let notional_value = quantity.convert(fill_price);
+                let rpnl = account.position.decrease_long(quantity, fill_price);
+                let fee = notional_value * fee;
+                let net_rpnl = rpnl - fee;
+                account.wallet_balance += net_rpnl;
+            } else {
+                // TODO: Close the log
+                // TODO: open a short as well
+                todo!()
+            }
         } else {
+            // Increase short position
             account
                 .position
                 .increase_short(quantity, fill_price, req_margin);
