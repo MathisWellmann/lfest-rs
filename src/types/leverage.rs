@@ -1,29 +1,28 @@
 use derive_more::Display;
-use fpdec::Decimal;
 
 /// Allows the quick construction of `Leverage`
 #[macro_export]
 macro_rules! leverage {
     ( $a:literal ) => {{
-        Leverage::new(fpdec::Dec!($a))
+        Leverage::new($a)
     }};
 }
 
 /// Leverage
-/// TODO: Change this to u8 type, as no fractional leverage should be possible
 #[derive(Default, Debug, Clone, Copy, PartialEq, Display)]
-pub struct Leverage(Decimal);
+pub struct Leverage(u8);
 
 impl Leverage {
     /// Create a new instance from a `Decimal` value
     #[inline(always)]
-    pub fn new(val: Decimal) -> Self {
+    pub fn new(val: u8) -> Self {
+        debug_assert!(val > 0);
         Self(val)
     }
 
     /// Get access to the inner `Decimal`
     #[inline(always)]
-    pub fn inner(&self) -> Decimal {
+    pub fn inner(&self) -> u8 {
         self.0
     }
 }

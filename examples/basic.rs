@@ -9,7 +9,7 @@ extern crate log;
 use std::{convert::TryInto, time::Instant};
 
 use lfest::{
-    account_tracker::{FullAccountTracker, ReturnsSource},
+    account_tracker::{FullAccountTracker, NoAccountTracker, ReturnsSource},
     prelude::*,
 };
 use load_trades::load_prices_from_csv;
@@ -18,20 +18,24 @@ use rand::{thread_rng, Rng};
 fn main() {
     let t0 = Instant::now();
 
-    let starting_wb = base!(1.0);
+    let acc_tracker = NoAccountTracker::default();
+    let contract_specification = ContractSpecification {
+        ticker: "TESTUSD".to_string(),
+        initial_margin: Dec!(0.01),
+        maintenance_margin: Dec!(0.02),
+        mark_method: MarkMethod::MidPrice,
+        price_filter: PriceFilter::default(),
+        quantity_filter: QuantityFilter::default(),
+    };
     let config = Config::new(
         fee!(0.0002),
         fee!(0.0006),
-        starting_wb,
-        leverage!(1.0),
-        true,
-        100,
-        PriceFilter::default(),
-        QuantityFilter::default(),
+        quote!(1000),
+        200,
+        leverage!(1),
+        contract_specification,
     )
     .unwrap();
-
-    let acc_tracker = FullAccountTracker::new(starting_wb);
     let mut exchange = Exchange::new(acc_tracker, config);
 
     // load trades from csv file
