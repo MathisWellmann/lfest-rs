@@ -47,6 +47,11 @@ fn submit_market_sell_order() {
 }
 
 #[test]
+fn submit_market_sell_order_with_short_position() {
+    todo!()
+}
+
+#[test]
 fn submit_market_sell_order_with_long_position() {
     let mut exchange = mock_exchange_base();
     assert_eq!(
@@ -77,4 +82,9 @@ fn submit_market_sell_order_with_long_position() {
         // - fee - fee - spread loss
         quote!(1000) - quote!(0.54) - quote!(0.5346) - quote!(9)
     );
+}
+
+#[test]
+fn submit_market_order_turnaround_long() {
+    todo!()
 }
