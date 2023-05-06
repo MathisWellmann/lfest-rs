@@ -189,7 +189,19 @@ mod tests {
 
     #[test]
     fn submit_market_sell_order_reject() {
-        todo!()
+        let mut exchange = mock_exchange_base();
+        assert_eq!(
+            exchange
+                .update_state(0, bba!(quote!(100), quote!(101)))
+                .unwrap(),
+            vec![]
+        );
+
+        let order = Order::market(Side::Sell, base!(10)).unwrap();
+        assert_eq!(
+            exchange.submit_order(order),
+            Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
+        );
     }
 
     #[test]
