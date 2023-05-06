@@ -15,11 +15,11 @@ where
     /// The number of futures contracts making up the position.
     /// Denoted in the currency in which the size is valued.
     /// e.g.: XBTUSD has a contract size of 1 USD, so `M::PairedCurrency` is USD.
-    size: M::PairedCurrency,
+    pub(crate) size: M::PairedCurrency,
     /// The entry price of the position
-    entry_price: QuoteCurrency,
+    pub(crate) entry_price: QuoteCurrency,
     /// The position margin of account, same denotation as wallet_balance
-    position_margin: M,
+    pub(crate) position_margin: M,
 }
 
 impl<M> Position<M>

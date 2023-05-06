@@ -133,10 +133,11 @@ where
                     Side::Buy => self.market_state.ask(),
                     Side::Sell => self.market_state.bid(),
                 };
-                let notional_value = order.quantity().convert(price);
-                let req_margin = self
-                    .risk_engine
-                    .check_required_margin(&self.user_account, notional_value)?;
+                let req_margin = self.risk_engine.check_required_margin(
+                    &self.market_state,
+                    &self.user_account,
+                    &order,
+                )?;
                 // From here on, everything is infallible
                 self.execution_engine.execute_market_order(
                     &mut self.user_account,
@@ -158,8 +159,34 @@ where
 
 #[cfg(test)]
 mod tests {
+    use fpdec::Decimal;
+
+    use crate::{mock_exchange_base, prelude::*};
+
     #[test]
     fn submit_order() {
+        let mut exchange = mock_exchange_base();
+        assert_eq!(
+            exchange
+                .update_state(0, bba!(quote!(100), quote!(101)))
+                .unwrap(),
+            (vec![], false)
+        );
+
+        let order = Order::market(Side::Buy, base!(0.5)).unwrap();
+        exchange.submit_order(order).unwrap();
+
+        // make sure its excuted immediately
+        assert_eq!(
+            exchange.account().position,
+            Position {
+                size: base!(0.5),
+                entry_price: quote!(101),
+                position_margin: quote!(50.5),
+            }
+        );
+
+        // TODO: test more
         todo!()
     }
 }
