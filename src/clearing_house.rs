@@ -4,8 +4,7 @@ use fpdec::Decimal;
 
 use crate::{
     prelude::{Account, AccountTracker},
-    quote,
-    types::{Currency, Fee, MarginCurrency, QuoteCurrency},
+    types::{Currency, MarginCurrency, QuoteCurrency},
 };
 
 /// A clearing house acts as an intermediary in futures transactions.
@@ -54,134 +53,23 @@ where
         todo!()
     }
 
-    /// Tries to increase a long (or neutral) position of the account.
+    /// Settlement referes to the actual transfer of funds or assets between the buyer and seller to fulfill the trade.
+    /// As the `ClearingHouse` is the central counterparty to every trade,
+    /// it is the buyer of every sell order,
+    /// and the seller of every buy order.
     ///
     /// # Arguments:
-    /// `amount`: The absolute amount by which to incrase.
-    /// `price`: The execution price.
+    /// `quantity`: The number of contract traded, where a negative number indicates a sell.
+    /// `fill_price`: The execution price of the trade
+    /// `req_margin`: The additional required margin as computed by the `RiskEngine`.
     ///
-    /// # Returns:
-    /// If Err, then there was not enough available balance.
-    /// Ok if successfull.
-    pub(crate) fn try_increase_long(
-        &mut self,
+    pub(crate) fn settle_filled_order(
+        &self,
         account: &mut Account<M>,
-        amount: M::PairedCurrency,
-        price: QuoteCurrency,
+        quantity: M::PairedCurrency,
+        fill_price: QuoteCurrency,
+        req_margin: M,
     ) {
-        // let value = amount.convert(price);
-        // account.position.increase_long(amount, price);
-        todo!()
-    }
-
-    /// Decrease a long position, realizing pnl while doing so.
-    ///
-    /// # Arguments:
-    /// `amount`: The absolute amount to decrease by, must be smaller or equal to the existing long `size`.
-    /// `price`: The execution price, determines the pnl.
-    ///
-    /// # Returns:
-    /// If Err the transaction failed, but due to the atomic nature of this call nothing happens.
-    pub(crate) fn try_decrease_long(
-        &mut self,
-        account: &mut Account<M>,
-        amount: M::PairedCurrency,
-        price: QuoteCurrency,
-        fee: Fee,
-        ts_ns: i64,
-    ) {
-        debug_assert!(amount > M::PairedCurrency::new_zero());
-        debug_assert!(price > quote!(0));
-
-        todo!();
-        // let value = amount.convert(price);
-        // let pnl = self.position.decrease_long(amount, price)?;
-
-        // let fees = value * fee;
-        // // Fee just vanishes as there is no one to benefit from the fee.
-        // let net_pnl = pnl - fees;
-        // todo!("realize pnl or return it");
-        // self.realize_pnl(net_pnl, ts_ns);
-    }
-
-    /// Tries to increase a short (or neutral) position of the account.
-    ///
-    /// # Arguments:
-    /// `amount`: The absolute amount by which to incrase.
-    /// `price`: The execution price.
-    ///
-    /// # Returns:
-    /// If Err, then there was not enough available balance.
-    /// Ok if successfull.
-    pub(crate) fn try_increase_short(
-        &mut self,
-        account: &mut Account<M>,
-        amount: M::PairedCurrency,
-        price: QuoteCurrency,
-    ) {
-        debug_assert!(amount > M::PairedCurrency::new_zero());
-        debug_assert!(price > quote!(0));
-
-        todo!();
-        // self.position.increase_short(amount, price);
-    }
-
-    /// Decrease a short position, realizing pnl while doing so.
-    ///
-    /// # Arguments:
-    /// `amount`: The absolute amount to decrease by, must be smaller or equal to the existing long `size`.
-    /// `price`: The execution price, determines the pnl.
-    ///
-    /// # Returns:
-    /// If Err the transaction failed, but due to the atomic nature of this call nothing happens.
-    pub(crate) fn try_decrease_short(
-        &mut self,
-        account: &mut Account<M>,
-        amount: M::PairedCurrency,
-        price: QuoteCurrency,
-        fee: Fee,
-        ts_ns: i64,
-    ) {
-        debug_assert!(amount > M::PairedCurrency::new_zero());
-        debug_assert!(price > quote!(0));
-
-        // let pnl = self.position.decrease_short(amount, price)?;
-        // let fees = amount.convert(price) * fee;
-        // // Fee just vanishes as there is no one to benefit from the fee.
-        // let net_pnl = pnl - fees;
-        todo!("realize profit");
-        // self.realize_pnl(net_pnl, ts_ns);
-    }
-
-    /// Turn a long position into a short one by,
-    /// 0. ensuring there is enough balance, all things considered.
-    /// 1. reducing the *existing* long position.
-    /// 2. entering a new short
-    pub(crate) fn try_turn_around_long(
-        &mut self,
-        account: &mut Account<M>,
-        amount: M::PairedCurrency,
-        price: QuoteCurrency,
-    ) {
-        debug_assert!(amount > M::PairedCurrency::new_zero());
-        debug_assert!(price > quote!(0));
-
-        todo!()
-    }
-
-    /// Turn a short position into a long one by,
-    /// 0. ensuring there is enough balance, all things considered.
-    /// 1. reducing the *existing* long position.
-    /// 2. entering a new short
-    pub(crate) fn try_turn_around_short(
-        &mut self,
-        account: &mut Account<M>,
-        amount: M::PairedCurrency,
-        price: QuoteCurrency,
-    ) {
-        debug_assert!(amount > M::PairedCurrency::new_zero());
-        debug_assert!(price > quote!(0));
-
         todo!()
     }
 }

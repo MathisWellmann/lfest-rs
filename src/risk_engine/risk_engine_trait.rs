@@ -1,7 +1,7 @@
 use crate::{
     market_state::MarketState,
     prelude::Account,
-    types::{Currency, MarginCurrency, Order},
+    types::{Currency, MarginCurrency, Order, QuoteCurrency},
 };
 
 /// The error that the `RiskEngine` outputs, if any.
@@ -34,9 +34,9 @@ where
     /// If Err, the account cannot satisfy the margin requirements.
     fn check_required_margin(
         &self,
-        market_state: &MarketState,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
+        fill_price: QuoteCurrency,
     ) -> Result<M, RiskError>;
 
     /// Ensure the account has enough maintenance margin, to keep the position open.

@@ -3,7 +3,7 @@ use crate::{
     contract_specification::ContractSpecification,
     market_state::MarketState,
     prelude::Account,
-    types::{Currency, MarginCurrency, Order, OrderType, Side},
+    types::{Currency, MarginCurrency, Order, OrderType, QuoteCurrency, Side},
 };
 
 #[derive(Debug, Clone)]
@@ -29,13 +29,13 @@ where
 {
     fn check_required_margin(
         &self,
-        market_state: &MarketState,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
+        fill_price: QuoteCurrency,
     ) -> Result<M, RiskError> {
         match order.order_type() {
-            OrderType::Market => self.handle_market_order(market_state, account, order),
-            OrderType::Limit => self.handle_limit_order(market_state, account, order),
+            OrderType::Market => self.handle_market_order(account, order, fill_price),
+            OrderType::Limit => self.handle_limit_order(account, order),
         }
     }
 
@@ -59,24 +59,24 @@ where
 {
     fn handle_market_order(
         &self,
-        market_state: &MarketState,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
+        fill_price: QuoteCurrency,
     ) -> Result<M, RiskError> {
         match order.side() {
-            Side::Buy => self.handle_market_buy_order(market_state, account, order),
-            Side::Sell => self.handle_market_sell_order(market_state, account, order),
+            Side::Buy => self.handle_market_buy_order(account, order, fill_price),
+            Side::Sell => self.handle_market_sell_order(account, order, fill_price),
         }
     }
 
     fn handle_market_buy_order(
         &self,
-        market_state: &MarketState,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
+        fill_price: QuoteCurrency,
     ) -> Result<M, RiskError> {
         if account.position.size() >= M::PairedCurrency::new_zero() {
-            let notional_value = order.quantity().convert(market_state.ask());
+            let notional_value = order.quantity().convert(fill_price);
             let margin_req = notional_value / account.desired_leverage;
             if margin_req > account.available_balance() {
                 return Err(RiskError::NotEnoughAvailableBalance);
@@ -93,28 +93,26 @@ where
 
     fn handle_market_sell_order(
         &self,
-        market_state: &MarketState,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
+        fill_price: QuoteCurrency,
     ) -> Result<M, RiskError> {
         todo!("handle_market_sell_order")
     }
 
     fn handle_limit_order(
         &self,
-        market_state: &MarketState,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
     ) -> Result<M, RiskError> {
         match order.side() {
-            Side::Buy => self.handle_limit_buy_order(market_state, account, order),
-            Side::Sell => self.handle_limit_sell_order(market_state, account, order),
+            Side::Buy => self.handle_limit_buy_order(account, order),
+            Side::Sell => self.handle_limit_sell_order(account, order),
         }
     }
 
     fn handle_limit_buy_order(
         &self,
-        market_state: &MarketState,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
     ) -> Result<M, RiskError> {
@@ -123,7 +121,6 @@ where
 
     fn handle_limit_sell_order(
         &self,
-        market_state: &MarketState,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
     ) -> Result<M, RiskError> {

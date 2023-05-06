@@ -33,16 +33,24 @@ where
         market_state: &MarketState,
         order: &Order<S>,
         clearing_house: &ClearingHouse<A, S::PairedCurrency>,
+        req_margin: S::PairedCurrency,
     ) {
         match order.side() {
-            Side::Buy => {
-                self.execute_market_buy(account, market_state, order.quantity(), market_state.ask())
-            }
+            Side::Buy => self.execute_market_buy(
+                account,
+                market_state,
+                order.quantity(),
+                market_state.ask(),
+                clearing_house,
+                req_margin,
+            ),
             Side::Sell => self.execute_market_sell(
                 account,
                 market_state,
                 order.quantity(),
                 market_state.bid(),
+                clearing_house,
+                req_margin,
             ),
         }
     }
@@ -53,6 +61,8 @@ where
         market_state: &MarketState,
         quantity: S,
         price: QuoteCurrency,
+        clearing_house: &ClearingHouse<A, S::PairedCurrency>,
+        req_margin: S::PairedCurrency,
     ) {
         if account.position().size() >= S::new_zero() {
             // account.try_increase_long(quantity, price);
@@ -80,6 +90,8 @@ where
         market_state: &MarketState,
         quantity: S,
         price: QuoteCurrency,
+        clearing_house: &ClearingHouse<A, S::PairedCurrency>,
+        req_margin: S::PairedCurrency,
     ) {
         if account.position().size() >= S::new_zero() {
             if quantity > account.position().size() {
@@ -106,8 +118,9 @@ where
         market_state: &MarketState,
         quantity: S,
         price: QuoteCurrency,
+        req_margin: S::PairedCurrency,
     ) {
-        todo!()
+        todo!("execute_limit_buy")
     }
 
     fn execute_limit_sell(
@@ -116,7 +129,8 @@ where
         market_state: &MarketState,
         quantity: S,
         price: QuoteCurrency,
+        req_margin: S::PairedCurrency,
     ) {
-        todo!()
+        todo!("execute_limit_sell")
     }
 }

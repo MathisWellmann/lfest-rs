@@ -86,7 +86,7 @@ where
         &mut self,
         timestamp_ns: u64,
         market_update: MarketUpdate,
-    ) -> Result<(Vec<Order<S>>, bool)> {
+    ) -> Result<Vec<Order<S>>> {
         self.market_state
             .update_state(timestamp_ns, market_update)?;
         if let Err(e) = self
@@ -97,11 +97,13 @@ where
             return Err(e.into());
         };
 
-        let exec_orders = self
-            .matching_engine
-            .handle_resting_orders(&self.market_state);
+        // TODO:
+        // let exec_orders = self
+        //     .matching_engine
+        //     .handle_resting_orders(&self.market_state);
 
-        todo!("handle order executions");
+        // todo!("handle order executions");
+        Ok(vec![])
     }
 
     /// Submit a new order to the exchange.
@@ -129,21 +131,25 @@ where
 
         match order.order_type() {
             OrderType::Market => {
-                let price = match order.side() {
+                let fill_price = match order.side() {
                     Side::Buy => self.market_state.ask(),
                     Side::Sell => self.market_state.bid(),
                 };
                 let req_margin = self.risk_engine.check_required_margin(
-                    &self.market_state,
                     &self.user_account,
                     &order,
+                    fill_price,
                 )?;
+                let quantity = match order.side() {
+                    Side::Buy => order.quantity(),
+                    Side::Sell => order.quantity().into_negative(),
+                };
                 // From here on, everything is infallible
-                self.execution_engine.execute_market_order(
+                self.clearing_house.settle_filled_order(
                     &mut self.user_account,
-                    &self.market_state,
-                    &order,
-                    &self.clearing_house,
+                    quantity,
+                    fill_price,
+                    req_margin,
                 );
                 order.mark_executed();
 
@@ -170,17 +176,17 @@ mod tests {
             exchange
                 .update_state(0, bba!(quote!(100), quote!(101)))
                 .unwrap(),
-            (vec![], false)
+            vec![]
         );
 
-        let order = Order::market(Side::Buy, base!(0.5)).unwrap();
+        let order = Order::market(Side::Buy, base!(5)).unwrap();
         exchange.submit_order(order).unwrap();
 
         // make sure its excuted immediately
         assert_eq!(
             exchange.account().position,
             Position {
-                size: base!(0.5),
+                size: base!(5),
                 entry_price: quote!(101),
                 position_margin: quote!(50.5),
             }
