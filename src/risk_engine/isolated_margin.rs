@@ -124,7 +124,17 @@ where
             // The order strictly reduces the position, so no additional margin is required.
             return Ok(());
         }
-        todo!("handle_market_sell_order")
+        // The order reduces the long position and opens a short.
+        let released_from_old_pos = account.position.position_margin;
+
+        let new_short_size = order.quantity() - account.position.size();
+        let new_margin_req = new_short_size.convert(fill_price) / account.position.leverage;
+
+        if new_margin_req > account.available_balance() + released_from_old_pos {
+            return Err(RiskError::NotEnoughAvailableBalance);
+        }
+
+        Ok(())
     }
 
     fn handle_limit_order(

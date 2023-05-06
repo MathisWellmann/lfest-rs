@@ -97,10 +97,12 @@ where
                 account.wallet_balance += net_rpnl;
             } else {
                 let new_long_size = quantity - account.position.size().abs();
+
                 // decrease the short first
                 let rpnl = account
                     .position
                     .decrease_short(account.position.size().abs(), fill_price);
+                // Realize the profit without transaction fees
                 let fee = quantity.convert(fill_price) * fee;
                 let net_rpnl = rpnl - fee;
                 account.wallet_balance += net_rpnl;
@@ -127,9 +129,22 @@ where
                 let net_rpnl = rpnl - fee;
                 account.wallet_balance += net_rpnl;
             } else {
-                // TODO: Close the long
-                // TODO: open a short as well
-                todo!()
+                let new_short_size = quantity - account.position.size();
+
+                // Close the long
+                let rpnl = account
+                    .position
+                    .decrease_long(account.position.size(), fill_price);
+
+                // Realize the profit without transaction fees
+                let fee = quantity.convert(fill_price) * fee;
+                let net_rpnl = rpnl - fee;
+                account.wallet_balance += net_rpnl;
+
+                // Open a short as well
+                account
+                    .position
+                    .open_position(new_short_size.into_negative(), fill_price);
             }
         } else {
             // Increase short position
