@@ -16,16 +16,10 @@ pub fn mock_exchange_base() -> Exchange<NoAccountTracker, BaseCurrency> {
         mark_method: MarkMethod::MidPrice,
         price_filter: PriceFilter::default(),
         quantity_filter: QuantityFilter::default(),
+        fee_maker: fee!(0.0002),
+        fee_taker: fee!(0.0006),
     };
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        quote!(1000),
-        200,
-        leverage!(1),
-        contract_specification,
-    )
-    .unwrap();
+    let config = Config::new(quote!(1000), 200, leverage!(1), contract_specification).unwrap();
     Exchange::new(acc_tracker, config)
 }
 
@@ -39,15 +33,9 @@ pub fn mock_exchange_quote() -> Exchange<NoAccountTracker, QuoteCurrency> {
         mark_method: MarkMethod::MidPrice,
         price_filter: PriceFilter::default(),
         quantity_filter: QuantityFilter::default(),
+        fee_maker: fee!(0.0002),
+        fee_taker: fee!(0.0006),
     };
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        base!(10),
-        200,
-        leverage!(1),
-        contract_specification,
-    )
-    .unwrap();
+    let config = Config::new(base!(10), 200, leverage!(1), contract_specification).unwrap();
     Exchange::new(acc_tracker, config)
 }

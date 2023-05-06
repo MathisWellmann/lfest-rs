@@ -1,6 +1,9 @@
 use fpdec::Decimal;
 
-use crate::prelude::{Currency, PriceFilter, QuantityFilter};
+use crate::{
+    prelude::{Currency, PriceFilter, QuantityFilter},
+    types::Fee,
+};
 
 /// Specifies the details of the futures contract
 #[derive(Debug, Clone)]
@@ -20,6 +23,10 @@ where
     pub price_filter: PriceFilter,
     /// Quantity rules
     pub quantity_filter: QuantityFilter<S>,
+    /// The maker fee as a fraction. e.g.: 2.5 basis points rebate -> -0.00025
+    pub fee_maker: Fee,
+    /// The taker fee as a fraction. e.g.: 10 basis points -> 0.0010
+    pub fee_taker: Fee,
 }
 
 /// Which price to use in `mark-to-market` calculations

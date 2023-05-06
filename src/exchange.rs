@@ -150,7 +150,7 @@ where
                     quantity,
                     fill_price,
                     req_margin,
-                    self.config.fee_taker(),
+                    self.config.contract_specification().fee_taker,
                 );
                 order.mark_executed();
 
@@ -168,11 +168,23 @@ where
 mod tests {
     use fpdec::Decimal;
 
-    use crate::{mock_exchange_base, prelude::*};
+    use crate::{mock_exchange_base, prelude::*, risk_engine::RiskError};
 
     #[test]
     fn submit_market_buy_order_reject() {
-        todo!()
+        let mut exchange = mock_exchange_base();
+        assert_eq!(
+            exchange
+                .update_state(0, bba!(quote!(99), quote!(100)))
+                .unwrap(),
+            vec![]
+        );
+
+        let order = Order::market(Side::Buy, base!(10)).unwrap();
+        assert_eq!(
+            exchange.submit_order(order),
+            Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
+        );
     }
 
     #[test]
