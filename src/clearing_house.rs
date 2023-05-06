@@ -4,7 +4,7 @@ use fpdec::Decimal;
 
 use crate::{
     prelude::{Account, AccountTracker},
-    types::{Currency, MarginCurrency, QuoteCurrency},
+    types::{Currency, Fee, MarginCurrency, QuoteCurrency},
 };
 
 /// A clearing house acts as an intermediary in futures transactions.
@@ -69,7 +69,50 @@ where
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
         req_margin: M,
+        fee: Fee,
     ) {
-        todo!()
+        if quantity > M::PairedCurrency::new_zero() {
+            self.settle_buy_order(account, quantity, fill_price, req_margin, fee);
+        } else {
+            self.settle_sell_order(account, quantity, fill_price, req_margin, fee);
+        }
+    }
+
+    fn settle_buy_order(
+        &self,
+        account: &mut Account<M>,
+        quantity: M::PairedCurrency,
+        fill_price: QuoteCurrency,
+        req_margin: M,
+        fee: Fee,
+    ) {
+        if account.position.size() >= M::PairedCurrency::new_zero() {
+            account
+                .position
+                .increase_long(quantity, fill_price, req_margin);
+            let fee = quantity.convert(fill_price) * fee;
+            account.wallet_balance -= fee;
+        } else {
+            // decrease short position (and maybe open long)
+            todo!()
+        }
+    }
+
+    fn settle_sell_order(
+        &self,
+        account: &mut Account<M>,
+        quantity: M::PairedCurrency,
+        fill_price: QuoteCurrency,
+        req_margin: M,
+        fee: Fee,
+    ) {
+        if account.position.size() > M::PairedCurrency::new_zero() {
+            // TODO: decrease long position (maybe open short)
+            todo!()
+        } else {
+            account
+                .position
+                .increase_short(quantity, fill_price, req_margin);
+        }
     }
 }

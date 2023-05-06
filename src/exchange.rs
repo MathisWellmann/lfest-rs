@@ -150,6 +150,7 @@ where
                     quantity,
                     fill_price,
                     req_margin,
+                    self.config.fee_taker(),
                 );
                 order.mark_executed();
 
@@ -188,8 +189,13 @@ mod tests {
             Position {
                 size: base!(5),
                 entry_price: quote!(101),
-                position_margin: quote!(50.5),
+                position_margin: quote!(505),
             }
+        );
+        assert_eq!(
+            exchange.account().available_balance(),
+            // - fee
+            quote!(495) - quote!(0.303)
         );
 
         // TODO: test more

@@ -131,7 +131,7 @@ where
             amount > M::PairedCurrency::new_zero(),
             "`amount` must be positive"
         );
-        debug_assert!(self.size > M::PairedCurrency::new_zero(), "Short is open");
+        debug_assert!(self.size >= M::PairedCurrency::new_zero(), "Short is open");
 
         let new_size = self.size + amount;
         self.entry_price = QuoteCurrency::new(
@@ -140,6 +140,7 @@ where
         );
 
         self.size = new_size;
+        self.position_margin += additional_margin;
     }
 
     /// Reduce a long position.
@@ -195,6 +196,7 @@ where
                 / new_size.inner().abs(),
         );
         self.size = new_size;
+        self.position_margin += additional_margin;
     }
 
     /// Reduce a short position
