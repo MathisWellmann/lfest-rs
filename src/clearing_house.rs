@@ -93,8 +93,17 @@ where
             let fee = quantity.convert(fill_price) * fee;
             account.wallet_balance -= fee;
         } else {
-            // decrease short position (and maybe open long)
-            todo!()
+            if quantity.into_negative() >= account.position.size {
+                // Strictly decrease the short position
+                let rpnl = account.position.decrease_short(quantity, fill_price);
+                let fee = quantity.convert(fill_price) * fee;
+                let net_rpnl = rpnl - fee;
+                account.wallet_balance += net_rpnl;
+            } else {
+                // TODO: decrease the short
+                // TODO: also open a long
+                todo!()
+            }
         }
     }
 
@@ -115,7 +124,7 @@ where
                 let net_rpnl = rpnl - fee;
                 account.wallet_balance += net_rpnl;
             } else {
-                // TODO: Close the log
+                // TODO: Close the long
                 // TODO: open a short as well
                 todo!()
             }

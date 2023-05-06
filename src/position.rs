@@ -157,7 +157,6 @@ where
         debug_assert!(quantity <= self.size, "Quantity larger than position size");
 
         self.size = self.size - quantity;
-
         self.position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
 
         M::pnl(self.entry_price, price, quantity)
@@ -208,18 +207,19 @@ where
         &mut self,
         quantity: M::PairedCurrency,
         price: QuoteCurrency,
-    ) -> Result<M> {
+    ) -> M {
         debug_assert!(
             quantity > M::PairedCurrency::new_zero(),
             "Amount must be positive; qed"
         );
         debug_assert!(
-            quantity.into_negative() < self.size,
+            quantity.into_negative() <= self.size,
             "Amount must be smaller than net short position; qed"
         );
 
         self.size = self.size + quantity;
+        self.position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
 
-        Ok(M::pnl(self.entry_price, price, quantity.into_negative()))
+        M::pnl(self.entry_price, price, quantity.into_negative())
     }
 }
