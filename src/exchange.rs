@@ -72,6 +72,18 @@ where
         &mut self.user_account
     }
 
+    /// Return a reference to the `AccountTracker` for performance statistics.
+    #[inline(always)]
+    pub fn account_tracker(&self) -> &A {
+        &self.clearing_house.account_tracker()
+    }
+
+    /// Return a reference to the currency `MarketState`
+    #[inline(always)]
+    pub fn market_state(&self) -> &MarketState {
+        &self.market_state
+    }
+
     /// Update the exchange state with new information
     ///
     /// ### Parameters:

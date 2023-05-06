@@ -9,7 +9,7 @@ extern crate log;
 use std::{convert::TryInto, time::Instant};
 
 use lfest::{
-    account_tracker::{FullAccountTracker, NoAccountTracker, ReturnsSource},
+    account_tracker::{FullAccountTracker, ReturnsSource},
     prelude::*,
 };
 use load_trades::load_prices_from_csv;
@@ -18,7 +18,8 @@ use rand::{thread_rng, Rng};
 fn main() {
     let t0 = Instant::now();
 
-    let acc_tracker = NoAccountTracker::default();
+    let starting_balance = base!(10);
+    let acc_tracker = FullAccountTracker::new(starting_balance);
     let contract_specification = ContractSpecification {
         ticker: "TESTUSD".to_string(),
         initial_margin: Dec!(0.01),
@@ -29,8 +30,9 @@ fn main() {
         fee_maker: fee!(0.0002),
         fee_taker: fee!(0.0006),
     };
-    let config = Config::new(quote!(1000), 200, leverage!(1), contract_specification).unwrap();
-    let mut exchange = Exchange::<NoAccountTracker, BaseCurrency>::new(acc_tracker, config);
+    let config = Config::new(starting_balance, 200, leverage!(1), contract_specification).unwrap();
+    let mut exchange =
+        Exchange::<FullAccountTracker<BaseCurrency>, QuoteCurrency>::new(acc_tracker, config);
 
     // load trades from csv file
     let prices = load_prices_from_csv("./data/Bitmex_XBTUSD_1M.csv").unwrap();
@@ -55,31 +57,28 @@ fn main() {
         }
 
         if i % 100 == 0 {
-            todo!()
-            // // Trade a fraction of the available wallet balance
-            // let order_value: BaseCurrency =
-            //     exchange.account().margin().wallet_balance() * base!(0.1);
-            // let order_size = order_value.convert(exchange.bid());
-            // let order = if rng.gen() {
-            //     Order::market(Side::Sell, order_size).unwrap() // Sell using
-            //                                                    // market order
-            // } else {
-            //     Order::market(Side::Buy, order_size).unwrap() // Buy using market order
-            // };
-            // // Handle order error here if needed
-            // match exchange.submit_order(order) {
-            //     Ok(order) => println!("succesfully submitted order: {:?}", order),
-            //     Err(order_err) => error!("an error has occurred: {}", order_err),
-            // }
+            // Trade a fraction of the available wallet balance
+            let order_value: BaseCurrency = exchange.account().wallet_balance() * Dec!(0.1);
+            let order_size = order_value.convert(exchange.market_state().bid());
+            let order = if rng.gen() {
+                Order::market(Side::Sell, order_size).unwrap() // Sell using
+                                                               // market order
+            } else {
+                Order::market(Side::Buy, order_size).unwrap() // Buy using market order
+            };
+            // Handle order error here if needed
+            match exchange.submit_order(order) {
+                Ok(order) => println!("succesfully submitted order: {:?}", order),
+                Err(order_err) => error!("an error has occurred: {}", order_err),
+            }
         }
     }
-    todo!()
-    // println!(
-    //     "time to simulate 1 million historical trades and {} orders: {}ms",
-    //     exchange.account().account_tracker().num_trades(),
-    //     t0.elapsed().as_millis()
-    // );
-    // analyze_results(&exchange.account().account_tracker());
+    println!(
+        "time to simulate 1 million historical trades and {} orders: {}ms",
+        exchange.account_tracker().num_trades(),
+        t0.elapsed().as_millis()
+    );
+    analyze_results(&exchange.account_tracker());
 }
 
 /// analyze the resulting performance metrics of the traded orders

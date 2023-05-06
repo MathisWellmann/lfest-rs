@@ -36,13 +36,6 @@ where
         }
     }
 
-    /// The margin accounts are adjusted to reflect investors gain or loss.
-    pub(crate) fn mark_to_market(&mut self, mark_price: QuoteCurrency) {
-        // let position_value = self.user_account.position().size().convert(mark_price);
-
-        todo!()
-    }
-
     /// The funding period for perpetual futures has ended.
     /// Funding = `mark_value` * `funding_rate`.
     /// `mark_value` is denoted in the margin currency.
@@ -51,6 +44,12 @@ where
     /// TODO: not used but may be in the future.
     pub(crate) fn settle_funding_period(&mut self, mark_value: M, funding_rate: Decimal) {
         todo!()
+    }
+
+    /// Return a reference to the `AccountTracker` for performance statistics.
+    #[inline(always)]
+    pub(crate) fn account_tracker(&self) -> &A {
+        &self.account_tracker
     }
 
     /// Settlement referes to the actual transfer of funds or assets between the buyer and seller to fulfill the trade.

@@ -35,6 +35,12 @@ where
         &self.position
     }
 
+    /// Return the current wallet balance of the account.
+    #[inline(always)]
+    pub fn wallet_balance(&self) -> M {
+        self.wallet_balance
+    }
+
     /// Return the available balance of the `Account`
     #[inline(always)]
     pub fn available_balance(&self) -> M {

@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub(crate) struct MarketState {
+pub struct MarketState {
     price_filter: PriceFilter,
     bid: QuoteCurrency,
     ask: QuoteCurrency,
@@ -19,7 +19,7 @@ pub(crate) struct MarketState {
 }
 
 impl MarketState {
-    pub fn new(price_filter: PriceFilter) -> Self {
+    pub(crate) fn new(price_filter: PriceFilter) -> Self {
         Self {
             price_filter,
             bid: quote!(0),
@@ -71,22 +71,22 @@ impl MarketState {
     }
 
     #[inline]
-    pub(crate) fn mid_price(&self) -> QuoteCurrency {
+    pub fn mid_price(&self) -> QuoteCurrency {
         (self.bid + self.ask) / quote!(2)
     }
 
     #[inline(always)]
-    pub(crate) fn current_timestamp_ns(&self) -> i64 {
+    pub fn current_timestamp_ns(&self) -> i64 {
         self.current_ts_ns
     }
 
     #[inline(always)]
-    pub(crate) fn bid(&self) -> QuoteCurrency {
+    pub fn bid(&self) -> QuoteCurrency {
         self.bid
     }
 
     #[inline(always)]
-    pub(crate) fn ask(&self) -> QuoteCurrency {
+    pub fn ask(&self) -> QuoteCurrency {
         self.ask
     }
 }
