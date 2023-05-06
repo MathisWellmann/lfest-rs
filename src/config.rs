@@ -1,6 +1,6 @@
 use crate::{
     contract_specification::ContractSpecification,
-    types::{Currency, Error, Fee, Result},
+    types::{Currency, Error, Fee, Leverage, Result},
 };
 
 #[derive(Debug, Clone)]
@@ -22,6 +22,7 @@ where
     starting_balance: M,
     /// The maximum number of open orders the user can have at any given time
     max_num_open_orders: usize,
+    initial_leverage: Leverage,
     /// The contract specification.
     contract_specification: ContractSpecification<M::PairedCurrency>,
 }
@@ -39,8 +40,7 @@ where
     /// linear futures, denoted in BASE for inverse futures
     /// `max_num_open_orders`: The maximum number of open ordes a user can have
     /// at any time.
-    /// `price_filter`: Filters for limit order pricing
-    /// `quantity_filter`: Filters for order quantities
+    /// `initial_leverage`: The initial desired leverage of positions.
     /// `contract_specification`: More details on the actual contract traded.
     ///
     /// # Returns:
@@ -51,6 +51,7 @@ where
         fee_taker: Fee,
         starting_balance: M,
         max_num_open_orders: usize,
+        initial_leverage: Leverage,
         contract_specification: ContractSpecification<M::PairedCurrency>,
     ) -> Result<Self> {
         if max_num_open_orders == 0 {
@@ -65,6 +66,7 @@ where
             fee_taker,
             starting_balance,
             max_num_open_orders,
+            initial_leverage,
             contract_specification,
         })
     }
@@ -97,5 +99,11 @@ where
     #[inline(always)]
     pub fn contract_specification(&self) -> &ContractSpecification<M::PairedCurrency> {
         &self.contract_specification
+    }
+
+    /// Return the configured initial leverage
+    #[inline(always)]
+    pub fn initial_leverage(&self) -> Leverage {
+        self.initial_leverage
     }
 }

@@ -16,7 +16,7 @@ use crate::{
     contract_specification::ContractSpecification,
     market_state::MarketState,
     prelude::Account,
-    types::{Currency, Leverage, MarginCurrency},
+    types::{Currency, MarginCurrency},
 };
 
 pub(crate) struct InitialMargin<M>(M);
@@ -45,7 +45,6 @@ where
         &self,
         account: &Account<M>,
         notional_value: M,
-        leverage: Leverage,
     ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError>;
 
     /// Ensure the account has enough maintenance margin, to keep the position open.
@@ -90,7 +89,6 @@ where
         &self,
         account: &Account<M>,
         notional_value: M,
-        leverage: Leverage,
     ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError> {
         todo!()
     }

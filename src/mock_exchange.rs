@@ -20,6 +20,7 @@ pub fn mock_exchange() -> Exchange<NoAccountTracker, BaseCurrency> {
         fee!(0.0006),
         quote!(1000),
         200,
+        leverage!(1),
         contract_specification,
     )
     .unwrap();

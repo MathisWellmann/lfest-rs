@@ -7,7 +7,7 @@ use crate::{
     market_state::MarketState,
     matching_engine::MatchingEngine,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
-    types::{Currency, Leverage, MarginCurrency, MarketUpdate, Order, OrderType, Result, Side},
+    types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, Result, Side},
 };
 
 #[derive(Debug, Clone)]
@@ -36,7 +36,7 @@ where
     /// as infomation source
     pub fn new(account_tracker: A, config: Config<S::PairedCurrency>) -> Self {
         let market_state = MarketState::new(config.contract_specification().price_filter.clone());
-        let account = Account::new(config.starting_balance());
+        let account = Account::new(config.starting_balance(), config.initial_leverage());
         let risk_engine = IsolatedMarginRiskEngine::<S::PairedCurrency>::new(
             config.contract_specification().clone(),
         );
@@ -108,12 +108,11 @@ where
     ///
     /// # Arguments:
     /// `order`: The order that is being submitted.
-    /// `leverage`: The desired leverage which is used to deposit the correct amount of variation margin.
     ///
     /// # Returns:
     /// If Ok, the order with timestamp and id filled in.
     /// Else its an error.
-    pub fn submit_order(&mut self, mut order: Order<S>, leverage: Leverage) -> Result<Order<S>> {
+    pub fn submit_order(&mut self, mut order: Order<S>) -> Result<Order<S>> {
         trace!("submit_order: {:?}", order);
 
         // Basic checks
@@ -135,11 +134,9 @@ where
                     Side::Sell => self.market_state.bid(),
                 };
                 let notional_value = order.quantity().convert(price);
-                let req_margin = self.risk_engine.check_required_margin(
-                    &self.user_account,
-                    notional_value,
-                    leverage,
-                )?;
+                let req_margin = self
+                    .risk_engine
+                    .check_required_margin(&self.user_account, notional_value)?;
                 // From here on, everything is infallible
                 self.execution_engine.execute_market_order(
                     &mut self.user_account,
