@@ -65,7 +65,7 @@ where
     /// Ok if successfull.
     pub(crate) fn try_increase_long(
         &mut self,
-        account: &mut Account<M::PairedCurrency>,
+        account: &mut Account<M>,
         amount: M::PairedCurrency,
         price: QuoteCurrency,
     ) {
@@ -84,7 +84,7 @@ where
     /// If Err the transaction failed, but due to the atomic nature of this call nothing happens.
     pub(crate) fn try_decrease_long(
         &mut self,
-        account: &mut Account<M::PairedCurrency>,
+        account: &mut Account<M>,
         amount: M::PairedCurrency,
         price: QuoteCurrency,
         fee: Fee,
@@ -115,7 +115,7 @@ where
     /// Ok if successfull.
     pub(crate) fn try_increase_short(
         &mut self,
-        account: &mut Account<M::PairedCurrency>,
+        account: &mut Account<M>,
         amount: M::PairedCurrency,
         price: QuoteCurrency,
     ) {
@@ -136,7 +136,7 @@ where
     /// If Err the transaction failed, but due to the atomic nature of this call nothing happens.
     pub(crate) fn try_decrease_short(
         &mut self,
-        account: &mut Account<M::PairedCurrency>,
+        account: &mut Account<M>,
         amount: M::PairedCurrency,
         price: QuoteCurrency,
         fee: Fee,
@@ -159,7 +159,7 @@ where
     /// 2. entering a new short
     pub(crate) fn try_turn_around_long(
         &mut self,
-        account: &mut Account<M::PairedCurrency>,
+        account: &mut Account<M>,
         amount: M::PairedCurrency,
         price: QuoteCurrency,
     ) {
@@ -175,7 +175,7 @@ where
     /// 2. entering a new short
     pub(crate) fn try_turn_around_short(
         &mut self,
-        account: &mut Account<M::PairedCurrency>,
+        account: &mut Account<M>,
         amount: M::PairedCurrency,
         price: QuoteCurrency,
     ) {

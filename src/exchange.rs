@@ -20,7 +20,7 @@ where
 {
     config: Config<S::PairedCurrency>,
     market_state: MarketState,
-    user_account: Account<S>,
+    user_account: Account<S::PairedCurrency>,
     risk_engine: IsolatedMarginRiskEngine<S::PairedCurrency>,
     matching_engine: MatchingEngine<S>,
     execution_engine: ExecutionEngine<A, S>,
@@ -63,13 +63,13 @@ where
 
     /// Return a reference to Account
     #[inline(always)]
-    pub fn account(&self) -> &Account<S> {
+    pub fn account(&self) -> &Account<S::PairedCurrency> {
         &self.user_account
     }
 
     /// Return a mutable reference to Account
     #[inline(always)]
-    pub fn account_mut(&mut self) -> &mut Account<S> {
+    pub fn account_mut(&mut self) -> &mut Account<S::PairedCurrency> {
         &mut self.user_account
     }
 
@@ -164,6 +164,7 @@ where
 mod tests {
 
     use super::*;
+    use crate::mock_exchange;
 
     #[test]
     fn submit_order() {

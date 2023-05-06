@@ -43,7 +43,7 @@ where
     /// If Err, the account cannot satisfy the margin requirements.
     fn check_required_margin(
         &self,
-        account: &Account<M::PairedCurrency>,
+        account: &Account<M>,
         notional_value: M,
         leverage: Leverage,
     ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError>;
@@ -61,7 +61,7 @@ where
     fn check_maintenance_margin(
         &self,
         market_state: &MarketState,
-        account: &Account<M::PairedCurrency>,
+        account: &Account<M>,
     ) -> Result<(), RiskError>;
 }
 
@@ -88,7 +88,7 @@ where
 {
     fn check_required_margin(
         &self,
-        account: &Account<M::PairedCurrency>,
+        account: &Account<M>,
         notional_value: M,
         leverage: Leverage,
     ) -> Result<(InitialMargin<M>, MaintenanceMargin<M>), RiskError> {
@@ -98,7 +98,7 @@ where
     fn check_maintenance_margin(
         &self,
         market_state: &MarketState,
-        account: &Account<<M as Currency>::PairedCurrency>,
+        account: &Account<M>,
     ) -> Result<(), RiskError> {
         let pos_value = account.position().size().convert(market_state.mid_price());
         if pos_value < account.position().position_margin() {

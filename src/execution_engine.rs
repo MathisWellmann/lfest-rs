@@ -29,7 +29,7 @@ where
 
     pub(crate) fn execute_market_order(
         &mut self,
-        account: &mut Account<S>,
+        account: &mut Account<S::PairedCurrency>,
         market_state: &MarketState,
         order: &Order<S>,
         clearing_house: &ClearingHouse<A, S::PairedCurrency>,
@@ -49,7 +49,7 @@ where
 
     fn execute_market_buy(
         &self,
-        account: &mut Account<S>,
+        account: &mut Account<S::PairedCurrency>,
         market_state: &MarketState,
         quantity: S,
         price: QuoteCurrency,
@@ -76,7 +76,7 @@ where
 
     fn execute_market_sell(
         &self,
-        account: &mut Account<S>,
+        account: &mut Account<S::PairedCurrency>,
         market_state: &MarketState,
         quantity: S,
         price: QuoteCurrency,
@@ -102,7 +102,7 @@ where
     // TODO: Is there even a need to differentiate between limit and market here?
     fn execute_limit_buy(
         &self,
-        account: &mut Account<S>,
+        account: &mut Account<S::PairedCurrency>,
         market_state: &MarketState,
         quantity: S,
         price: QuoteCurrency,
@@ -112,7 +112,7 @@ where
 
     fn execute_limit_sell(
         &self,
-        account: &mut Account<S>,
+        account: &mut Account<S::PairedCurrency>,
         market_state: &MarketState,
         quantity: S,
         price: QuoteCurrency,

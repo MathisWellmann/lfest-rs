@@ -7,22 +7,20 @@ use crate::{
 /// The users account
 /// Generic over:
 /// S: The `Currency` representing the order quantity
-pub struct Account<S>
+pub struct Account<M>
 where
-    S: Currency,
-    S::PairedCurrency: MarginCurrency,
+    M: Currency + MarginCurrency,
 {
-    pub(crate) wallet_balance: S::PairedCurrency,
-    pub(crate) position: Position<S::PairedCurrency>,
+    pub(crate) wallet_balance: M,
+    pub(crate) position: Position<M>,
 }
 
-impl<S> Account<S>
+impl<M> Account<M>
 where
-    S: Currency + Default,
-    S::PairedCurrency: MarginCurrency,
+    M: Currency + MarginCurrency,
 {
     /// Create a new [`Account`] instance.
-    pub(crate) fn new(starting_balance: S::PairedCurrency) -> Self {
+    pub(crate) fn new(starting_balance: M) -> Self {
         let position = Position::default();
 
         Self {
@@ -31,15 +29,9 @@ where
         }
     }
 
-    /// Set a new position manually, be sure that you know what you are doing
-    #[inline(always)]
-    pub fn set_position(&mut self, position: Position<S::PairedCurrency>) {
-        self.position = position;
-    }
-
     /// Return a reference to the accounts position.
     #[inline(always)]
-    pub fn position(&self) -> &Position<S::PairedCurrency> {
+    pub fn position(&self) -> &Position<M> {
         &self.position
     }
 }
