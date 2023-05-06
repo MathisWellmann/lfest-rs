@@ -86,12 +86,20 @@ where
             return Ok(());
         }
         // Else its a short position which needs to be reduced
-        if order.quantity().into_negative() >= account.position.size() {
+        if order.quantity() <= account.position.size().abs() {
             // The order strictly reduces the position, so no additional margin is required.
             return Ok(());
         }
         // The order reduces the short and puts on a long
-        todo!();
+        let released_from_old_pos = account.position.position_margin;
+
+        let new_long_size = order.quantity() - account.position.size.abs();
+        let new_notional_value = new_long_size.convert(fill_price);
+        let new_margin_req = new_notional_value / account.position.leverage;
+
+        if new_margin_req > account.available_balance() + released_from_old_pos {
+            return Err(RiskError::NotEnoughAvailableBalance);
+        }
 
         Ok(())
     }
