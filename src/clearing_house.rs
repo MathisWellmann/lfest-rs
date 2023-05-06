@@ -61,20 +61,19 @@ where
     /// # Arguments:
     /// `quantity`: The number of contract traded, where a negative number indicates a sell.
     /// `fill_price`: The execution price of the trade
-    /// `req_margin`: The additional required margin as computed by the `RiskEngine`.
+    /// `fee`: The fee fraction for this type of order settlement.
     ///
     pub(crate) fn settle_filled_order(
         &self,
         account: &mut Account<M>,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
-        req_margin: M,
         fee: Fee,
     ) {
         if quantity > M::PairedCurrency::new_zero() {
-            self.settle_buy_order(account, quantity, fill_price, req_margin, fee);
+            self.settle_buy_order(account, quantity, fill_price, fee);
         } else {
-            self.settle_sell_order(account, quantity.abs(), fill_price, req_margin, fee);
+            self.settle_sell_order(account, quantity.abs(), fill_price, fee);
         }
     }
 
@@ -83,13 +82,10 @@ where
         account: &mut Account<M>,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
-        req_margin: M,
         fee: Fee,
     ) {
         if account.position.size() >= M::PairedCurrency::new_zero() {
-            account
-                .position
-                .increase_long(quantity, fill_price, req_margin);
+            account.position.increase_long(quantity, fill_price);
             let fee = quantity.convert(fill_price) * fee;
             account.wallet_balance -= fee;
         } else {
@@ -120,7 +116,6 @@ where
         account: &mut Account<M>,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
-        req_margin: M,
         fee: Fee,
     ) {
         if account.position.size() > M::PairedCurrency::new_zero() {
@@ -138,9 +133,7 @@ where
             }
         } else {
             // Increase short position
-            account
-                .position
-                .increase_short(quantity, fill_price, req_margin);
+            account.position.increase_short(quantity, fill_price);
             let fee = quantity.convert(fill_price) * fee;
             account.wallet_balance -= fee;
         }

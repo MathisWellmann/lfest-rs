@@ -135,11 +135,8 @@ where
                     Side::Buy => self.market_state.ask(),
                     Side::Sell => self.market_state.bid(),
                 };
-                let req_margin = self.risk_engine.check_required_margin(
-                    &self.user_account,
-                    &order,
-                    fill_price,
-                )?;
+                self.risk_engine
+                    .check_required_margin(&self.user_account, &order, fill_price)?;
                 let quantity = match order.side() {
                     Side::Buy => order.quantity(),
                     Side::Sell => order.quantity().into_negative(),
@@ -149,7 +146,6 @@ where
                     &mut self.user_account,
                     quantity,
                     fill_price,
-                    req_margin,
                     self.config.contract_specification().fee_taker,
                 );
                 order.mark_executed();

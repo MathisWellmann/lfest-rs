@@ -114,6 +114,35 @@ fn submit_market_sell_order_with_long_position() {
 }
 
 #[test]
-fn submit_market_order_turnaround_long() {
-    todo!()
+fn submit_market_sell_order_turnaround_long() {
+    let mut exchange = mock_exchange_base();
+    assert_eq!(
+        exchange
+            .update_state(0, bba!(quote!(100), quote!(101)))
+            .unwrap(),
+        vec![]
+    );
+
+    // First enter a long position
+    let order = Order::market(Side::Buy, base!(9)).unwrap();
+    exchange.submit_order(order).unwrap();
+
+    // Now reverse the position
+    let order = Order::market(Side::Sell, base!(18)).unwrap();
+    exchange.submit_order(order).unwrap();
+
+    assert_eq!(
+        exchange.account().position,
+        Position {
+            size: base!(-9),
+            entry_price: quote!(100),
+            position_margin: quote!(900),
+            leverage: leverage!(1),
+        }
+    );
+    assert_eq!(
+        exchange.account().available_balance(),
+        // - fee - fee - spread loss
+        quote!(100) - quote!(0.5454) - quote!(1.08) - quote!(9)
+    );
 }

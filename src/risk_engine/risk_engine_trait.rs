@@ -37,7 +37,7 @@ where
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
-    ) -> Result<M, RiskError>;
+    ) -> Result<(), RiskError>;
 
     /// Ensure the account has enough maintenance margin, to keep the position open.
     /// The maintenance margin is the minimum amount of funds that must be maintained in a trader's account

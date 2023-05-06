@@ -32,7 +32,7 @@ where
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
-    ) -> Result<M, RiskError> {
+    ) -> Result<(), RiskError> {
         match order.order_type() {
             OrderType::Market => self.handle_market_order(account, order, fill_price),
             OrderType::Limit => self.handle_limit_order(account, order),
@@ -62,7 +62,7 @@ where
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
-    ) -> Result<M, RiskError> {
+    ) -> Result<(), RiskError> {
         match order.side() {
             Side::Buy => self.handle_market_buy_order(account, order, fill_price),
             Side::Sell => self.handle_market_sell_order(account, order, fill_price),
@@ -74,22 +74,26 @@ where
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
-    ) -> Result<M, RiskError> {
+    ) -> Result<(), RiskError> {
         if account.position.size() >= M::PairedCurrency::new_zero() {
+            // A long position increases in size.
             let notional_value = order.quantity().convert(fill_price);
             let margin_req = notional_value / account.position.leverage;
             let fee = notional_value * self.contract_spec.fee_taker;
             if margin_req + fee > account.available_balance() {
                 return Err(RiskError::NotEnoughAvailableBalance);
             }
-            return Ok(margin_req);
+            return Ok(());
         }
         // Else its a short position which needs to be reduced
-        if order.quantity().into_negative() <= account.position.size() {
+        if order.quantity().into_negative() >= account.position.size() {
             // The order strictly reduces the position, so no additional margin is required.
-            return Ok(M::new_zero());
+            return Ok(());
         }
-        todo!("The order reduces the short and puts on a long")
+        // The order reduces the short and puts on a long
+        todo!();
+
+        Ok(())
     }
 
     fn handle_market_sell_order(
@@ -97,7 +101,7 @@ where
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
-    ) -> Result<M, RiskError> {
+    ) -> Result<(), RiskError> {
         if account.position.size() <= M::PairedCurrency::new_zero() {
             let notional_value = order.quantity().convert(fill_price);
             let margin_req = notional_value / account.position.leverage;
@@ -105,12 +109,12 @@ where
             if margin_req + fee > account.available_balance() {
                 return Err(RiskError::NotEnoughAvailableBalance);
             }
-            return Ok(margin_req);
+            return Ok(());
         }
         // Else its a long position which needs to be reduced
         if order.quantity() <= account.position.size() {
             // The order strictly reduces the position, so no additional margin is required.
-            return Ok(M::new_zero());
+            return Ok(());
         }
         todo!("handle_market_sell_order")
     }
@@ -119,7 +123,7 @@ where
         &self,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
-    ) -> Result<M, RiskError> {
+    ) -> Result<(), RiskError> {
         match order.side() {
             Side::Buy => self.handle_limit_buy_order(account, order),
             Side::Sell => self.handle_limit_sell_order(account, order),
@@ -130,7 +134,7 @@ where
         &self,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
-    ) -> Result<M, RiskError> {
+    ) -> Result<(), RiskError> {
         todo!("handle_limit_buy_order")
     }
 
@@ -138,7 +142,7 @@ where
         &self,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
-    ) -> Result<M, RiskError> {
+    ) -> Result<(), RiskError> {
         todo!("handle_limit_sell_order")
     }
 }

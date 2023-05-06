@@ -106,14 +106,8 @@ where
     /// `amount`: The absolute amount to increase the position by.
     ///     The `amount` must have been approved by the `RiskEngine`.
     /// `price`: The price at which it is sold.
-    /// `additional_margin`: The additional margin deposited as collateral.
     ///
-    pub(crate) fn increase_long(
-        &mut self,
-        quantity: M::PairedCurrency,
-        price: QuoteCurrency,
-        additional_margin: M,
-    ) {
+    pub(crate) fn increase_long(&mut self, quantity: M::PairedCurrency, price: QuoteCurrency) {
         debug_assert!(
             quantity > M::PairedCurrency::new_zero(),
             "`amount` must be positive"
@@ -127,7 +121,7 @@ where
         );
 
         self.size = new_size;
-        self.position_margin += additional_margin;
+        self.position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
     }
 
     /// Reduce a long position.
@@ -159,14 +153,8 @@ where
     /// `amount`: The absolute amount to increase the short position by.
     ///     The `amount` must have been approved by the `RiskEngine`.
     /// `price`: The entry price.
-    /// `additional_margin`: The additional margin deposited as collateral.
     ///
-    pub(crate) fn increase_short(
-        &mut self,
-        quantity: M::PairedCurrency,
-        price: QuoteCurrency,
-        additional_margin: M,
-    ) {
+    pub(crate) fn increase_short(&mut self, quantity: M::PairedCurrency, price: QuoteCurrency) {
         debug_assert!(
             quantity > M::PairedCurrency::new_zero(),
             "Amount must be positive; qed"
@@ -182,7 +170,7 @@ where
                 / new_size.inner().abs(),
         );
         self.size = new_size;
-        self.position_margin += additional_margin;
+        self.position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
     }
 
     /// Reduce a short position
