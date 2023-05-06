@@ -2,7 +2,7 @@ use fpdec::Decimal;
 
 use crate::{
     quote,
-    types::{Currency, Error, Leverage, MarginCurrency, QuoteCurrency, Result},
+    types::{Currency, Leverage, MarginCurrency, QuoteCurrency},
 };
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
@@ -91,22 +91,13 @@ where
     /// `size`: The position size, negative denoting a negative position.
     ///     The `size` must have been approved by the `RiskEngine`.
     /// `entry_price`: The price at which the position was entered.
-    /// `position_margin`: The collateral backing this position.
     ///
-    pub(crate) fn open_position(
-        &mut self,
-        size: M::PairedCurrency,
-        price: QuoteCurrency,
-        position_margin: M,
-    ) -> Result<()> {
-        if price <= quote!(0) {
-            return Err(Error::InvalidPrice);
-        }
+    pub(crate) fn open_position(&mut self, size: M::PairedCurrency, price: QuoteCurrency) {
+        debug_assert!(price > quote!(0));
+
         self.size = size;
         self.entry_price = price;
-        self.position_margin = position_margin;
-
-        Ok(())
+        self.position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
     }
 
     /// Increase a long (or neutral) position.
