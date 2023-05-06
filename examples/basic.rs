@@ -36,7 +36,7 @@ fn main() {
         contract_specification,
     )
     .unwrap();
-    let mut exchange = Exchange::new(acc_tracker, config);
+    let mut exchange = Exchange::<NoAccountTracker, BaseCurrency>::new(acc_tracker, config);
 
     // load trades from csv file
     let prices = load_prices_from_csv("./data/Bitmex_XBTUSD_1M.csv").unwrap();
@@ -64,29 +64,31 @@ fn main() {
         }
 
         if i % 100 == 0 {
-            // Trade a fraction of the available wallet balance
-            let order_value: BaseCurrency =
-                exchange.account().margin().wallet_balance() * base!(0.1);
-            let order_size = order_value.convert(exchange.bid());
-            let order = if rng.gen() {
-                Order::market(Side::Sell, order_size).unwrap() // Sell using
-                                                               // market order
-            } else {
-                Order::market(Side::Buy, order_size).unwrap() // Buy using market order
-            };
-            // Handle order error here if needed
-            match exchange.submit_order(order) {
-                Ok(order) => println!("succesfully submitted order: {:?}", order),
-                Err(order_err) => error!("an error has occurred: {}", order_err),
-            }
+            todo!()
+            // // Trade a fraction of the available wallet balance
+            // let order_value: BaseCurrency =
+            //     exchange.account().margin().wallet_balance() * base!(0.1);
+            // let order_size = order_value.convert(exchange.bid());
+            // let order = if rng.gen() {
+            //     Order::market(Side::Sell, order_size).unwrap() // Sell using
+            //                                                    // market order
+            // } else {
+            //     Order::market(Side::Buy, order_size).unwrap() // Buy using market order
+            // };
+            // // Handle order error here if needed
+            // match exchange.submit_order(order) {
+            //     Ok(order) => println!("succesfully submitted order: {:?}", order),
+            //     Err(order_err) => error!("an error has occurred: {}", order_err),
+            // }
         }
     }
-    println!(
-        "time to simulate 1 million historical trades and {} orders: {}ms",
-        exchange.account().account_tracker().num_trades(),
-        t0.elapsed().as_millis()
-    );
-    analyze_results(&exchange.account().account_tracker());
+    todo!()
+    // println!(
+    //     "time to simulate 1 million historical trades and {} orders: {}ms",
+    //     exchange.account().account_tracker().num_trades(),
+    //     t0.elapsed().as_millis()
+    // );
+    // analyze_results(&exchange.account().account_tracker());
 }
 
 /// analyze the resulting performance metrics of the traded orders

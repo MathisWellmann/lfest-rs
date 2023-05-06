@@ -26,7 +26,7 @@ mod risk_engine;
 mod types;
 mod utils;
 
-pub use mock_exchange::mock_exchange;
+pub use mock_exchange::{mock_exchange_base, mock_exchange_quote};
 
 /// Exports common types
 pub mod prelude {
