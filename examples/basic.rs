@@ -26,16 +26,10 @@ fn main() {
         mark_method: MarkMethod::MidPrice,
         price_filter: PriceFilter::default(),
         quantity_filter: QuantityFilter::default(),
+        fee_maker: fee!(0.0002),
+        fee_taker: fee!(0.0006),
     };
-    let config = Config::new(
-        fee!(0.0002),
-        fee!(0.0006),
-        quote!(1000),
-        200,
-        leverage!(1),
-        contract_specification,
-    )
-    .unwrap();
+    let config = Config::new(quote!(1000), 200, leverage!(1), contract_specification).unwrap();
     let mut exchange = Exchange::<NoAccountTracker, BaseCurrency>::new(acc_tracker, config);
 
     // load trades from csv file
@@ -47,7 +41,7 @@ fn main() {
     for (i, p) in prices.iter().enumerate() {
         let price_decimal: Decimal = (*p).try_into().expect("Unable to convert f64 into Decimal");
         let spread: Decimal = Decimal::ONE / Decimal::from(10);
-        let (exec_orders, liq) = exchange
+        let exec_orders = exchange
             .update_state(
                 i as u64,
                 MarketUpdate::Bba {
@@ -55,10 +49,7 @@ fn main() {
                     ask: QuoteCurrency::new(price_decimal + spread),
                 },
             )
-            .unwrap();
-        if liq {
-            // check liquidation
-        }
+            .expect("Got REKT. Try again next time :D");
         if !exec_orders.is_empty() {
             println!("executed orders: {:?}", exec_orders);
         }
