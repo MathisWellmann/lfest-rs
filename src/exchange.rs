@@ -141,10 +141,12 @@ where
                 self.execution_engine.execute_market_order(
                     &mut self.user_account,
                     &self.market_state,
-                    order,
+                    &order,
                     &self.clearing_house,
                 );
-                todo!("return order with fields modified");
+                order.mark_executed();
+
+                Ok(order)
             }
             OrderType::Limit => {
                 todo!("risk engine checks");

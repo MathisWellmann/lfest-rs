@@ -1,6 +1,5 @@
 use crate::{
     clearing_house::ClearingHouse,
-    errors::Result,
     market_state::MarketState,
     prelude::{Account, AccountTracker},
     types::{Currency, MarginCurrency, Order, QuoteCurrency, Side},
@@ -32,9 +31,9 @@ where
         &mut self,
         account: &mut Account<S>,
         market_state: &MarketState,
-        mut order: Order<S>,
+        order: &Order<S>,
         clearing_house: &ClearingHouse<A, S::PairedCurrency>,
-    ) -> Result<Order<S>> {
+    ) {
         match order.side() {
             Side::Buy => {
                 self.execute_market_buy(account, market_state, order.quantity(), market_state.ask())
@@ -46,9 +45,6 @@ where
                 market_state.bid(),
             ),
         }
-        order.mark_executed();
-
-        Ok(order)
     }
 
     fn execute_market_buy(
@@ -58,22 +54,21 @@ where
         quantity: S,
         price: QuoteCurrency,
     ) {
-        let price = market_state.ask();
         if account.position().size() >= S::new_zero() {
-            account.try_increase_long(quantity, price);
+            // account.try_increase_long(quantity, price);
         } else {
             if quantity > account.position().size().abs() {
-                account.try_turn_around_short(quantity, price);
+                // account.try_turn_around_short(quantity, price);
             } else {
                 // decrease short and realize pnl.
-                account
-                    .try_decrease_short(
-                        quantity,
-                        price,
-                        self.config.fee_taker(),
-                        market_state.current_timestamp_ns(),
-                    )
-                    .expect("Must be valid; qed");
+                // account
+                //     .try_decrease_short(
+                //         quantity,
+                //         price,
+                //         self.config.fee_taker(),
+                //         market_state.current_timestamp_ns(),
+                //     )
+                //     .expect("Must be valid; qed");
             }
         }
         todo!()
@@ -86,21 +81,20 @@ where
         quantity: S,
         price: QuoteCurrency,
     ) {
-        let price = market_state.bid();
         if account.position().size() >= S::new_zero() {
             if quantity > account.position().size() {
-                account.try_turn_around_long(quantity, price);
+                // account.try_turn_around_long(quantity, price);
             } else {
                 // decrease_long and realize pnl.
-                account.try_decrease_long(
-                    quantity,
-                    price,
-                    self.config.fee_taker(),
-                    market_state.current_timestamp_ns(),
-                );
+                // account.try_decrease_long(
+                //     quantity,
+                //     price,
+                //     self.config.fee_taker(),
+                //     market_state.current_timestamp_ns(),
+                // );
             }
         } else {
-            account.try_increase_short(quantity, price);
+            // account.try_increase_short(quantity, price);
         }
         todo!()
     }

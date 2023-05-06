@@ -103,10 +103,10 @@ where
     /// Check if any active orders have been triggered by the most recent price
     /// action method is called after new external data has been consumed
     pub(crate) fn handle_resting_orders(&mut self, market_state: &MarketState) {
-        self.active_limit_orders()
-            .iter()
-            .map(|(i, _)| *i)
-            .for_each(|v| self.handle_limit_order());
+        // self.active_limit_orders()
+        //     .iter()
+        //     .map(|(i, _)| *i)
+        //     .for_each(|v| self.handle_limit_order());
     }
 
     fn handle_limit_order(&mut self) {

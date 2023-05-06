@@ -53,6 +53,7 @@ where
     pub(crate) fn settle_funding_period(&mut self, mark_value: M, funding_rate: Decimal) {
         todo!()
     }
+
     /// Tries to increase a long (or neutral) position of the account.
     ///
     /// # Arguments:
@@ -68,13 +69,9 @@ where
         amount: M::PairedCurrency,
         price: QuoteCurrency,
     ) {
-        let value = amount.convert(price);
-        account
-            .position
-            .increase_long(amount, price)
-            .expect("Increasing a position here must work; qed");
-
-        Ok(())
+        // let value = amount.convert(price);
+        // account.position.increase_long(amount, price);
+        todo!()
     }
 
     /// Decrease a long position, realizing pnl while doing so.
@@ -96,13 +93,14 @@ where
         debug_assert!(amount > M::PairedCurrency::new_zero());
         debug_assert!(price > quote!(0));
 
-        let value = amount.convert(price);
-        let pnl = self.position.decrease_long(amount, price)?;
+        todo!();
+        // let value = amount.convert(price);
+        // let pnl = self.position.decrease_long(amount, price)?;
 
-        let fees = value * fee;
-        // Fee just vanishes as there is no one to benefit from the fee.
-        let net_pnl = pnl - fees;
-        todo!("realize pnl or return it");
+        // let fees = value * fee;
+        // // Fee just vanishes as there is no one to benefit from the fee.
+        // let net_pnl = pnl - fees;
+        // todo!("realize pnl or return it");
         // self.realize_pnl(net_pnl, ts_ns);
     }
 
@@ -124,10 +122,8 @@ where
         debug_assert!(amount > M::PairedCurrency::new_zero());
         debug_assert!(price > quote!(0));
 
-        todo!("margin");
-        self.position
-            .increase_short(amount, price)
-            .expect("Increasing a position here must work; qed");
+        todo!();
+        // self.position.increase_short(amount, price);
     }
 
     /// Decrease a short position, realizing pnl while doing so.
@@ -149,10 +145,10 @@ where
         debug_assert!(amount > M::PairedCurrency::new_zero());
         debug_assert!(price > quote!(0));
 
-        let pnl = self.position.decrease_short(amount, price)?;
-        let fees = amount.convert(price) * fee;
-        // Fee just vanishes as there is no one to benefit from the fee.
-        let net_pnl = pnl - fees;
+        // let pnl = self.position.decrease_short(amount, price)?;
+        // let fees = amount.convert(price) * fee;
+        // // Fee just vanishes as there is no one to benefit from the fee.
+        // let net_pnl = pnl - fees;
         todo!("realize profit");
         // self.realize_pnl(net_pnl, ts_ns);
     }
