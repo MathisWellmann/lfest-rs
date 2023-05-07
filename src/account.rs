@@ -3,8 +3,8 @@ use hashbrown::HashMap;
 use crate::{
     exchange::EXPECT_LIMIT_PRICE,
     position::Position,
-    types::{Currency, Error, Leverage, MarginCurrency, Order, Result, Side},
-    utils::min,
+    types::{Currency, Error, Leverage, MarginCurrency, Order, OrderType, Result, Side},
+    utils::{max, min},
 };
 
 #[derive(Debug, Clone)]
@@ -92,6 +92,8 @@ where
 
     /// Append a new limit order as active order
     pub(crate) fn append_limit_order(&mut self, order: Order<M::PairedCurrency>) {
+        debug_assert!(matches!(order.order_type(), OrderType::Limit));
+
         debug!("append_limit_order: order: {:?}", order);
 
         // self.account_tracker.log_limit_order_submission();
@@ -176,15 +178,18 @@ where
             debug!("compute_order_margin: notional_value_sum of buy orders: {notional_value_sum}");
 
             // Offset the limit order cost by a potential short position
-            notional_value_sum = notional_value_sum
-                - min(self.position.size(), M::PairedCurrency::new_zero())
-                    .abs()
-                    .convert(self.position.entry_price);
+            notional_value_sum = max(
+                notional_value_sum
+                    - min(self.position.size(), M::PairedCurrency::new_zero())
+                        .abs()
+                        .convert(self.position.entry_price),
+                M::new_zero(),
+            );
 
             notional_value_sum / self.position.leverage
         } else {
             // The sell orders dominate
-            let notional_value_sum = self
+            let mut notional_value_sum = self
                 .active_limit_orders
                 .values()
                 .filter(|order| matches!(order.side(), Side::Sell))
@@ -197,7 +202,12 @@ where
             debug!("compute_order_margin: notional_value_sum of sell orders: {notional_value_sum}");
 
             // Offset the limit order cost by a potential long position
-            todo!();
+            notional_value_sum = max(
+                M::new_zero(),
+                notional_value_sum
+                    - max(M::PairedCurrency::new_zero(), self.position.size())
+                        .convert(self.position.entry_price),
+            );
 
             notional_value_sum / self.position.leverage
         }
@@ -207,5 +217,23 @@ where
     fn next_order_id(&mut self) -> u64 {
         self.next_order_id += 1;
         self.next_order_id - 1
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prelude::*;
+
+    #[test]
+    fn account_order_margin() {
+        let mut account = Account::new(quote!(1000), leverage!(1));
+
+        assert_eq!(account.compute_order_margin(), quote!(0));
+
+        let order = Order::limit(Side::Buy, quote!(100), base!(1)).unwrap();
+        account.append_limit_order(order);
+
+        todo!()
     }
 }

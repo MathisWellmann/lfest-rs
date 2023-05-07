@@ -4,7 +4,7 @@ use crate::{
     exchange::EXPECT_LIMIT_PRICE,
     market_state::MarketState,
     prelude::Account,
-    types::{Currency, MarginCurrency, Order, QuoteCurrency, Side},
+    types::{Currency, MarginCurrency, Order, OrderType, QuoteCurrency, Side},
 };
 
 #[derive(Debug, Clone)]
@@ -34,6 +34,7 @@ where
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
     ) -> Result<(), RiskError> {
+        debug_assert!(matches!(order.order_type(), OrderType::Market));
         match order.side() {
             Side::Buy => self.handle_market_buy_order(account, order, fill_price),
             Side::Sell => self.handle_market_sell_order(account, order, fill_price),
@@ -45,6 +46,7 @@ where
         account: &Account<M>,
         order: &Order<<M as Currency>::PairedCurrency>,
     ) -> Result<(), RiskError> {
+        debug_assert!(matches!(order.order_type(), OrderType::Limit));
         match order.side() {
             Side::Buy => self.handle_limit_buy_order(account, order),
             Side::Sell => self.handle_limit_sell_order(account, order),
@@ -75,6 +77,9 @@ where
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
     ) -> Result<(), RiskError> {
+        debug_assert!(matches!(order.order_type(), OrderType::Market));
+        debug_assert!(matches!(order.side(), Side::Buy));
+
         if account.position.size() >= M::PairedCurrency::new_zero() {
             // A long position increases in size.
             let notional_value = order.quantity().convert(fill_price);
@@ -110,6 +115,9 @@ where
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
     ) -> Result<(), RiskError> {
+        debug_assert!(matches!(order.order_type(), OrderType::Market));
+        debug_assert!(matches!(order.side(), Side::Sell));
+
         if account.position.size() <= M::PairedCurrency::new_zero() {
             let notional_value = order.quantity().convert(fill_price);
             let margin_req = notional_value / account.position.leverage;
@@ -142,6 +150,9 @@ where
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
     ) -> Result<(), RiskError> {
+        debug_assert!(matches!(order.order_type(), OrderType::Limit));
+        debug_assert!(matches!(order.side(), Side::Buy));
+
         let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
 
         if account.position.size() >= M::PairedCurrency::new_zero() {
@@ -164,6 +175,9 @@ where
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
     ) -> Result<(), RiskError> {
+        debug_assert!(matches!(order.order_type(), OrderType::Limit));
+        debug_assert!(matches!(order.side(), Side::Sell));
+
         todo!("handle_limit_sell_order")
     }
 
