@@ -5,7 +5,6 @@ use crate::{
     config::Config,
     execution_engine::ExecutionEngine,
     market_state::MarketState,
-    matching_engine::MatchingEngine,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, Result, Side},
 };
@@ -21,7 +20,6 @@ where
     market_state: MarketState,
     user_account: Account<S::PairedCurrency>,
     risk_engine: IsolatedMarginRiskEngine<S::PairedCurrency>,
-    matching_engine: MatchingEngine<S>,
     execution_engine: ExecutionEngine<A, S>,
     clearing_house: ClearingHouse<A, S::PairedCurrency>,
 }
@@ -48,7 +46,6 @@ where
             market_state,
             clearing_house,
             risk_engine,
-            matching_engine: MatchingEngine::default(),
             execution_engine,
             user_account: account,
         }
@@ -168,7 +165,7 @@ where
             OrderType::Limit => {
                 self.risk_engine
                     .check_limit_order(&self.user_account, &order)?;
-                todo!("risk engine checks");
+                self.user_account.append_limit_order(order);
                 todo!("If passing, place into orderbook of matching engine");
             }
         }
