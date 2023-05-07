@@ -148,7 +148,7 @@ where
                     Side::Sell => self.market_state.bid(),
                 };
                 self.risk_engine
-                    .check_required_margin(&self.user_account, &order, fill_price)?;
+                    .check_market_order(&self.user_account, &order, fill_price)?;
                 let quantity = match order.side() {
                     Side::Buy => order.quantity(),
                     Side::Sell => order.quantity().into_negative(),
@@ -166,6 +166,8 @@ where
                 Ok(order)
             }
             OrderType::Limit => {
+                self.risk_engine
+                    .check_limit_order(&self.user_account, &order)?;
                 todo!("risk engine checks");
                 todo!("If passing, place into orderbook of matching engine");
             }

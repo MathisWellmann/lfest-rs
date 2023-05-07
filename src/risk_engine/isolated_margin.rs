@@ -3,7 +3,7 @@ use crate::{
     contract_specification::ContractSpecification,
     market_state::MarketState,
     prelude::Account,
-    types::{Currency, MarginCurrency, Order, OrderType, QuoteCurrency, Side},
+    types::{Currency, MarginCurrency, Order, QuoteCurrency, Side},
 };
 
 #[derive(Debug, Clone)]
@@ -27,16 +27,24 @@ impl<M> RiskEngine<M> for IsolatedMarginRiskEngine<M>
 where
     M: Currency + MarginCurrency,
 {
-    fn check_required_margin(
+    fn check_market_order(
         &self,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
     ) -> Result<(), RiskError> {
-        match order.order_type() {
-            OrderType::Market => self.handle_market_order(account, order, fill_price),
-            OrderType::Limit => self.handle_limit_order(account, order),
+        match order.side() {
+            Side::Buy => self.handle_market_buy_order(account, order, fill_price),
+            Side::Sell => self.handle_market_sell_order(account, order, fill_price),
         }
+    }
+
+    fn check_limit_order(
+        &self,
+        account: &Account<M>,
+        order: &Order<<M as Currency>::PairedCurrency>,
+    ) -> Result<(), RiskError> {
+        todo!()
     }
 
     fn check_maintenance_margin(
@@ -57,18 +65,6 @@ impl<M> IsolatedMarginRiskEngine<M>
 where
     M: Currency + MarginCurrency,
 {
-    fn handle_market_order(
-        &self,
-        account: &Account<M>,
-        order: &Order<M::PairedCurrency>,
-        fill_price: QuoteCurrency,
-    ) -> Result<(), RiskError> {
-        match order.side() {
-            Side::Buy => self.handle_market_buy_order(account, order, fill_price),
-            Side::Sell => self.handle_market_sell_order(account, order, fill_price),
-        }
-    }
-
     fn handle_market_buy_order(
         &self,
         account: &Account<M>,

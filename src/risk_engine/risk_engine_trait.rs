@@ -18,7 +18,7 @@ pub(crate) trait RiskEngine<M>
 where
     M: Currency + MarginCurrency,
 {
-    /// Checks if the account it able to satisfy the margin requirements.
+    /// Checks if the account it able to satisfy the margin requirements for a new market order.
     ///
     /// When a trader submits an order to increase their position,
     /// the risk engine will typically calculate the margin requirements as if the new order is executed and added to their existing positions.
@@ -32,11 +32,18 @@ where
     ///
     /// # Returns:
     /// If Err, the account cannot satisfy the margin requirements.
-    fn check_required_margin(
+    fn check_market_order(
         &self,
         account: &Account<M>,
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
+    ) -> Result<(), RiskError>;
+
+    /// Checks if the account it able to satisfy the margin requirements for a new limit order.
+    fn check_limit_order(
+        &self,
+        account: &Account<M>,
+        order: &Order<M::PairedCurrency>,
     ) -> Result<(), RiskError>;
 
     /// Ensure the account has enough maintenance margin, to keep the position open.

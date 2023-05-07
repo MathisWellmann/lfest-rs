@@ -96,8 +96,8 @@ where
             if quantity.into_negative() >= account.position.size {
                 // Strictly decrease the short position
                 let rpnl = account.position.decrease_short(quantity, fill_price);
-                self.account_tracker.log_rpnl(rpnl, ts_ns);
                 account.wallet_balance += rpnl;
+                self.account_tracker.log_rpnl(rpnl, ts_ns);
             } else {
                 let new_long_size = quantity - account.position.size().abs();
 
@@ -105,7 +105,6 @@ where
                 let rpnl = account
                     .position
                     .decrease_short(account.position.size().abs(), fill_price);
-                // Realize the profit without transaction fees
                 account.wallet_balance += rpnl;
                 self.account_tracker.log_rpnl(rpnl, ts_ns);
 
@@ -142,7 +141,6 @@ where
                     .position
                     .decrease_long(account.position.size(), fill_price);
 
-                // Realize the profit without transaction fees
                 account.wallet_balance += rpnl;
                 self.account_tracker.log_rpnl(rpnl, ts_ns);
 
