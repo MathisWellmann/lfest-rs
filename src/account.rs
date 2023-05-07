@@ -1,7 +1,6 @@
 use hashbrown::HashMap;
 
 use crate::{
-    market_state::MarketState,
     position::Position,
     types::{Currency, Error, Leverage, MarginCurrency, Order, Result},
 };
@@ -16,11 +15,11 @@ where
 {
     pub(crate) wallet_balance: M,
     pub(crate) position: Position<M>,
-    active_limit_orders: HashMap<u64, Order<M::PairedCurrency>>,
+    // Maps the order `id` to the actual `Order`.
+    pub(crate) active_limit_orders: HashMap<u64, Order<M::PairedCurrency>>,
     // Maps the `user_order_id` to the internal order nonce
-    lookup_order_nonce_from_user_order_id: HashMap<u64, u64>,
-    executed_orders: Vec<Order<M::PairedCurrency>>,
-    next_order_id: u64,
+    pub(crate) lookup_order_nonce_from_user_order_id: HashMap<u64, u64>,
+    pub(crate) next_order_id: u64,
 }
 
 impl<M> Account<M>
@@ -36,7 +35,6 @@ where
             position,
             active_limit_orders: HashMap::new(),
             lookup_order_nonce_from_user_order_id: HashMap::new(),
-            executed_orders: vec![],
             next_order_id: 0,
         }
     }
@@ -68,12 +66,6 @@ where
     /// If Err, the account is unable to provide enough variation margin for the desired leverage.
     pub fn update_desired_leverage(&mut self, leverage: Leverage) -> Result<()> {
         todo!()
-    }
-
-    /// The number of currently active limit orders
-    #[inline(always)]
-    pub(crate) fn num_active_limit_orders(&self) -> usize {
-        self.active_limit_orders.len()
     }
 
     /// Cancel an active order based on the user_order_id of an Order
@@ -123,42 +115,26 @@ where
     /// returns Some order if successful with given order_id
     pub fn cancel_order(&mut self, order_id: u64) -> Result<Order<M::PairedCurrency>> {
         debug!("cancel_order: {}", order_id);
-        let removed_order = match self.active_limit_orders.remove(&order_id) {
-            None => return Err(Error::OrderIdNotFound),
-            Some(o) => o,
-        };
+        let removed_order = self
+            .active_limit_orders
+            .remove(&order_id)
+            .ok_or(Error::OrderIdNotFound)?;
 
         // self.account_tracker.log_limit_order_cancellation();
 
         Ok(removed_order)
     }
 
-    /// Return the currently active limit orders
-    #[inline(always)]
-    pub fn active_limit_orders(&self) -> &HashMap<u64, Order<M::PairedCurrency>> {
-        &self.active_limit_orders
-    }
-
-    /// Return recently executed orders
-    /// and clear them afterwards
-    pub(crate) fn executed_orders(&mut self) -> Vec<Order<M::PairedCurrency>> {
-        let exec_orders = self.executed_orders.clone();
-        self.executed_orders.clear();
-
-        exec_orders
-    }
-
-    /// Check if any active orders have been triggered by the most recent price
-    /// action method is called after new external data has been consumed
-    pub(crate) fn handle_resting_orders(&mut self, market_state: &MarketState) {
-        // self.active_limit_orders()
-        //     .iter()
-        //     .map(|(i, _)| *i)
-        //     .for_each(|v| self.handle_limit_order());
-    }
-
-    fn handle_limit_order(&mut self) {
-        todo!()
+    /// Removes an executed limit order from the list of active ones
+    pub(crate) fn remove_executed_order_from_active(&mut self, order_id: u64) {
+        let order = self
+            .active_limit_orders
+            .remove(&order_id)
+            .expect("The order must have been active; qed");
+        if let Some(user_order_id) = order.user_order_id() {
+            self.lookup_order_nonce_from_user_order_id
+                .remove(user_order_id);
+        }
     }
 
     #[inline(always)]

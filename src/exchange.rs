@@ -9,6 +9,8 @@ use crate::{
     types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, Result, Side},
 };
 
+const EXPECT_LIMIT_PRICE: &str = "A limit price must be present for a limit order; qed";
+
 #[derive(Debug, Clone)]
 /// The main leveraged futures exchange for simulated trading
 pub struct Exchange<A, S>
@@ -106,13 +108,47 @@ where
             return Err(e.into());
         };
 
-        // TODO:
-        // let exec_orders = self
-        //     .matching_engine
-        //     .handle_resting_orders(&self.market_state);
+        let to_be_exec = self.check_resting_orders();
+        for order in to_be_exec.iter() {
+            let qty = match order.side() {
+                Side::Buy => order.quantity(),
+                Side::Sell => order.quantity().into_negative(),
+            };
+            self.clearing_house.settle_filled_order(
+                &mut self.user_account,
+                qty,
+                order.limit_price().expect(EXPECT_LIMIT_PRICE),
+                self.config.contract_specification().fee_maker,
+                self.market_state.current_timestamp_ns(),
+            );
+            self.user_account
+                .remove_executed_order_from_active(order.id());
+        }
 
-        // todo!("handle order executions");
-        Ok(vec![])
+        Ok(to_be_exec)
+    }
+
+    /// Check if any resting orders have been executed
+    fn check_resting_orders(&mut self) -> Vec<Order<S>> {
+        Vec::from_iter(
+            self.user_account
+                .active_limit_orders
+                .values()
+                .cloned()
+                .filter(|order| self.check_limit_order_execution(order)),
+        )
+    }
+
+    /// Check an individual resting order if it has been executed.
+    ///
+    /// # Returns:
+    /// If `Some`, The order is filled and needs to be settled.
+    fn check_limit_order_execution(&self, order: &Order<S>) -> bool {
+        let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
+        match order.side() {
+            Side::Buy => self.market_state.bid() < l_price,
+            Side::Sell => self.market_state.ask() > l_price,
+        }
     }
 
     /// Submit a new order to the exchange.
