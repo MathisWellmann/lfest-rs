@@ -9,7 +9,7 @@ use crate::{
     types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, Result, Side},
 };
 
-const EXPECT_LIMIT_PRICE: &str = "A limit price must be present for a limit order; qed";
+pub(crate) const EXPECT_LIMIT_PRICE: &str = "A limit price must be present for a limit order; qed";
 
 #[derive(Debug, Clone)]
 /// The main leveraged futures exchange for simulated trading
@@ -195,15 +195,14 @@ where
                     self.market_state.current_timestamp_ns(),
                 );
                 order.mark_executed();
-
-                Ok(order)
             }
             OrderType::Limit => {
                 self.risk_engine
                     .check_limit_order(&self.user_account, &order)?;
-                self.user_account.append_limit_order(order);
-                todo!("If passing, place into orderbook of matching engine");
+                self.user_account.append_limit_order(order.clone());
             }
         }
+
+        Ok(order)
     }
 }

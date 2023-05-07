@@ -29,6 +29,10 @@ See [`PriceFilter`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.PriceFilte
 [`QuantityFilter`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.QuantityFilter.html)
 - Isolated margining
 
+### Not included (maybe in the future):
+- Funding rate (assumed 0)
+- Orderbook
+
 ### Order Types
 The supported order types are:
 - `Market`: aggressively execute against the best bid / ask
@@ -73,7 +77,7 @@ For an example see [examples](examples/basic.rs)
 - Rework some internal components for greater clarity and simplicity
 
 ### Contributions
-If you find a bug or would like to help out, feel free to create a pull-request.
+If you have time available to contribute to the project, feel free to contact me and maybe we can arrange a mutually benefitial aggreement.
 
 ### Donations :moneybag: :money_with_wings:
 I you would like to support the development of this crate, feel free to send over a donation:

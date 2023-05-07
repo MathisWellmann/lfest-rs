@@ -1,8 +1,10 @@
 use hashbrown::HashMap;
 
 use crate::{
+    exchange::EXPECT_LIMIT_PRICE,
     position::Position,
-    types::{Currency, Error, Leverage, MarginCurrency, Order, Result},
+    types::{Currency, Error, Leverage, MarginCurrency, Order, Result, Side},
+    utils::min,
 };
 
 #[derive(Debug, Clone)]
@@ -134,6 +136,70 @@ where
         if let Some(user_order_id) = order.user_order_id() {
             self.lookup_order_nonce_from_user_order_id
                 .remove(user_order_id);
+        }
+    }
+
+    /// Compute the current order margin requirement.
+    fn compute_order_margin(&self) -> M {
+        let mut open_buy_quantity: M::PairedCurrency = self
+            .active_limit_orders
+            .values()
+            .filter(|order| matches!(order.side(), Side::Buy))
+            .map(|order| order.quantity())
+            .fold(M::PairedCurrency::new_zero(), |acc, x| acc + x);
+        let mut open_sell_quantity: M::PairedCurrency = self
+            .active_limit_orders
+            .values()
+            .filter(|order| matches!(order.side(), Side::Sell))
+            .map(|order| order.quantity())
+            .fold(M::PairedCurrency::new_zero(), |acc, x| acc + x);
+
+        // Offset against the open position size.
+        if self.position.size() > M::PairedCurrency::new_zero() {
+            open_sell_quantity = open_sell_quantity - self.position.size();
+        } else {
+            open_buy_quantity = open_buy_quantity - self.position.size().abs();
+        }
+
+        if open_buy_quantity > open_sell_quantity {
+            // The buy orders dominate
+            let mut notional_value_sum = self
+                .active_limit_orders
+                .values()
+                .filter(|order| matches!(order.side(), Side::Buy))
+                .map(|order| {
+                    order
+                        .quantity()
+                        .convert(order.limit_price().expect(EXPECT_LIMIT_PRICE))
+                })
+                .fold(M::new_zero(), |acc, x| acc + x);
+            debug!("compute_order_margin: notional_value_sum of buy orders: {notional_value_sum}");
+
+            // Offset the limit order cost by a potential short position
+            notional_value_sum = notional_value_sum
+                - min(self.position.size(), M::PairedCurrency::new_zero())
+                    .abs()
+                    .convert(self.position.entry_price);
+
+            notional_value_sum / self.position.leverage
+        } else {
+            // The sell orders dominate
+            let notional_value_sum = self
+                .active_limit_orders
+                .values()
+                .filter(|order| matches!(order.side(), Side::Sell))
+                .map(|order| {
+                    order
+                        .quantity()
+                        .convert(order.limit_price().expect(EXPECT_LIMIT_PRICE))
+                })
+                .fold(M::new_zero(), |acc, x| acc + x);
+            debug!("compute_order_margin: notional_value_sum of sell orders: {notional_value_sum}");
+
+            // Offset the limit order cost by a potential long position
+            todo!();
+
+            notional_value_sum / self.position.leverage
         }
     }
 
