@@ -226,14 +226,32 @@ mod tests {
     use crate::prelude::*;
 
     #[test]
-    fn account_order_margin() {
+    fn account_order_margin_no_position() {
         let mut account = Account::new(quote!(1000), leverage!(1));
 
         assert_eq!(account.compute_order_margin(), quote!(0));
 
-        let order = Order::limit(Side::Buy, quote!(100), base!(1)).unwrap();
+        let order = Order::limit(Side::Buy, quote!(90), base!(1)).unwrap();
         account.append_limit_order(order);
+        assert_eq!(account.compute_order_margin(), quote!(90));
 
+        let order = Order::limit(Side::Sell, quote!(100), base!(1)).unwrap();
+        account.append_limit_order(order);
+        assert_eq!(account.compute_order_margin(), quote!(100));
+
+        let order = Order::limit(Side::Sell, quote!(120), base!(1)).unwrap();
+        account.append_limit_order(order);
+        assert_eq!(account.compute_order_margin(), quote!(120));
+    }
+
+    #[test]
+    fn account_order_margin_with_long() {
+        let mut account = Account::new(quote!(1000), leverage!(1));
+        todo!()
+    }
+
+    #[test]
+    fn account_order_margin_with_short() {
         todo!()
     }
 }
