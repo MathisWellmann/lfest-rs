@@ -20,6 +20,7 @@ mod execution_engine;
 mod market_state;
 mod mock_exchange;
 mod order_filters;
+mod order_margin;
 mod position;
 mod risk_engine;
 #[cfg(test)]
