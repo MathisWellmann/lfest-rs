@@ -279,6 +279,35 @@ mod tests {
 
     #[test]
     fn account_order_margin_with_short() {
-        todo!()
+        let _ = pretty_env_logger::try_init();
+
+        let mut account = Account::new(quote!(1000), leverage!(1));
+        account.position = Position {
+            size: base!(-1),
+            entry_price: quote!(100),
+            position_margin: quote!(100),
+            leverage: leverage!(1),
+        };
+        assert_eq!(account.compute_order_margin(), quote!(0));
+
+        let mut order = Order::limit(Side::Buy, quote!(90), base!(1)).unwrap();
+        order.set_id(0);
+        account.append_limit_order(order);
+        assert_eq!(account.compute_order_margin(), quote!(0));
+
+        let mut order = Order::limit(Side::Sell, quote!(100), base!(1)).unwrap();
+        order.set_id(1);
+        account.append_limit_order(order);
+        assert_eq!(account.compute_order_margin(), quote!(100));
+
+        let mut order = Order::limit(Side::Sell, quote!(120), base!(1)).unwrap();
+        order.set_id(2);
+        account.append_limit_order(order);
+        assert_eq!(account.compute_order_margin(), quote!(220));
+
+        let mut order = Order::limit(Side::Buy, quote!(95), base!(1)).unwrap();
+        order.set_id(3);
+        account.append_limit_order(order);
+        assert_eq!(account.compute_order_margin(), quote!(220));
     }
 }
