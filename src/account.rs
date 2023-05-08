@@ -101,10 +101,13 @@ where
         let user_order_id = *order.user_order_id();
         match self.active_limit_orders.insert(order_id, order) {
             None => {}
-            Some(_) => warn!(
-                "there already was an order with this id in active_limit_orders. \
+            Some(_) => {
+                error!(
+                    "there already was an order with this id in active_limit_orders. \
             This should not happen as order id should be incrementing"
-            ),
+                );
+                debug_assert!(false)
+            }
         };
         match user_order_id {
             None => {}
@@ -163,54 +166,47 @@ where
             open_buy_quantity = open_buy_quantity - self.position.size().abs();
         }
 
-        if open_buy_quantity > open_sell_quantity {
-            // The buy orders dominate
-            let mut notional_value_sum = self
-                .active_limit_orders
-                .values()
-                .filter(|order| matches!(order.side(), Side::Buy))
-                .map(|order| {
-                    order
-                        .quantity()
-                        .convert(order.limit_price().expect(EXPECT_LIMIT_PRICE))
-                })
-                .fold(M::new_zero(), |acc, x| acc + x);
-            debug!("compute_order_margin: notional_value_sum of buy orders: {notional_value_sum}");
+        let mut buy_notional_value_sum = self
+            .active_limit_orders
+            .values()
+            .filter(|order| matches!(order.side(), Side::Buy))
+            .map(|order| {
+                order
+                    .quantity()
+                    .convert(order.limit_price().expect(EXPECT_LIMIT_PRICE))
+            })
+            .fold(M::new_zero(), |acc, x| acc + x);
 
-            // Offset the limit order cost by a potential short position
-            notional_value_sum = max(
-                notional_value_sum
-                    - min(self.position.size(), M::PairedCurrency::new_zero())
-                        .abs()
-                        .convert(self.position.entry_price),
-                M::new_zero(),
-            );
+        // Offset the limit order cost by a potential short position
+        buy_notional_value_sum = max(
+            buy_notional_value_sum
+                - min(self.position.size(), M::PairedCurrency::new_zero())
+                    .abs()
+                    .convert(self.position.entry_price),
+            M::new_zero(),
+        );
 
-            notional_value_sum / self.position.leverage
-        } else {
-            // The sell orders dominate
-            let mut notional_value_sum = self
-                .active_limit_orders
-                .values()
-                .filter(|order| matches!(order.side(), Side::Sell))
-                .map(|order| {
-                    order
-                        .quantity()
-                        .convert(order.limit_price().expect(EXPECT_LIMIT_PRICE))
-                })
-                .fold(M::new_zero(), |acc, x| acc + x);
-            debug!("compute_order_margin: notional_value_sum of sell orders: {notional_value_sum}");
+        // The sell orders dominate
+        let mut sell_notional_value_sum = self
+            .active_limit_orders
+            .values()
+            .filter(|order| matches!(order.side(), Side::Sell))
+            .map(|order| {
+                order
+                    .quantity()
+                    .convert(order.limit_price().expect(EXPECT_LIMIT_PRICE))
+            })
+            .fold(M::new_zero(), |acc, x| acc + x);
 
-            // Offset the limit order cost by a potential long position
-            notional_value_sum = max(
-                M::new_zero(),
-                notional_value_sum
-                    - max(M::PairedCurrency::new_zero(), self.position.size())
-                        .convert(self.position.entry_price),
-            );
+        // Offset the limit order cost by a potential long position
+        sell_notional_value_sum = max(
+            M::new_zero(),
+            sell_notional_value_sum
+                - max(M::PairedCurrency::new_zero(), self.position.size())
+                    .convert(self.position.entry_price),
+        );
 
-            notional_value_sum / self.position.leverage
-        }
+        max(buy_notional_value_sum, sell_notional_value_sum) / self.position.leverage
     }
 
     #[inline(always)]
@@ -231,23 +227,54 @@ mod tests {
 
         assert_eq!(account.compute_order_margin(), quote!(0));
 
-        let order = Order::limit(Side::Buy, quote!(90), base!(1)).unwrap();
+        let mut order = Order::limit(Side::Buy, quote!(90), base!(1)).unwrap();
+        order.set_id(0);
         account.append_limit_order(order);
         assert_eq!(account.compute_order_margin(), quote!(90));
 
-        let order = Order::limit(Side::Sell, quote!(100), base!(1)).unwrap();
+        let mut order = Order::limit(Side::Sell, quote!(100), base!(1)).unwrap();
+        order.set_id(1);
         account.append_limit_order(order);
         assert_eq!(account.compute_order_margin(), quote!(100));
 
-        let order = Order::limit(Side::Sell, quote!(120), base!(1)).unwrap();
+        let mut order = Order::limit(Side::Sell, quote!(120), base!(1)).unwrap();
+        order.set_id(2);
         account.append_limit_order(order);
-        assert_eq!(account.compute_order_margin(), quote!(120));
+        assert_eq!(account.compute_order_margin(), quote!(220));
     }
 
     #[test]
     fn account_order_margin_with_long() {
+        let _ = pretty_env_logger::try_init();
+
         let mut account = Account::new(quote!(1000), leverage!(1));
-        todo!()
+        account.position = Position {
+            size: base!(1),
+            entry_price: quote!(100),
+            position_margin: quote!(100),
+            leverage: leverage!(1),
+        };
+        assert_eq!(account.compute_order_margin(), quote!(0));
+
+        let mut order = Order::limit(Side::Buy, quote!(90), base!(1)).unwrap();
+        order.set_id(0);
+        account.append_limit_order(order);
+        assert_eq!(account.compute_order_margin(), quote!(90));
+
+        let mut order = Order::limit(Side::Sell, quote!(100), base!(1)).unwrap();
+        order.set_id(1);
+        account.append_limit_order(order);
+        assert_eq!(account.compute_order_margin(), quote!(90));
+
+        let mut order = Order::limit(Side::Sell, quote!(120), base!(1)).unwrap();
+        order.set_id(2);
+        account.append_limit_order(order);
+        assert_eq!(account.compute_order_margin(), quote!(120));
+
+        let mut order = Order::limit(Side::Buy, quote!(95), base!(1)).unwrap();
+        order.set_id(3);
+        account.append_limit_order(order);
+        assert_eq!(account.compute_order_margin(), quote!(185));
     }
 
     #[test]
