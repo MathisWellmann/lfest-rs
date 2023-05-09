@@ -69,7 +69,11 @@ where
         market_state: &MarketState,
         account: &Account<M>,
     ) -> Result<(), RiskError> {
-        let pos_value = account.position().size().convert(market_state.mid_price());
+        let pos_value = account
+            .position()
+            .size()
+            .abs()
+            .convert(market_state.mid_price());
         let maint_margin = account
             .position()
             .size()

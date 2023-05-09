@@ -171,13 +171,71 @@ fn submit_limit_buy_order_with_long() {
 
 #[test]
 fn submit_limit_buy_order_with_short() {
-    todo!()
+    let mut exchange = mock_exchange_base();
+    assert_eq!(
+        exchange
+            .update_state(0, bba!(quote!(100), quote!(101)))
+            .unwrap(),
+        vec![]
+    );
+    let order = Order::market(Side::Sell, base!(9)).unwrap();
+    exchange.submit_order(order).unwrap();
+
+    assert_eq!(
+        exchange.account().position(),
+        &Position {
+            size: base!(-9),
+            entry_price: quote!(100),
+            position_margin: quote!(900),
+            leverage: leverage!(1),
+        }
+    );
+
+    // Another sell limit order should not work
+    let order = Order::limit(Side::Sell, quote!(101), base!(1)).unwrap();
+    assert_eq!(
+        exchange.submit_order(order),
+        Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
+    );
+
+    // But buy order should work
+    let mut order = Order::limit(Side::Buy, quote!(100), base!(9)).unwrap();
+    exchange.submit_order(order.clone()).unwrap();
+
+    order.set_id(2);
+    assert_eq!(
+        exchange
+            .update_state(0, bba!(quote!(98), quote!(99)))
+            .unwrap(),
+        vec![order]
+    );
+
+    assert_eq!(
+        exchange.account().position(),
+        &Position {
+            size: base!(0),
+            entry_price: quote!(100),
+            position_margin: quote!(0),
+            leverage: leverage!(1),
+        }
+    );
 }
 
+// test rejection if the limit price >= ask
 #[test]
 fn submit_limit_buy_order_above_ask() {
-    // TODO: test rejection if the limit price >= ask
-    todo!()
+    let mut exchange = mock_exchange_base();
+    assert_eq!(
+        exchange
+            .update_state(0, bba!(quote!(99), quote!(100)))
+            .unwrap(),
+        vec![]
+    );
+    let order = Order::limit(Side::Buy, quote!(100), base!(9)).unwrap();
+    assert_eq!(
+        exchange.submit_order(order),
+        Err(Error::OrderError(OrderError::LimitPriceAboveAsk))
+    );
 }
 
 #[test]
