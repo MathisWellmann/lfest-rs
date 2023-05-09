@@ -16,4 +16,5 @@ mod isolated_margin;
 mod risk_engine_trait;
 
 pub(crate) use isolated_margin::IsolatedMarginRiskEngine;
-pub(crate) use risk_engine_trait::{RiskEngine, RiskError};
+pub(crate) use risk_engine_trait::RiskEngine;
+pub use risk_engine_trait::RiskError;

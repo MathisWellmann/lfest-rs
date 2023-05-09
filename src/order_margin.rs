@@ -3,7 +3,7 @@ use hashbrown::HashMap;
 use crate::{
     exchange::EXPECT_LIMIT_PRICE,
     prelude::Position,
-    types::{Currency, MarginCurrency, Order, Side},
+    types::{Currency, Fee, MarginCurrency, Order, Side},
     utils::{max, min},
 };
 
@@ -11,35 +11,20 @@ use crate::{
 pub(crate) fn compute_order_margin<M>(
     position: &Position<M>,
     active_limit_orders: &HashMap<u64, Order<M::PairedCurrency>>,
+    fee: Fee,
 ) -> M
 where
     M: Currency + MarginCurrency,
 {
-    let mut open_buy_quantity: M::PairedCurrency = active_limit_orders
-        .values()
-        .filter(|order| matches!(order.side(), Side::Buy))
-        .map(|order| order.quantity())
-        .fold(M::PairedCurrency::new_zero(), |acc, x| acc + x);
-    let mut open_sell_quantity: M::PairedCurrency = active_limit_orders
-        .values()
-        .filter(|order| matches!(order.side(), Side::Sell))
-        .map(|order| order.quantity())
-        .fold(M::PairedCurrency::new_zero(), |acc, x| acc + x);
-
-    // Offset against the open position size.
-    if position.size() > M::PairedCurrency::new_zero() {
-        open_sell_quantity = open_sell_quantity - position.size();
-    } else {
-        open_buy_quantity = open_buy_quantity - position.size().abs();
-    }
-
     let mut buy_notional_value_sum = active_limit_orders
         .values()
         .filter(|order| matches!(order.side(), Side::Buy))
         .map(|order| {
-            order
+            let notional_value = order
                 .quantity()
-                .convert(order.limit_price().expect(EXPECT_LIMIT_PRICE))
+                .convert(order.limit_price().expect(EXPECT_LIMIT_PRICE));
+            let fee = notional_value * fee;
+            notional_value + fee
         })
         .fold(M::new_zero(), |acc, x| acc + x);
 
@@ -57,9 +42,11 @@ where
         .values()
         .filter(|order| matches!(order.side(), Side::Sell))
         .map(|order| {
-            order
+            let notional_value = order
                 .quantity()
-                .convert(order.limit_price().expect(EXPECT_LIMIT_PRICE))
+                .convert(order.limit_price().expect(EXPECT_LIMIT_PRICE));
+            let fee = notional_value * fee;
+            notional_value + fee
         })
         .fold(M::new_zero(), |acc, x| acc + x);
 
@@ -80,10 +67,11 @@ mod tests {
 
     #[test]
     fn account_order_margin_no_position() {
-        let mut account = Account::new(quote!(1000), leverage!(1));
+        let fee = fee!(0.0002);
+        let mut account = Account::new(quote!(1000), leverage!(1), fee);
 
         assert_eq!(
-            compute_order_margin(account.position(), &account.active_limit_orders),
+            compute_order_margin(account.position(), &account.active_limit_orders, fee),
             quote!(0)
         );
 
@@ -91,24 +79,24 @@ mod tests {
         order.set_id(0);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
-            quote!(90)
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
+            quote!(90) + quote!(0.018)
         );
 
         let mut order = Order::limit(Side::Sell, quote!(100), base!(1)).unwrap();
         order.set_id(1);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
-            quote!(100)
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
+            quote!(100) + quote!(0.02)
         );
 
         let mut order = Order::limit(Side::Sell, quote!(120), base!(1)).unwrap();
         order.set_id(2);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
-            quote!(220)
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
+            quote!(220) + quote!(0.044)
         );
     }
 
@@ -116,7 +104,8 @@ mod tests {
     fn account_order_margin_with_long() {
         let _ = pretty_env_logger::try_init();
 
-        let mut account = Account::new(quote!(1000), leverage!(1));
+        let fee = fee!(0.0002);
+        let mut account = Account::new(quote!(1000), leverage!(1), fee);
         account.position = Position {
             size: base!(1),
             entry_price: quote!(100),
@@ -124,7 +113,7 @@ mod tests {
             leverage: leverage!(1),
         };
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
             quote!(0)
         );
 
@@ -132,32 +121,32 @@ mod tests {
         order.set_id(0);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
-            quote!(90)
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
+            quote!(90) + quote!(0.018)
         );
 
         let mut order = Order::limit(Side::Sell, quote!(100), base!(1)).unwrap();
         order.set_id(1);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
-            quote!(90)
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
+            quote!(90) + quote!(0.018)
         );
 
         let mut order = Order::limit(Side::Sell, quote!(120), base!(1)).unwrap();
         order.set_id(2);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
-            quote!(120)
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
+            quote!(120) + quote!(0.044)
         );
 
         let mut order = Order::limit(Side::Buy, quote!(95), base!(1)).unwrap();
         order.set_id(3);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
-            quote!(185)
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
+            quote!(185) + quote!(0.037)
         );
     }
 
@@ -165,7 +154,8 @@ mod tests {
     fn account_order_margin_with_short() {
         let _ = pretty_env_logger::try_init();
 
-        let mut account = Account::new(quote!(1000), leverage!(1));
+        let fee = fee!(0.0002);
+        let mut account = Account::new(quote!(1000), leverage!(1), fee);
         account.position = Position {
             size: base!(-1),
             entry_price: quote!(100),
@@ -173,7 +163,7 @@ mod tests {
             leverage: leverage!(1),
         };
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
             quote!(0)
         );
 
@@ -181,7 +171,7 @@ mod tests {
         order.set_id(0);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
             quote!(0)
         );
 
@@ -189,24 +179,24 @@ mod tests {
         order.set_id(1);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
-            quote!(100)
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
+            quote!(100) + quote!(0.02)
         );
 
         let mut order = Order::limit(Side::Sell, quote!(120), base!(1)).unwrap();
         order.set_id(2);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
-            quote!(220)
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
+            quote!(220) + quote!(0.044)
         );
 
         let mut order = Order::limit(Side::Buy, quote!(95), base!(1)).unwrap();
         order.set_id(3);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders),
-            quote!(220)
+            compute_order_margin(&account.position, &account.active_limit_orders, fee),
+            quote!(220) + quote!(0.044)
         );
     }
 }

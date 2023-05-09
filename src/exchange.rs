@@ -24,6 +24,7 @@ where
     risk_engine: IsolatedMarginRiskEngine<S::PairedCurrency>,
     execution_engine: ExecutionEngine<A, S>,
     clearing_house: ClearingHouse<A, S::PairedCurrency>,
+    next_order_id: u64,
 }
 
 impl<A, S> Exchange<A, S>
@@ -36,7 +37,11 @@ where
     /// as infomation source
     pub fn new(account_tracker: A, config: Config<S::PairedCurrency>) -> Self {
         let market_state = MarketState::new(config.contract_specification().price_filter.clone());
-        let account = Account::new(config.starting_balance(), config.initial_leverage());
+        let account = Account::new(
+            config.starting_balance(),
+            config.initial_leverage(),
+            config.contract_specification().fee_maker,
+        );
         let risk_engine = IsolatedMarginRiskEngine::<S::PairedCurrency>::new(
             config.contract_specification().clone(),
         );
@@ -50,6 +55,7 @@ where
             risk_engine,
             execution_engine,
             user_account: account,
+            next_order_id: 0,
         }
     }
 
@@ -173,6 +179,7 @@ where
             .validate_order(&order, self.market_state.mid_price())?;
 
         order.set_timestamp(self.market_state.current_timestamp_ns());
+        order.set_id(self.next_order_id());
 
         match order.order_type() {
             OrderType::Market => {
@@ -204,5 +211,10 @@ where
         }
 
         Ok(order)
+    }
+    #[inline(always)]
+    fn next_order_id(&mut self) -> u64 {
+        self.next_order_id += 1;
+        self.next_order_id - 1
     }
 }

@@ -46,6 +46,7 @@ pub mod prelude {
         order_filters::{PriceFilter, QuantityFilter},
         position::Position,
         quote,
+        risk_engine::RiskError,
         types::*,
     };
 }

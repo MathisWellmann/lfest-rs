@@ -53,7 +53,8 @@ where
 
         let mut orders = account.active_limit_orders.clone();
         orders.insert(order.id(), order.clone());
-        let new_order_margin = compute_order_margin(&account.position, &orders);
+        let new_order_margin =
+            compute_order_margin(&account.position, &orders, self.contract_spec.fee_maker);
 
         let available_balance = account.wallet_balance - account.position.position_margin;
         if new_order_margin > available_balance {

@@ -3,7 +3,7 @@ use hashbrown::HashMap;
 use crate::{
     order_margin::compute_order_margin,
     position::Position,
-    types::{Currency, Error, Leverage, MarginCurrency, Order, OrderType, Result},
+    types::{Currency, Error, Fee, Leverage, MarginCurrency, Order, OrderType, Result},
 };
 
 #[derive(Debug, Clone)]
@@ -20,7 +20,7 @@ where
     pub(crate) active_limit_orders: HashMap<u64, Order<M::PairedCurrency>>,
     // Maps the `user_order_id` to the internal order nonce
     pub(crate) lookup_order_nonce_from_user_order_id: HashMap<u64, u64>,
-    pub(crate) next_order_id: u64,
+    maker_fee: Fee,
 }
 
 impl<M> Account<M>
@@ -28,7 +28,7 @@ where
     M: Currency + MarginCurrency,
 {
     /// Create a new [`Account`] instance.
-    pub(crate) fn new(starting_balance: M, leverage: Leverage) -> Self {
+    pub(crate) fn new(starting_balance: M, leverage: Leverage, maker_fee: Fee) -> Self {
         let position = Position::new(leverage);
 
         Self {
@@ -36,7 +36,7 @@ where
             position,
             active_limit_orders: HashMap::new(),
             lookup_order_nonce_from_user_order_id: HashMap::new(),
-            next_order_id: 0,
+            maker_fee,
         }
     }
 
@@ -56,7 +56,8 @@ where
     #[inline(always)]
     pub fn available_balance(&self) -> M {
         // TODO: this call is expensive so maybe compute once and store
-        let order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
+        let order_margin =
+            compute_order_margin(&self.position, &self.active_limit_orders, self.maker_fee);
         let ab = self.wallet_balance - self.position.position_margin - order_margin;
         debug_assert!(ab >= M::new_zero());
         ab
@@ -143,11 +144,5 @@ where
             self.lookup_order_nonce_from_user_order_id
                 .remove(user_order_id);
         }
-    }
-
-    #[inline(always)]
-    fn next_order_id(&mut self) -> u64 {
-        self.next_order_id += 1;
-        self.next_order_id - 1
     }
 }
