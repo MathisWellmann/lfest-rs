@@ -73,18 +73,6 @@ where
         }
     }
 
-    /// Allows the user to deposit additional variation margin,
-    /// decreases the risk and implied leverage of the position.
-    pub(crate) fn deposit_variation_margin(&mut self, margin: M) {
-        todo!()
-    }
-
-    /// Allows the user to release variation margin,
-    /// increasing the risk and implied leverage of the position.
-    pub(crate) fn release_variation_margin(&mut self, margin: M) {
-        todo!()
-    }
-
     /// Create a new position with all fields custom.
     ///
     /// # Arguments:

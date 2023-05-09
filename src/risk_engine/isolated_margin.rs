@@ -3,6 +3,7 @@ use crate::{
     contract_specification::ContractSpecification,
     exchange::EXPECT_LIMIT_PRICE,
     market_state::MarketState,
+    order_margin::compute_order_margin,
     prelude::Account,
     types::{Currency, MarginCurrency, Order, OrderType, QuoteCurrency, Side},
 };
@@ -47,10 +48,19 @@ where
         order: &Order<<M as Currency>::PairedCurrency>,
     ) -> Result<(), RiskError> {
         debug_assert!(matches!(order.order_type(), OrderType::Limit));
-        match order.side() {
-            Side::Buy => self.handle_limit_buy_order(account, order),
-            Side::Sell => self.handle_limit_sell_order(account, order),
+
+        let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
+
+        let mut orders = account.active_limit_orders.clone();
+        orders.insert(order.id(), order.clone());
+        let new_order_margin = compute_order_margin(&account.position, &orders);
+
+        let available_balance = account.wallet_balance - account.position.position_margin;
+        if new_order_margin > available_balance {
+            return Err(RiskError::NotEnoughAvailableBalance);
         }
+
+        Ok(())
     }
 
     fn check_maintenance_margin(
@@ -59,7 +69,12 @@ where
         account: &Account<M>,
     ) -> Result<(), RiskError> {
         let pos_value = account.position().size().convert(market_state.mid_price());
-        if pos_value < account.position().position_margin() {
+        let maint_margin = account
+            .position()
+            .size()
+            .convert(account.position.entry_price)
+            * self.contract_spec.maintenance_margin;
+        if pos_value < maint_margin {
             return Err(RiskError::Liquidate);
         }
 
@@ -143,67 +158,5 @@ where
         }
 
         Ok(())
-    }
-
-    fn handle_limit_buy_order(
-        &self,
-        account: &Account<M>,
-        order: &Order<M::PairedCurrency>,
-    ) -> Result<(), RiskError> {
-        debug_assert!(matches!(order.order_type(), OrderType::Limit));
-        debug_assert!(matches!(order.side(), Side::Buy));
-
-        let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
-
-        if account.position.size() >= M::PairedCurrency::new_zero() {
-            // The position does not offset the limit buy order
-            let order_margin =
-                self.order_margin_with_new_buy_order(account, order.quantity(), l_price);
-            if order_margin > account.available_balance() {
-                return Err(RiskError::NotEnoughAvailableBalance);
-            }
-        } else {
-            // The position does offset the limit order
-            todo!()
-        }
-
-        Ok(())
-    }
-
-    fn handle_limit_sell_order(
-        &self,
-        account: &Account<M>,
-        order: &Order<M::PairedCurrency>,
-    ) -> Result<(), RiskError> {
-        debug_assert!(matches!(order.order_type(), OrderType::Limit));
-        debug_assert!(matches!(order.side(), Side::Sell));
-
-        todo!("handle_limit_sell_order")
-    }
-
-    fn order_margin_with_new_buy_order(
-        &self,
-        account: &Account<M>,
-        quantity: M::PairedCurrency,
-        price: QuoteCurrency,
-    ) -> M {
-        let mut open_buy_quantity: M::PairedCurrency = account
-            .active_limit_orders
-            .values()
-            .filter(|order| matches!(order.side(), Side::Buy))
-            .map(|order| order.quantity())
-            .fold(M::PairedCurrency::new_zero(), |acc, x| acc + x);
-        let open_sell_quantity: M::PairedCurrency = account
-            .active_limit_orders
-            .values()
-            .filter(|order| matches!(order.side(), Side::Sell))
-            .map(|order| order.quantity())
-            .fold(M::PairedCurrency::new_zero(), |acc, x| acc + x);
-
-        open_buy_quantity = open_buy_quantity + quantity;
-
-        if account.position.size() > M::PairedCurrency::new_zero() {}
-
-        todo!()
     }
 }

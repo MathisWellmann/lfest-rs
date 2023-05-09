@@ -1,6 +1,7 @@
 use hashbrown::HashMap;
 
 use crate::{
+    order_margin::compute_order_margin,
     position::Position,
     types::{Currency, Error, Leverage, MarginCurrency, Order, OrderType, Result},
 };
@@ -54,9 +55,11 @@ where
     /// Return the available balance of the `Account`
     #[inline(always)]
     pub fn available_balance(&self) -> M {
-        // TODO - order_margin
-        warn!("order_margin not included in `available_balance` calculation!");
-        self.wallet_balance - self.position.position_margin
+        // TODO: this call is expensive so maybe compute once and store
+        let order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
+        let ab = self.wallet_balance - self.position.position_margin - order_margin;
+        debug_assert!(ab >= M::new_zero());
+        ab
     }
 
     /// Allows the user to update their desired leverage.
