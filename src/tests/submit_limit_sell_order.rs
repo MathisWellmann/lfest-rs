@@ -100,3 +100,19 @@ fn submit_limit_sell_order_no_position_max() {
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
     );
 }
+
+#[test]
+fn submit_limit_sell_order_below_bid() {
+    let mut exchange = mock_exchange_base();
+    assert_eq!(
+        exchange
+            .update_state(0, bba!(quote!(99), quote!(100)))
+            .unwrap(),
+        vec![]
+    );
+    let order = Order::limit(Side::Sell, quote!(99), base!(9)).unwrap();
+    assert_eq!(
+        exchange.submit_order(order),
+        Err(Error::OrderError(OrderError::LimitPriceBelowBid))
+    );
+}
