@@ -98,4 +98,90 @@ fn submit_limit_buy_order_no_position_max() {
         exchange.submit_order(order.clone()),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
     );
+
+    let mut order = Order::limit(Side::Sell, quote!(100), base!(5)).unwrap();
+    exchange.submit_order(order.clone()).unwrap();
+    let mut order = Order::limit(Side::Sell, quote!(100), base!(4)).unwrap();
+    exchange.submit_order(order.clone()).unwrap();
+    let mut order = Order::limit(Side::Sell, quote!(100), base!(1)).unwrap();
+    assert_eq!(
+        exchange.submit_order(order.clone()),
+        Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
+    );
+}
+
+#[test]
+fn submit_limit_buy_order_with_long() {
+    let mut exchange = mock_exchange_base();
+    assert_eq!(
+        exchange
+            .update_state(0, bba!(quote!(99), quote!(100)))
+            .unwrap(),
+        vec![]
+    );
+    let order = Order::market(Side::Buy, base!(9)).unwrap();
+    exchange.submit_order(order).unwrap();
+
+    assert_eq!(
+        exchange.account().position(),
+        &Position {
+            size: base!(9),
+            entry_price: quote!(100),
+            position_margin: quote!(900),
+            leverage: leverage!(1),
+        }
+    );
+
+    assert_eq!(
+        exchange
+            .update_state(0, bba!(quote!(100), quote!(101)))
+            .unwrap(),
+        vec![]
+    );
+
+    // Another buy limit order should not work
+    let order = Order::limit(Side::Buy, quote!(100), base!(1)).unwrap();
+    assert_eq!(
+        exchange.submit_order(order),
+        Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
+    );
+
+    // But sell order should work
+    let mut order = Order::limit(Side::Sell, quote!(101), base!(9)).unwrap();
+    exchange.submit_order(order.clone()).unwrap();
+
+    order.set_id(2);
+    assert_eq!(
+        exchange
+            .update_state(0, bba!(quote!(102), quote!(103)))
+            .unwrap(),
+        vec![order]
+    );
+
+    assert_eq!(
+        exchange.account().position(),
+        &Position {
+            size: base!(0),
+            entry_price: quote!(100),
+            position_margin: quote!(0),
+            leverage: leverage!(1),
+        }
+    );
+}
+
+#[test]
+fn submit_limit_buy_order_with_short() {
+    todo!()
+}
+
+#[test]
+fn submit_limit_buy_order_above_ask() {
+    // TODO: test rejection if the limit price >= ask
+    todo!()
+}
+
+#[test]
+fn submit_limit_buy_order_turnaround_long() {
+    // With a long position open, be able to open a short position of equal size
+    todo!()
 }

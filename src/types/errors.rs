@@ -14,10 +14,10 @@ pub enum OrderError {
     LimitPriceTooHigh,
 
     #[error("The limit price is larger than the current ask")]
-    LimitPriceLargerThanAsk,
+    LimitPriceAboveAsk,
 
     #[error("The limit price is lower than the current bid")]
-    LimitPriceLowerThanBid,
+    LimitPriceBelowBid,
 
     #[error("The order price does not conform to the step size.")]
     InvalidOrderPriceStepSize,

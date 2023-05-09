@@ -6,7 +6,9 @@ use crate::{
     execution_engine::ExecutionEngine,
     market_state::MarketState,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
-    types::{Currency, MarginCurrency, MarketUpdate, Order, OrderType, Result, Side},
+    types::{
+        Currency, Error, MarginCurrency, MarketUpdate, Order, OrderError, OrderType, Result, Side,
+    },
 };
 
 pub(crate) const EXPECT_LIMIT_PRICE: &str = "A limit price must be present for a limit order; qed";
@@ -204,6 +206,19 @@ where
                 order.mark_executed();
             }
             OrderType::Limit => {
+                let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
+                match order.side() {
+                    Side::Buy => {
+                        if l_price >= self.market_state.ask() {
+                            return Err(Error::OrderError(OrderError::LimitPriceAboveAsk));
+                        }
+                    }
+                    Side::Sell => {
+                        if l_price <= self.market_state.bid() {
+                            return Err(Error::OrderError(OrderError::LimitPriceBelowBid));
+                        }
+                    }
+                }
                 self.risk_engine
                     .check_limit_order(&self.user_account, &order)?;
                 self.user_account.append_limit_order(order.clone());
