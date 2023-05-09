@@ -68,3 +68,35 @@ fn submit_limit_sell_order_no_position() {
         quote!(1000) - fee - fee
     );
 }
+
+// Test there is a maximum quantity of buy orders the account can post.
+#[test]
+fn submit_limit_sell_order_no_position_max() {
+    let mut exchange = mock_exchange_base();
+    assert_eq!(
+        exchange
+            .update_state(0, bba!(quote!(99), quote!(100)))
+            .unwrap(),
+        vec![]
+    );
+
+    let mut order = Order::limit(Side::Sell, quote!(100), base!(5)).unwrap();
+    exchange.submit_order(order.clone()).unwrap();
+    let mut order = Order::limit(Side::Sell, quote!(100), base!(4)).unwrap();
+    exchange.submit_order(order.clone()).unwrap();
+    let mut order = Order::limit(Side::Sell, quote!(100), base!(1)).unwrap();
+    assert_eq!(
+        exchange.submit_order(order.clone()),
+        Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
+    );
+
+    let mut order = Order::limit(Side::Buy, quote!(99), base!(5)).unwrap();
+    exchange.submit_order(order.clone()).unwrap();
+    let mut order = Order::limit(Side::Buy, quote!(99), base!(4)).unwrap();
+    exchange.submit_order(order.clone()).unwrap();
+    let mut order = Order::limit(Side::Buy, quote!(99), base!(2)).unwrap();
+    assert_eq!(
+        exchange.submit_order(order.clone()),
+        Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
+    );
+}
