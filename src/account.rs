@@ -170,6 +170,8 @@ where
             .active_limit_orders
             .remove(&order_id)
             .expect("The order must have been active; qed");
+        self.order_margin =
+            compute_order_margin(&self.position, &self.active_limit_orders, self.maker_fee);
         if let Some(user_order_id) = order.user_order_id() {
             self.lookup_order_nonce_from_user_order_id
                 .remove(user_order_id);

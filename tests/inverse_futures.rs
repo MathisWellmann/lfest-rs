@@ -95,7 +95,7 @@ fn inv_long_market_loss_full() {
         exchange
             .account()
             .position()
-            .unrealized_pnl(quote!(999), quote!(1000)),
+            .unrealized_pnl(quote!(1000), quote!(1001)),
         base!(0.0)
     );
     assert_eq!(exchange.account().wallet_balance(), base!(0.99952));
@@ -691,36 +691,36 @@ fn inv_execute_limit() {
         .unwrap();
     assert_eq!(exec_orders.len(), 1);
 
-    assert_eq!(exchange.market_state().bid(), quote!(750.0));
-    assert_eq!(exchange.market_state().ask(), quote!(751.0));
+    assert_eq!(exchange.market_state().bid(), quote!(750));
+    assert_eq!(exchange.market_state().ask(), quote!(751));
     assert_eq!(exchange.account().active_limit_orders().len(), 0);
-    assert_eq!(exchange.account().position().size(), quote!(450.0));
-    assert_eq!(exchange.account().position().entry_price(), quote!(900.0));
+    assert_eq!(exchange.account().position().size(), quote!(450));
+    assert_eq!(exchange.account().position().entry_price(), quote!(900));
     assert_eq!(exchange.account().wallet_balance(), base!(0.9999));
     assert_eq!(exchange.account().available_balance(), base!(0.4999));
     assert_eq!(exchange.account().position().position_margin(), base!(0.5));
-    assert_eq!(exchange.account().order_margin(), base!(0.0));
+    assert_eq!(exchange.account().order_margin(), base!(0));
 
-    let o = Order::limit(Side::Sell, quote!(1000.0), quote!(450.0)).unwrap();
+    let o = Order::limit(Side::Sell, quote!(1000), quote!(450)).unwrap();
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
 
     let _ = exchange
-        .update_state(1, bba!(quote!(1200.0), quote!(1201.0)))
+        .update_state(1, bba!(quote!(1199), quote!(1200)))
         .unwrap();
 
     assert_eq!(exchange.account().active_limit_orders().len(), 0);
-    assert_eq!(exchange.account().position().size(), quote!(0.0));
-    assert_eq!(exchange.account().position().position_margin(), base!(0.0));
+    assert_eq!(exchange.account().position().size(), quote!(0));
+    assert_eq!(exchange.account().position().position_margin(), base!(0));
     assert_eq!(exchange.account().wallet_balance(), base!(1.04981));
     assert_eq!(exchange.account().available_balance(), base!(1.04981));
 
-    let o = Order::limit(Side::Sell, quote!(1200.0), quote!(600.0)).unwrap();
+    let o = Order::limit(Side::Sell, quote!(1200), quote!(600)).unwrap();
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
 
     let _ = exchange
-        .update_state(2, bba!(quote!(1200.1), quote!(1200.2)))
+        .update_state(2, bba!(quote!(1201), quote!(1202)))
         .unwrap();
     assert_eq!(exchange.account().position().size(), quote!(-600.0));
     assert_eq!(exchange.account().position().position_margin(), base!(0.5));
