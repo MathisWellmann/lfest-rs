@@ -60,6 +60,10 @@ where
         // to be reversed into the opposite position of the same size,
         // which should be possible and requires a slightly modified calculation that
         let available_balance = account.wallet_balance - account.position.position_margin;
+        debug!(
+            "new_order_margin: {}, available_balance: {}",
+            new_order_margin, available_balance
+        );
         if new_order_margin > available_balance {
             return Err(RiskError::NotEnoughAvailableBalance);
         }

@@ -160,8 +160,8 @@ where
     fn check_limit_order_execution(&self, order: &Order<S>) -> bool {
         let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
         match order.side() {
-            Side::Buy => self.market_state.bid() < l_price,
-            Side::Sell => self.market_state.ask() > l_price,
+            Side::Buy => self.market_state.ask() < l_price,
+            Side::Sell => self.market_state.bid() > l_price,
         }
     }
 
