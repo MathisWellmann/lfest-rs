@@ -117,6 +117,8 @@ fn submit_limit_sell_order_below_bid() {
     );
 }
 
+// With a long position open, be able to open a short position of equal size using a limit order
+// TODO: this requires a change in the `IsolatedMarginRiskEngine`
 #[test]
 fn submit_limit_sell_order_turnaround_long() {
     let mut exchange = mock_exchange_base();
