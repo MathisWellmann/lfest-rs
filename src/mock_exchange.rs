@@ -24,7 +24,9 @@ pub fn mock_exchange_base() -> Exchange<NoAccountTracker, BaseCurrency> {
 }
 
 /// Constructs a mock exchange for testing.
-pub fn mock_exchange_quote() -> Exchange<NoAccountTracker, QuoteCurrency> {
+pub fn mock_exchange_quote(
+    starting_balance: BaseCurrency,
+) -> Exchange<NoAccountTracker, QuoteCurrency> {
     let acc_tracker = NoAccountTracker::default();
     let contract_specification = ContractSpecification {
         ticker: "TESTUSD".to_string(),
@@ -36,6 +38,6 @@ pub fn mock_exchange_quote() -> Exchange<NoAccountTracker, QuoteCurrency> {
         fee_maker: fee!(0.0002),
         fee_taker: fee!(0.0006),
     };
-    let config = Config::new(base!(10), 200, leverage!(1), contract_specification).unwrap();
+    let config = Config::new(starting_balance, 200, leverage!(1), contract_specification).unwrap();
     Exchange::new(acc_tracker, config)
 }

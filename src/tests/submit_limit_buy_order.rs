@@ -242,7 +242,6 @@ fn submit_limit_buy_order_above_ask() {
 // TODO: this requires a change in the `IsolatedMarginRiskEngine`
 #[test]
 fn submit_limit_buy_order_turnaround_short() {
-    todo!("this should work");
     // let mut exchange = mock_exchange_base();
     // assert_eq!(
     //     exchange
