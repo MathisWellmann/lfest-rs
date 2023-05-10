@@ -151,29 +151,26 @@ fn inv_short_market_win_full() {
 
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
-        .update_state(0, bba!(quote!(1000.0), quote!(1001.0)))
+        .update_state(0, bba!(quote!(1000), quote!(1001)))
         .unwrap();
 
-    let o = Order::market(Side::Sell, quote!(800.0)).unwrap();
+    let o = Order::market(Side::Sell, quote!(800)).unwrap();
     exchange.submit_order(o).unwrap();
-    let _ = exchange
-        .update_state(1, bba!(quote!(1000), quote!(1001)))
-        .unwrap();
 
-    assert_eq!(exchange.account().position().size(), quote!(-800.0));
+    assert_eq!(exchange.account().position().size(), quote!(-800));
 
     let _ = exchange
-        .update_state(1, bba!(quote!(799.0), quote!(800.0)))
+        .update_state(1, bba!(quote!(799), quote!(800)))
         .unwrap();
     assert_eq!(
         exchange
             .account()
             .position()
-            .unrealized_pnl(quote!(1000), quote!(1001)),
+            .unrealized_pnl(exchange.market_state().bid(), exchange.market_state().ask()),
         base!(0.2)
     );
 
-    let size = quote!(800.0);
+    let size = quote!(800);
     let o = Order::market(Side::Buy, size).unwrap();
     let order_err = exchange.submit_order(o);
     assert!(order_err.is_ok());
@@ -182,10 +179,10 @@ fn inv_short_market_win_full() {
         .unwrap();
 
     let fee_quote0 = size.fee_portion(exchange.config().contract_specification().fee_taker);
-    let fee_base0 = fee_quote0.convert(quote!(1000.0));
+    let fee_base0 = fee_quote0.convert(quote!(1000));
 
     let fee_quote1 = size.fee_portion(exchange.config().contract_specification().fee_taker);
-    let fee_base1 = fee_quote1.convert(quote!(800.0));
+    let fee_base1 = fee_quote1.convert(quote!(800));
 
     let fee_combined: BaseCurrency = fee_base0 + fee_base1;
 
