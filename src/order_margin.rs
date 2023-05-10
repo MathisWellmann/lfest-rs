@@ -28,14 +28,16 @@ where
         })
         .fold(M::new_zero(), |acc, x| acc + x);
 
-    // Offset the limit order cost by a potential short position
-    buy_notional_value_sum = max(
-        buy_notional_value_sum
-            - min(position.size(), M::PairedCurrency::new_zero())
-                .abs()
-                .convert(position.entry_price),
-        M::new_zero(),
-    );
+    if position.size() < M::PairedCurrency::new_zero() {
+        // Offset the limit order cost by a potential short position
+        buy_notional_value_sum = max(
+            buy_notional_value_sum
+                - min(position.size(), M::PairedCurrency::new_zero())
+                    .abs()
+                    .convert(position.entry_price),
+            M::new_zero(),
+        );
+    }
 
     // The sell orders dominate
     let mut sell_notional_value_sum = active_limit_orders
@@ -50,12 +52,14 @@ where
         })
         .fold(M::new_zero(), |acc, x| acc + x);
 
-    // Offset the limit order cost by a potential long position
-    sell_notional_value_sum = max(
-        M::new_zero(),
-        sell_notional_value_sum
-            - max(M::PairedCurrency::new_zero(), position.size()).convert(position.entry_price),
-    );
+    if position.size() > M::PairedCurrency::new_zero() {
+        // Offset the limit order cost by a potential long position
+        sell_notional_value_sum = max(
+            M::new_zero(),
+            sell_notional_value_sum
+                - max(M::PairedCurrency::new_zero(), position.size()).convert(position.entry_price),
+        );
+    }
 
     max(buy_notional_value_sum, sell_notional_value_sum) / position.leverage
 }
