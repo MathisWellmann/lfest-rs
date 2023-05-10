@@ -53,6 +53,12 @@ where
         self.position_margin
     }
 
+    /// Return the set leverage of the position
+    #[inline(always)]
+    pub fn leverage(&self) -> Leverage {
+        self.leverage
+    }
+
     /// Returns the implied leverage of the position based on the position value and the collateral backing it.
     /// It is computed by dividing the total value of the position by the amount of margin required to hold that position.
     #[inline]
