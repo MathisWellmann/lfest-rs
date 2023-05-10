@@ -18,9 +18,7 @@ use crate::{
 /// variation margin from the clearing house.
 #[derive(Debug, Clone)]
 pub struct ClearingHouse<A, M> {
-    /// Keeps track of all trades of the `Account`.
-    account_tracker: A,
-    _margin_curr: std::marker::PhantomData<M>,
+    _margin_curr: std::marker::PhantomData<(A, M)>,
 }
 
 impl<A, M> ClearingHouse<A, M>
@@ -29,9 +27,8 @@ where
     M: Currency + MarginCurrency,
 {
     /// Create a new instance with a user account
-    pub(crate) fn new(account_tracker: A) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            account_tracker,
             _margin_curr: Default::default(),
         }
     }
@@ -44,12 +41,6 @@ where
     /// TODO: not used but may be in the future.
     pub(crate) fn settle_funding_period(&mut self, mark_value: M, funding_rate: Decimal) {
         todo!()
-    }
-
-    /// Return a reference to the `AccountTracker` for performance statistics.
-    #[inline(always)]
-    pub(crate) fn account_tracker(&self) -> &A {
-        &self.account_tracker
     }
 
     /// Settlement referes to the actual transfer of funds or assets between the buyer and seller to fulfill the trade.
@@ -65,21 +56,30 @@ where
     pub(crate) fn settle_filled_order(
         &mut self,
         account: &mut Account<M>,
+        account_tracker: &mut A,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
         fee: Fee,
         ts_ns: i64,
     ) {
         if quantity > M::PairedCurrency::new_zero() {
-            self.settle_buy_order(account, quantity, fill_price, fee, ts_ns);
+            self.settle_buy_order(account, account_tracker, quantity, fill_price, fee, ts_ns);
         } else {
-            self.settle_sell_order(account, quantity.abs(), fill_price, fee, ts_ns);
+            self.settle_sell_order(
+                account,
+                account_tracker,
+                quantity.abs(),
+                fill_price,
+                fee,
+                ts_ns,
+            );
         }
     }
 
     fn settle_buy_order(
         &mut self,
         account: &mut Account<M>,
+        account_tracker: &mut A,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
         fee: Fee,
@@ -88,7 +88,7 @@ where
         let notional_value = quantity.convert(fill_price);
         let fee = notional_value * fee;
         account.wallet_balance -= fee;
-        self.account_tracker.log_fee(fee);
+        account_tracker.log_fee(fee);
 
         if account.position.size() >= M::PairedCurrency::new_zero() {
             account.position.increase_long(quantity, fill_price);
@@ -97,7 +97,7 @@ where
                 // Strictly decrease the short position
                 let rpnl = account.position.decrease_short(quantity, fill_price);
                 account.wallet_balance += rpnl;
-                self.account_tracker.log_rpnl(rpnl, ts_ns);
+                account_tracker.log_rpnl(rpnl, ts_ns);
             } else {
                 let new_long_size = quantity - account.position.size().abs();
 
@@ -106,7 +106,7 @@ where
                     .position
                     .decrease_short(account.position.size().abs(), fill_price);
                 account.wallet_balance += rpnl;
-                self.account_tracker.log_rpnl(rpnl, ts_ns);
+                account_tracker.log_rpnl(rpnl, ts_ns);
 
                 // also open a long
                 account.position.open_position(new_long_size, fill_price);
@@ -117,6 +117,7 @@ where
     fn settle_sell_order(
         &mut self,
         account: &mut Account<M>,
+        account_tracker: &mut A,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
         fee: Fee,
@@ -125,14 +126,14 @@ where
         let notional_value = quantity.convert(fill_price);
         let fee = notional_value * fee;
         account.wallet_balance -= fee;
-        self.account_tracker.log_fee(fee);
+        account_tracker.log_fee(fee);
 
         if account.position.size() > M::PairedCurrency::new_zero() {
             if quantity <= account.position.size() {
                 // Decrease the long only
                 let rpnl = account.position.decrease_long(quantity, fill_price);
                 account.wallet_balance += rpnl;
-                self.account_tracker.log_rpnl(rpnl, ts_ns);
+                account_tracker.log_rpnl(rpnl, ts_ns);
             } else {
                 let new_short_size = quantity - account.position.size();
 
@@ -142,7 +143,7 @@ where
                     .decrease_long(account.position.size(), fill_price);
 
                 account.wallet_balance += rpnl;
-                self.account_tracker.log_rpnl(rpnl, ts_ns);
+                account_tracker.log_rpnl(rpnl, ts_ns);
 
                 // Open a short as well
                 account

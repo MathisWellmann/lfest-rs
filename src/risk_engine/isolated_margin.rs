@@ -56,6 +56,9 @@ where
         let new_order_margin =
             compute_order_margin(&account.position, &orders, self.contract_spec.fee_maker);
 
+        // TODO: this calculation does not allow a fully loaded long (or short) position
+        // to be reversed into the opposite position of the same size,
+        // which should be possible and requires a slightly modified calculation that
         let available_balance = account.wallet_balance - account.position.position_margin;
         if new_order_margin > available_balance {
             return Err(RiskError::NotEnoughAvailableBalance);

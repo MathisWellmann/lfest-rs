@@ -3,7 +3,6 @@ use crate::{
     account_tracker::AccountTracker,
     clearing_house::ClearingHouse,
     config::Config,
-    execution_engine::ExecutionEngine,
     market_state::MarketState,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     types::{
@@ -23,8 +22,8 @@ where
     config: Config<S::PairedCurrency>,
     market_state: MarketState,
     user_account: Account<S::PairedCurrency>,
+    account_tracker: A,
     risk_engine: IsolatedMarginRiskEngine<S::PairedCurrency>,
-    execution_engine: ExecutionEngine<A, S>,
     clearing_house: ClearingHouse<A, S::PairedCurrency>,
     next_order_id: u64,
 }
@@ -47,16 +46,15 @@ where
         let risk_engine = IsolatedMarginRiskEngine::<S::PairedCurrency>::new(
             config.contract_specification().clone(),
         );
-        let clearing_house = ClearingHouse::new(account_tracker);
-        let execution_engine = ExecutionEngine::<A, S>::new();
+        let clearing_house = ClearingHouse::new();
 
         Self {
             config,
             market_state,
             clearing_house,
             risk_engine,
-            execution_engine,
             user_account: account,
+            account_tracker,
             next_order_id: 0,
         }
     }
@@ -82,7 +80,7 @@ where
     /// Return a reference to the `AccountTracker` for performance statistics.
     #[inline(always)]
     pub fn account_tracker(&self) -> &A {
-        &self.clearing_house.account_tracker()
+        &self.account_tracker()
     }
 
     /// Return a reference to the currency `MarketState`
@@ -124,6 +122,7 @@ where
             };
             self.clearing_house.settle_filled_order(
                 &mut self.user_account,
+                &mut self.account_tracker,
                 qty,
                 order.limit_price().expect(EXPECT_LIMIT_PRICE),
                 self.config.contract_specification().fee_maker,
@@ -198,6 +197,7 @@ where
                 // From here on, everything is infallible
                 self.clearing_house.settle_filled_order(
                     &mut self.user_account,
+                    &mut self.account_tracker,
                     quantity,
                     fill_price,
                     self.config.contract_specification().fee_taker,
