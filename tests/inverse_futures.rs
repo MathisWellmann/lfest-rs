@@ -1,91 +1,87 @@
 //! Test file for the inverse futures mode of the exchange
 
-use fpdec::{Dec, Decimal};
-use lfest::{mock_exchange_base, prelude::*};
+use fpdec::Decimal;
+use lfest::{mock_exchange_quote, prelude::*};
 
 #[test]
 fn inv_long_market_win_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let mut exchange = mock_exchange_base();
-    todo!();
-    // let _ = exchange
-    //     .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
-    //     .unwrap();
+    let mut exchange = mock_exchange_quote();
+    let _ = exchange
+        .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
+        .unwrap();
 
-    // let value: BaseCurrency = exchange.account().margin().available_balance() * base!(0.8);
-    // let size = value.convert(exchange.ask());
-    // let o = Order::market(Side::Buy, size).unwrap();
-    // exchange.submit_order(o).unwrap();
+    let value: BaseCurrency = exchange.account().available_balance() * base!(0.8);
+    let size = value.convert(exchange.market_state().ask());
+    let o = Order::market(Side::Buy, size).unwrap();
+    exchange.submit_order(o).unwrap();
 
-    // let _ = exchange
-    //     .update_state(1, bba!(quote!(1000), quote!(1001)))
-    //     .unwrap();
+    let _ = exchange
+        .update_state(1, bba!(quote!(1000), quote!(1001)))
+        .unwrap();
 
-    // let fee_quote = size.fee_portion(fee_taker);
-    // let fee_base1 = fee_quote.convert(exchange.bid());
+    let fee_quote = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_base1 = fee_quote.convert(exchange.market_state().bid());
 
-    // assert_eq!(exchange.account().position().size(), size);
-    // assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
-    // assert_eq!(
-    //     exchange
-    //         .account()
-    //         .position()
-    //         .unrealized_pnl(quote!(1000), quote!(1001)),
-    //     base!(0.0)
-    // );
-    // assert_eq!(
-    //     exchange.account().margin().wallet_balance(),
-    //     base!(1.0) - fee_base1
-    // );
-    // assert_eq!(exchange.account().margin().position_margin(), base!(0.8));
-    // assert_eq!(
-    //     exchange.account().margin().available_balance(),
-    //     (base!(0.2) - fee_base1)
-    // );
+    assert_eq!(exchange.account().position().size(), size);
+    assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
+    assert_eq!(
+        exchange
+            .account()
+            .position()
+            .unrealized_pnl(quote!(1000), quote!(1001)),
+        base!(0.0)
+    );
+    assert_eq!(exchange.account().wallet_balance(), base!(1.0) - fee_base1);
+    assert_eq!(exchange.account().position().position_margin(), base!(0.8));
+    assert_eq!(
+        exchange.account().available_balance(),
+        (base!(0.2) - fee_base1)
+    );
 
-    // let _ = exchange
-    //     .update_state(1, bba!(quote!(2000), quote!(2001)))
-    //     .unwrap();
-    // assert_eq!(
-    //     exchange
-    //         .account()
-    //         .position()
-    //         .unrealized_pnl(quote!(2000), quote!(2001)),
-    //     base!(0.4)
-    // );
+    let _ = exchange
+        .update_state(1, bba!(quote!(2000), quote!(2001)))
+        .unwrap();
+    assert_eq!(
+        exchange
+            .account()
+            .position()
+            .unrealized_pnl(quote!(2000), quote!(2001)),
+        base!(0.4)
+    );
 
-    // let size = quote!(800.0);
-    // let fee_base2 = size.fee_portion(fee_taker);
-    // let fee_asset2 = fee_base2.convert(quote!(2000.0));
+    let size = quote!(800.0);
+    let fee_base2 = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_asset2 = fee_base2.convert(quote!(2000.0));
 
-    // let o = Order::market(Side::Sell, size).unwrap();
-    // exchange.submit_order(o).unwrap();
+    let o = Order::market(Side::Sell, size).unwrap();
+    exchange.submit_order(o).unwrap();
 
-    // assert_eq!(exchange.account().position().size(), quote!(0.0));
-    // assert_eq!(
-    //     exchange
-    //         .account()
-    //         .position()
-    //         .unrealized_pnl(quote!(2000), quote!(2001)),
-    //     base!(0.0)
-    // );
-    // assert_eq!(
-    //     exchange.account().margin().wallet_balance(),
-    //     (base!(1.4) - fee_base1 - fee_asset2)
-    // );
-    // assert_eq!(exchange.account().margin().position_margin(), base!(0.0));
-    // assert_eq!(
-    //     exchange.account().margin().available_balance(),
-    //     (base!(1.4) - fee_base1 - fee_asset2)
-    // );
+    assert_eq!(exchange.account().position().size(), quote!(0.0));
+    assert_eq!(
+        exchange
+            .account()
+            .position()
+            .unrealized_pnl(quote!(2000), quote!(2001)),
+        base!(0.0)
+    );
+    assert_eq!(
+        exchange.account().wallet_balance(),
+        (base!(1.4) - fee_base1 - fee_asset2)
+    );
+    assert_eq!(exchange.account().position().position_margin(), base!(0.0));
+    assert_eq!(
+        exchange.account().available_balance(),
+        (base!(1.4) - fee_base1 - fee_asset2)
+    );
 }
 
 #[test]
 fn inv_long_market_loss_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_quote();
     todo!();
     // let _ = exchange
     //     .update_state(0, bba!(quote!(999), quote!(1000)))
@@ -157,7 +153,7 @@ fn inv_long_market_loss_full() {
 fn inv_short_market_win_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_quote();
     todo!();
     // let _ = exchange
     //     .update_state(0, bba!(quote!(1000.0), quote!(1001.0)))
@@ -221,7 +217,7 @@ fn inv_short_market_win_full() {
 fn inv_short_market_loss_full() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_quote();
     todo!();
     // let _ = exchange
     //     .update_state(0, bba!(quote!(1000), quote!(1001)))
@@ -307,7 +303,7 @@ fn inv_short_market_loss_full() {
 fn inv_long_market_win_partial() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_quote();
     todo!();
     // let _ = exchange
     //     .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
@@ -399,7 +395,7 @@ fn inv_long_market_win_partial() {
 fn inv_long_market_loss_partial() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_quote();
     todo!();
     // let _ = exchange
     //     .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
@@ -461,7 +457,7 @@ fn inv_long_market_loss_partial() {
 fn inv_short_market_win_partial() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_quote();
     todo!();
     // let _ = exchange
     //     .update_state(0, bba!(quote!(1000.0), quote!(1001.0)))
@@ -539,7 +535,7 @@ fn inv_short_market_win_partial() {
 fn inv_short_market_loss_partial() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_quote();
     todo!();
     // let _ = exchange
     //     .update_state(0, bba!(quote!(1000), quote!(1001)))
@@ -618,7 +614,7 @@ fn inv_short_market_loss_partial() {
 fn inv_test_market_roundtrip() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_quote();
     todo!();
     // let _ = exchange
     //     .update_state(0, bba!(quote!(999), quote!(1000)))
@@ -696,7 +692,7 @@ fn inv_test_market_roundtrip() {
 fn inv_execute_limit() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_quote();
     todo!();
     // let _ = exchange
     //     .update_state(0, bba!(quote!(1000.0), quote!(1001.0)))
