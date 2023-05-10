@@ -235,32 +235,34 @@ where
 
         Ok(order)
     }
+
     #[inline(always)]
     fn next_order_id(&mut self) -> u64 {
         self.next_order_id += 1;
         self.next_order_id - 1
     }
+
     /// Cancel an active order based on the user_order_id of an Order
+    ///
+    /// # Arguments:
+    /// `user_order_id`: The `user_order_id` of the order to cancel.
     ///
     /// # Returns:
     /// the cancelled order if successfull, error when the `user_order_id` is
     /// not found
-    pub(crate) fn cancel_order_by_user_id(
-        &mut self,
-        user_order_id: u64,
-        account_tracker: &mut A,
-    ) -> Result<Order<S>> {
+    pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Result<Order<S>> {
         self.account
-            .cancel_order_by_user_id(user_order_id, account_tracker)
+            .cancel_order_by_user_id(user_order_id, &mut self.account_tracker)
     }
 
-    /// Cancel an active order
+    /// Cancel an active order.
+    ///
+    /// # Arguments:
+    /// `order_id`: The `id` (assigned by the exchange) of the order to cancel.
+    ///
     /// returns Some order if successful with given order_id
-    pub(crate) fn cancel_order(
-        &mut self,
-        order_id: u64,
-        account_tracker: &mut A,
-    ) -> Result<Order<S>> {
-        self.account.cancel_order(order_id, account_tracker)
+    pub fn cancel_order(&mut self, order_id: u64) -> Result<Order<S>> {
+        self.account
+            .cancel_order(order_id, &mut self.account_tracker)
     }
 }
