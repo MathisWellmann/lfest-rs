@@ -53,6 +53,12 @@ where
         self.wallet_balance
     }
 
+    /// Return a reference to the currently active limit orders of the account
+    #[inline(always)]
+    pub fn active_limit_orders(&self) -> &HashMap<u64, Order<M::PairedCurrency>> {
+        &self.active_limit_orders
+    }
+
     /// Return the available balance of the `Account`
     #[inline(always)]
     pub fn available_balance(&self) -> M {

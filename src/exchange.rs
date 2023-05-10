@@ -260,7 +260,8 @@ where
     /// # Arguments:
     /// `order_id`: The `id` (assigned by the exchange) of the order to cancel.
     ///
-    /// returns Some order if successful with given order_id
+    /// # Returns:
+    /// An order if successful with the given order_id.
     pub fn cancel_order(&mut self, order_id: u64) -> Result<Order<S>> {
         self.account
             .cancel_order(order_id, &mut self.account_tracker)
