@@ -694,15 +694,15 @@ where
             (timestamp_ns as i64 - self.high_water_mark_ts) / HOURLY_NS as i64;
     }
 
-    fn log_rpnl(&mut self, rpnl: M, ts_ns: i64) {
-        self.total_rpnl += rpnl;
-        self.wallet_balance_last += rpnl;
-        if rpnl < M::new_zero() {
-            self.total_loss += rpnl.abs();
+    fn log_rpnl(&mut self, net_rpnl: M, ts_ns: i64) {
+        self.total_rpnl += net_rpnl;
+        self.wallet_balance_last += net_rpnl;
+        if net_rpnl < M::new_zero() {
+            self.total_loss += net_rpnl.abs();
             self.num_losses += 1;
         } else {
             self.num_wins += 1;
-            self.total_profit += rpnl;
+            self.total_profit += net_rpnl;
         }
         if self.wallet_balance_last > self.wallet_balance_high {
             self.wallet_balance_high = self.wallet_balance_last;

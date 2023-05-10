@@ -4,7 +4,7 @@ use fpdec::Decimal;
 
 use crate::{
     prelude::{Account, AccountTracker},
-    types::{Currency, Fee, MarginCurrency, QuoteCurrency},
+    types::{Currency, Fee, MarginCurrency, QuoteCurrency, Side},
 };
 
 /// A clearing house acts as an intermediary in futures transactions.
@@ -62,6 +62,13 @@ where
         fee: Fee,
         ts_ns: i64,
     ) {
+        let side = if quantity > M::PairedCurrency::new_zero() {
+            Side::Buy
+        } else {
+            Side::Sell
+        };
+        account_tracker.log_trade(side, fill_price, quantity);
+
         if quantity > M::PairedCurrency::new_zero() {
             self.settle_buy_order(account, account_tracker, quantity, fill_price, fee, ts_ns);
         } else {

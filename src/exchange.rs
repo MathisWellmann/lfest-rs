@@ -136,6 +136,7 @@ where
                 self.market_state.current_timestamp_ns(),
             );
             self.account.remove_executed_order_from_active(order.id());
+            self.account_tracker.log_limit_order_fill();
         }
 
         Ok(to_be_exec)
@@ -210,6 +211,7 @@ where
                     self.market_state.current_timestamp_ns(),
                 );
                 order.mark_executed();
+                self.account_tracker.log_market_order_fill();
             }
             OrderType::Limit => {
                 let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
