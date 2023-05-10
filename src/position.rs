@@ -186,6 +186,10 @@ where
             "Amount must be positive; qed"
         );
         debug_assert!(
+            self.size < M::PairedCurrency::new_zero(),
+            "Position must be short!"
+        );
+        debug_assert!(
             quantity.into_negative() <= self.size,
             "Amount must be smaller than net short position; qed"
         );
