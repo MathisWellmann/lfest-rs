@@ -383,61 +383,62 @@ fn inv_long_market_loss_partial() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_quote();
-    todo!();
-    // let _ = exchange
-    //     .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
-    //     .unwrap();
+    let _ = exchange
+        .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
+        .unwrap();
 
-    // let o = Order::market(Side::Buy, quote!(800.0)).unwrap();
-    // exchange.submit_order(o).unwrap();
-    // let _ = exchange
-    //     .update_state(1, bba!(quote!(999), quote!(1000)))
-    //     .unwrap();
+    let o = Order::market(Side::Buy, quote!(800.0)).unwrap();
+    exchange.submit_order(o).unwrap();
+    let _ = exchange
+        .update_state(1, bba!(quote!(999), quote!(1000)))
+        .unwrap();
 
-    // assert_eq!(exchange.account().position().size(), quote!(800.0));
+    assert_eq!(exchange.account().position().size(), quote!(800.0));
 
-    // let _ = exchange
-    //     .update_state(1, bba!(quote!(800.0), quote!(801.0)))
-    //     .unwrap();
-    // assert_eq!(
-    //     exchange
-    //         .account()
-    //         .position()
-    //         .unrealized_pnl(quote!(999), quote!(1000)),
-    //     base!(-0.2)
-    // );
+    let _ = exchange
+        .update_state(1, bba!(quote!(800.0), quote!(801.0)))
+        .unwrap();
+    assert_eq!(
+        exchange
+            .account()
+            .position()
+            .unrealized_pnl(quote!(999), quote!(1000)),
+        base!(-0.2)
+    );
 
-    // let o = Order::market(Side::Sell, quote!(400.0)).unwrap();
-    // exchange.submit_order(o).unwrap();
-    // let _ = exchange
-    //     .update_state(1, bba!(quote!(800), quote!(801)))
-    //     .unwrap();
+    let o = Order::market(Side::Sell, quote!(400.0)).unwrap();
+    exchange.submit_order(o).unwrap();
+    let _ = exchange
+        .update_state(1, bba!(quote!(800), quote!(801)))
+        .unwrap();
 
-    // let fee_quote0 = quote!(800.0).fee_portion(fee_taker);
-    // let fee_base0: BaseCurrency = fee_quote0.convert(quote!(1000.0));
+    let fee_quote0 =
+        quote!(800.0).fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_base0: BaseCurrency = fee_quote0.convert(quote!(1000.0));
 
-    // let fee_quote1 = quote!(400.0).fee_portion(fee_taker);
-    // let fee_base1: BaseCurrency = fee_quote1.convert(quote!(800.0));
+    let fee_quote1 =
+        quote!(400.0).fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_base1: BaseCurrency = fee_quote1.convert(quote!(800.0));
 
-    // let fee_combined: BaseCurrency = fee_base0 + fee_base1;
+    let fee_combined: BaseCurrency = fee_base0 + fee_base1;
 
-    // assert_eq!(exchange.account().position().size(), quote!(400.0));
-    // assert_eq!(
-    //     exchange
-    //         .account()
-    //         .position()
-    //         .unrealized_pnl(quote!(800), quote!(801)),
-    //     base!(-0.1)
-    // );
-    // assert_eq!(
-    //     exchange.account().margin().wallet_balance(),
-    //     (base!(0.9) - fee_combined)
-    // );
-    // assert_eq!(exchange.account().margin().position_margin(), base!(0.4));
-    // assert_eq!(
-    //     exchange.account().margin().available_balance(),
-    //     (base!(0.5) - fee_combined)
-    // );
+    assert_eq!(exchange.account().position().size(), quote!(400.0));
+    assert_eq!(
+        exchange
+            .account()
+            .position()
+            .unrealized_pnl(quote!(800), quote!(801)),
+        base!(-0.1)
+    );
+    assert_eq!(
+        exchange.account().wallet_balance(),
+        (base!(0.9) - fee_combined)
+    );
+    assert_eq!(exchange.account().position().position_margin(), base!(0.4));
+    assert_eq!(
+        exchange.account().available_balance(),
+        (base!(0.5) - fee_combined)
+    );
 }
 
 #[test]
