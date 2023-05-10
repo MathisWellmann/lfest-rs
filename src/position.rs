@@ -190,8 +190,8 @@ where
             "Position must be short!"
         );
         debug_assert!(
-            quantity.into_negative() <= self.size,
-            "Amount must be smaller than net short position; qed"
+            quantity <= self.size.abs(),
+            "Amount must be smaller than short position; qed"
         );
 
         self.size = self.size + quantity;

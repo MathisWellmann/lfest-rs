@@ -399,7 +399,7 @@ fn inv_long_market_loss_partial() {
         exchange
             .account()
             .position()
-            .unrealized_pnl(quote!(999), quote!(1000)),
+            .unrealized_pnl(exchange.market_state().bid(), exchange.market_state().ask()),
         base!(-0.2)
     );
 

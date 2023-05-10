@@ -100,6 +100,7 @@ where
         if account.position.size() >= M::PairedCurrency::new_zero() {
             account.position.increase_long(quantity, fill_price);
         } else {
+            // Position must be short
             if quantity.into_negative() >= account.position.size {
                 // Strictly decrease the short position
                 let rpnl = account.position.decrease_short(quantity, fill_price);
