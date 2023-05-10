@@ -72,6 +72,9 @@ where
         market_state: &MarketState,
         account: &Account<M>,
     ) -> Result<(), RiskError> {
+        if account.position.size() == M::PairedCurrency::new_zero() {
+            return Ok(());
+        }
         let pos_value = account
             .position()
             .size()
