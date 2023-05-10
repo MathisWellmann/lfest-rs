@@ -3,6 +3,7 @@ use hashbrown::HashMap;
 use crate::{
     order_margin::compute_order_margin,
     position::Position,
+    prelude::AccountTracker,
     types::{Currency, Error, Fee, Leverage, MarginCurrency, Order, OrderType, Result},
 };
 
@@ -77,10 +78,14 @@ where
     /// # Returns:
     /// the cancelled order if successfull, error when the `user_order_id` is
     /// not found
-    pub fn cancel_order_by_user_id(
+    pub(crate) fn cancel_order_by_user_id<A>(
         &mut self,
         user_order_id: u64,
-    ) -> Result<Order<M::PairedCurrency>> {
+        account_tracker: &mut A,
+    ) -> Result<Order<M::PairedCurrency>>
+    where
+        A: AccountTracker<M>,
+    {
         debug!("cancel_order_by_user_id: user_order_id: {}", user_order_id);
         let id: u64 = match self
             .lookup_order_nonce_from_user_order_id
@@ -89,7 +94,7 @@ where
             None => return Err(Error::UserOrderIdNotFound),
             Some(id) => id,
         };
-        self.cancel_order(id)
+        self.cancel_order(id, account_tracker)
     }
 
     /// Append a new limit order as active order
@@ -122,14 +127,21 @@ where
 
     /// Cancel an active order
     /// returns Some order if successful with given order_id
-    pub fn cancel_order(&mut self, order_id: u64) -> Result<Order<M::PairedCurrency>> {
+    pub(crate) fn cancel_order<A>(
+        &mut self,
+        order_id: u64,
+        account_tracker: &mut A,
+    ) -> Result<Order<M::PairedCurrency>>
+    where
+        A: AccountTracker<M>,
+    {
         debug!("cancel_order: {}", order_id);
         let removed_order = self
             .active_limit_orders
             .remove(&order_id)
             .ok_or(Error::OrderIdNotFound)?;
 
-        // self.account_tracker.log_limit_order_cancellation();
+        account_tracker.log_limit_order_cancellation();
 
         Ok(removed_order)
     }

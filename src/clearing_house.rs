@@ -97,7 +97,7 @@ where
                 // Strictly decrease the short position
                 let rpnl = account.position.decrease_short(quantity, fill_price);
                 account.wallet_balance += rpnl;
-                account_tracker.log_rpnl(rpnl, ts_ns);
+                account_tracker.log_rpnl(rpnl - fee, ts_ns);
             } else {
                 let new_long_size = quantity - account.position.size().abs();
 
@@ -106,7 +106,7 @@ where
                     .position
                     .decrease_short(account.position.size().abs(), fill_price);
                 account.wallet_balance += rpnl;
-                account_tracker.log_rpnl(rpnl, ts_ns);
+                account_tracker.log_rpnl(rpnl - fee, ts_ns);
 
                 // also open a long
                 account.position.open_position(new_long_size, fill_price);
@@ -133,7 +133,7 @@ where
                 // Decrease the long only
                 let rpnl = account.position.decrease_long(quantity, fill_price);
                 account.wallet_balance += rpnl;
-                account_tracker.log_rpnl(rpnl, ts_ns);
+                account_tracker.log_rpnl(rpnl - fee, ts_ns);
             } else {
                 let new_short_size = quantity - account.position.size();
 
@@ -143,7 +143,7 @@ where
                     .decrease_long(account.position.size(), fill_price);
 
                 account.wallet_balance += rpnl;
-                account_tracker.log_rpnl(rpnl, ts_ns);
+                account_tracker.log_rpnl(rpnl - fee, ts_ns);
 
                 // Open a short as well
                 account

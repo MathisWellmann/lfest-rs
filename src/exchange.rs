@@ -21,7 +21,7 @@ where
 {
     config: Config<S::PairedCurrency>,
     market_state: MarketState,
-    user_account: Account<S::PairedCurrency>,
+    account: Account<S::PairedCurrency>,
     account_tracker: A,
     risk_engine: IsolatedMarginRiskEngine<S::PairedCurrency>,
     clearing_house: ClearingHouse<A, S::PairedCurrency>,
@@ -53,7 +53,7 @@ where
             market_state,
             clearing_house,
             risk_engine,
-            user_account: account,
+            account,
             account_tracker,
             next_order_id: 0,
         }
@@ -68,19 +68,19 @@ where
     /// Return a reference to Account
     #[inline(always)]
     pub fn account(&self) -> &Account<S::PairedCurrency> {
-        &self.user_account
+        &self.account
     }
 
     /// Return a mutable reference to Account
     #[inline(always)]
     pub fn account_mut(&mut self) -> &mut Account<S::PairedCurrency> {
-        &mut self.user_account
+        &mut self.account
     }
 
     /// Return a reference to the `AccountTracker` for performance statistics.
     #[inline(always)]
     pub fn account_tracker(&self) -> &A {
-        &self.account_tracker()
+        &self.account_tracker
     }
 
     /// Return a reference to the currency `MarketState`
@@ -106,9 +106,16 @@ where
     ) -> Result<Vec<Order<S>>> {
         self.market_state
             .update_state(timestamp_ns, market_update)?;
+        self.account_tracker.update(
+            timestamp_ns,
+            self.market_state.mid_price(),
+            self.account
+                .position
+                .unrealized_pnl(self.market_state.bid(), self.market_state.ask()),
+        );
         if let Err(e) = self
             .risk_engine
-            .check_maintenance_margin(&self.market_state, &self.user_account)
+            .check_maintenance_margin(&self.market_state, &self.account)
         {
             todo!("liquidate position");
             return Err(e.into());
@@ -121,15 +128,14 @@ where
                 Side::Sell => order.quantity().into_negative(),
             };
             self.clearing_house.settle_filled_order(
-                &mut self.user_account,
+                &mut self.account,
                 &mut self.account_tracker,
                 qty,
                 order.limit_price().expect(EXPECT_LIMIT_PRICE),
                 self.config.contract_specification().fee_maker,
                 self.market_state.current_timestamp_ns(),
             );
-            self.user_account
-                .remove_executed_order_from_active(order.id());
+            self.account.remove_executed_order_from_active(order.id());
         }
 
         Ok(to_be_exec)
@@ -138,7 +144,7 @@ where
     /// Check if any resting orders have been executed
     fn check_resting_orders(&mut self) -> Vec<Order<S>> {
         Vec::from_iter(
-            self.user_account
+            self.account
                 .active_limit_orders
                 .values()
                 .cloned()
@@ -189,14 +195,14 @@ where
                     Side::Sell => self.market_state.bid(),
                 };
                 self.risk_engine
-                    .check_market_order(&self.user_account, &order, fill_price)?;
+                    .check_market_order(&self.account, &order, fill_price)?;
                 let quantity = match order.side() {
                     Side::Buy => order.quantity(),
                     Side::Sell => order.quantity().into_negative(),
                 };
                 // From here on, everything is infallible
                 self.clearing_house.settle_filled_order(
-                    &mut self.user_account,
+                    &mut self.account,
                     &mut self.account_tracker,
                     quantity,
                     fill_price,
@@ -219,9 +225,9 @@ where
                         }
                     }
                 }
-                self.risk_engine
-                    .check_limit_order(&self.user_account, &order)?;
-                self.user_account.append_limit_order(order.clone());
+                self.risk_engine.check_limit_order(&self.account, &order)?;
+                self.account.append_limit_order(order.clone());
+                self.account_tracker.log_limit_order_submission();
             }
         }
 
@@ -231,5 +237,28 @@ where
     fn next_order_id(&mut self) -> u64 {
         self.next_order_id += 1;
         self.next_order_id - 1
+    }
+    /// Cancel an active order based on the user_order_id of an Order
+    ///
+    /// # Returns:
+    /// the cancelled order if successfull, error when the `user_order_id` is
+    /// not found
+    pub(crate) fn cancel_order_by_user_id(
+        &mut self,
+        user_order_id: u64,
+        account_tracker: &mut A,
+    ) -> Result<Order<S>> {
+        self.account
+            .cancel_order_by_user_id(user_order_id, account_tracker)
+    }
+
+    /// Cancel an active order
+    /// returns Some order if successful with given order_id
+    pub(crate) fn cancel_order(
+        &mut self,
+        order_id: u64,
+        account_tracker: &mut A,
+    ) -> Result<Order<S>> {
+        self.account.cancel_order(order_id, account_tracker)
     }
 }
