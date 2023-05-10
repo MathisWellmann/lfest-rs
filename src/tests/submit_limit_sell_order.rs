@@ -121,33 +121,34 @@ fn submit_limit_sell_order_below_bid() {
 // TODO: this requires a change in the `IsolatedMarginRiskEngine`
 #[test]
 fn submit_limit_sell_order_turnaround_long() {
-    let mut exchange = mock_exchange_base();
-    assert_eq!(
-        exchange
-            .update_state(0, bba!(quote!(100), quote!(101)))
-            .unwrap(),
-        vec![]
-    );
-    let order = Order::market(Side::Buy, base!(9)).unwrap();
-    exchange.submit_order(order).unwrap();
+    todo!("this should work");
+    // let mut exchange = mock_exchange_base();
+    // assert_eq!(
+    //     exchange
+    //         .update_state(0, bba!(quote!(100), quote!(101)))
+    //         .unwrap(),
+    //     vec![]
+    // );
+    // let order = Order::market(Side::Buy, base!(9)).unwrap();
+    // exchange.submit_order(order).unwrap();
 
-    let order = Order::limit(Side::Sell, quote!(101), base!(18)).unwrap();
-    exchange.submit_order(order.clone()).unwrap();
+    // let order = Order::limit(Side::Sell, quote!(101), base!(18)).unwrap();
+    // exchange.submit_order(order.clone()).unwrap();
 
-    // Execute the limit buy order
-    assert_eq!(
-        exchange
-            .update_state(0, bba!(quote!(98), quote!(99)))
-            .unwrap(),
-        vec![order]
-    );
-    assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(9),
-            entry_price: quote!(100),
-            position_margin: quote!(900),
-            leverage: leverage!(1),
-        }
-    );
+    // // Execute the limit buy order
+    // assert_eq!(
+    //     exchange
+    //         .update_state(0, bba!(quote!(98), quote!(99)))
+    //         .unwrap(),
+    //     vec![order]
+    // );
+    // assert_eq!(
+    //     exchange.account().position(),
+    //     &Position {
+    //         size: base!(9),
+    //         entry_price: quote!(100),
+    //         position_margin: quote!(900),
+    //         leverage: leverage!(1),
+    //     }
+    // );
 }

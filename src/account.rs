@@ -22,6 +22,7 @@ where
     // Maps the `user_order_id` to the internal order nonce
     pub(crate) lookup_order_nonce_from_user_order_id: HashMap<u64, u64>,
     maker_fee: Fee,
+    order_margin: M,
 }
 
 impl<M> Account<M>
@@ -38,6 +39,7 @@ where
             active_limit_orders: HashMap::new(),
             lookup_order_nonce_from_user_order_id: HashMap::new(),
             maker_fee,
+            order_margin: M::new_zero(),
         }
     }
 
@@ -51,6 +53,12 @@ where
     #[inline(always)]
     pub fn wallet_balance(&self) -> M {
         self.wallet_balance
+    }
+
+    /// Return the current order margin
+    #[inline(always)]
+    pub fn order_margin(&self) -> M {
+        self.order_margin
     }
 
     /// Return a reference to the currently active limit orders of the account
@@ -129,6 +137,8 @@ where
                     .insert(user_order_id, order_id);
             }
         };
+        self.order_margin =
+            compute_order_margin(&self.position, &self.active_limit_orders, self.maker_fee);
     }
 
     /// Cancel an active order
@@ -146,6 +156,8 @@ where
             .active_limit_orders
             .remove(&order_id)
             .ok_or(Error::OrderIdNotFound)?;
+        self.order_margin =
+            compute_order_margin(&self.position, &self.active_limit_orders, self.maker_fee);
 
         account_tracker.log_limit_order_cancellation();
 
