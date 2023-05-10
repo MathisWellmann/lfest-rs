@@ -95,35 +95,32 @@ fn limit_orders_2() {
     if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_base();
-    todo!()
 
-    // let (exec_orders, liq) = exchange
-    //     .update_state(
-    //         0,
-    //         MarketUpdate::Bba {
-    //             bid: quote!(100.0),
-    //             ask: quote!(100.1),
-    //         },
-    //     )
-    //     .unwrap();
-    // assert!(!liq);
-    // assert!(exec_orders.is_empty());
+    let exec_orders = exchange
+        .update_state(
+            0,
+            MarketUpdate::Bba {
+                bid: quote!(100.0),
+                ask: quote!(101),
+            },
+        )
+        .unwrap();
+    assert!(exec_orders.is_empty());
 
-    // let o = Order::limit(Side::Sell, quote!(100.1), base!(0.75)).unwrap();
-    // exchange.submit_order(o).unwrap();
+    let o = Order::limit(Side::Sell, quote!(101), base!(0.75)).unwrap();
+    exchange.submit_order(o).unwrap();
 
-    // let o = Order::limit(Side::Buy, quote!(100.0), base!(0.5)).unwrap();
-    // exchange.submit_order(o).unwrap();
+    let o = Order::limit(Side::Buy, quote!(100), base!(0.5)).unwrap();
+    exchange.submit_order(o).unwrap();
 
-    // let (exec_orders, liq) = exchange
-    //     .update_state(
-    //         1,
-    //         MarketUpdate::Bba {
-    //             bid: quote!(99.0),
-    //             ask: quote!(99.1),
-    //         },
-    //     )
-    //     .unwrap();
-    // assert!(!liq);
-    // assert_eq!(exec_orders.len(), 1);
+    let exec_orders = exchange
+        .update_state(
+            1,
+            MarketUpdate::Bba {
+                bid: quote!(99),
+                ask: quote!(100),
+            },
+        )
+        .unwrap();
+    assert_eq!(exec_orders.len(), 1);
 }

@@ -15,7 +15,11 @@ pub fn mock_exchange_base() -> Exchange<NoAccountTracker, BaseCurrency> {
         maintenance_margin: Dec!(0.02),
         mark_method: MarkMethod::MidPrice,
         price_filter: PriceFilter::default(),
-        quantity_filter: QuantityFilter::default(),
+        quantity_filter: QuantityFilter {
+            min_quantity: base!(0),
+            max_quantity: base!(0),
+            step_size: base!(0.01),
+        },
         fee_maker: fee!(0.0002),
         fee_taker: fee!(0.0006),
     };
