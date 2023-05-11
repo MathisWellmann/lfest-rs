@@ -49,8 +49,6 @@ where
     ) -> Result<(), RiskError> {
         debug_assert!(matches!(order.order_type(), OrderType::Limit));
 
-        let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
-
         let mut orders = account.active_limit_orders.clone();
         orders.insert(order.id(), order.clone());
         let new_order_margin =

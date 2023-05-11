@@ -70,14 +70,15 @@ Then proceed to use it in your code.
 For an example see [examples](examples/basic.rs)
 
 ### TODOs:
-- proper liquidations
-- More modular and testable `AccountTracker`
+- proper liquidations (see `update_state` in `Exchange`)
 - Orderbook support (with `MatchingEngine`)
-- Funding rate
+- Funding rate (support `settle_funding_period` in `ClearingHouse`)
 - Multiple accounts (low priority)
 - Multiple markets
 - Portfolio `RiskEngine` for multiple markets
 - Split out `FullAccountTracker` into smaller and easier to test units (Good first contribution).
+- Support `update_desired_leverage` in `Account`
+- CI pipeline on Github
 
 ### Contributions
 If you have time available to contribute to the project, feel free to contact me and maybe we can arrange a **mutually benefitial aggreement**.

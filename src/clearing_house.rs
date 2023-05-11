@@ -39,8 +39,9 @@ where
     /// If the funding rate is positive, longs pay shorts.
     /// Else its the otherway around.
     /// TODO: not used but may be in the future.
-    pub(crate) fn settle_funding_period(&mut self, mark_value: M, funding_rate: Decimal) {
-        todo!()
+    #[allow(unused)]
+    pub(crate) fn settle_funding_period(&mut self, _mark_value: M, _funding_rate: Decimal) {
+        todo!("Support `settle_funding_period`")
     }
 
     /// Settlement referes to the actual transfer of funds or assets between the buyer and seller to fulfill the trade.

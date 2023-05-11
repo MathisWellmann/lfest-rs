@@ -83,8 +83,8 @@ where
     ///
     /// # Returns:
     /// If Err, the account is unable to provide enough variation margin for the desired leverage.
-    pub fn update_desired_leverage(&mut self, leverage: Leverage) -> Result<()> {
-        todo!()
+    pub fn update_desired_leverage(&mut self, _leverage: Leverage) -> Result<()> {
+        todo!("Support `update_desired_leverage`")
     }
 
     /// Cancel an active order based on the user_order_id of an Order
