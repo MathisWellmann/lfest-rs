@@ -80,6 +80,7 @@ For an example see [examples](examples/basic.rs)
 - Support `update_desired_leverage` in `Account`
 - CI pipeline on Github
 - Support auto-deleveraging
+- Make the `user_order_id` type in `Order` generic (eg. support both `String` and `u64` for more user flexibility)
 
 ### Contributions
 If you have time available to contribute to the project, feel free to contact me and maybe we can arrange a **mutually benefitial aggreement**.
