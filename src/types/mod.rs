@@ -12,6 +12,6 @@ pub use errors::*;
 pub use fee::{Fee, FeeType};
 pub use leverage::Leverage;
 pub use market_update::MarketUpdate;
-pub use order::Order;
+pub use order::{Filled, Order};
 pub use order_type::OrderType;
 pub use side::Side;
