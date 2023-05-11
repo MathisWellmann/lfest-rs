@@ -59,18 +59,24 @@ fn limit_orders_only() {
         .update_state(
             2,
             MarketUpdate::Bba {
-                bid: quote!(106.0),
-                ask: quote!(106.1),
+                bid: quote!(106),
+                ask: quote!(107),
             },
         )
         .unwrap();
     assert!(!exec_orders.is_empty());
 
     assert_eq!(exchange.account().position().size(), base!(0.0));
-    assert_eq!(exchange.account().wallet_balance(), quote!(1050.083902));
+    assert_eq!(
+        exchange.account().wallet_balance(),
+        quote!(1049.5) - quote!(0.198) - quote!(0.2079)
+    );
     assert_eq!(exchange.account().position().position_margin(), quote!(0.0));
     assert_eq!(exchange.account().order_margin(), quote!(0.0));
-    assert_eq!(exchange.account().available_balance(), quote!(1050.083902));
+    assert_eq!(
+        exchange.account().available_balance(),
+        quote!(1049.5) - quote!(0.198) - quote!(0.2079)
+    );
 }
 
 #[test]
