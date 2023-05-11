@@ -1,7 +1,7 @@
 # Leveraged Futures Exchange for Simulated Trading (LFEST)
 :radioactive: This is a personal project, use a your own risk.   
 
-lfest-rs is a simulated futures exchange capable of leveraged positions.    
+lfest-rs is a simulated perpetual futures exchange capable of leveraged positions.    
 You fed it external market data through the [`MarketUpdate`](https://docs.rs/lfest/latest/lfest/prelude/enum.MarketUpdate.html) enum to update the `MarketState`.
 Where you either provide bid and ask price or information derived from a [candle](https://github.com/MathisWellmann/trade_aggregation-rs).   
 Macros ([`bba`](https://docs.rs/lfest/latest/lfest/macro.bba.html), [`candle`](https://docs.rs/lfest/latest/lfest/macro.candle.html)) make it easy to construct the concrete variant.   
