@@ -97,8 +97,8 @@ where
     /// `market_update`: Newest market information
     ///
     /// ### Returns:
-    /// executed orders
-    /// true if position has been liquidated
+    /// If Ok, the executed orders,
+    /// Some Error otherwise
     pub fn update_state(
         &mut self,
         timestamp_ns: u64,
@@ -117,7 +117,7 @@ where
             .risk_engine
             .check_maintenance_margin(&self.market_state, &self.account)
         {
-            todo!("liquidate position");
+            // TODO: liquidate position properly
             return Err(e.into());
         };
 
