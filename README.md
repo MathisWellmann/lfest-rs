@@ -79,6 +79,7 @@ For an example see [examples](examples/basic.rs)
 - Split out `FullAccountTracker` into smaller and easier to test units (Good first contribution).
 - Support `update_desired_leverage` in `Account`
 - CI pipeline on Github
+- Support auto-deleveraging
 
 ### Contributions
 If you have time available to contribute to the project, feel free to contact me and maybe we can arrange a **mutually benefitial aggreement**.
