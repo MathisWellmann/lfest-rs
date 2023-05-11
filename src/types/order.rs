@@ -17,8 +17,20 @@ pub struct Order<S> {
     quantity: S,
     /// order side
     side: Side,
-    /// whether or not the order has been marked as executed
-    pub(crate) executed: bool,
+    /// whether or not the order has been executed
+    pub(crate) filled: Filled,
+}
+
+/// Whether the order has been executed
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Filled {
+    /// The order has not been filled yet
+    No,
+    /// The order has been filled
+    Yes {
+        /// The average price this order has been filled at
+        fill_price: QuoteCurrency,
+    },
 }
 
 impl<S> Order<S>
@@ -50,7 +62,7 @@ where
             limit_price: Some(limit_price),
             quantity: size,
             side,
-            executed: false,
+            filled: Filled::No,
         })
     }
 
@@ -75,7 +87,7 @@ where
             limit_price: None,
             quantity: size,
             side,
-            executed: false,
+            filled: Filled::No,
         })
     }
 
@@ -127,16 +139,16 @@ where
         self.side
     }
 
-    /// Execution status of Order
+    /// Fill status of the `Order`
     #[inline(always)]
-    pub fn executed(&self) -> bool {
-        self.executed
+    pub fn filled(&self) -> Filled {
+        self.filled
     }
 
-    /// Marks the order as executed
+    /// Marks the order as filled at the `fill_price`
     #[inline(always)]
-    pub(crate) fn mark_executed(&mut self) {
-        self.executed = true;
+    pub(crate) fn mark_filled(&mut self, fill_price: QuoteCurrency) {
+        self.filled = Filled::Yes { fill_price }
     }
 
     #[inline(always)]

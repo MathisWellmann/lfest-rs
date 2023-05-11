@@ -25,6 +25,7 @@ fn submit_limit_buy_order_no_position() {
 
     // Now fill the order
     order.set_id(0);
+    order.mark_filled(order.limit_price().unwrap());
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(96), quote!(97)))
@@ -56,6 +57,7 @@ fn submit_limit_buy_order_no_position() {
     );
 
     order.set_id(1);
+    order.mark_filled(order.limit_price().unwrap());
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
@@ -89,21 +91,21 @@ fn submit_limit_buy_order_no_position_max() {
         vec![]
     );
 
-    let mut order = Order::limit(Side::Buy, quote!(100), base!(5)).unwrap();
+    let order = Order::limit(Side::Buy, quote!(100), base!(5)).unwrap();
     exchange.submit_order(order.clone()).unwrap();
-    let mut order = Order::limit(Side::Buy, quote!(100), base!(4)).unwrap();
+    let order = Order::limit(Side::Buy, quote!(100), base!(4)).unwrap();
     exchange.submit_order(order.clone()).unwrap();
-    let mut order = Order::limit(Side::Buy, quote!(100), base!(1)).unwrap();
+    let order = Order::limit(Side::Buy, quote!(100), base!(1)).unwrap();
     assert_eq!(
         exchange.submit_order(order.clone()),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
     );
 
-    let mut order = Order::limit(Side::Sell, quote!(101), base!(5)).unwrap();
+    let order = Order::limit(Side::Sell, quote!(101), base!(5)).unwrap();
     exchange.submit_order(order.clone()).unwrap();
-    let mut order = Order::limit(Side::Sell, quote!(101), base!(4)).unwrap();
+    let order = Order::limit(Side::Sell, quote!(101), base!(4)).unwrap();
     exchange.submit_order(order.clone()).unwrap();
-    let mut order = Order::limit(Side::Sell, quote!(101), base!(1)).unwrap();
+    let order = Order::limit(Side::Sell, quote!(101), base!(1)).unwrap();
     assert_eq!(
         exchange.submit_order(order.clone()),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
@@ -151,6 +153,7 @@ fn submit_limit_buy_order_with_long() {
     exchange.submit_order(order.clone()).unwrap();
 
     order.set_id(2);
+    order.mark_filled(order.limit_price().unwrap());
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(102), quote!(103)))
@@ -203,6 +206,7 @@ fn submit_limit_buy_order_with_short() {
     exchange.submit_order(order.clone()).unwrap();
 
     order.set_id(2);
+    order.mark_filled(order.limit_price().unwrap());
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(98), quote!(99)))

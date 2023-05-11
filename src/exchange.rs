@@ -121,22 +121,24 @@ where
             return Err(e.into());
         };
 
-        let to_be_exec = self.check_resting_orders();
-        for order in to_be_exec.iter() {
+        let mut to_be_exec = self.check_resting_orders();
+        for order in to_be_exec.iter_mut() {
             let qty = match order.side() {
                 Side::Buy => order.quantity(),
                 Side::Sell => order.quantity().into_negative(),
             };
+            let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
             self.clearing_house.settle_filled_order(
                 &mut self.account,
                 &mut self.account_tracker,
                 qty,
-                order.limit_price().expect(EXPECT_LIMIT_PRICE),
+                l_price,
                 self.config.contract_specification().fee_maker,
                 self.market_state.current_timestamp_ns(),
             );
             self.account.remove_executed_order_from_active(order.id());
             self.account_tracker.log_limit_order_fill();
+            order.mark_filled(l_price);
         }
 
         Ok(to_be_exec)
@@ -210,7 +212,7 @@ where
                     self.config.contract_specification().fee_taker,
                     self.market_state.current_timestamp_ns(),
                 );
-                order.mark_executed();
+                order.mark_filled(fill_price);
                 self.account_tracker.log_market_order_fill();
             }
             OrderType::Limit => {

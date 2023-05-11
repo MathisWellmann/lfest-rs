@@ -1,5 +1,6 @@
 use crate::{mock_exchange_base, prelude::*};
 
+#[test]
 fn submit_limit_sell_order_no_position() {
     let mut exchange = mock_exchange_base();
     assert_eq!(
@@ -23,6 +24,7 @@ fn submit_limit_sell_order_no_position() {
     );
 
     // Now fill the order
+    order.mark_filled(order.limit_price().unwrap());
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(101), quote!(102)))
@@ -32,24 +34,25 @@ fn submit_limit_sell_order_no_position() {
     assert_eq!(
         exchange.account().position,
         Position {
-            size: base!(9),
+            size: base!(-9),
             entry_price: quote!(100),
             position_margin: quote!(900),
             leverage: leverage!(1),
         }
     );
-    let fee = quote!(0.1);
+    let fee = quote!(0.18);
     assert_eq!(exchange.account().wallet_balance, quote!(1000) - fee);
-    assert_eq!(exchange.account().available_balance(), quote!(900) - fee);
+    assert_eq!(exchange.account().available_balance(), quote!(100) - fee);
 
     // close the position again
     let mut order = Order::limit(Side::Buy, quote!(100), base!(9)).unwrap();
     exchange.submit_order(order.clone()).unwrap();
 
     order.set_id(1);
+    order.mark_filled(order.limit_price().unwrap());
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(99), quote!(100)))
+            .update_state(0, bba!(quote!(98), quote!(99)))
             .unwrap(),
         vec![order]
     );
@@ -80,21 +83,21 @@ fn submit_limit_sell_order_no_position_max() {
         vec![]
     );
 
-    let mut order = Order::limit(Side::Sell, quote!(100), base!(5)).unwrap();
+    let order = Order::limit(Side::Sell, quote!(100), base!(5)).unwrap();
     exchange.submit_order(order.clone()).unwrap();
-    let mut order = Order::limit(Side::Sell, quote!(100), base!(4)).unwrap();
+    let order = Order::limit(Side::Sell, quote!(100), base!(4)).unwrap();
     exchange.submit_order(order.clone()).unwrap();
-    let mut order = Order::limit(Side::Sell, quote!(100), base!(1)).unwrap();
+    let order = Order::limit(Side::Sell, quote!(100), base!(1)).unwrap();
     assert_eq!(
         exchange.submit_order(order.clone()),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
     );
 
-    let mut order = Order::limit(Side::Buy, quote!(99), base!(5)).unwrap();
+    let order = Order::limit(Side::Buy, quote!(99), base!(5)).unwrap();
     exchange.submit_order(order.clone()).unwrap();
-    let mut order = Order::limit(Side::Buy, quote!(99), base!(4)).unwrap();
+    let order = Order::limit(Side::Buy, quote!(99), base!(4)).unwrap();
     exchange.submit_order(order.clone()).unwrap();
-    let mut order = Order::limit(Side::Buy, quote!(99), base!(2)).unwrap();
+    let order = Order::limit(Side::Buy, quote!(99), base!(2)).unwrap();
     assert_eq!(
         exchange.submit_order(order.clone()),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
