@@ -11,10 +11,10 @@ The exchange can be configured using [`Config`](https://docs.rs/lfest/0.31.0/lfe
 ### Features:
 - :currency_exchange: Fixed point arithmetic using [`fpdec`](https://github.com/mamrhein/fpdec.rs) crate, for super fast and precise numeric calculations.
 - :brain: Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct types at function boundaries.   
-Examples include:
+Examples include:   
 [`BaseCurrency`](https://docs.rs/lfest/latest/lfest/prelude/struct.BaseCurrency.html),   
 [`QuoteCurrency`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuoteCurrency.html),   
-[`Fee`](https://docs.rs/lfest/latest/lfest/prelude/struct.Fee.html) and   
+[`Fee`](https://docs.rs/lfest/latest/lfest/prelude/struct.Fee.html),    
 [`Leverage`](https://docs.rs/lfest/latest/lfest/prelude/struct.Leverage.html).      
 This makes it impossible to mistakenly input for example a `USD` denoted value into a function that expects a `BTC` denoted value.    
 - :satellite: Flexible market data integration through the [`MarketUpdate`](https://docs.rs/lfest/latest/lfest/prelude/enum.MarketUpdate.html) type and associated macros.   
@@ -24,14 +24,10 @@ or implement your own using the [`AccountTracker`](https://docs.rs/lfest/latest/
 - :heavy_check_mark: Broad test coverage, to get closer to ensured correctness.
 - :mag: Auditable due to its small and consice codebase. ~ 6k LOC
 - :page_with_curl: Supports both `linear` and `inverse` futures contracts.
-- :no_entry: Order filtering to make sure the price and quantity follow certain rules. 
-See [`PriceFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.PriceFilter.html) and 
-[`QuantityFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuantityFilter.html)
+- :no_entry: Order filtering to make sure the price and quantity follow certain rules. See:    
+[`PriceFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.PriceFilter.html)     
+[`QuantityFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuantityFilter.html)    
 - `IsolatedMarginRiskEngine`
-
-### Not included (maybe in the future):
-- Funding rate (assumed 0)
-- Orderbook
 
 ### Order Types
 The supported order types are:
@@ -78,6 +74,7 @@ For an example see [examples](examples/basic.rs)
 - More modular and testable `AccountTracker`
 - Orderbook support (with `MatchingEngine`)
 - Funding rate
+- Multiple accounts (low priority)
 - Multiple markets
 - Portfolio `RiskEngine` for multiple markets
 - Split out `FullAccountTracker` into smaller and easier to test units (Good first contribution).
@@ -87,6 +84,7 @@ If you have time available to contribute to the project, feel free to contact me
 
 ### Donations :moneybag: :money_with_wings:
 I you would like to support the development of this crate, feel free to send over a donation:
+
 Or if you're a greedy [Ferengi](https://memory-alpha.fandom.com/wiki/Ferengi) looking for work, 
 get payed to work on this project (Send me an [eMail](wellmannmathis@gmail.com)).
 
