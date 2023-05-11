@@ -1,7 +1,6 @@
 use super::{risk_engine_trait::RiskError, RiskEngine};
 use crate::{
     contract_specification::ContractSpecification,
-    exchange::EXPECT_LIMIT_PRICE,
     market_state::MarketState,
     order_margin::compute_order_margin,
     prelude::Account,
