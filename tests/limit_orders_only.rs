@@ -83,7 +83,7 @@ fn limit_orders_2() {
         .update_state(
             0,
             MarketUpdate::Bba {
-                bid: quote!(100.0),
+                bid: quote!(100),
                 ask: quote!(101),
             },
         )
@@ -100,8 +100,8 @@ fn limit_orders_2() {
         .update_state(
             1,
             MarketUpdate::Bba {
-                bid: quote!(99),
-                ask: quote!(100),
+                bid: quote!(98),
+                ask: quote!(99),
             },
         )
         .unwrap();

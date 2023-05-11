@@ -26,6 +26,7 @@ macro_rules! base {
     Eq,
     PartialEq,
     PartialOrd,
+    Ord,
     Add,
     Sub,
     Mul,
@@ -155,6 +156,14 @@ impl Mul<Fee> for BaseCurrency {
 
     fn mul(self, rhs: Fee) -> Self::Output {
         Self(self.0 * rhs.inner())
+    }
+}
+
+impl Add<Fee> for BaseCurrency {
+    type Output = Self;
+
+    fn add(self, rhs: Fee) -> Self::Output {
+        Self(self.0 + rhs.inner())
     }
 }
 

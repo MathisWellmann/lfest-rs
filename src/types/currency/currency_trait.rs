@@ -11,6 +11,7 @@ pub trait Currency:
     + Default
     + Send
     + Sized
+    + Ord
     + std::fmt::Debug
     + std::fmt::Display
     // Require to do arithmetic with `Self` on the right hand side
@@ -26,6 +27,7 @@ pub trait Currency:
     + std::ops::Div<Decimal, Output = Self>
     + std::ops::Div<Leverage, Output = Self>
     + std::ops::Mul<Fee, Output = Self>
+    + std::ops::Add<Fee, Output = Self>
     + std::ops::AddAssign
     + std::ops::SubAssign
     + PartialEq
