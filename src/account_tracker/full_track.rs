@@ -740,8 +740,8 @@ where
         self.num_market_order_fills += 1;
     }
 
-    fn log_trade(&mut self, side: Side, price: QuoteCurrency, size: M::PairedCurrency) {
-        self.total_turnover += size.convert(price);
+    fn log_trade(&mut self, side: Side, price: QuoteCurrency, quantity: M::PairedCurrency) {
+        self.total_turnover += quantity.abs().convert(price);
         self.num_trades += 1;
         if let Side::Buy = side {
             self.num_buys += 1
