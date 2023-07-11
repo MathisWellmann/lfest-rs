@@ -115,12 +115,6 @@ impl PriceFilter {
                 enforce_step_size(self.tick_size, *high)?;
                 enforce_bid_ask_spread(*bid, *ask)?;
                 enforce_bid_ask_spread(*low, *high)?;
-                if bid < low {
-                    return Err(Error::InvalidMarketUpdatePrice);
-                }
-                if ask > high {
-                    return Err(Error::InvalidMarketUpdatePrice);
-                }
             }
         }
         Ok(())
