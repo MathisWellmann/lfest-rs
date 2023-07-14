@@ -316,6 +316,9 @@ where
         let mean_return = decimal_sum(rets_acc.iter().map(|v| v.inner())) / n;
         let rets_dec = Vec::<Decimal>::from_iter(rets_acc.iter().map(|v| v.inner()));
         let variance = variance(&rets_dec);
+        if variance == Decimal::ZERO {
+            return Decimal::ZERO;
+        }
 
         mean_return / variance
     }
