@@ -278,6 +278,9 @@ where
             let n: Decimal = (diff_returns.len() as u64).into();
             let mean = decimal_sum(diff_returns.iter().cloned()) / n;
             let variance = variance(&diff_returns);
+            if variance == Decimal::ZERO {
+                return Decimal::ZERO;
+            }
             let std_dev = decimal_sqrt(variance);
 
             annualization_mult * mean / std_dev
@@ -290,6 +293,9 @@ where
             let n: Decimal = (downside_rets.len() as u64).into();
             let mean = decimal_sum(downside_rets.iter().cloned()) / n;
             let variance = variance(&downside_rets);
+            if variance == Decimal::ZERO {
+                return Decimal::ZERO;
+            }
             let std_dev = decimal_sqrt(variance);
 
             annualization_mult * mean / std_dev
