@@ -222,11 +222,17 @@ where
             let diff_returns: Vec<Decimal> =
                 rets_acc.iter().map(|v| v.inner() - mean_bnh_ret).collect();
             let var = variance(&diff_returns);
+            if var == Decimal::ZERO {
+                return Decimal::ZERO;
+            }
             let std_dev = decimal_sqrt(var);
 
             annualization_mult * mean_ret_acc / std_dev
         } else {
             let var = variance(&rets_acc.iter().map(|v| v.inner()).collect::<Vec<_>>());
+            if var == Decimal::ZERO {
+                return Decimal::ZERO;
+            }
             let std_dev = decimal_sqrt(var);
 
             annualization_mult * mean_ret_acc / std_dev
