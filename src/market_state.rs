@@ -41,16 +41,16 @@ impl MarketState {
     pub(crate) fn update_state(
         &mut self,
         timestamp_ns: u64,
-        market_update: MarketUpdate,
+        market_update: &MarketUpdate,
     ) -> Result<()> {
-        self.price_filter.validate_market_update(&market_update)?;
+        self.price_filter.validate_market_update(market_update)?;
 
         match market_update {
             MarketUpdate::Bba { bid, ask } => {
-                self.bid = bid;
-                self.ask = ask;
-                self.high = ask;
-                self.low = bid;
+                self.bid = *bid;
+                self.ask = *ask;
+                self.high = *ask;
+                self.low = *bid;
             }
             MarketUpdate::Candle {
                 bid,
@@ -58,10 +58,10 @@ impl MarketState {
                 high,
                 low,
             } => {
-                self.bid = bid;
-                self.ask = ask;
-                self.high = high;
-                self.low = low;
+                self.bid = *bid;
+                self.ask = *ask;
+                self.high = *high;
+                self.low = *low;
             }
         }
         self.current_ts_ns = timestamp_ns as i64;

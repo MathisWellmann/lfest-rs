@@ -4,7 +4,7 @@ use fpdec::{Dec, Decimal};
 
 use crate::{account_tracker::NoAccountTracker, prelude::*};
 
-/// Constructs a mock exchange for testing.
+/// Constructs a mock exchange (for linear futures) for testing.
 /// The size is denoted in `BaseCurrency`
 /// and the margin currency is `QuoteCurency`
 pub fn mock_exchange_base() -> Exchange<NoAccountTracker, BaseCurrency> {
@@ -27,7 +27,7 @@ pub fn mock_exchange_base() -> Exchange<NoAccountTracker, BaseCurrency> {
     Exchange::new(acc_tracker, config)
 }
 
-/// Constructs a mock exchange for testing.
+/// Constructs a mock exchange (for inverse futures) for testing.
 pub fn mock_exchange_quote(
     starting_balance: BaseCurrency,
 ) -> Exchange<NoAccountTracker, QuoteCurrency> {

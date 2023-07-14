@@ -105,7 +105,7 @@ where
         market_update: MarketUpdate,
     ) -> Result<Vec<Order<S>>> {
         self.market_state
-            .update_state(timestamp_ns, market_update)?;
+            .update_state(timestamp_ns, &market_update)?;
         self.account_tracker.update(
             timestamp_ns,
             self.market_state.mid_price(),
@@ -121,7 +121,7 @@ where
             return Err(e.into());
         };
 
-        let mut to_be_exec = self.check_resting_orders();
+        let mut to_be_exec = self.check_resting_orders(&market_update);
         for order in to_be_exec.iter_mut() {
             let qty = match order.side() {
                 Side::Buy => order.quantity(),
@@ -145,13 +145,13 @@ where
     }
 
     /// Check if any resting orders have been executed
-    fn check_resting_orders(&mut self) -> Vec<Order<S>> {
+    fn check_resting_orders(&mut self, market_update: &MarketUpdate) -> Vec<Order<S>> {
         Vec::from_iter(
             self.account
                 .active_limit_orders
                 .values()
                 .cloned()
-                .filter(|order| self.check_limit_order_execution(order)),
+                .filter(|order| self.check_limit_order_execution(order, market_update)),
         )
     }
 
@@ -159,11 +159,23 @@ where
     ///
     /// # Returns:
     /// If `Some`, The order is filled and needs to be settled.
-    fn check_limit_order_execution(&self, order: &Order<S>) -> bool {
+    fn check_limit_order_execution(&self, order: &Order<S>, market_update: &MarketUpdate) -> bool {
         let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
-        match order.side() {
-            Side::Buy => self.market_state.ask() < l_price,
-            Side::Sell => self.market_state.bid() > l_price,
+
+        match market_update {
+            MarketUpdate::Bba { bid, ask } => match order.side() {
+                Side::Buy => *ask < l_price,
+                Side::Sell => *bid > l_price,
+            },
+            MarketUpdate::Candle {
+                bid: _,
+                ask: _,
+                low,
+                high,
+            } => match order.side() {
+                Side::Buy => *low < l_price,
+                Side::Sell => *high > l_price,
+            },
         }
     }
 
@@ -268,4 +280,79 @@ where
         self.account
             .cancel_order(order_id, &mut self.account_tracker)
     }
+}
+
+#[cfg(test)]
+mod test {
+    use fpdec::Decimal;
+
+    use crate::{mock_exchange_base, prelude::*};
+
+    #[test]
+    fn check_limit_order_execution_bba() {
+        let exchange = mock_exchange_base();
+
+        let market_update = MarketUpdate::Bba {
+            bid: quote!(100),
+            ask: quote!(101),
+        };
+        // Buys
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Buy, quote!(90), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Buy, quote!(101), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Buy, quote!(102), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            true
+        );
+
+        // Sells
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Sell, quote!(110), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Sell, quote!(100), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Sell, quote!(99), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            true
+        );
+    }
+
+    // #[test]
+    // fn check_limit_order_execution_candle() {
+    //     let exchange = mock_exchange_base();
+
+    //     let market_update = MarketUpdate::Candle {
+    //         bid: quote!(100),
+    //         ask: quote!(101),
+    //         low: quote!(98),
+    //         high: quote!(102),
+    //     };
+    //     todo!()
+    // }
 }
