@@ -343,16 +343,60 @@ mod test {
         );
     }
 
-    // #[test]
-    // fn check_limit_order_execution_candle() {
-    //     let exchange = mock_exchange_base();
+    #[test]
+    fn check_limit_order_execution_candle() {
+        let exchange = mock_exchange_base();
 
-    //     let market_update = MarketUpdate::Candle {
-    //         bid: quote!(100),
-    //         ask: quote!(101),
-    //         low: quote!(98),
-    //         high: quote!(102),
-    //     };
-    //     todo!()
-    // }
+        let market_update = MarketUpdate::Candle {
+            bid: quote!(100),
+            ask: quote!(101),
+            low: quote!(98),
+            high: quote!(102),
+        };
+        // Buys
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Buy, quote!(90), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Buy, quote!(98), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Buy, quote!(99), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            true
+        );
+
+        // Sells
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Sell, quote!(110), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Sell, quote!(102), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Sell, quote!(101), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            true
+        );
+    }
 }
