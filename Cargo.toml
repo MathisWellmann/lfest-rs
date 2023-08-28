@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.35.8"
+version = "0.35.9"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2021"
 license-file = "LICENSE"
@@ -12,15 +12,15 @@ categories = ["finance", "simulation"]
 exclude = ["/img", "/data", "/.idea", "/vendor"]
 
 [dependencies]
-log = { version = "^0.4", features = ["release_max_level_info"] }
-pretty_env_logger = "^0.5"
-serde = { version = "^1", features = ["derive"] }
-thiserror = "^1"
-hashbrown = "^0.13"
-derive_more = { version = "^0.99", features = ["add", "mul"] }
-fpdec = "^0.7"
+log = { version = "0.4", features = ["release_max_level_info"] }
+pretty_env_logger = "0.5"
+serde = { version = "1", features = ["derive"] }
+thiserror = "1"
+hashbrown = "0.14"
+derive_more = { version = "0.99", features = ["add", "mul"] }
+fpdec = "0.8"
 
 [dev-dependencies]
-csv = "^1"
-rand = "^0.8"
-rand_distr = "^0.4"
+csv = "1"
+rand = "0.8"
+rand_distr = "0.4"
