@@ -119,6 +119,9 @@ pub enum Error {
 
     #[error(transparent)]
     RiskError(#[from] RiskError),
+
+    #[error("The specified leverage must be > 0")]
+    InvalidLeverage,
 }
 
 /// This is defined as a convenience.
