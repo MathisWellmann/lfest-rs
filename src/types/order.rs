@@ -49,7 +49,7 @@ where
     #[inline]
     pub fn limit(side: Side, limit_price: QuoteCurrency, size: S) -> Result<Self, OrderError> {
         if limit_price <= QuoteCurrency::new_zero() {
-            return Err(OrderError::LimitPriceTooLow);
+            return Err(OrderError::LimitPriceBelowZero);
         }
         if size <= S::new_zero() {
             return Err(OrderError::OrderSizeMustBePositive);

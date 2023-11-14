@@ -7,11 +7,20 @@ pub enum OrderError {
     #[error("Maximum number of active orders reached")]
     MaxActiveOrders,
 
-    #[error("The limit order price is lower than the minimum price filter.")]
-    LimitPriceTooLow,
+    #[error("The limit order price is lower than the low price multiple.")]
+    LimitPriceBelowMultiple,
 
-    #[error("The limit order price exceeds the maximum price filter.")]
-    LimitPriceTooHigh,
+    #[error("The limit order price is lower than the minimum price filter.")]
+    LimitPriceBelowMin,
+
+    #[error("The limit price is below zero")]
+    LimitPriceBelowZero,
+
+    #[error("The limit order price exceeds the maximum price multiple.")]
+    LimitPriceAboveMultiple,
+
+    #[error("The limit price is above the maximum price.")]
+    LimitPriceAboveMax,
 
     #[error("The limit price is larger than the current ask")]
     LimitPriceAboveAsk,

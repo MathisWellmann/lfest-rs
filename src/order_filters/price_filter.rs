@@ -59,10 +59,10 @@ impl PriceFilter {
         match order.limit_price() {
             Some(limit_price) => {
                 if limit_price < self.min_price && self.min_price != QuoteCurrency::new_zero() {
-                    return Err(OrderError::LimitPriceTooLow);
+                    return Err(OrderError::LimitPriceBelowMin);
                 }
                 if limit_price > self.max_price && self.max_price != QuoteCurrency::new_zero() {
-                    return Err(OrderError::LimitPriceTooHigh);
+                    return Err(OrderError::LimitPriceAboveMax);
                 }
                 if ((limit_price - self.min_price) % self.tick_size) != QuoteCurrency::new_zero() {
                     return Err(OrderError::InvalidOrderPriceStepSize);
@@ -70,12 +70,12 @@ impl PriceFilter {
                 if limit_price > mark_price * self.multiplier_up
                     && self.multiplier_up != Decimal::ZERO
                 {
-                    return Err(OrderError::LimitPriceTooHigh);
+                    return Err(OrderError::LimitPriceAboveMultiple);
                 }
                 if limit_price < mark_price * self.multiplier_down
                     && self.multiplier_down != Decimal::ZERO
                 {
-                    return Err(OrderError::LimitPriceTooLow);
+                    return Err(OrderError::LimitPriceBelowMultiple);
                 }
                 Ok(())
             }
@@ -194,12 +194,12 @@ mod tests {
         let order = Order::limit(Side::Buy, quote!(0.05), base!(0.1)).unwrap();
         assert_eq!(
             filter.validate_order(&order, mark_price),
-            Err(OrderError::LimitPriceTooLow)
+            Err(OrderError::LimitPriceBelowMin)
         );
         let order = Order::limit(Side::Buy, quote!(1001), base!(0.1)).unwrap();
         assert_eq!(
             filter.validate_order(&order, mark_price),
-            Err(OrderError::LimitPriceTooHigh)
+            Err(OrderError::LimitPriceAboveMax)
         );
 
         // Test upper price band
@@ -208,7 +208,7 @@ mod tests {
         let order = Order::limit(Side::Buy, quote!(121), base!(0.1)).unwrap();
         assert_eq!(
             filter.validate_order(&order, mark_price),
-            Err(OrderError::LimitPriceTooHigh)
+            Err(OrderError::LimitPriceAboveMultiple)
         );
 
         // Test lower price band
@@ -217,7 +217,7 @@ mod tests {
         let order = Order::limit(Side::Buy, quote!(79), base!(0.1)).unwrap();
         assert_eq!(
             filter.validate_order(&order, mark_price),
-            Err(OrderError::LimitPriceTooLow)
+            Err(OrderError::LimitPriceBelowMultiple)
         );
 
         // Test step size
