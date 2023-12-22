@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.37.0"
+version = "0.38.0"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2021"
 license-file = "LICENSE"
@@ -18,7 +18,7 @@ serde = { version = "1", features = ["derive"] }
 thiserror = "1"
 hashbrown = "0.14"
 derive_more = { version = "0.99", features = ["add", "mul"] }
-fpdec = "0.8"
+fpdec = "0.10"
 
 [dev-dependencies]
 csv = "1"

@@ -32,7 +32,7 @@ pub use mock_exchange::{mock_exchange_base, mock_exchange_quote};
 /// Exports common types
 pub mod prelude {
     // To make the macros work
-    pub use fpdec::{Dec, Decimal};
+    pub use fpdec::{self, Dec, Decimal};
 
     pub use crate::{
         account::Account,
