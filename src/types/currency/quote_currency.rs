@@ -13,7 +13,7 @@ use crate::{
 #[macro_export]
 macro_rules! quote {
     ( $a:literal ) => {{
-        QuoteCurrency::new(fpdec::Dec!($a))
+        QuoteCurrency::new($crate::prelude::fpdec::Dec!($a))
     }};
 }
 
