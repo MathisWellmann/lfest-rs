@@ -282,6 +282,9 @@ where
                     .map(|v| v.inner() - mean_bnh_ret)
                     .filter(|v| *v < Dec!(0)),
             );
+            if diff_returns.is_empty() {
+                return Decimal::ZERO;
+            }
             let n: Decimal = (diff_returns.len() as u64).into();
             let mean = decimal_sum(diff_returns.iter().cloned()) / n;
             let variance = variance(&diff_returns);
