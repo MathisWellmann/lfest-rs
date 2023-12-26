@@ -255,6 +255,9 @@ where
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
         };
+        if rets_acc.is_empty() {
+            return Decimal::ZERO;
+        }
         let annualization_mult = match returns_source {
             ReturnsSource::Daily => Dec!(19.10497),  // sqrt(365)
             ReturnsSource::Hourly => Dec!(93.59487), // sqrt(365 * 24)
@@ -265,6 +268,10 @@ where
                 ReturnsSource::Daily => &self.hist_returns_daily_bnh,
                 ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
             };
+            debug_assert!(
+                !rets_bnh.is_empty(),
+                "The buy and hold returns should not be empty at this point"
+            );
             let n: Decimal = (rets_bnh.len() as u64).into();
             let mean_bnh_ret = decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n;
 
@@ -279,22 +286,23 @@ where
             let mean = decimal_sum(diff_returns.iter().cloned()) / n;
             let variance = variance(&diff_returns);
             if variance == Decimal::ZERO {
-                return Decimal::ZERO;
+                return Decimal::MAX;
             }
             let std_dev = decimal_sqrt(variance);
 
             annualization_mult * mean / std_dev
         } else {
-            let downside_rets: Vec<Decimal> = rets_acc
-                .iter()
-                .map(|v| v.inner())
-                .filter(|v| *v < Dec!(0))
-                .collect();
+            let downside_rets = Vec::<Decimal>::from_iter(
+                rets_acc.iter().map(|v| v.inner()).filter(|v| *v < Dec!(0)),
+            );
+            if downside_rets.is_empty() {
+                return Decimal::ZERO;
+            }
             let n: Decimal = (downside_rets.len() as u64).into();
             let mean = decimal_sum(downside_rets.iter().cloned()) / n;
             let variance = variance(&downside_rets);
             if variance == Decimal::ZERO {
-                return Decimal::ZERO;
+                return Decimal::MAX;
             }
             let std_dev = decimal_sqrt(variance);
 
