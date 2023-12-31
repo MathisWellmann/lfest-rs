@@ -42,6 +42,7 @@ pub mod prelude {
         contract_specification::*,
         exchange::Exchange,
         fee, leverage,
+        market_state::MarketState,
         order_filters::{PriceFilter, QuantityFilter},
         position::Position,
         quote,

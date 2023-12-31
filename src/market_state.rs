@@ -6,16 +6,25 @@ use crate::{
     types::{Currency, MarketUpdate, QuoteCurrency, Result},
 };
 
+/// Some information regarding the state of the market.
 #[derive(Debug, Clone)]
 pub struct MarketState {
+    /// Used to validate states
     price_filter: PriceFilter,
+    /// The current bid
     bid: QuoteCurrency,
+    /// The current ask
     ask: QuoteCurrency,
+    /// The high of the last period.
+    /// Is determined by the values in `MarketUpdate`
     high: QuoteCurrency,
+    /// The low of the last period.
+    /// Is determined by the values in `MarketUpdate`
     low: QuoteCurrency,
-    // The current timestamp in nanoseconds
+    /// The current timestamp in nanoseconds
     current_ts_ns: i64,
-    step: u64, // used for synchronizing orders
+    /// Used for synchronizing orders
+    step: u64,
 }
 
 impl MarketState {
@@ -70,23 +79,39 @@ impl MarketState {
         Ok(())
     }
 
+    /// Get the mid price
     #[inline]
     pub fn mid_price(&self) -> QuoteCurrency {
         (self.bid + self.ask) / quote!(2)
     }
 
-    #[inline(always)]
+    /// Get the last observed timestamp in nanoseconts
+    #[inline]
     pub fn current_timestamp_ns(&self) -> i64 {
         self.current_ts_ns
     }
 
-    #[inline(always)]
+    /// Get the last observed bid price.
+    #[inline]
     pub fn bid(&self) -> QuoteCurrency {
         self.bid
     }
 
-    #[inline(always)]
+    /// Get the last observed ask price.
+    #[inline]
     pub fn ask(&self) -> QuoteCurrency {
         self.ask
+    }
+
+    /// Get the last observed period high price
+    #[inline]
+    pub fn high(&self) -> QuoteCurrency {
+        self.high
+    }
+
+    /// Get the last observed period low price
+    #[inline]
+    pub fn low(&self) -> QuoteCurrency {
+        self.low
     }
 }
