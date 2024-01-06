@@ -15,7 +15,8 @@ pub struct Account<M>
 where
     M: Currency + MarginCurrency,
 {
-    pub(crate) wallet_balance: M,
+    /// The wallet balance of the user denoted in the margin currency.
+    pub wallet_balance: M,
     pub(crate) position: Position<M>,
     // Maps the order `id` to the actual `Order`.
     pub(crate) active_limit_orders: HashMap<u64, Order<M::PairedCurrency>>,
