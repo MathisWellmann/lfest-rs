@@ -629,6 +629,10 @@ where
     M: Currency + MarginCurrency + Send,
 {
     fn update(&mut self, timestamp_ns: u64, price: QuoteCurrency, upnl: M) {
+        if price == quote!(0) {
+            trace!("Price is 0, not updating the `FullAccountTracker`");
+            return;
+        }
         self.price_last = price;
         if self.price_a_day_ago.is_zero() {
             self.price_a_day_ago = price;
