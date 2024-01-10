@@ -27,7 +27,7 @@ pub enum MarketUpdate {
 #[macro_export]
 macro_rules! bba {
     ( $b:expr, $a:expr ) => {{
-        MarketUpdate::Bba { bid: $b, ask: $a }
+        $crate::prelude::MarketUpdate::Bba { bid: $b, ask: $a }
     }};
 }
 
@@ -35,7 +35,7 @@ macro_rules! bba {
 #[macro_export]
 macro_rules! candle {
     ( $b:expr, $a:expr, $l:expr, $h:expr ) => {{
-        MarketUpdate::Candle {
+        $crate::prelude::MarketUpdate::Candle {
             bid: $b,
             ask: $a,
             low: $l,
