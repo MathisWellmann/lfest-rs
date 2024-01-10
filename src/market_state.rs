@@ -10,17 +10,12 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct MarketState {
     /// Used to validate states
+    // TODO: remove here and pass through were needed
     price_filter: PriceFilter,
     /// The current bid
     bid: QuoteCurrency,
     /// The current ask
     ask: QuoteCurrency,
-    /// The high of the last period.
-    /// Is determined by the values in `MarketUpdate`
-    high: QuoteCurrency,
-    /// The low of the last period.
-    /// Is determined by the values in `MarketUpdate`
-    low: QuoteCurrency,
     /// The current timestamp in nanoseconds
     current_ts_ns: i64,
     /// Used for synchronizing orders
@@ -33,8 +28,6 @@ impl MarketState {
             price_filter,
             bid: quote!(0),
             ask: quote!(0),
-            high: quote!(0),
-            low: quote!(0),
             current_ts_ns: 0,
             step: 0,
         }
@@ -47,30 +40,25 @@ impl MarketState {
     ///     and if setting order timestamps is enabled in the config.
     /// `market_update`: Newest market information
     ///
-    pub(crate) fn update_state(
+    pub(crate) fn update_state<S>(
         &mut self,
         timestamp_ns: u64,
-        market_update: &MarketUpdate,
-    ) -> Result<()> {
+        market_update: &MarketUpdate<S>,
+    ) -> Result<()>
+    where
+        S: Currency,
+    {
         self.price_filter.validate_market_update(market_update)?;
 
         match market_update {
             MarketUpdate::Bba { bid, ask } => {
                 self.bid = *bid;
                 self.ask = *ask;
-                self.high = *ask;
-                self.low = *bid;
             }
-            MarketUpdate::Candle {
-                bid,
-                ask,
-                high,
-                low,
-            } => {
+            MarketUpdate::Trade { .. } => {}
+            MarketUpdate::Candle { bid, ask, .. } => {
                 self.bid = *bid;
                 self.ask = *ask;
-                self.high = *high;
-                self.low = *low;
             }
         }
         self.current_ts_ns = timestamp_ns as i64;
@@ -101,17 +89,5 @@ impl MarketState {
     #[inline]
     pub fn ask(&self) -> QuoteCurrency {
         self.ask
-    }
-
-    /// Get the last observed period high price
-    #[inline]
-    pub fn high(&self) -> QuoteCurrency {
-        self.high
-    }
-
-    /// Get the last observed period low price
-    #[inline]
-    pub fn low(&self) -> QuoteCurrency {
-        self.low
     }
 }

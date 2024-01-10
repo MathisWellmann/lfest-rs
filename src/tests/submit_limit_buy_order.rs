@@ -1,4 +1,4 @@
-use crate::{mock_exchange_base, prelude::*};
+use crate::{mock_exchange_base, prelude::*, trade};
 
 #[test]
 fn submit_limit_buy_order_no_position() {
@@ -28,10 +28,13 @@ fn submit_limit_buy_order_no_position() {
     order.mark_filled(order.limit_price().unwrap());
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(96), quote!(97)))
+            .update_state(0, trade!(quote!(98), base!(1), Side::Sell))
             .unwrap(),
         vec![order]
     );
+    exchange
+        .update_state(0, bba!(quote!(96), quote!(99)))
+        .unwrap();
     assert_eq!(
         exchange.account().position,
         Position {
@@ -58,9 +61,12 @@ fn submit_limit_buy_order_no_position() {
 
     order.set_id(1);
     order.mark_filled(order.limit_price().unwrap());
+    exchange
+        .update_state(0, bba!(quote!(96), quote!(98)))
+        .unwrap();
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(99), quote!(100)))
+            .update_state(0, trade!(quote!(98), base!(1), Side::Buy))
             .unwrap(),
         vec![order]
     );
@@ -156,7 +162,7 @@ fn submit_limit_buy_order_with_long() {
     order.mark_filled(order.limit_price().unwrap());
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(102), quote!(103)))
+            .update_state(0, trade!(quote!(101), base!(1), Side::Buy))
             .unwrap(),
         vec![order]
     );
@@ -209,7 +215,7 @@ fn submit_limit_buy_order_with_short() {
     order.mark_filled(order.limit_price().unwrap());
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(98), quote!(99)))
+            .update_state(0, trade!(quote!(100), base!(1), Side::Sell))
             .unwrap(),
         vec![order]
     );

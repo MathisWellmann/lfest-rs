@@ -84,7 +84,13 @@ impl PriceFilter {
     }
 
     /// Make sure the market update conforms to the `PriceFilter` rules
-    pub(crate) fn validate_market_update(&self, market_update: &MarketUpdate) -> Result<(), Error> {
+    pub(crate) fn validate_market_update<S>(
+        &self,
+        market_update: &MarketUpdate<S>,
+    ) -> Result<(), Error>
+    where
+        S: Currency,
+    {
         match market_update {
             MarketUpdate::Bba { bid, ask } => {
                 enforce_min_price(self.min_price, *bid)?;
@@ -94,6 +100,12 @@ impl PriceFilter {
                 enforce_step_size(self.tick_size, *bid)?;
                 enforce_step_size(self.tick_size, *ask)?;
                 enforce_bid_ask_spread(*bid, *ask)?;
+            }
+            // We don't validate the `quantity` in the price filter, rather in the `QuantityFilter`.
+            MarketUpdate::Trade { price, .. } => {
+                enforce_min_price(self.min_price, *price)?;
+                enforce_max_price(self.max_price, *price)?;
+                enforce_step_size(self.tick_size, *price)?;
             }
             MarketUpdate::Candle {
                 bid,
