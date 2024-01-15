@@ -7,7 +7,7 @@ use crate::{
     cornish_fisher::cornish_fisher_value_at_risk,
     quote,
     types::{Currency, MarginCurrency, QuoteCurrency, Side},
-    utils::{decimal_pow, decimal_sqrt, decimal_sum, decimal_to_f64, variance},
+    utils::{decimal_pow, decimal_sqrt, decimal_sum, decimal_to_f64, variance, min, f64_to_decimal},
 };
 
 const DAILY_NS: u64 = 86_400_000_000_000;
@@ -249,8 +249,9 @@ where
     pub fn sortino(
         &self,
         returns_source: ReturnsSource,
-        risk_free_is_buy_and_hold: bool,
+        target_return: f64,
     ) -> Decimal {
+        let target_return = f64_to_decimal(target_return, Dec!(0.001));
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
@@ -263,54 +264,24 @@ where
             ReturnsSource::Hourly => Dec!(93.59487), // sqrt(365 * 24)
         };
 
-        if risk_free_is_buy_and_hold {
-            let rets_bnh = match returns_source {
-                ReturnsSource::Daily => &self.hist_returns_daily_bnh,
-                ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
-            };
-            debug_assert!(
-                !rets_bnh.is_empty(),
-                "The buy and hold returns should not be empty at this point"
-            );
-            let n: Decimal = (rets_bnh.len() as u64).into();
-            let mean_bnh_ret = decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n;
+        let n: Decimal = (rets_acc.len() as u64).into();
+	    let mean_acc_ret = decimal_sum(rets_acc.iter().map(|v| v.inner())) / n;
 
-            // compute the difference of returns of account and market
-            let diff_returns = Vec::<Decimal>::from_iter(
-                rets_acc
-                    .iter()
-                    .map(|v| v.inner() - mean_bnh_ret)
-                    .filter(|v| *v < Dec!(0)),
-            );
-            if diff_returns.is_empty() {
-                return Decimal::ZERO;
-            }
-            let n: Decimal = (diff_returns.len() as u64).into();
-            let mean = decimal_sum(diff_returns.iter().cloned()) / n;
-            let variance = variance(&diff_returns);
-            if variance == Decimal::ZERO {
-                return Decimal::MAX;
-            }
-            let std_dev = decimal_sqrt(variance);
+        let underperformance = Vec::<Decimal>::from_iter(
+            rets_acc.iter().map(|v|
+                decimal_pow(
+                    min(Decimal::ZERO, v.inner() - target_return),
+                    2
+                )
+            ),
+        );
 
-            annualization_mult * mean / std_dev
-        } else {
-            let downside_rets = Vec::<Decimal>::from_iter(
-                rets_acc.iter().map(|v| v.inner()).filter(|v| *v < Dec!(0)),
-            );
-            if downside_rets.is_empty() {
-                return Decimal::ZERO;
-            }
-            let n: Decimal = (downside_rets.len() as u64).into();
-            let mean = decimal_sum(downside_rets.iter().cloned()) / n;
-            let variance = variance(&downside_rets);
-            if variance == Decimal::ZERO {
-                return Decimal::MAX;
-            }
-            let std_dev = decimal_sqrt(variance);
+        let avrg_underperformance = 
+            decimal_sum(underperformance.iter().cloned()) / n;
+            
+        let target_downside_deviation = decimal_sqrt(avrg_underperformance);
 
-            annualization_mult * mean / std_dev
-        }
+        (mean_acc_ret - target_return) * annualization_mult / target_downside_deviation
     }
 
     /// Return the theoretical kelly leverage that would maximize the compounded growth rate,
@@ -815,8 +786,8 @@ num_trading_days: {},
             self.annualized_roi(),
             self.sharpe(ReturnsSource::Daily, true),
             self.sharpe(ReturnsSource::Hourly, true),
-            self.sortino(ReturnsSource::Daily, true),
-            self.sortino(ReturnsSource::Hourly, true),
+            self.sortino(ReturnsSource::Daily, 0.0),
+            self.sortino(ReturnsSource::Hourly, 0.0),
             self.max_drawdown_wallet_balance(),
             self.max_drawdown_total(),
             self.historical_value_at_risk(ReturnsSource::Daily, 0.01),
