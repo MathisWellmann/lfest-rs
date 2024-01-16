@@ -281,7 +281,7 @@ where
             
         let target_downside_deviation = decimal_sqrt(avrg_underperformance);
 
-        (mean_acc_ret - target_return) * annualization_mult / target_downside_deviation
+        ((mean_acc_ret - target_return) * annualization_mult) / target_downside_deviation
     }
 
     /// Return the theoretical kelly leverage that would maximize the compounded growth rate,
@@ -1378,6 +1378,30 @@ mod tests {
                 3
             ),
             5.358
+        );
+    }
+
+    #[test]
+    fn acc_tracker_sortino(){
+        if let Err(_) = pretty_env_logger::try_init() {}
+
+        let ACC_RETS_H: [QuoteCurrency; 8] = [
+            quote!(0.17),
+            quote!(0.15),
+            quote!(0.23),
+            quote!(-0.05),
+            quote!(0.12),
+            quote!(0.09),
+            quote!(0.13),
+            quote!(-0.04)
+        ];
+
+        let mut at = FullAccountTracker::new(quote!(100.0));
+        at.hist_returns_hourly_acc= ACC_RETS_H.into(); 
+
+        assert_eq!(
+            at.sortino(ReturnsSource::Hourly, 0.0),
+            Dec!(413.434120785921266521)
         );
     }
 }
