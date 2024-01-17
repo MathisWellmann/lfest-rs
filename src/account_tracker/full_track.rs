@@ -7,7 +7,7 @@ use crate::{
     cornish_fisher::cornish_fisher_value_at_risk,
     quote,
     types::{Currency, MarginCurrency, QuoteCurrency, Side},
-    utils::{decimal_pow, decimal_sqrt, decimal_sum, decimal_to_f64, variance, min},
+    utils::{decimal_pow, decimal_sqrt, decimal_sum, decimal_to_f64, min, variance},
 };
 
 const DAILY_NS: u64 = 86_400_000_000_000;
@@ -249,9 +249,8 @@ where
     pub fn sortino(
         &self,
         returns_source: ReturnsSource,
-        risk_free_is_buy_and_hold: bool
+        risk_free_is_buy_and_hold: bool,
     ) -> Decimal {
-        let target_return;
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
@@ -264,7 +263,7 @@ where
             ReturnsSource::Hourly => Dec!(93.59487), // sqrt(365 * 24)
         };
 
-        if risk_free_is_buy_and_hold {
+        let target_return: Decimal = if risk_free_is_buy_and_hold {
             let rets_bnh = match returns_source {
                 ReturnsSource::Daily => &self.hist_returns_daily_bnh,
                 ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
@@ -274,27 +273,23 @@ where
                 "The buy and hold returns should not be empty at this point"
             );
             let n: Decimal = (rets_bnh.len() as u64).into();
-	        target_return = decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n;
+            decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n
         } else {
-            target_return = Decimal::ZERO;
-        }
+            Decimal::ZERO
+        };
 
         let n: Decimal = (rets_acc.len() as u64).into();
-	    let mean_acc_ret = decimal_sum(rets_acc.iter().map(|v| v.inner())) / n;
+        let mean_acc_ret = decimal_sum(rets_acc.iter().map(|v| v.inner())) / n;
 
         let underperformance = Vec::<Decimal>::from_iter(
-            rets_acc.iter().map(|v|
-                decimal_pow(
-                    min(Decimal::ZERO, v.inner() - target_return),
-                    2
-                )
-            ),
+            rets_acc
+                .iter()
+                .map(|v| decimal_pow(min(Decimal::ZERO, v.inner() - target_return), 2)),
         );
 
-        let avrg_underperformance = 
-            decimal_sum(underperformance.iter().cloned()) / n;
-            
-        let target_downside_deviation = decimal_sqrt(avrg_underperformance);
+        let avg_underperformance = decimal_sum(underperformance.iter().cloned()) / n;
+
+        let target_downside_deviation = decimal_sqrt(avg_underperformance);
 
         ((mean_acc_ret - target_return) * annualization_mult) / target_downside_deviation
     }
@@ -831,21 +826,11 @@ mod tests {
     use fpdec::Round;
 
     use super::*;
-    use crate::utils::tests::round;
-    use crate::utils::f64_to_decimal;
+    use crate::utils::{f64_to_decimal, tests::round};
 
     // Example pulled from the following article about the Sortino ratio:
     // http://www.redrockcapital.com/Sortino__A__Sharper__Ratio_Red_Rock_Capital.pdf
-    const ACC_RETS_H: [f64; 8] = [
-        0.17,
-        0.15,
-        0.23,
-        -0.05,
-        0.12,
-        0.09,
-        0.13,
-        -0.04
-    ];
+    const ACC_RETS_H: [f64; 8] = [0.17, 0.15, 0.23, -0.05, 0.12, 0.09, 0.13, -0.04];
 
     // Some example hourly ln returns of BCHEUR i pulled from somewhere from about
     // october 2021
@@ -1411,19 +1396,22 @@ mod tests {
     }
 
     #[test]
-    fn acc_tracker_sortino(){
+    fn acc_tracker_sortino() {
         if let Err(_) = pretty_env_logger::try_init() {}
 
         let mut at = FullAccountTracker::new(quote!(100.0));
 
         at.hist_returns_hourly_acc = Vec::<QuoteCurrency>::from_iter(
-            ACC_RETS_H.iter().map(|v|
-                QuoteCurrency::new(f64_to_decimal(*v, Dec!(0.001)))
-            ),
+            ACC_RETS_H
+                .iter()
+                .map(|v| QuoteCurrency::new(f64_to_decimal(*v, Dec!(0.001)))),
         );
 
+        const EXPECTED_SORTINO_RATIO: Decimal = Dec!(413.434120785921266504);
+
         assert!(
-            at.sortino(ReturnsSource::Hourly, false) - Dec!(413.434120785921266504) < Dec!(0.0000000000000001),
+            at.sortino(ReturnsSource::Hourly, false) - EXPECTED_SORTINO_RATIO
+                < Dec!(0.0000000000000001),
         );
     }
 }
