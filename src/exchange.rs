@@ -150,8 +150,8 @@ where
             self.account
                 .active_limit_orders
                 .values()
-                .cloned()
-                .filter(|order| self.check_limit_order_execution(order, market_update)),
+                .filter(|order| self.check_limit_order_execution(order, market_update))
+                .cloned(),
         )
     }
 

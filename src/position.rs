@@ -135,7 +135,7 @@ where
         debug_assert!(quantity > M::PairedCurrency::new_zero());
         debug_assert!(quantity <= self.size, "Quantity larger than position size");
 
-        self.size = self.size - quantity;
+        self.size -= quantity;
         self.position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
 
         M::pnl(self.entry_price, price, quantity)
@@ -194,7 +194,7 @@ where
             "Amount must be smaller than short position; qed"
         );
 
-        self.size = self.size + quantity;
+        self.size += quantity;
         self.position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
 
         M::pnl(self.entry_price, price, quantity.into_negative())

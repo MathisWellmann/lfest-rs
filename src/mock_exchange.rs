@@ -8,7 +8,7 @@ use crate::{account_tracker::NoAccountTracker, prelude::*};
 /// The size is denoted in `BaseCurrency`
 /// and the margin currency is `QuoteCurency`
 pub fn mock_exchange_base() -> Exchange<NoAccountTracker, BaseCurrency> {
-    let acc_tracker = NoAccountTracker::default();
+    let acc_tracker = NoAccountTracker;
     let contract_specification = ContractSpecification {
         ticker: "TESTUSD".to_string(),
         initial_margin: Dec!(0.01),
@@ -31,7 +31,7 @@ pub fn mock_exchange_base() -> Exchange<NoAccountTracker, BaseCurrency> {
 pub fn mock_exchange_quote(
     starting_balance: BaseCurrency,
 ) -> Exchange<NoAccountTracker, QuoteCurrency> {
-    let acc_tracker = NoAccountTracker::default();
+    let acc_tracker = NoAccountTracker;
     let contract_specification = ContractSpecification {
         ticker: "TESTUSD".to_string(),
         initial_margin: Dec!(0.01),

@@ -49,8 +49,8 @@ where
         if remaining_short_size > M::PairedCurrency::new_zero() {
             // offset the order qty by as much as possible
             let offset = max(order_qty, remaining_short_size);
-            order_qty = order_qty - offset;
-            remaining_short_size = remaining_short_size - offset;
+            order_qty -= offset;
+            remaining_short_size -= offset;
         }
         let order_value = order_qty.convert(b.limit_price().expect(EXPECT_LIMIT_PRICE));
         let margin_req = order_value / position.leverage;
@@ -65,8 +65,8 @@ where
         if remaining_long_size > M::PairedCurrency::new_zero() {
             // offset the order qty by as much as possible
             let offset = max(order_qty, remaining_long_size);
-            order_qty = order_qty - offset;
-            remaining_long_size = remaining_long_size - offset;
+            order_qty -= offset;
+            remaining_long_size -= offset;
         }
         let order_value = order_qty.convert(s.limit_price().expect(EXPECT_LIMIT_PRICE));
         let margin_req = order_value / position.leverage;
