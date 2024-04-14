@@ -1,5 +1,6 @@
 /target
 /vendor
+/.direnv
 .idea
 Cargo.lock
 .nvimlog
