@@ -22,9 +22,7 @@
         rust = (
           pkgs.rust-bin.stable.latest.default.override {
             extensions = [
-              "rust-src"
               "rust-analyzer"
-              "clippy"
             ];
             targets = ["x86_64-unknown-linux-gnu"];
           }
@@ -33,12 +31,6 @@
         with pkgs; {
           devShells.default = mkShell {
             buildInputs = [
-              # openssl
-              # protobuf
-              # clang
-              # pkg-config
-              # fontconfig
-              # cmake
               (lib.hiPrio rust-bin.nightly."2024-04-01".rustfmt)
               rust
             ];
