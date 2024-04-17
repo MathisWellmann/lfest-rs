@@ -204,8 +204,8 @@ where
         order.set_id(self.next_order_id());
 
         match order.order_type() {
-            OrderType::Market => {
-                let fill_price = match order.side() {
+            OrderType::Market { side } => {
+                let fill_price = match side {
                     Side::Buy => self.market_state.ask(),
                     Side::Sell => self.market_state.bid(),
                 };
@@ -227,16 +227,15 @@ where
                 order.mark_filled(fill_price);
                 self.account_tracker.log_market_order_fill();
             }
-            OrderType::Limit => {
-                let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
-                match order.side() {
+            OrderType::Limit { side, limit_price } => {
+                match side {
                     Side::Buy => {
-                        if l_price >= self.market_state.ask() {
+                        if limit_price >= self.market_state.ask() {
                             return Err(Error::OrderError(OrderError::LimitPriceAboveAsk));
                         }
                     }
                     Side::Sell => {
-                        if l_price <= self.market_state.bid() {
+                        if limit_price <= self.market_state.bid() {
                             return Err(Error::OrderError(OrderError::LimitPriceBelowBid));
                         }
                     }

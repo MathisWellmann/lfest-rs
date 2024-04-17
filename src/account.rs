@@ -114,7 +114,7 @@ where
 
     /// Append a new limit order as active order
     pub(crate) fn append_limit_order(&mut self, order: Order<M::PairedCurrency>) {
-        debug_assert!(matches!(order.order_type(), OrderType::Limit));
+        debug_assert!(matches!(order.order_type(), OrderType::Limit { .. }));
 
         debug!("append_limit_order: order: {:?}", order);
 

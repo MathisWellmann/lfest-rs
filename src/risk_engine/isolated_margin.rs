@@ -34,7 +34,7 @@ where
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
     ) -> Result<(), RiskError> {
-        debug_assert!(matches!(order.order_type(), OrderType::Market));
+        debug_assert!(matches!(order.order_type(), OrderType::Market { .. }));
         match order.side() {
             Side::Buy => self.handle_market_buy_order(account, order, fill_price),
             Side::Sell => self.handle_market_sell_order(account, order, fill_price),
@@ -46,7 +46,7 @@ where
         account: &Account<M>,
         order: &Order<<M as Currency>::PairedCurrency>,
     ) -> Result<(), RiskError> {
-        debug_assert!(matches!(order.order_type(), OrderType::Limit));
+        debug_assert!(matches!(order.order_type(), OrderType::Limit { .. }));
 
         let mut orders = account.active_limit_orders.clone();
         orders.insert(order.id(), order.clone());
@@ -104,7 +104,7 @@ where
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
     ) -> Result<(), RiskError> {
-        debug_assert!(matches!(order.order_type(), OrderType::Market));
+        debug_assert!(matches!(order.order_type(), OrderType::Market { .. }));
         debug_assert!(matches!(order.side(), Side::Buy));
 
         if account.position.size() >= M::PairedCurrency::new_zero() {
@@ -142,7 +142,7 @@ where
         order: &Order<M::PairedCurrency>,
         fill_price: QuoteCurrency,
     ) -> Result<(), RiskError> {
-        debug_assert!(matches!(order.order_type(), OrderType::Market));
+        debug_assert!(matches!(order.order_type(), OrderType::Market { .. }));
         debug_assert!(matches!(order.side(), Side::Sell));
 
         if account.position.size() <= M::PairedCurrency::new_zero() {
