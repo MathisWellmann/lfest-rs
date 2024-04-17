@@ -4,7 +4,7 @@ use lfest::{mock_exchange_base, prelude::*};
 
 #[test]
 fn limit_orders_only() {
-    if let Err(_) = pretty_env_logger::try_init() {}
+    let _ = pretty_env_logger::try_init();
 
     let mut exchange = mock_exchange_base();
 
@@ -81,7 +81,7 @@ fn limit_orders_only() {
 
 #[test]
 fn limit_orders_2() {
-    if let Err(_) = pretty_env_logger::try_init() {}
+    let _ = pretty_env_logger::try_init();
 
     let mut exchange = mock_exchange_base();
 

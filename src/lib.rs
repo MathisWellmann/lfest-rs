@@ -1,5 +1,9 @@
-#![deny(missing_docs, rustdoc::missing_crate_level_docs, unused_imports)]
-#![warn(clippy::all)]
+#![deny(
+    missing_docs,
+    rustdoc::missing_crate_level_docs,
+    unused_imports,
+    clippy::all
+)]
 #![doc = include_str!("../README.md")]
 
 //! lfest - leveraged futures exchange for simulated trading
