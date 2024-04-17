@@ -33,12 +33,12 @@
         with pkgs; {
           devShells.default = mkShell {
             buildInputs = [
-              openssl
-              protobuf
-              clang
-              pkg-config
-              fontconfig
-              cmake
+              # openssl
+              # protobuf
+              # clang
+              # pkg-config
+              # fontconfig
+              # cmake
               (lib.hiPrio rust-bin.nightly."2024-04-01".rustfmt)
               rust
             ];
