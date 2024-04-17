@@ -4,7 +4,7 @@ use lfest::{mock_exchange_base, prelude::*};
 
 #[test]
 fn lin_long_market_win_full() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_base();
     let _ = exchange

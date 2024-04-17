@@ -131,6 +131,9 @@ pub enum Error {
 
     #[error("The specified leverage must be > 0")]
     InvalidLeverage,
+
+    #[error(transparent)]
+    Decimal(#[from] fpdec::DecimalError),
 }
 
 /// This is defined as a convenience.

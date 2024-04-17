@@ -1,10 +1,10 @@
 //! Test if a pure limit order strategy works correctly
 
-use lfest::{mock_exchange_base, prelude::*};
+use lfest::{mock_exchange_base, prelude::*, trade};
 
 #[test]
 fn limit_orders_only() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_base();
 
@@ -25,13 +25,10 @@ fn limit_orders_only() {
     assert_eq!(exchange.account().available_balance(), quote!(9.802));
 
     let exec_orders = exchange
-        .update_state(
-            1,
-            MarketUpdate::Bba {
-                bid: quote!(98),
-                ask: quote!(99),
-            },
-        )
+        .update_state(1, trade!(quote!(100), base!(10), Side::Sell))
+        .unwrap();
+    let _ = exchange
+        .update_state(1, bba!(quote!(98), quote!(99)))
         .unwrap();
     assert_eq!(exec_orders.len(), 1);
 
@@ -56,13 +53,10 @@ fn limit_orders_only() {
     assert_eq!(exchange.account().order_margin(), quote!(0));
 
     let exec_orders = exchange
-        .update_state(
-            2,
-            MarketUpdate::Bba {
-                bid: quote!(106),
-                ask: quote!(107),
-            },
-        )
+        .update_state(2, trade!(quote!(105), base!(10), Side::Buy))
+        .unwrap();
+    let _ = exchange
+        .update_state(2, bba!(quote!(106), quote!(107)))
         .unwrap();
     assert!(!exec_orders.is_empty());
 
@@ -81,7 +75,7 @@ fn limit_orders_only() {
 
 #[test]
 fn limit_orders_2() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_base();
 
@@ -103,13 +97,10 @@ fn limit_orders_2() {
     exchange.submit_order(o).unwrap();
 
     let exec_orders = exchange
-        .update_state(
-            1,
-            MarketUpdate::Bba {
-                bid: quote!(98),
-                ask: quote!(99),
-            },
-        )
+        .update_state(1, trade!(quote!(98), base!(2), Side::Sell))
+        .unwrap();
+    let _ = exchange
+        .update_state(1, bba!(quote!(98), quote!(99)))
         .unwrap();
     assert_eq!(exec_orders.len(), 1);
 }

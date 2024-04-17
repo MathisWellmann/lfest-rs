@@ -1,4 +1,7 @@
-use crate::prelude::{Currency, QuoteCurrency, Side};
+use crate::{
+    prelude::{Account, Currency, MarketState, QuoteCurrency, Side},
+    types::MarginCurrency,
+};
 
 /// Something that tracks the performance of the Account.
 /// This allows for greated flexibility over using the FullAccountTracker
@@ -6,7 +9,7 @@ use crate::prelude::{Currency, QuoteCurrency, Side};
 /// returns
 pub trait AccountTracker<M>: Send
 where
-    M: Currency,
+    M: Currency + MarginCurrency,
 {
     /// Update with each tick, using data provided in update_state method of
     /// Exchange.
@@ -15,7 +18,7 @@ where
     /// `timestamp_ns`: timestamp of latest tick in nanoseconds
     /// `price`: price of latest tick
     /// `upnl`: unrealized profit and loss of account in current tick
-    fn update(&mut self, timestamp_ns: u64, price: QuoteCurrency, upnl: M);
+    fn update(&mut self, timestamp_ns: u64, market_state: &MarketState, account: &Account<M>);
 
     /// Log a realized profit and loss event
     ///

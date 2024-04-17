@@ -2,12 +2,14 @@ use std::{fmt::Display, iter::FromIterator};
 
 use fpdec::{Dec, Decimal};
 
+use super::d_ratio;
 use crate::{
     account_tracker::AccountTracker,
     cornish_fisher::cornish_fisher_value_at_risk,
+    prelude::{Account, MarketState},
     quote,
-    types::{Currency, MarginCurrency, QuoteCurrency, Side},
-    utils::{decimal_pow, decimal_sqrt, decimal_sum, decimal_to_f64, variance},
+    types::{Currency, LnReturns, MarginCurrency, QuoteCurrency, Side},
+    utils::{decimal_pow, decimal_sqrt, decimal_sum, decimal_to_f64, min, variance},
 };
 
 const DAILY_NS: u64 = 86_400_000_000_000;
@@ -263,7 +265,7 @@ where
             ReturnsSource::Hourly => Dec!(93.59487), // sqrt(365 * 24)
         };
 
-        if risk_free_is_buy_and_hold {
+        let target_return: Decimal = if risk_free_is_buy_and_hold {
             let rets_bnh = match returns_source {
                 ReturnsSource::Daily => &self.hist_returns_daily_bnh,
                 ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
@@ -273,44 +275,25 @@ where
                 "The buy and hold returns should not be empty at this point"
             );
             let n: Decimal = (rets_bnh.len() as u64).into();
-            let mean_bnh_ret = decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n;
-
-            // compute the difference of returns of account and market
-            let diff_returns = Vec::<Decimal>::from_iter(
-                rets_acc
-                    .iter()
-                    .map(|v| v.inner() - mean_bnh_ret)
-                    .filter(|v| *v < Dec!(0)),
-            );
-            if diff_returns.is_empty() {
-                return Decimal::ZERO;
-            }
-            let n: Decimal = (diff_returns.len() as u64).into();
-            let mean = decimal_sum(diff_returns.iter().cloned()) / n;
-            let variance = variance(&diff_returns);
-            if variance == Decimal::ZERO {
-                return Decimal::MAX;
-            }
-            let std_dev = decimal_sqrt(variance);
-
-            annualization_mult * mean / std_dev
+            decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n
         } else {
-            let downside_rets = Vec::<Decimal>::from_iter(
-                rets_acc.iter().map(|v| v.inner()).filter(|v| *v < Dec!(0)),
-            );
-            if downside_rets.is_empty() {
-                return Decimal::ZERO;
-            }
-            let n: Decimal = (downside_rets.len() as u64).into();
-            let mean = decimal_sum(downside_rets.iter().cloned()) / n;
-            let variance = variance(&downside_rets);
-            if variance == Decimal::ZERO {
-                return Decimal::MAX;
-            }
-            let std_dev = decimal_sqrt(variance);
+            Decimal::ZERO
+        };
 
-            annualization_mult * mean / std_dev
-        }
+        let n: Decimal = (rets_acc.len() as u64).into();
+        let mean_acc_ret = decimal_sum(rets_acc.iter().map(|v| v.inner())) / n;
+
+        let underperformance = Vec::<Decimal>::from_iter(
+            rets_acc
+                .iter()
+                .map(|v| decimal_pow(min(Decimal::ZERO, v.inner() - target_return), 2)),
+        );
+
+        let avg_underperformance = decimal_sum(underperformance.iter().cloned()) / n;
+
+        let target_downside_deviation = decimal_sqrt(avg_underperformance);
+
+        ((mean_acc_ret - target_return) * annualization_mult) / target_downside_deviation
     }
 
     /// Return the theoretical kelly leverage that would maximize the compounded growth rate,
@@ -395,65 +378,24 @@ where
         }
     }
 
-    /// Calculate the cornish fisher value at risk based on daily returns of the
-    /// account # Arguments
-    /// returns_source: the sampling interval of pnl snapshots
-    /// percentile: in range [0.0, 1.0], usually something like 0.01 or 0.05
-    #[inline]
+    /// Calculate the cornish fisher value at risk of the account.
+    ///
+    /// # Arguments:
+    /// - `returns_source`: the sampling interval of pnl snapshots
+    /// - `percentile`: in range [0.0, 1.0], usually something like 0.01 or 0.05
     pub fn cornish_fisher_value_at_risk(
         &self,
         returns_source: ReturnsSource,
         percentile: f64,
-    ) -> f64 {
+    ) -> crate::Result<M> {
         let rets = match returns_source {
             ReturnsSource::Daily => &self.hist_ln_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_ln_returns_hourly_acc,
         };
-        cornish_fisher_value_at_risk(
-            rets,
-            decimal_to_f64(self.wallet_balance_start.inner()),
-            percentile,
+        Ok(
+            cornish_fisher_value_at_risk(&LnReturns(rets), self.wallet_balance_start, percentile)?
+                .asset_value_at_risk,
         )
-        .2
-    }
-
-    /// Calculate the corni fisher value at risk from n consequtive hourly
-    /// return values This should have better statistical properties
-    /// compared to using daily returns due to having more samples. Set n to
-    /// 24 for daily value at risk, but with 24x more samples from which to take
-    /// the percentile, giving a more accurate VaR
-    /// # Parameters:
-    /// n: number of hourly returns to use
-    /// percentile: value between [0.0, 1.0], smaller value will return more
-    /// worst case results
-    pub fn cornish_fisher_value_at_risk_from_n_hourly_returns(
-        &self,
-        n: usize,
-        percentile: f64,
-    ) -> f64 {
-        let rets = &self.hist_ln_returns_hourly_acc;
-        if rets.len() < n {
-            debug!("not enough hourly returns to compute CF-VaR for n={}", n);
-            return 0.0;
-        }
-        let mut ret_streaks = Vec::with_capacity(rets.len() - n);
-        for i in n..rets.len() {
-            let mut r = 1.0;
-            for ret in rets.iter().take(i).skip(i - n) {
-                r *= ret.exp();
-            }
-            ret_streaks.push(r);
-        }
-
-        // TODO: make work with `Decimal` type
-        let cf_var = cornish_fisher_value_at_risk(
-            &ret_streaks,
-            decimal_to_f64(self.wallet_balance_start.inner()),
-            percentile,
-        )
-        .1;
-        decimal_to_f64(self.wallet_balance_start.inner())
-            - (decimal_to_f64(self.wallet_balance_start.inner()) * cf_var)
     }
 
     /// Return the number of trading days
@@ -470,7 +412,7 @@ where
     ///
     /// # Parameters:
     /// `returns_source`: The sampling interval of pnl snapshots
-    pub fn d_ratio(&self, returns_source: ReturnsSource) -> f64 {
+    pub fn d_ratio(&self, returns_source: ReturnsSource) -> crate::Result<f64> {
         let rets_acc = match returns_source {
             ReturnsSource::Daily => &self.hist_ln_returns_daily_acc,
             ReturnsSource::Hourly => &self.hist_ln_returns_hourly_acc,
@@ -479,40 +421,12 @@ where
             ReturnsSource::Daily => &self.hist_ln_returns_daily_bnh,
             ReturnsSource::Hourly => &self.hist_ln_returns_hourly_bnh,
         };
-
-        let cf_var_bnh = cornish_fisher_value_at_risk(
-            rets_bnh,
-            decimal_to_f64(self.wallet_balance_start.inner()),
-            0.01,
+        d_ratio(
+            LnReturns(rets_acc),
+            LnReturns(rets_bnh),
+            self.wallet_balance_start,
+            self.num_trading_days(),
         )
-        .1;
-        let cf_var_acc = cornish_fisher_value_at_risk(
-            rets_acc,
-            decimal_to_f64(self.wallet_balance_start.inner()),
-            0.01,
-        )
-        .1;
-
-        let num_trading_days = self.num_trading_days() as f64;
-
-        // compute annualized returns
-        let roi_acc = rets_acc
-            .iter()
-            .fold(1.0, |acc, x| acc * x.exp())
-            .powf(365.0 / num_trading_days);
-        let roi_bnh = rets_bnh
-            .iter()
-            .fold(1.0, |acc, x| acc * x.exp())
-            .powf(365.0 / num_trading_days);
-
-        let rtv_acc = roi_acc / cf_var_acc;
-        let rtv_bnh = roi_bnh / cf_var_bnh;
-        debug!(
-            "roi_acc: {:.2}, roi_bnh: {:.2}, cf_var_bnh: {:.8}, cf_var_acc: {:.8}, rtv_acc: {}, rtv_bnh: {}",
-            roi_acc, roi_bnh, cf_var_bnh, cf_var_acc, rtv_acc, rtv_bnh,
-        );
-
-        (1.0 + (roi_acc - roi_bnh) / roi_bnh.abs()) * (cf_var_bnh / cf_var_acc)
     }
 
     /// Annualized return on investment as a factor, e.g.: 100% -> 2x
@@ -628,7 +542,12 @@ impl<M> AccountTracker<M> for FullAccountTracker<M>
 where
     M: Currency + MarginCurrency + Send,
 {
-    fn update(&mut self, timestamp_ns: u64, price: QuoteCurrency, upnl: M) {
+    fn update(&mut self, timestamp_ns: u64, market_state: &MarketState, account: &Account<M>) {
+        let price = market_state.mid_price();
+        if price == quote!(0) {
+            trace!("Price is 0, not updating the `FullAccountTracker`");
+            return;
+        }
         self.price_last = price;
         if self.price_a_day_ago.is_zero() {
             self.price_a_day_ago = price;
@@ -647,6 +566,9 @@ where
             self.ts_first = timestamp_ns;
         }
         self.ts_last = timestamp_ns;
+        let upnl = account
+            .position()
+            .unrealized_pnl(market_state.bid(), market_state.ask());
         if timestamp_ns > self.next_daily_trigger_ts {
             self.next_daily_trigger_ts = timestamp_ns + DAILY_NS;
 
@@ -793,10 +715,9 @@ drawdown_wallet_balance: {},
 drawdown_total: {},
 historical_value_at_risk_daily: {},
 historical_value_at_risk_hourly: {},
-cornish_fisher_value_at_risk_daily: {},
-cornish_fisher_value_at_risk_daily_from_hourly_returns: {},
-d_ratio_daily: {},
-d_ratio_hourly: {},
+cornish_fisher_value_at_risk_daily: {:?},
+d_ratio_daily: {:?},
+d_ratio_hourly: {:?},
 num_trades: {},
 buy_ratio: {},
 turnover: {},
@@ -818,7 +739,6 @@ num_trading_days: {},
             self.historical_value_at_risk(ReturnsSource::Daily, 0.01),
             self.historical_value_at_risk_from_n_hourly_returns(24, 0.01),
             self.cornish_fisher_value_at_risk(ReturnsSource::Daily, 0.01),
-            self.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01),
             self.d_ratio(ReturnsSource::Daily),
             self.d_ratio(ReturnsSource::Hourly),
             self.num_trades(),
@@ -841,412 +761,19 @@ mod tests {
     use fpdec::Round;
 
     use super::*;
-    use crate::utils::tests::round;
+    use crate::{
+        prelude::PriceFilter,
+        test_helpers::LN_RETS_H,
+        utils::{f64_to_decimal, tests::round},
+    };
 
-    // Some example hourly ln returns of BCHEUR i pulled from somewhere from about
-    // october 2021
-    const LN_RETS_H: [f64; 400] = [
-        0.00081502,
-        0.00333945,
-        0.01293622,
-        -0.00477679,
-        -0.01195175,
-        0.00750783,
-        0.00426066,
-        0.01214974,
-        0.00892472,
-        0.00344957,
-        0.00684050,
-        -0.00492310,
-        0.00322274,
-        0.02181239,
-        0.00592118,
-        0.00122343,
-        -0.00623743,
-        -0.00273835,
-        0.01127133,
-        -0.07646319,
-        0.07090849,
-        -0.00494601,
-        -0.00624408,
-        0.00256976,
-        0.00130659,
-        0.00098106,
-        -0.00635020,
-        0.00191424,
-        -0.00306103,
-        0.00640057,
-        -0.00550237,
-        0.00469525,
-        0.00207676,
-        -0.00449422,
-        0.00472523,
-        -0.00459109,
-        -0.00382578,
-        0.00420916,
-        -0.01085029,
-        0.00277287,
-        -0.00929482,
-        0.00680648,
-        -0.00772934,
-        -0.00250064,
-        -0.01213199,
-        -0.00098276,
-        -0.00441975,
-        0.00118162,
-        0.00318254,
-        -0.00314559,
-        -0.00210387,
-        0.00452694,
-        -0.00116603,
-        -0.00240180,
-        0.00188400,
-        0.00442843,
-        -0.00769548,
-        0.00154913,
-        0.00447643,
-        0.00081605,
-        -0.00081605,
-        -0.00201872,
-        0.00183335,
-        0.00540848,
-        -0.01165400,
-        0.00293312,
-        0.00133104,
-        -0.00555275,
-        0.00309541,
-        -0.01556380,
-        -0.00101692,
-        -0.00094336,
-        -0.00039885,
-        0.00121517,
-        0.00312631,
-        -0.00452272,
-        -0.00484508,
-        0.00718562,
-        0.00252812,
-        -0.00085555,
-        0.00582124,
-        0.00917446,
-        -0.00847876,
-        0.00492033,
-        -0.00139778,
-        -0.00511463,
-        0.00474712,
-        -0.00256881,
-        0.00185255,
-        -0.00276838,
-        -0.00118933,
-        0.01393963,
-        0.00211617,
-        -0.00733174,
-        0.00223456,
-        0.00331485,
-        -0.00812862,
-        0.00127036,
-        0.01245729,
-        -0.01264150,
-        0.00075547,
-        -0.00219115,
-        0.00163830,
-        -0.00734218,
-        0.00730533,
-        -0.00090229,
-        -0.00585425,
-        0.00370310,
-        -0.00388606,
-        0.00350045,
-        -0.00593072,
-        0.00756601,
-        0.02024774,
-        0.01012805,
-        0.00128986,
-        -0.00030365,
-        -0.01334484,
-        -0.00177715,
-        -0.00373107,
-        0.00792646,
-        0.00013139,
-        -0.00342925,
-        0.01376916,
-        0.00051222,
-        0.00475530,
-        -0.01058291,
-        -0.00384123,
-        -0.00663085,
-        0.00141987,
-        -0.00084096,
-        -0.00953725,
-        -0.00181163,
-        -0.00127357,
-        0.00040589,
-        -0.00053500,
-        0.00271486,
-        -0.00024039,
-        0.00613869,
-        -0.00222986,
-        -0.00340949,
-        -0.00190351,
-        0.00934898,
-        0.00117479,
-        -0.00102569,
-        0.00003728,
-        0.00257564,
-        0.00893534,
-        -0.00150733,
-        -0.00645575,
-        -0.00572640,
-        0.00951222,
-        -0.02857972,
-        0.00519596,
-        0.00908435,
-        -0.00122096,
-        -0.00510812,
-        0.00103059,
-        -0.00003682,
-        -0.00266620,
-        0.00473049,
-        0.00377094,
-        0.03262131,
-        -0.00294230,
-        -0.00281953,
-        -0.00362701,
-        -0.00001896,
-        0.00212520,
-        0.00367280,
-        -0.00188566,
-        0.00647177,
-        -0.00816393,
-        0.00705369,
-        0.00903244,
-        -0.00235244,
-        0.01674118,
-        -0.00652002,
-        0.02306826,
-        0.00615165,
-        0.00122285,
-        -0.00276431,
-        0.00962792,
-        0.01871500,
-        -0.00793240,
-        0.00881768,
-        0.00592885,
-        0.02721942,
-        0.00850996,
-        -0.01381862,
-        0.00936217,
-        -0.00407480,
-        0.00236606,
-        -0.00513002,
-        0.01970497,
-        -0.01412668,
-        0.01755395,
-        -0.00895548,
-        0.00511687,
-        0.00296984,
-        0.02988059,
-        -0.02572539,
-        -0.00835808,
-        0.00918683,
-        0.00781964,
-        0.00013195,
-        -0.00880214,
-        -0.01109966,
-        -0.00734618,
-        0.00665653,
-        -0.01180100,
-        0.00818809,
-        0.00311751,
-        -0.00260218,
-        0.00804343,
-        -0.00705497,
-        0.01304860,
-        0.02186613,
-        -0.00044516,
-        0.00443816,
-        0.02123462,
-        -0.00900067,
-        0.02808619,
-        -0.00069790,
-        0.00723525,
-        -0.03541517,
-        0.00054277,
-        0.00457999,
-        0.00391639,
-        -0.00836064,
-        -0.00862783,
-        -0.00347063,
-        0.00661578,
-        -0.00616864,
-        -0.00129618,
-        0.01089079,
-        -0.00963933,
-        -0.00265747,
-        -0.00609216,
-        -0.01428360,
-        -0.00690326,
-        0.00598589,
-        -0.00141808,
-        -0.00766637,
-        -0.00563078,
-        0.00103317,
-        -0.00549794,
-        -0.00339958,
-        0.01535745,
-        -0.00779424,
-        -0.00051603,
-        -0.00689776,
-        0.00672581,
-        0.00489062,
-        -0.01046298,
-        -0.00153764,
-        0.01137449,
-        0.00019427,
-        0.00352505,
-        0.01106645,
-        -0.00325858,
-        -0.01342477,
-        0.00084053,
-        0.00735775,
-        -0.00149757,
-        -0.01594285,
-        0.00096097,
-        -0.00549709,
-        0.00603137,
-        -0.00027786,
-        -0.00243330,
-        -0.00095889,
-        0.00223883,
-        0.00900579,
-        0.00107754,
-        0.00365070,
-        0.00015150,
-        0.00153795,
-        0.00685195,
-        -0.01102705,
-        0.01336526,
-        0.06330828,
-        0.01472186,
-        -0.00948722,
-        0.00951088,
-        -0.02122735,
-        -0.00657814,
-        0.00736579,
-        -0.00494730,
-        0.00945349,
-        -0.00910751,
-        0.00156993,
-        -0.01752120,
-        -0.00516317,
-        -0.00036133,
-        0.01299930,
-        -0.00960670,
-        -0.00695372,
-        0.00358371,
-        -0.00248066,
-        -0.00085553,
-        0.01013308,
-        -0.01031310,
-        0.01391146,
-        -0.00500684,
-        -0.01070302,
-        0.00551785,
-        0.01211034,
-        -0.00066270,
-        -0.00748760,
-        0.01321500,
-        -0.00914815,
-        0.00367207,
-        -0.00230517,
-        0.00171125,
-        -0.00573824,
-        -0.00231329,
-        0.00798303,
-        -0.01103654,
-        -0.00069986,
-        0.01773706,
-        0.00760968,
-        -0.00032401,
-        -0.00831888,
-        0.00282665,
-        0.00401237,
-        0.00646741,
-        0.02859090,
-        0.00270779,
-        -0.05185343,
-        0.01053533,
-        -0.00342470,
-        -0.00574274,
-        -0.00148180,
-        -0.00443228,
-        -0.00244637,
-        0.01041581,
-        0.00580057,
-        -0.00174600,
-        -0.00167422,
-        -0.00006874,
-        0.00696707,
-        0.01696395,
-        -0.00887856,
-        -0.01404375,
-        -0.00735852,
-        0.00454126,
-        0.00451603,
-        -0.00009190,
-        -0.00279887,
-        0.00881306,
-        0.00254559,
-        -0.00333110,
-        0.00718494,
-        -0.00642254,
-        -0.00157037,
-        0.00406956,
-        0.00896032,
-        0.00668507,
-        -0.00638110,
-        0.00457055,
-        -0.00124432,
-        0.00211392,
-        -0.00490214,
-        0.00855329,
-        -0.01061018,
-        0.00374296,
-        0.01959687,
-        -0.00374546,
-        -0.00886619,
-        0.00798554,
-        -0.00540965,
-        -0.00297704,
-        0.00608164,
-        0.00523561,
-        0.01267846,
-        -0.00429216,
-        -0.01136444,
-        0.00498445,
-        -0.01758464,
-        0.01302850,
-        -0.00007140,
-        0.01033403,
-        0.00269672,
-        0.00674951,
-        0.00206539,
-        -0.00862200,
-        0.00393849,
-        -0.00504716,
-        -0.00120369,
-        0.01363795,
-        0.00965599,
-        -0.01106959,
-        0.00534806,
-        -0.01509123,
-        -0.00450012,
-        -0.00187109,
-        0.00254361,
-        -0.00813596,
-        0.00054829,
-        0.00250690,
-        0.00753453,
-    ];
+    // Example pulled from the following article about the Sortino ratio:
+    // http://www.redrockcapital.com/Sortino__A__Sharper__Ratio_Red_Rock_Capital.pdf
+    const ACC_RETS_H: [f64; 8] = [0.17, 0.15, 0.23, -0.05, 0.12, 0.09, 0.13, -0.04];
+
+    fn mock_market_state_from_mid_price(mid_price: QuoteCurrency) -> MarketState {
+        MarketState::from_components(PriceFilter::default(), mid_price, mid_price, 0, 0)
+    }
 
     #[test]
     fn acc_tracker_profit_loss_ratio() {
@@ -1267,16 +794,32 @@ mod tests {
     #[test]
     fn acc_tracker_buy_and_hold_return() {
         let mut at = FullAccountTracker::new(quote!(100.0));
-        at.update(0, quote!(100.0), quote!(0.0));
-        at.update(0, quote!(200.0), quote!(0.0));
+        at.update(
+            0,
+            &mock_market_state_from_mid_price(quote!(100.0)),
+            &Account::default(),
+        );
+        at.update(
+            0,
+            &mock_market_state_from_mid_price(quote!(200.0)),
+            &Account::default(),
+        );
         assert_eq!(at.buy_and_hold_return(), quote!(100.0));
     }
 
     #[test]
     fn acc_tracker_sell_and_hold_return() {
         let mut at = FullAccountTracker::new(quote!(100.0));
-        at.update(0, quote!(100.0), quote!(0.0));
-        at.update(0, quote!(50.0), quote!(0.0));
+        at.update(
+            0,
+            &mock_market_state_from_mid_price(quote!(100.0)),
+            &Account::default(),
+        );
+        at.update(
+            0,
+            &mock_market_state_from_mid_price(quote!(50.0)),
+            &Account::default(),
+        );
         assert_eq!(at.sell_and_hold_return(), quote!(50.0));
     }
 
@@ -1301,22 +844,38 @@ mod tests {
     #[test]
     fn acc_tracker_buy_and_hold() {
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
-        acc_tracker.update(0, quote!(100.0), quote!(0.0));
-        acc_tracker.update(0, quote!(200.0), quote!(0.0));
+        acc_tracker.update(
+            0,
+            &mock_market_state_from_mid_price(quote!(100.0)),
+            &Account::default(),
+        );
+        acc_tracker.update(
+            0,
+            &mock_market_state_from_mid_price(quote!(200.0)),
+            &Account::default(),
+        );
         assert_eq!(acc_tracker.buy_and_hold_return(), quote!(100.0));
     }
 
     #[test]
     fn acc_tracker_sell_and_hold() {
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
-        acc_tracker.update(0, quote!(100.0), quote!(0.0));
-        acc_tracker.update(0, quote!(200.0), quote!(0.0));
+        acc_tracker.update(
+            0,
+            &mock_market_state_from_mid_price(quote!(100.0)),
+            &Account::default(),
+        );
+        acc_tracker.update(
+            0,
+            &mock_market_state_from_mid_price(quote!(200.0)),
+            &Account::default(),
+        );
         assert_eq!(acc_tracker.sell_and_hold_return(), quote!(-100.0));
     }
 
     #[test]
     fn acc_tracker_historical_value_at_risk() {
-        let _ = pretty_env_logger::try_init();
+        if let Err(_e) = pretty_env_logger::try_init() {}
 
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
@@ -1339,7 +898,7 @@ mod tests {
 
     #[test]
     fn acc_tracker_historical_value_at_risk_from_n_hourly_returns() {
-        let _ = pretty_env_logger::try_init();
+        if let Err(_) = pretty_env_logger::try_init() {}
 
         let mut at = FullAccountTracker::new(quote!(100.0));
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
@@ -1362,47 +921,54 @@ mod tests {
 
     #[test]
     fn acc_tracker_cornish_fisher_value_at_risk() {
-        let _ = pretty_env_logger::try_init();
+        if let Err(_e) = pretty_env_logger::try_init() {}
 
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
         assert_eq!(
             round(
-                acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.05),
+                decimal_to_f64(
+                    acc_tracker
+                        .cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.05)
+                        .unwrap()
+                        .inner()
+                ),
                 3
             ),
-            1.354
+            98.646
         );
         assert_eq!(
             round(
-                acc_tracker.cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.01),
+                decimal_to_f64(
+                    acc_tracker
+                        .cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.01)
+                        .unwrap()
+                        .inner()
+                ),
                 3
             ),
-            5.786
+            94.214
         );
     }
 
     #[test]
-    fn acc_tracker_cornish_fisher_value_at_risk_from_n_hourly_returns() {
-        let _ = pretty_env_logger::try_init();
+    fn acc_tracker_sortino() {
+        if let Err(_) = pretty_env_logger::try_init() {}
 
         let mut at = FullAccountTracker::new(quote!(100.0));
-        at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
-        assert_eq!(
-            round(
-                at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.05),
-                3
-            ),
-            4.043
+        at.hist_returns_hourly_acc = Vec::<QuoteCurrency>::from_iter(
+            ACC_RETS_H
+                .iter()
+                .map(|v| QuoteCurrency::new(f64_to_decimal(*v, Dec!(0.001)))),
         );
-        assert_eq!(
-            round(
-                at.cornish_fisher_value_at_risk_from_n_hourly_returns(24, 0.01),
-                3
-            ),
-            5.358
+
+        const EXPECTED_SORTINO_RATIO: Decimal = Dec!(413.434120785921266504);
+
+        assert!(
+            at.sortino(ReturnsSource::Hourly, false) - EXPECTED_SORTINO_RATIO
+                < Dec!(0.0000000000000001),
         );
     }
 }

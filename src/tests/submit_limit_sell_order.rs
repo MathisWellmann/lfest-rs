@@ -1,4 +1,4 @@
-use crate::{mock_exchange_base, prelude::*};
+use crate::{mock_exchange_base, prelude::*, trade};
 
 #[test]
 fn submit_limit_sell_order_no_position() {
@@ -27,10 +27,13 @@ fn submit_limit_sell_order_no_position() {
     order.mark_filled(order.limit_price().unwrap());
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(101), quote!(102)))
+            .update_state(0, trade!(quote!(100), base!(1), Side::Buy))
             .unwrap(),
         vec![order]
     );
+    exchange
+        .update_state(0, bba!(quote!(101), quote!(102)))
+        .unwrap();
     assert_eq!(
         exchange.account().position,
         Position {
@@ -52,7 +55,7 @@ fn submit_limit_sell_order_no_position() {
     order.mark_filled(order.limit_price().unwrap());
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(98), quote!(99)))
+            .update_state(0, trade!(quote!(100), base!(1), Side::Sell))
             .unwrap(),
         vec![order]
     );

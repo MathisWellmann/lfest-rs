@@ -26,6 +26,24 @@ where
     order_margin: M,
 }
 
+#[cfg(test)]
+impl<M> Default for Account<M>
+where
+    M: Currency + MarginCurrency,
+{
+    fn default() -> Self {
+        use crate::prelude::{fee, Dec, Decimal};
+        Self {
+            wallet_balance: M::new(Dec!(1)),
+            position: Position::default(),
+            active_limit_orders: HashMap::default(),
+            lookup_order_nonce_from_user_order_id: HashMap::default(),
+            maker_fee: fee!(0.0),
+            order_margin: M::new(Dec!(0)),
+        }
+    }
+}
+
 impl<M> Account<M>
 where
     M: Currency + MarginCurrency,

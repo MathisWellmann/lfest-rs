@@ -1,9 +1,5 @@
-#![deny(
-    missing_docs,
-    rustdoc::missing_crate_level_docs,
-    unused_imports,
-    clippy::all
-)]
+#![deny(missing_docs, rustdoc::missing_crate_level_docs, unused_imports)]
+#![warn(clippy::all)]
 #![doc = include_str!("../README.md")]
 
 //! lfest - leveraged futures exchange for simulated trading
@@ -27,11 +23,14 @@ mod order_margin;
 mod position;
 mod risk_engine;
 #[cfg(test)]
+mod test_helpers;
+#[cfg(test)]
 mod tests;
 mod types;
 mod utils;
 
 pub use mock_exchange::{mock_exchange_base, mock_exchange_quote};
+pub use types::Result;
 
 /// Exports common types
 pub mod prelude {

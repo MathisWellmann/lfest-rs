@@ -102,17 +102,12 @@ where
     pub fn update_state(
         &mut self,
         timestamp_ns: u64,
-        market_update: MarketUpdate,
+        market_update: MarketUpdate<S>,
     ) -> Result<Vec<Order<S>>> {
         self.market_state
             .update_state(timestamp_ns, &market_update)?;
-        self.account_tracker.update(
-            timestamp_ns,
-            self.market_state.mid_price(),
-            self.account
-                .position
-                .unrealized_pnl(self.market_state.bid(), self.market_state.ask()),
-        );
+        self.account_tracker
+            .update(timestamp_ns, &self.market_state, &self.account);
         if let Err(e) = self
             .risk_engine
             .check_maintenance_margin(&self.market_state, &self.account)
@@ -145,7 +140,7 @@ where
     }
 
     /// Check if any resting orders have been executed
-    fn check_resting_orders(&mut self, market_update: &MarketUpdate) -> Vec<Order<S>> {
+    fn check_resting_orders(&mut self, market_update: &MarketUpdate<S>) -> Vec<Order<S>> {
         Vec::from_iter(
             self.account
                 .active_limit_orders
@@ -159,22 +154,37 @@ where
     ///
     /// # Returns:
     /// If `Some`, The order is filled and needs to be settled.
-    fn check_limit_order_execution(&self, order: &Order<S>, market_update: &MarketUpdate) -> bool {
-        let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
+    fn check_limit_order_execution(
+        &self,
+        limit_order: &Order<S>,
+        market_update: &MarketUpdate<S>,
+    ) -> bool {
+        let limit_price = limit_order.limit_price().expect(EXPECT_LIMIT_PRICE);
 
         match market_update {
-            MarketUpdate::Bba { bid, ask } => match order.side() {
-                Side::Buy => *ask < l_price,
-                Side::Sell => *bid > l_price,
-            },
+            MarketUpdate::Bba { .. } => {
+                // Updates to the best bid and ask prices do not trigger limit orders for simulation purposes.
+                false
+            }
+            MarketUpdate::Trade {
+                price,
+                quantity: _,
+                side,
+            } => {
+                // For now we ignore the filled quantity, which will change in future versions.
+                match limit_order.side() {
+                    Side::Buy => *price <= limit_price && matches!(side, Side::Sell),
+                    Side::Sell => *price >= limit_price && matches!(side, Side::Buy),
+                }
+            }
             MarketUpdate::Candle {
                 bid: _,
                 ask: _,
                 low,
                 high,
-            } => match order.side() {
-                Side::Buy => *low < l_price,
-                Side::Sell => *high > l_price,
+            } => match limit_order.side() {
+                Side::Buy => *low < limit_price,
+                Side::Sell => *high > limit_price,
             },
         }
     }
@@ -211,7 +221,7 @@ where
                 };
                 self.risk_engine
                     .check_market_order(&self.account, &order, fill_price)?;
-                let quantity = match order.side() {
+                let quantity = match side {
                     Side::Buy => order.quantity(),
                     Side::Sell => order.quantity().into_negative(),
                 };
@@ -288,12 +298,13 @@ mod test {
     use crate::{mock_exchange_base, prelude::*};
 
     #[test]
-    fn check_limit_order_execution_bba() {
+    fn check_limit_order_execution_buy_trade() {
         let exchange = mock_exchange_base();
 
-        let market_update = MarketUpdate::Bba {
-            bid: quote!(100),
-            ask: quote!(101),
+        let market_update = MarketUpdate::Trade {
+            price: quote!(100.0),
+            quantity: base!(1.0),
+            side: Side::Buy,
         };
         // Buys
         assert_eq!(
@@ -305,14 +316,84 @@ mod test {
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(101), base!(0.1)).unwrap(),
+                &Order::limit(Side::Buy, quote!(99), base!(0.1)).unwrap(),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(102), base!(0.1)).unwrap(),
+                &Order::limit(Side::Buy, quote!(100), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Buy, quote!(101), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+
+        // Sells
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Sell, quote!(110), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Sell, quote!(101), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Sell, quote!(100), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn check_limit_order_execution_sell_trade() {
+        let exchange = mock_exchange_base();
+
+        let market_update = MarketUpdate::Trade {
+            price: quote!(100.0),
+            quantity: base!(1.0),
+            side: Side::Sell,
+        };
+        // Buys
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Buy, quote!(90), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Buy, quote!(99), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            false
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Buy, quote!(100), base!(0.1)).unwrap(),
+                &market_update
+            ),
+            true
+        );
+        assert_eq!(
+            exchange.check_limit_order_execution(
+                &Order::limit(Side::Buy, quote!(101), base!(0.1)).unwrap(),
                 &market_update
             ),
             true
@@ -328,17 +409,17 @@ mod test {
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Sell, quote!(100), base!(0.1)).unwrap(),
+                &Order::limit(Side::Sell, quote!(101), base!(0.1)).unwrap(),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Sell, quote!(99), base!(0.1)).unwrap(),
+                &Order::limit(Side::Sell, quote!(100), base!(0.1)).unwrap(),
                 &market_update
             ),
-            true
+            false
         );
     }
 

@@ -1,11 +1,11 @@
 //! Test file for the inverse futures mode of the exchange
 
 use fpdec::Decimal;
-use lfest::{mock_exchange_quote, prelude::*};
+use lfest::{mock_exchange_quote, prelude::*, trade};
 
 #[test]
 fn inv_long_market_win_full() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
@@ -79,7 +79,7 @@ fn inv_long_market_win_full() {
 
 #[test]
 fn inv_long_market_loss_full() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
@@ -147,7 +147,7 @@ fn inv_long_market_loss_full() {
 
 #[test]
 fn inv_short_market_win_full() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
@@ -207,7 +207,7 @@ fn inv_short_market_win_full() {
 
 #[test]
 fn inv_short_market_loss_full() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
@@ -289,7 +289,7 @@ fn inv_short_market_loss_full() {
 
 #[test]
 fn inv_long_market_win_partial() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
@@ -377,7 +377,7 @@ fn inv_long_market_win_partial() {
 
 #[test]
 fn inv_long_market_loss_partial() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
@@ -440,7 +440,7 @@ fn inv_long_market_loss_partial() {
 
 #[test]
 fn inv_short_market_win_partial() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
@@ -516,7 +516,7 @@ fn inv_short_market_win_partial() {
 
 #[test]
 fn inv_short_market_loss_partial() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
@@ -591,7 +591,7 @@ fn inv_short_market_loss_partial() {
 
 #[test]
 fn inv_test_market_roundtrip() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
@@ -668,7 +668,7 @@ fn inv_test_market_roundtrip() {
 
 #[test]
 fn inv_execute_limit() {
-    let _ = pretty_env_logger::try_init();
+    if let Err(_) = pretty_env_logger::try_init() {}
 
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
@@ -684,6 +684,9 @@ fn inv_execute_limit() {
     assert_eq!(exchange.account().order_margin(), base!(0.5001)); // this includes the fee too
 
     let exec_orders = exchange
+        .update_state(1, trade!(quote!(900.0), quote!(1.0), Side::Sell))
+        .unwrap();
+    let _ = exchange
         .update_state(1, bba!(quote!(750.0), quote!(751.0)))
         .unwrap();
     assert_eq!(exec_orders.len(), 1);
@@ -703,6 +706,9 @@ fn inv_execute_limit() {
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
 
     let _ = exchange
+        .update_state(1, trade!(quote!(1000), quote!(1), Side::Buy))
+        .unwrap();
+    let _ = exchange
         .update_state(1, bba!(quote!(1199), quote!(1200)))
         .unwrap();
 
@@ -716,6 +722,9 @@ fn inv_execute_limit() {
     exchange.submit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
 
+    let _ = exchange
+        .update_state(2, trade!(quote!(1200), quote!(1), Side::Buy))
+        .unwrap();
     let _ = exchange
         .update_state(2, bba!(quote!(1201), quote!(1202)))
         .unwrap();
