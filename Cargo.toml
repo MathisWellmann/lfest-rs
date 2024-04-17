@@ -9,7 +9,7 @@ repository = "https://github.com/MathisWellmann/lfest-rs"
 readme = "README.md"
 keywords = ["exchange", "trading", "simulation", "backest", "leverage"]
 categories = ["finance", "simulation"]
-exclude = ["/img", "/data", "/.idea", "/vendor"]
+exclude = ["/img", "/data", "/.idea", "/vendor", "/.direnv"]
 
 [dependencies]
 log = { version = "0.4", features = ["release_max_level_info"] }
