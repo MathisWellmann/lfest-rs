@@ -1,6 +1,6 @@
 use crate::{
     prelude::{Account, Currency, MarketState, QuoteCurrency, Side},
-    types::MarginCurrency,
+    types::{MarginCurrency, TimestampNs},
 };
 
 /// Something that tracks the performance of the Account.
@@ -18,14 +18,19 @@ where
     /// `timestamp_ns`: timestamp of latest tick in nanoseconds
     /// `price`: price of latest tick
     /// `upnl`: unrealized profit and loss of account in current tick
-    fn update(&mut self, timestamp_ns: u64, market_state: &MarketState, account: &Account<M>);
+    fn update(
+        &mut self,
+        timestamp_ns: TimestampNs,
+        market_state: &MarketState,
+        account: &Account<M>,
+    );
 
     /// Log a realized profit and loss event
     ///
     /// # Arguments:
     /// `net_rpnl`: The realized profit and loss, denoted in margin currency.
     /// `ts_ns`: The timestamp in nanoseconds of this event.
-    fn log_rpnl(&mut self, net_rpnl: M, ts_ns: i64);
+    fn log_rpnl(&mut self, net_rpnl: M, ts_ns: TimestampNs);
 
     /// Log a fee, measured in the margin currency
     fn log_fee(&mut self, fee_in_margin: M);

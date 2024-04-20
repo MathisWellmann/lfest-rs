@@ -7,6 +7,7 @@ use crate::{
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     types::{
         Currency, Error, MarginCurrency, MarketUpdate, Order, OrderError, OrderType, Result, Side,
+        TimestampNs,
     },
 };
 
@@ -101,7 +102,7 @@ where
     /// Some Error otherwise
     pub fn update_state(
         &mut self,
-        timestamp_ns: u64,
+        timestamp_ns: TimestampNs,
         market_update: MarketUpdate<S>,
     ) -> Result<Vec<Order<S>>> {
         self.market_state
