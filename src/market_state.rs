@@ -3,7 +3,7 @@ use fpdec::Decimal;
 use crate::{
     prelude::PriceFilter,
     quote,
-    types::{Currency, MarketUpdate, QuoteCurrency, Result},
+    types::{Currency, MarketUpdate, QuoteCurrency, Result, TimestampNs},
 };
 
 /// Some information regarding the state of the market.
@@ -17,7 +17,7 @@ pub struct MarketState {
     /// The current ask
     ask: QuoteCurrency,
     /// The current timestamp in nanoseconds
-    current_ts_ns: i64,
+    current_ts_ns: TimestampNs,
     /// Used for synchronizing orders
     step: u64,
 }
@@ -42,7 +42,7 @@ impl MarketState {
     ///
     pub(crate) fn update_state<S>(
         &mut self,
-        timestamp_ns: u64,
+        timestamp_ns: TimestampNs,
         market_update: &MarketUpdate<S>,
     ) -> Result<()>
     where
@@ -61,7 +61,7 @@ impl MarketState {
                 self.ask = *ask;
             }
         }
-        self.current_ts_ns = timestamp_ns as i64;
+        self.current_ts_ns = timestamp_ns;
         self.step += 1;
 
         Ok(())
@@ -75,7 +75,7 @@ impl MarketState {
 
     /// Get the last observed timestamp in nanoseconts
     #[inline]
-    pub fn current_timestamp_ns(&self) -> i64 {
+    pub fn current_timestamp_ns(&self) -> TimestampNs {
         self.current_ts_ns
     }
 

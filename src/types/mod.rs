@@ -18,3 +18,6 @@ pub use side::Side;
 
 /// Natural Logarithmic Returns newtype wrapping a borrowed slice of generic floats.
 pub struct LnReturns<'a, T: num_traits::Float>(pub &'a [T]);
+
+/// The type of a timestamp that is measured in nanoseconds.
+pub type TimestampNs = i64;

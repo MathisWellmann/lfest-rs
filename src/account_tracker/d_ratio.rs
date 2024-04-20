@@ -18,7 +18,7 @@ pub fn d_ratio<'a, M>(
     returns_account: LnReturns<'a, f64>,
     returns_bnh: LnReturns<'a, f64>,
     wallet_balance_start: M,
-    num_trading_days: u64,
+    num_trading_days: i64,
 ) -> Result<f64>
 where
     M: Currency + MarginCurrency + Send,

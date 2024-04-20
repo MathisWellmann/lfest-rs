@@ -8,12 +8,12 @@ use crate::{
     cornish_fisher::cornish_fisher_value_at_risk,
     prelude::{Account, MarketState},
     quote,
-    types::{Currency, LnReturns, MarginCurrency, QuoteCurrency, Side},
+    types::{Currency, LnReturns, MarginCurrency, QuoteCurrency, Side, TimestampNs},
     utils::{decimal_pow, decimal_sqrt, decimal_sum, decimal_to_f64, min, variance},
 };
 
-const DAILY_NS: u64 = 86_400_000_000_000;
-const HOURLY_NS: u64 = 3_600_000_000_000;
+const DAILY_NS: TimestampNs = 86_400_000_000_000;
+const HOURLY_NS: TimestampNs = 3_600_000_000_000;
 
 /// Defines the possible sources of returns to use
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -29,10 +29,10 @@ pub enum ReturnsSource {
 /// if using tick-by-tick data due to the storage of many returns
 #[derive(Debug, Clone)]
 pub struct FullAccountTracker<M> {
-    wallet_balance_last: M,  // last wallet balance recording
-    wallet_balance_start: M, // wallet balance at start
-    wallet_balance_high: M,  // maximum wallet balance observed
-    high_water_mark_ts: i64, // Timestamp of the maximum wallet balance
+    wallet_balance_last: M,          // last wallet balance recording
+    wallet_balance_start: M,         // wallet balance at start
+    wallet_balance_high: M,          // maximum wallet balance observed
+    high_water_mark_ts: TimestampNs, // Timestamp of the maximum wallet balance
     total_rpnl: M,
     upnl: M,
     num_trades: i64,
@@ -61,8 +61,8 @@ pub struct FullAccountTracker<M> {
     hist_ln_returns_hourly_acc: Vec<f64>,
     hist_ln_returns_hourly_bnh: Vec<f64>,
     // timestamps for when to trigger the next pnl snapshots
-    next_daily_trigger_ts: u64,
-    next_hourly_trigger_ts: u64,
+    next_daily_trigger_ts: i64,
+    next_hourly_trigger_ts: i64,
     last_daily_pnl: M,
     last_hourly_pnl: M,
     last_tick_pnl: M,
@@ -74,8 +74,8 @@ pub struct FullAccountTracker<M> {
     price_a_day_ago: QuoteCurrency,
     price_an_hour_ago: QuoteCurrency,
     price_a_tick_ago: QuoteCurrency,
-    ts_first: u64,
-    ts_last: u64,
+    ts_first: TimestampNs,
+    ts_last: TimestampNs,
 }
 
 /// TODO: create its own `risk` crate out of these implementations for better
@@ -400,7 +400,7 @@ where
 
     /// Return the number of trading days
     #[inline(always)]
-    pub fn num_trading_days(&self) -> u64 {
+    pub fn num_trading_days(&self) -> i64 {
         (self.ts_last - self.ts_first) / DAILY_NS
     }
 
@@ -542,7 +542,12 @@ impl<M> AccountTracker<M> for FullAccountTracker<M>
 where
     M: Currency + MarginCurrency + Send,
 {
-    fn update(&mut self, timestamp_ns: u64, market_state: &MarketState, account: &Account<M>) {
+    fn update(
+        &mut self,
+        timestamp_ns: TimestampNs,
+        market_state: &MarketState,
+        account: &Account<M>,
+    ) {
         let price = market_state.mid_price();
         if price == quote!(0) {
             trace!("Price is 0, not updating the `FullAccountTracker`");
@@ -638,8 +643,7 @@ where
         }
 
         // update max drawdown duration
-        self.max_drawdown_duration_hours =
-            (timestamp_ns as i64 - self.high_water_mark_ts) / HOURLY_NS as i64;
+        self.max_drawdown_duration_hours = (timestamp_ns - self.high_water_mark_ts) / HOURLY_NS;
     }
 
     fn log_rpnl(&mut self, net_rpnl: M, ts_ns: i64) {

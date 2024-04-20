@@ -45,7 +45,7 @@ fn main() {
         let spread: Decimal = Decimal::ONE / Decimal::from(10);
         let exec_orders = exchange
             .update_state(
-                i as u64,
+                i as i64,
                 MarketUpdate::Bba {
                     bid: QuoteCurrency::new(price_decimal),
                     ask: QuoteCurrency::new(price_decimal + spread),
