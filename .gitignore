@@ -2,5 +2,4 @@
 /vendor
 /.direnv
 .idea
-Cargo.lock
 .nvimlog
