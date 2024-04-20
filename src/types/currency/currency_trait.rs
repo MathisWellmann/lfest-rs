@@ -39,6 +39,7 @@ pub trait Currency:
     type PairedCurrency: Currency<PairedCurrency = Self>;
 
     /// Create a new instance from a `Rational` value
+    /// TODO: change return type to be `Result<Self>`, beacuse inputting a `Decimal` that it LTE zero could happen.
     #[must_use]
     fn new(val: Decimal) -> Self;
 

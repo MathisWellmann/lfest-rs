@@ -1,11 +1,12 @@
 use fpdec::Decimal;
+use getset::{CopyGetters, Getters};
 
 use crate::{
     quote,
     types::{Currency, Leverage, MarginCurrency, QuoteCurrency},
 };
 
-#[derive(Debug, Clone, Default, Eq, PartialEq)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Getters, CopyGetters)]
 /// Describes the position information of the account.
 /// It assumes isolated margining mechanism, because the margin is directly associated with the position.
 pub struct Position<M>
@@ -15,12 +16,19 @@ where
     /// The number of futures contracts making up the position.
     /// Denoted in the currency in which the size is valued.
     /// e.g.: XBTUSD has a contract size of 1 USD, so `M::PairedCurrency` is USD.
+    #[getset(get_copy = "pub")]
     pub(crate) size: M::PairedCurrency,
+
     /// The entry price of the position
+    #[getset(get_copy = "pub")]
     pub(crate) entry_price: QuoteCurrency,
+
     /// The position margin of account, same denotation as wallet_balance
+    #[getset(get_copy = "pub")]
     pub(crate) position_margin: M,
+
     /// The position leverage,
+    #[getset(get_copy = "pub")]
     pub(crate) leverage: Leverage,
 }
 
@@ -33,30 +41,6 @@ where
             leverage,
             ..Default::default()
         }
-    }
-
-    /// Return the position size
-    #[inline(always)]
-    pub fn size(&self) -> M::PairedCurrency {
-        self.size
-    }
-
-    /// Return the entry price of the position
-    #[inline(always)]
-    pub fn entry_price(&self) -> QuoteCurrency {
-        self.entry_price
-    }
-
-    /// Return the collateral backing this position
-    #[inline(always)]
-    pub fn position_margin(&self) -> M {
-        self.position_margin
-    }
-
-    /// Return the set leverage of the position
-    #[inline(always)]
-    pub fn leverage(&self) -> Leverage {
-        self.leverage
     }
 
     /// Returns the implied leverage of the position based on the position value and the collateral backing it.

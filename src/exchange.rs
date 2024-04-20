@@ -1,3 +1,5 @@
+use getset::Getters;
+
 use crate::{
     account::Account,
     account_tracker::AccountTracker,
@@ -13,19 +15,33 @@ use crate::{
 
 pub(crate) const EXPECT_LIMIT_PRICE: &str = "A limit price must be present for a limit order; qed";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Getters)]
 /// The main leveraged futures exchange for simulated trading
 pub struct Exchange<A, S>
 where
     S: Currency,
     S::PairedCurrency: MarginCurrency,
 {
+    /// The exchange configuration.
+    #[getset(get = "pub")]
     config: Config<S::PairedCurrency>,
+
+    /// The current state of the simulated market.
+    #[getset(get = "pub")]
     market_state: MarketState,
+
+    /// The main user account.
+    #[getset(get = "pub", get_mut = "mut")]
     account: Account<S::PairedCurrency>,
+
+    /// A performance tracker for the user account.
+    #[getset(get = "pub")]
     account_tracker: A,
+
     risk_engine: IsolatedMarginRiskEngine<S::PairedCurrency>,
+
     clearing_house: ClearingHouse<A, S::PairedCurrency>,
+
     next_order_id: u64,
 }
 
@@ -58,36 +74,6 @@ where
             account_tracker,
             next_order_id: 0,
         }
-    }
-
-    /// Return a reference to current exchange config
-    #[inline(always)]
-    pub fn config(&self) -> &Config<S::PairedCurrency> {
-        &self.config
-    }
-
-    /// Return a reference to Account
-    #[inline(always)]
-    pub fn account(&self) -> &Account<S::PairedCurrency> {
-        &self.account
-    }
-
-    /// Return a mutable reference to Account
-    #[inline(always)]
-    pub fn account_mut(&mut self) -> &mut Account<S::PairedCurrency> {
-        &mut self.account
-    }
-
-    /// Return a reference to the `AccountTracker` for performance statistics.
-    #[inline(always)]
-    pub fn account_tracker(&self) -> &A {
-        &self.account_tracker
-    }
-
-    /// Return a reference to the currency `MarketState`
-    #[inline(always)]
-    pub fn market_state(&self) -> &MarketState {
-        &self.market_state
     }
 
     /// Update the exchange state with new information
@@ -241,12 +227,12 @@ where
             OrderType::Limit { side, limit_price } => {
                 match side {
                     Side::Buy => {
-                        if limit_price >= self.market_state.ask() {
+                        if *limit_price >= self.market_state.ask() {
                             return Err(Error::OrderError(OrderError::LimitPriceAboveAsk));
                         }
                     }
                     Side::Sell => {
-                        if limit_price <= self.market_state.bid() {
+                        if *limit_price <= self.market_state.bid() {
                             return Err(Error::OrderError(OrderError::LimitPriceBelowBid));
                         }
                     }
