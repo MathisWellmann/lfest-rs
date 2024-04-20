@@ -9,7 +9,10 @@ use crate::{
 /// Compute the current order margin requirement.
 pub(crate) fn compute_order_margin<M, UserOrderId>(
     position: &Position<M>,
-    active_limit_orders: &HashMap<u64, LimitOrder<M::PairedCurrency, UserOrderId, Pending>>,
+    active_limit_orders: &HashMap<
+        u64,
+        LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
+    >,
     fee: Fee,
 ) -> M
 where
@@ -45,7 +48,7 @@ where
     let mut buy_margin_req = M::new_zero();
     let mut remaining_short_size = min(position.size(), M::PairedCurrency::new_zero()).abs();
     for b in &buys {
-        let mut order_qty = b.quantity().total();
+        let mut order_qty = b.quantity();
         if remaining_short_size > M::PairedCurrency::new_zero() {
             // offset the order qty by as much as possible
             let offset = max(order_qty, remaining_short_size);
@@ -61,7 +64,7 @@ where
     let mut sell_margin_req = M::new_zero();
     let mut remaining_long_size = max(position.size(), M::PairedCurrency::new_zero());
     for s in &sells {
-        let mut order_qty = s.quantity().total();
+        let mut order_qty = s.quantity();
         if remaining_long_size > M::PairedCurrency::new_zero() {
             // offset the order qty by as much as possible
             let offset = max(order_qty, remaining_long_size);

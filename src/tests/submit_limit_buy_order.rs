@@ -25,14 +25,15 @@ fn submit_limit_buy_order_no_position() {
 
     // Now fill the order
     let meta = ExchangeOrderMeta::new(0, 0);
-    let order = order.into_pending(meta);
+    let mut order = order.into_pending(meta);
     let limit_price = order.limit_price();
-    let order = order.into_filled(limit_price, 0);
+    order.fill(limit_price, order.quantity());
+    let expected_order_update = LimitOrderUpdate::FullyFilled(order.into_filled(limit_price, 0));
     assert_eq!(
         exchange
-            .update_state(0, trade!(quote!(98), base!(1), Side::Sell))
+            .update_state(0, trade!(quote!(98), base!(5), Side::Sell))
             .unwrap(),
-        vec![order]
+        vec![expected_order_update]
     );
     exchange
         .update_state(0, bba!(quote!(96), quote!(99)))
@@ -62,17 +63,18 @@ fn submit_limit_buy_order_no_position() {
     );
 
     let meta = ExchangeOrderMeta::new(1, 0);
-    let order = order.into_pending(meta);
+    let mut order = order.into_pending(meta);
     let limit_price = order.limit_price();
-    let order = order.into_filled(limit_price, 0);
+    order.fill(limit_price, order.quantity());
+    let expected_order_update = LimitOrderUpdate::FullyFilled(order.into_filled(limit_price, 0));
     exchange
         .update_state(0, bba!(quote!(96), quote!(98)))
         .unwrap();
     assert_eq!(
         exchange
-            .update_state(0, trade!(quote!(98), base!(1), Side::Buy))
+            .update_state(0, trade!(quote!(98), base!(5), Side::Buy))
             .unwrap(),
-        vec![order]
+        vec![expected_order_update]
     );
     assert_eq!(
         exchange.account().position,
@@ -163,14 +165,15 @@ fn submit_limit_buy_order_with_long() {
     exchange.submit_limit_order(order.clone()).unwrap();
 
     let meta = ExchangeOrderMeta::new(2, 0);
-    let order = order.into_pending(meta);
+    let mut order = order.into_pending(meta);
     let limit_price = order.limit_price();
-    let order = order.into_filled(limit_price, 0);
+    order.fill(limit_price, order.quantity());
+    let expected_order_update = LimitOrderUpdate::FullyFilled(order.into_filled(limit_price, 0));
     assert_eq!(
         exchange
-            .update_state(0, trade!(quote!(101), base!(1), Side::Buy))
+            .update_state(0, trade!(quote!(101), base!(9), Side::Buy))
             .unwrap(),
-        vec![order]
+        vec![expected_order_update]
     );
 
     assert_eq!(
@@ -218,14 +221,15 @@ fn submit_limit_buy_order_with_short() {
     exchange.submit_limit_order(order.clone()).unwrap();
 
     let meta = ExchangeOrderMeta::new(2, 0);
-    let order = order.into_pending(meta);
+    let mut order = order.into_pending(meta);
     let limit_price = order.limit_price();
-    let order = order.into_filled(limit_price, 0);
+    order.fill(limit_price, order.quantity());
+    let expected_order_update = LimitOrderUpdate::FullyFilled(order.into_filled(limit_price, 0));
     assert_eq!(
         exchange
-            .update_state(0, trade!(quote!(100), base!(1), Side::Sell))
+            .update_state(0, trade!(quote!(100), base!(9), Side::Sell))
             .unwrap(),
-        vec![order]
+        vec![expected_order_update]
     );
 
     assert_eq!(

@@ -1,7 +1,7 @@
 use getset::{CopyGetters, Getters};
 
 use super::{
-    order_meta::ExchangeOrderMeta, order_status::NewOrder, Filled, MarginCurrency, OrderQuantity,
+    order_meta::ExchangeOrderMeta, order_status::NewOrder, Filled, FilledQuantity, MarginCurrency,
     Pending, TimestampNs,
 };
 use crate::types::{Currency, OrderError, QuoteCurrency, Side};
@@ -30,8 +30,8 @@ where
     limit_price: QuoteCurrency,
 
     /// The amount of Currency `S` the order is for and fill information.
-    #[getset(get = "pub")]
-    quantity: OrderQuantity<Q>,
+    #[getset(get_copy = "pub")]
+    quantity: Q,
 
     /// Depending on the status, different information is available.
     #[getset(get = "pub")]
@@ -63,7 +63,7 @@ where
             user_order_id: (),
             state: NewOrder,
             limit_price,
-            quantity: OrderQuantity::new_unfilled(quantity),
+            quantity,
             side,
         })
     }
@@ -101,7 +101,7 @@ where
             user_order_id,
             state: NewOrder,
             limit_price,
-            quantity: OrderQuantity::new_unfilled(quantity),
+            quantity,
             side,
         })
     }
@@ -110,7 +110,7 @@ where
     pub(crate) fn into_pending(
         self,
         meta: ExchangeOrderMeta,
-    ) -> LimitOrder<Q, UserOrderId, Pending> {
+    ) -> LimitOrder<Q, UserOrderId, Pending<Q>> {
         LimitOrder {
             user_order_id: self.user_order_id,
             side: self.side,
@@ -121,7 +121,7 @@ where
     }
 }
 
-impl<Q, UserOrderId> LimitOrder<Q, UserOrderId, Pending>
+impl<Q, UserOrderId> LimitOrder<Q, UserOrderId, Pending<Q>>
 where
     Q: Currency,
     Q::PairedCurrency: MarginCurrency,
@@ -133,15 +133,69 @@ where
         fill_price: QuoteCurrency,
         ts_ns_executed: TimestampNs,
     ) -> LimitOrder<Q, UserOrderId, Filled> {
-        let mut quantity = self.quantity;
-        quantity.fill(fill_price);
+        debug_assert!(match self.state.filled_quantity {
+            FilledQuantity::Unfilled => false,
+            FilledQuantity::Filled{cumulative_qty, avg_price: _} => cumulative_qty == self.quantity
+        }, "The `FilledQuantity` must be have the entire outstanding quantity filled. Call `fill` first.");
 
         LimitOrder {
             user_order_id: self.user_order_id,
-            state: Filled::new(self.state.meta().clone(), ts_ns_executed),
+            state: Filled::new(self.state.meta().clone(), ts_ns_executed, fill_price),
             limit_price: self.limit_price,
-            quantity,
+            quantity: self.quantity,
             side: self.side,
+        }
+    }
+
+    /// Used when an order get some `quantity` filled at a `price`.
+    ///
+    /// # Returns:
+    /// `true` if order quantity is fully filled.
+    pub(crate) fn fill(&mut self, price: QuoteCurrency, quantity: Q) -> bool {
+        debug_assert!(
+            quantity <= self.quantity,
+            "The filled quantity can not be greater than the limit order quantity"
+        );
+        debug_assert!(
+            quantity > Q::new_zero(),
+            "Filled `quantity` must be greater than zero."
+        );
+
+        match &mut self.state.filled_quantity {
+            FilledQuantity::Unfilled => {
+                self.state.filled_quantity = FilledQuantity::Filled {
+                    cumulative_qty: quantity,
+                    avg_price: price,
+                };
+                quantity == self.quantity
+            }
+            FilledQuantity::Filled {
+                cumulative_qty,
+                avg_price,
+            } => {
+                debug_assert!(quantity <= (self.quantity - *cumulative_qty), "The filled quantity can not be greater than the outstanding limit order quantity.");
+
+                let new_qty = *cumulative_qty + quantity;
+                *avg_price = QuoteCurrency::new(
+                    ((cumulative_qty.inner() * avg_price.inner())
+                        + (price.inner() * quantity.inner()))
+                        / new_qty.inner(),
+                );
+                *cumulative_qty = new_qty;
+
+                *cumulative_qty == self.quantity
+            }
+        }
+    }
+
+    /// Return the unfilled quantity.
+    pub(crate) fn unfilled_quantity(&self) -> Q {
+        match self.state.filled_quantity {
+            FilledQuantity::Unfilled => self.quantity,
+            FilledQuantity::Filled {
+                cumulative_qty,
+                avg_price: _,
+            } => self.quantity - cumulative_qty,
         }
     }
 }

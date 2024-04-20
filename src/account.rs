@@ -29,7 +29,7 @@ where
     /// Maps the order `id` to the actual `Order`.
     #[getset(get = "pub")]
     pub(crate) active_limit_orders:
-        HashMap<u64, LimitOrder<M::PairedCurrency, UserOrderId, Pending>>,
+        HashMap<OrderId, LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>>,
 
     // Maps the `user_order_id` to the internal order nonce.
     pub(crate) lookup_order_nonce_from_user_order_id: HashMap<UserOrderId, OrderId>,
@@ -111,7 +111,7 @@ where
         &mut self,
         user_order_id: UserOrderId,
         account_tracker: &mut A,
-    ) -> Result<LimitOrder<M::PairedCurrency, UserOrderId, Pending>>
+    ) -> Result<LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>>
     where
         A: AccountTracker<M>,
     {
@@ -132,7 +132,7 @@ where
     /// Append a new limit order as active order
     pub(crate) fn append_limit_order(
         &mut self,
-        order: LimitOrder<M::PairedCurrency, UserOrderId, Pending>,
+        order: LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
     ) {
         debug!("append_limit_order: order: {:?}", order);
 
@@ -160,7 +160,7 @@ where
         &mut self,
         order_id: OrderId,
         account_tracker: &mut A,
-    ) -> Result<LimitOrder<M::PairedCurrency, UserOrderId, Pending>>
+    ) -> Result<LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>>
     where
         A: AccountTracker<M>,
     {
