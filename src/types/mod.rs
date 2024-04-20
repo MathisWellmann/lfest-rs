@@ -6,8 +6,8 @@ mod limit_order;
 mod market_order;
 mod market_update;
 mod order_meta;
-mod order_quantity;
 mod order_status;
+mod order_update;
 mod side;
 
 pub use currency::{BaseCurrency, Currency, MarginCurrency, QuoteCurrency};
@@ -18,8 +18,8 @@ pub use limit_order::LimitOrder;
 pub use market_order::MarketOrder;
 pub use market_update::MarketUpdate;
 pub use order_meta::ExchangeOrderMeta;
-pub use order_quantity::*;
-pub use order_status::{Filled, NewOrder, Pending};
+pub use order_status::{Filled, FilledQuantity, NewOrder, Pending};
+pub use order_update::LimitOrderUpdate;
 pub use side::Side;
 
 /// Natural Logarithmic Returns newtype wrapping a borrowed slice of generic floats.

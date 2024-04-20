@@ -37,7 +37,7 @@ where
     fn check_market_order(
         &self,
         account: &Account<M, UserOrderId>,
-        order: &MarketOrder<M::PairedCurrency, UserOrderId, Pending>,
+        order: &MarketOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
         fill_price: QuoteCurrency,
     ) -> Result<(), RiskError>;
 
@@ -45,7 +45,7 @@ where
     fn check_limit_order(
         &self,
         account: &Account<M, UserOrderId>,
-        order: &LimitOrder<M::PairedCurrency, UserOrderId, Pending>,
+        order: &LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
     ) -> Result<(), RiskError>;
 
     /// Ensure the account has enough maintenance margin, to keep the position open.

@@ -2,7 +2,7 @@ use getset::{CopyGetters, Getters};
 
 use super::{
     order_status::NewOrder, Currency, ExchangeOrderMeta, Filled, MarginCurrency, OrderError,
-    OrderQuantity, Pending, QuoteCurrency, Side, TimestampNs,
+    Pending, QuoteCurrency, Side, TimestampNs,
 };
 
 /// Defines an market order aka taker order.
@@ -24,8 +24,8 @@ where
     side: Side,
 
     /// The amount of currency `S` the order is for and fill information.
-    #[getset(get = "pub")]
-    quantity: OrderQuantity<Q>,
+    #[getset(get_copy = "pub")]
+    quantity: Q,
 
     /// Depending on the status, different information is available.
     #[getset(get = "pub")]
@@ -53,7 +53,7 @@ where
             user_order_id: (),
             state: NewOrder,
             side,
-            quantity: OrderQuantity::new_unfilled(quantity),
+            quantity,
         })
     }
 }
@@ -83,7 +83,7 @@ where
         Ok(Self {
             user_order_id,
             state: NewOrder,
-            quantity: OrderQuantity::new_unfilled(quantity),
+            quantity,
             side,
         })
     }
@@ -92,7 +92,7 @@ where
     pub(crate) fn into_pending(
         self,
         meta: ExchangeOrderMeta,
-    ) -> MarketOrder<Q, UserOrderId, Pending> {
+    ) -> MarketOrder<Q, UserOrderId, Pending<Q>> {
         MarketOrder {
             user_order_id: self.user_order_id,
             side: self.side,
@@ -102,7 +102,7 @@ where
     }
 }
 
-impl<Q, UserOrderId> MarketOrder<Q, UserOrderId, Pending>
+impl<Q, UserOrderId> MarketOrder<Q, UserOrderId, Pending<Q>>
 where
     Q: Currency,
     Q::PairedCurrency: MarginCurrency,
@@ -114,13 +114,10 @@ where
         fill_price: QuoteCurrency,
         ts_ns_executed: TimestampNs,
     ) -> MarketOrder<Q, UserOrderId, Filled> {
-        let mut quantity = self.quantity;
-        quantity.fill(fill_price);
-
         MarketOrder {
             user_order_id: self.user_order_id,
-            state: Filled::new(self.state.meta().clone(), ts_ns_executed),
-            quantity,
+            state: Filled::new(self.state.meta().clone(), ts_ns_executed, fill_price),
+            quantity: self.quantity,
             side: self.side,
         }
     }

@@ -71,25 +71,23 @@ mod tests {
         };
 
         let order = MarketOrder::new(Side::Buy, quote!(50)).unwrap();
-        filter
-            .validate_order_quantity(order.quantity().total())
-            .unwrap();
+        filter.validate_order_quantity(order.quantity()).unwrap();
 
         let order = MarketOrder::new(Side::Buy, quote!(5)).unwrap();
         assert_eq!(
-            filter.validate_order_quantity(order.quantity().total()),
+            filter.validate_order_quantity(order.quantity()),
             Err(OrderError::QuantityTooLow)
         );
 
         let order = MarketOrder::new(Side::Buy, quote!(5000)).unwrap();
         assert_eq!(
-            filter.validate_order_quantity(order.quantity().total()),
+            filter.validate_order_quantity(order.quantity()),
             Err(OrderError::QuantityTooHigh)
         );
 
         let order = MarketOrder::new(Side::Buy, quote!(50.5)).unwrap();
         assert_eq!(
-            filter.validate_order_quantity(order.quantity().total()),
+            filter.validate_order_quantity(order.quantity()),
             Err(OrderError::InvalidQuantityStepSize)
         );
     }
