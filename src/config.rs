@@ -1,9 +1,11 @@
+use getset::{CopyGetters, Getters};
+
 use crate::{
     contract_specification::ContractSpecification,
     types::{Currency, Error, Leverage, Result},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Getters, CopyGetters)]
 /// Define the Exchange configuration
 pub struct Config<M>
 where
@@ -15,11 +17,19 @@ where
     /// then its a linear futures contract.
     /// If `BaseCurrency` is used as the margin currency,
     /// then its an inverse futures contract.
+    #[getset(get_copy = "pub")]
     starting_balance: M,
+
     /// The maximum number of open orders the user can have at any given time
+    #[getset(get_copy = "pub")]
     max_num_open_orders: usize,
+
+    /// The leverage initially set by the user.
+    #[getset(get_copy = "pub")]
     initial_leverage: Leverage,
+
     /// The contract specification.
+    #[getset(get = "pub")]
     contract_specification: ContractSpecification<M::PairedCurrency>,
 }
 
@@ -61,29 +71,5 @@ where
             initial_leverage,
             contract_specification,
         })
-    }
-
-    /// Return the starting wallet balance of this Config
-    #[inline(always)]
-    pub fn starting_balance(&self) -> M {
-        self.starting_balance
-    }
-
-    /// Returns the maximum number of open orders that are allowed
-    #[inline(always)]
-    pub fn max_num_open_orders(&self) -> usize {
-        self.max_num_open_orders
-    }
-
-    /// Return a reference to the `ContractSpecification`
-    #[inline(always)]
-    pub fn contract_specification(&self) -> &ContractSpecification<M::PairedCurrency> {
-        &self.contract_specification
-    }
-
-    /// Return the configured initial leverage
-    #[inline(always)]
-    pub fn initial_leverage(&self) -> Leverage {
-        self.initial_leverage
     }
 }

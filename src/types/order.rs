@@ -1,21 +1,36 @@
+use getset::{CopyGetters, Getters};
+
 use crate::types::{Currency, OrderError, OrderType, QuoteCurrency, Side};
 
 /// Defines an order
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Order<S> {
+#[derive(Debug, Clone, PartialEq, Eq, Getters, CopyGetters)]
+pub struct Order<S: Currency> {
     /// id will be filled in using exchange.submit_order()
+    #[getset(get_copy = "pub")]
     id: u64,
+
     /// Order Id provided by user
+    #[getset(get_copy = "pub")]
     user_order_id: Option<u64>,
     /// timestamp will be filled in using exchange.submit_order()
+
+    #[getset(get_copy = "pub")]
     timestamp: i64,
+
     /// order type
+    #[getset(get = "pub")]
     order_type: OrderType,
+
     /// the limit order price
+    #[getset(get_copy = "pub")]
     limit_price: Option<QuoteCurrency>,
+
     /// The amount of Currency `S` the order is for
+    #[getset(get_copy = "pub")]
     quantity: S,
+
     /// whether or not the order has been executed
+    #[getset(get_copy = "pub")]
     pub(crate) filled: Filled,
 }
 
@@ -87,48 +102,6 @@ where
         })
     }
 
-    /// Id of Order
-    #[inline]
-    pub fn id(&self) -> u64 {
-        self.id
-    }
-
-    /// User id of Order
-    #[inline]
-    pub fn user_order_id(&self) -> &Option<u64> {
-        &self.user_order_id
-    }
-
-    /// Set the user id of Order
-    #[inline]
-    pub fn set_user_order_id(&mut self, id: u64) {
-        self.user_order_id = Some(id)
-    }
-
-    /// Timestamp of Order
-    #[inline]
-    pub fn timestamp(&self) -> i64 {
-        self.timestamp
-    }
-
-    /// OrderType of Order
-    #[inline]
-    pub fn order_type(&self) -> OrderType {
-        self.order_type
-    }
-
-    /// limit price of Order
-    #[inline]
-    pub fn limit_price(&self) -> Option<QuoteCurrency> {
-        self.limit_price
-    }
-
-    /// Quantity of Order
-    #[inline]
-    pub fn quantity(&self) -> S {
-        self.quantity
-    }
-
     /// Side of Order
     #[inline]
     pub fn side(&self) -> Side {
@@ -139,12 +112,6 @@ where
                 limit_price: _,
             } => side,
         }
-    }
-
-    /// Fill status of the `Order`
-    #[inline]
-    pub fn filled(&self) -> Filled {
-        self.filled
     }
 
     /// Marks the order as filled at the `fill_price`

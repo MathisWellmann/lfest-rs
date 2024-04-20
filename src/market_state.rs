@@ -1,4 +1,5 @@
 use fpdec::Decimal;
+use getset::{CopyGetters, Getters};
 
 use crate::{
     prelude::PriceFilter,
@@ -7,18 +8,26 @@ use crate::{
 };
 
 /// Some information regarding the state of the market.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Getters, CopyGetters)]
 pub struct MarketState {
     /// Used to validate states
     // TODO: remove here and pass through were needed
     price_filter: PriceFilter,
+
     /// The current bid
+    #[getset(get_copy = "pub")]
     bid: QuoteCurrency,
+
     /// The current ask
+    #[getset(get_copy = "pub")]
     ask: QuoteCurrency,
+
     /// The current timestamp in nanoseconds
+    #[getset(get_copy = "pub")]
     current_ts_ns: TimestampNs,
-    /// Used for synchronizing orders
+
+    /// Used for synchronizing orders.
+    #[getset(get_copy = "pub")]
     step: u64,
 }
 
@@ -77,18 +86,6 @@ impl MarketState {
     #[inline]
     pub fn current_timestamp_ns(&self) -> TimestampNs {
         self.current_ts_ns
-    }
-
-    /// Get the last observed bid price.
-    #[inline]
-    pub fn bid(&self) -> QuoteCurrency {
-        self.bid
-    }
-
-    /// Get the last observed ask price.
-    #[inline]
-    pub fn ask(&self) -> QuoteCurrency {
-        self.ask
     }
 
     #[cfg(test)]

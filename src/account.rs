@@ -1,3 +1,4 @@
+use getset::{CopyGetters, Getters};
 use hashbrown::HashMap;
 
 use crate::{
@@ -7,22 +8,34 @@ use crate::{
     types::{Currency, Error, Fee, Leverage, MarginCurrency, Order, OrderType, Result},
 };
 
-#[derive(Debug, Clone)]
 /// The users account
 /// Generic over:
 /// S: The `Currency` representing the order quantity
+#[derive(Debug, Clone, Getters, CopyGetters)]
 pub struct Account<M>
 where
     M: Currency + MarginCurrency,
 {
     /// The wallet balance of the user denoted in the margin currency.
-    pub wallet_balance: M,
+    /// TODO: I don't really want this to be mutably accessible publically, but for now thats how we roll.
+    #[getset(get_copy = "pub", get_mut = "pub")]
+    pub(crate) wallet_balance: M,
+
+    /// The current account `Position`.
+    #[getset(get = "pub")]
     pub(crate) position: Position<M>,
-    // Maps the order `id` to the actual `Order`.
+
+    /// Maps the order `id` to the actual `Order`.
+    #[getset(get = "pub")]
     pub(crate) active_limit_orders: HashMap<u64, Order<M::PairedCurrency>>,
-    // Maps the `user_order_id` to the internal order nonce
+
+    /// Maps the `user_order_id` to the internal order nonce
     pub(crate) lookup_order_nonce_from_user_order_id: HashMap<u64, u64>,
+
     maker_fee: Fee,
+
+    /// The current order margin used by the user `Account`.
+    #[getset(get_copy = "pub")]
     order_margin: M,
 }
 
@@ -60,30 +73,6 @@ where
             maker_fee,
             order_margin: M::new_zero(),
         }
-    }
-
-    /// Return a reference to the accounts position.
-    #[inline(always)]
-    pub fn position(&self) -> &Position<M> {
-        &self.position
-    }
-
-    /// Return the current wallet balance of the account.
-    #[inline(always)]
-    pub fn wallet_balance(&self) -> M {
-        self.wallet_balance
-    }
-
-    /// Return the current order margin
-    #[inline(always)]
-    pub fn order_margin(&self) -> M {
-        self.order_margin
-    }
-
-    /// Return a reference to the currently active limit orders of the account
-    #[inline(always)]
-    pub fn active_limit_orders(&self) -> &HashMap<u64, Order<M::PairedCurrency>> {
-        &self.active_limit_orders
     }
 
     /// Return the available balance of the `Account`
@@ -138,7 +127,7 @@ where
 
         // self.account_tracker.log_limit_order_submission();
         let order_id = order.id();
-        let user_order_id = *order.user_order_id();
+        let user_order_id = order.user_order_id();
         match self.active_limit_orders.insert(order_id, order) {
             None => {}
             Some(_) => {
@@ -193,7 +182,7 @@ where
             compute_order_margin(&self.position, &self.active_limit_orders, self.maker_fee);
         if let Some(user_order_id) = order.user_order_id() {
             self.lookup_order_nonce_from_user_order_id
-                .remove(user_order_id);
+                .remove(&user_order_id);
         }
     }
 }
