@@ -17,19 +17,20 @@ use crate::{
 /// house. If there has been a gain on the transactions, the account receives
 /// variation margin from the clearing house.
 #[derive(Debug, Clone)]
-pub struct ClearingHouse<A, M> {
-    _margin_curr: std::marker::PhantomData<(A, M)>,
+pub struct ClearingHouse<A, M, UserOrderId> {
+    _phanton: std::marker::PhantomData<(A, M, UserOrderId)>,
 }
 
-impl<A, M> ClearingHouse<A, M>
+impl<A, M, UserOrderId> ClearingHouse<A, M, UserOrderId>
 where
     A: AccountTracker<M>,
     M: Currency + MarginCurrency,
+    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
-    /// Create a new instance with a user account
+    /// Create a new instance.
     pub(crate) fn new() -> Self {
         Self {
-            _margin_curr: Default::default(),
+            _phanton: Default::default(),
         }
     }
 
@@ -56,7 +57,7 @@ where
     ///
     pub(crate) fn settle_filled_order(
         &mut self,
-        account: &mut Account<M>,
+        account: &mut Account<M, UserOrderId>,
         account_tracker: &mut A,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
@@ -86,7 +87,7 @@ where
 
     fn settle_buy_order(
         &mut self,
-        account: &mut Account<M>,
+        account: &mut Account<M, UserOrderId>,
         account_tracker: &mut A,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
@@ -125,7 +126,7 @@ where
 
     fn settle_sell_order(
         &mut self,
-        account: &mut Account<M>,
+        account: &mut Account<M, UserOrderId>,
         account_tracker: &mut A,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,

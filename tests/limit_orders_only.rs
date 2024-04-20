@@ -19,8 +19,8 @@ fn limit_orders_only() {
         .unwrap();
     assert_eq!(exec_orders.len(), 0);
 
-    let o = Order::limit(Side::Buy, quote!(100), base!(9.9)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = LimitOrder::new(Side::Buy, quote!(100), base!(9.9)).unwrap();
+    exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.account().order_margin(), quote!(990.198));
     assert_eq!(exchange.account().available_balance(), quote!(9.802));
 
@@ -48,8 +48,8 @@ fn limit_orders_only() {
     assert_eq!(exchange.account().order_margin(), quote!(0.0));
     assert_eq!(exchange.account().available_balance(), quote!(9.802));
 
-    let o = Order::limit(Side::Sell, quote!(105), base!(9.9)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = LimitOrder::new(Side::Sell, quote!(105), base!(9.9)).unwrap();
+    exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.account().order_margin(), quote!(0));
 
     let exec_orders = exchange
@@ -90,11 +90,11 @@ fn limit_orders_2() {
         .unwrap();
     assert!(exec_orders.is_empty());
 
-    let o = Order::limit(Side::Sell, quote!(101), base!(0.75)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = LimitOrder::new(Side::Sell, quote!(101), base!(0.75)).unwrap();
+    exchange.submit_limit_order(o).unwrap();
 
-    let o = Order::limit(Side::Buy, quote!(100), base!(0.5)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = LimitOrder::new(Side::Buy, quote!(100), base!(0.5)).unwrap();
+    exchange.submit_limit_order(o).unwrap();
 
     let exec_orders = exchange
         .update_state(1, trade!(quote!(98), base!(2), Side::Sell))

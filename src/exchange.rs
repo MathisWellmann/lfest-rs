@@ -8,23 +8,22 @@ use crate::{
     market_state::MarketState,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     types::{
-        Currency, Error, MarginCurrency, MarketUpdate, Order, OrderError, OrderType, Result, Side,
-        TimestampNs,
+        Currency, Error, ExchangeOrderMeta, Filled, LimitOrder, MarginCurrency, MarketOrder,
+        MarketUpdate, NewOrder, OrderError, OrderId, Pending, Result, Side, TimestampNs,
     },
 };
 
-pub(crate) const EXPECT_LIMIT_PRICE: &str = "A limit price must be present for a limit order; qed";
-
-#[derive(Debug, Clone, Getters)]
 /// The main leveraged futures exchange for simulated trading
-pub struct Exchange<A, S>
+#[derive(Debug, Clone, Getters)]
+pub struct Exchange<A, Q, UserOrderId>
 where
-    S: Currency,
-    S::PairedCurrency: MarginCurrency,
+    Q: Currency,
+    Q::PairedCurrency: MarginCurrency,
+    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
     /// The exchange configuration.
     #[getset(get = "pub")]
-    config: Config<S::PairedCurrency>,
+    config: Config<Q::PairedCurrency>,
 
     /// The current state of the simulated market.
     #[getset(get = "pub")]
@@ -32,35 +31,36 @@ where
 
     /// The main user account.
     #[getset(get = "pub", get_mut = "mut")]
-    account: Account<S::PairedCurrency>,
+    account: Account<Q::PairedCurrency, UserOrderId>,
 
     /// A performance tracker for the user account.
     #[getset(get = "pub")]
     account_tracker: A,
 
-    risk_engine: IsolatedMarginRiskEngine<S::PairedCurrency>,
+    risk_engine: IsolatedMarginRiskEngine<Q::PairedCurrency>,
 
-    clearing_house: ClearingHouse<A, S::PairedCurrency>,
+    clearing_house: ClearingHouse<A, Q::PairedCurrency, UserOrderId>,
 
     next_order_id: u64,
 }
 
-impl<A, S> Exchange<A, S>
+impl<A, Q, UserOrderId> Exchange<A, Q, UserOrderId>
 where
-    A: AccountTracker<S::PairedCurrency>,
-    S: Currency,
-    S::PairedCurrency: MarginCurrency,
+    A: AccountTracker<Q::PairedCurrency>,
+    Q: Currency,
+    Q::PairedCurrency: MarginCurrency,
+    UserOrderId: Clone + Eq + PartialEq + std::hash::Hash + std::fmt::Debug,
 {
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
-    pub fn new(account_tracker: A, config: Config<S::PairedCurrency>) -> Self {
+    pub fn new(account_tracker: A, config: Config<Q::PairedCurrency>) -> Self {
         let market_state = MarketState::new(config.contract_specification().price_filter.clone());
         let account = Account::new(
             config.starting_balance(),
             config.initial_leverage(),
             config.contract_specification().fee_maker,
         );
-        let risk_engine = IsolatedMarginRiskEngine::<S::PairedCurrency>::new(
+        let risk_engine = IsolatedMarginRiskEngine::<Q::PairedCurrency>::new(
             config.contract_specification().clone(),
         );
         let clearing_house = ClearingHouse::new();
@@ -84,13 +84,13 @@ where
     /// `market_update`: Newest market information
     ///
     /// ### Returns:
-    /// If Ok, the executed orders,
-    /// Some Error otherwise
+    /// If Ok, the executed limit orders,
+    /// Some Error otherwise.
     pub fn update_state(
         &mut self,
         timestamp_ns: TimestampNs,
-        market_update: MarketUpdate<S>,
-    ) -> Result<Vec<Order<S>>> {
+        market_update: MarketUpdate<Q>,
+    ) -> Result<Vec<LimitOrder<Q, UserOrderId, Filled>>> {
         self.market_state
             .update_state(timestamp_ns, &market_update)?;
         self.account_tracker
@@ -103,13 +103,13 @@ where
             return Err(e.into());
         };
 
-        let mut to_be_exec = self.check_resting_orders(&market_update);
-        for order in to_be_exec.iter_mut() {
+        let to_be_exec = self.check_resting_orders(&market_update);
+        Ok(Vec::from_iter(to_be_exec.into_iter().map(|order| {
             let qty = match order.side() {
-                Side::Buy => order.quantity(),
-                Side::Sell => order.quantity().into_negative(),
+                Side::Buy => order.quantity().total(),
+                Side::Sell => order.quantity().total().into_negative(),
             };
-            let l_price = order.limit_price().expect(EXPECT_LIMIT_PRICE);
+            let l_price = order.limit_price();
             self.clearing_house.settle_filled_order(
                 &mut self.account,
                 &mut self.account_tracker,
@@ -118,16 +118,18 @@ where
                 self.config.contract_specification().fee_maker,
                 self.market_state.current_timestamp_ns(),
             );
-            self.account.remove_executed_order_from_active(order.id());
+            self.account
+                .remove_executed_order_from_active(order.state().meta().id());
             self.account_tracker.log_limit_order_fill();
-            order.mark_filled(l_price);
-        }
-
-        Ok(to_be_exec)
+            order.into_filled(l_price, timestamp_ns)
+        })))
     }
 
     /// Check if any resting orders have been executed
-    fn check_resting_orders(&mut self, market_update: &MarketUpdate<S>) -> Vec<Order<S>> {
+    fn check_resting_orders(
+        &mut self,
+        market_update: &MarketUpdate<Q>,
+    ) -> Vec<LimitOrder<Q, UserOrderId, Pending>> {
         Vec::from_iter(
             self.account
                 .active_limit_orders
@@ -143,10 +145,10 @@ where
     /// If `Some`, The order is filled and needs to be settled.
     fn check_limit_order_execution(
         &self,
-        limit_order: &Order<S>,
-        market_update: &MarketUpdate<S>,
+        limit_order: &LimitOrder<Q, UserOrderId, Pending>,
+        market_update: &MarketUpdate<Q>,
     ) -> bool {
-        let limit_price = limit_order.limit_price().expect(EXPECT_LIMIT_PRICE);
+        let limit_price = limit_order.limit_price();
 
         match market_update {
             MarketUpdate::Bba { .. } => {
@@ -176,7 +178,7 @@ where
         }
     }
 
-    /// Submit a new order to the exchange.
+    /// Submit a new `LimitOrder` to the exchange.
     ///
     /// # Arguments:
     /// `order`: The order that is being submitted.
@@ -184,97 +186,130 @@ where
     /// # Returns:
     /// If Ok, the order with timestamp and id filled in.
     /// Else its an error.
-    pub fn submit_order(&mut self, mut order: Order<S>) -> Result<Order<S>> {
+    pub fn submit_limit_order(
+        &mut self,
+        order: LimitOrder<Q, UserOrderId, NewOrder>,
+    ) -> Result<LimitOrder<Q, UserOrderId, Pending>> {
         trace!("submit_order: {:?}", order);
 
         // Basic checks
         self.config
             .contract_specification()
             .quantity_filter
-            .validate_order(&order)?;
+            .validate_order_quantity(order.quantity().total())?;
         self.config
             .contract_specification()
             .price_filter
-            .validate_order(&order, self.market_state.mid_price())?;
+            .validate_limit_order(&order, self.market_state.mid_price())?;
 
-        order.set_timestamp(self.market_state.current_timestamp_ns());
-        order.set_id(self.next_order_id());
+        let meta = ExchangeOrderMeta::new(
+            self.next_order_id(),
+            self.market_state.current_timestamp_ns(),
+        );
+        let order = order.into_pending(meta);
 
-        match order.order_type() {
-            OrderType::Market { side } => {
-                let fill_price = match side {
-                    Side::Buy => self.market_state.ask(),
-                    Side::Sell => self.market_state.bid(),
-                };
-                self.risk_engine
-                    .check_market_order(&self.account, &order, fill_price)?;
-                let quantity = match side {
-                    Side::Buy => order.quantity(),
-                    Side::Sell => order.quantity().into_negative(),
-                };
-                // From here on, everything is infallible
-                self.clearing_house.settle_filled_order(
-                    &mut self.account,
-                    &mut self.account_tracker,
-                    quantity,
-                    fill_price,
-                    self.config.contract_specification().fee_taker,
-                    self.market_state.current_timestamp_ns(),
-                );
-                order.mark_filled(fill_price);
-                self.account_tracker.log_market_order_fill();
-            }
-            OrderType::Limit { side, limit_price } => {
-                match side {
-                    Side::Buy => {
-                        if *limit_price >= self.market_state.ask() {
-                            return Err(Error::OrderError(OrderError::LimitPriceAboveAsk));
-                        }
-                    }
-                    Side::Sell => {
-                        if *limit_price <= self.market_state.bid() {
-                            return Err(Error::OrderError(OrderError::LimitPriceBelowBid));
-                        }
-                    }
+        match order.side() {
+            Side::Buy => {
+                if order.limit_price() >= self.market_state.ask() {
+                    return Err(Error::OrderError(OrderError::LimitPriceAboveAsk));
                 }
-                self.risk_engine.check_limit_order(&self.account, &order)?;
-                self.account.append_limit_order(order.clone());
-                self.account_tracker.log_limit_order_submission();
+            }
+            Side::Sell => {
+                if order.limit_price() <= self.market_state.bid() {
+                    return Err(Error::OrderError(OrderError::LimitPriceBelowBid));
+                }
             }
         }
+        self.risk_engine.check_limit_order(&self.account, &order)?;
+        self.account.append_limit_order(order.clone());
+        self.account_tracker.log_limit_order_submission();
 
         Ok(order)
     }
 
-    #[inline(always)]
-    fn next_order_id(&mut self) -> u64 {
+    /// Submit a new `MarketOrder` to the exchange.
+    ///
+    /// # Arguments:
+    /// `order`: The order that is being submitted.
+    ///
+    /// # Returns:
+    /// If Ok, the order with timestamp and id filled in.
+    /// Else its an error.
+    pub fn submit_market_order(
+        &mut self,
+        order: MarketOrder<Q, UserOrderId, NewOrder>,
+    ) -> Result<MarketOrder<Q, UserOrderId, Filled>> {
+        // Basic checks
+        self.config
+            .contract_specification()
+            .quantity_filter
+            .validate_order_quantity(order.quantity().total())?;
+
+        let meta = ExchangeOrderMeta::new(
+            self.next_order_id(),
+            self.market_state.current_timestamp_ns(),
+        );
+        let order = order.into_pending(meta);
+
+        let fill_price = match order.side() {
+            Side::Buy => self.market_state.ask(),
+            Side::Sell => self.market_state.bid(),
+        };
+        self.risk_engine
+            .check_market_order(&self.account, &order, fill_price)?;
+        let quantity = match order.side() {
+            Side::Buy => order.quantity().total(),
+            Side::Sell => order.quantity().total().into_negative(),
+        };
+        // From here on, everything is infallible
+        self.clearing_house.settle_filled_order(
+            &mut self.account,
+            &mut self.account_tracker,
+            quantity,
+            fill_price,
+            self.config.contract_specification().fee_taker,
+            self.market_state.current_timestamp_ns(),
+        );
+        self.account_tracker.log_market_order_fill();
+
+        Ok(order.into_filled(fill_price, self.market_state.current_timestamp_ns()))
+    }
+
+    #[inline]
+    fn next_order_id(&mut self) -> OrderId {
         self.next_order_id += 1;
         self.next_order_id - 1
     }
 
-    /// Cancel an active order based on the user_order_id of an Order
+    /// Cancel an active limit order based on the `user_order_id`.
     ///
     /// # Arguments:
-    /// `user_order_id`: The `user_order_id` of the order to cancel.
+    /// `user_order_id`: The user order id of the order to cancel.
     ///
     /// # Returns:
     /// the cancelled order if successfull, error when the `user_order_id` is
     /// not found
-    pub fn cancel_order_by_user_id(&mut self, user_order_id: u64) -> Result<Order<S>> {
+    pub fn cancel_limit_order_by_user_id(
+        &mut self,
+        user_order_id: UserOrderId,
+    ) -> Result<LimitOrder<Q, UserOrderId, Pending>> {
         self.account
             .cancel_order_by_user_id(user_order_id, &mut self.account_tracker)
     }
 
-    /// Cancel an active order.
+    /// Cancel an active limit order.
     ///
     /// # Arguments:
     /// `order_id`: The `id` (assigned by the exchange) of the order to cancel.
     ///
     /// # Returns:
     /// An order if successful with the given order_id.
-    pub fn cancel_order(&mut self, order_id: u64) -> Result<Order<S>> {
+    pub fn cancel_order(
+        &mut self,
+        order_id: OrderId,
+    ) -> Result<LimitOrder<Q, UserOrderId, Pending>> {
         self.account
-            .cancel_order(order_id, &mut self.account_tracker)
+            .cancel_limit_order(order_id, &mut self.account_tracker)
     }
 }
 
@@ -283,6 +318,10 @@ mod test {
     use fpdec::Decimal;
 
     use crate::{mock_exchange_base, prelude::*};
+
+    fn dummy_meta() -> ExchangeOrderMeta {
+        ExchangeOrderMeta::new(0, 0)
+    }
 
     #[test]
     fn check_limit_order_execution_buy_trade() {
@@ -296,28 +335,36 @@ mod test {
         // Buys
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(90), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Buy, quote!(90), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(99), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Buy, quote!(99), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(100), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Buy, quote!(100), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(101), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Buy, quote!(101), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
@@ -326,21 +373,27 @@ mod test {
         // Sells
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Sell, quote!(110), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Sell, quote!(110), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Sell, quote!(101), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Sell, quote!(101), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Sell, quote!(100), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Sell, quote!(100), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             true
@@ -359,28 +412,36 @@ mod test {
         // Buys
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(90), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Buy, quote!(90), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(99), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Buy, quote!(99), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(100), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Buy, quote!(100), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             true
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(101), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Buy, quote!(101), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             true
@@ -389,21 +450,27 @@ mod test {
         // Sells
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Sell, quote!(110), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Sell, quote!(110), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Sell, quote!(101), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Sell, quote!(101), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Sell, quote!(100), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Sell, quote!(100), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
@@ -423,21 +490,27 @@ mod test {
         // Buys
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(90), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Buy, quote!(90), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(98), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Buy, quote!(98), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Buy, quote!(99), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Buy, quote!(99), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             true
@@ -446,21 +519,27 @@ mod test {
         // Sells
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Sell, quote!(110), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Sell, quote!(110), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Sell, quote!(102), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Sell, quote!(102), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             false
         );
         assert_eq!(
             exchange.check_limit_order_execution(
-                &Order::limit(Side::Sell, quote!(101), base!(0.1)).unwrap(),
+                &LimitOrder::new(Side::Sell, quote!(101), base!(0.1))
+                    .unwrap()
+                    .into_pending(dummy_meta()),
                 &market_update
             ),
             true

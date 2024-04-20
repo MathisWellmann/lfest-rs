@@ -2,10 +2,7 @@
 
 use fpdec::{Dec, Decimal};
 
-use crate::{
-    prelude::OrderError,
-    types::{Currency, Order},
-};
+use crate::{prelude::OrderError, types::Currency};
 
 /// The `SizeFilter` defines the quantity rules that each order needs to follow
 /// The generic currency `S` is always the `PairedCurrency` of the margin
@@ -42,18 +39,18 @@ where
     }
 }
 
-impl<S> QuantityFilter<S>
+impl<Q> QuantityFilter<Q>
 where
-    S: Currency,
+    Q: Currency,
 {
-    pub(crate) fn validate_order(&self, order: &Order<S>) -> Result<(), OrderError> {
-        if order.quantity() < self.min_quantity && self.min_quantity != S::new_zero() {
+    pub(crate) fn validate_order_quantity(&self, quantity: Q) -> Result<(), OrderError> {
+        if quantity < self.min_quantity && self.min_quantity != Q::new_zero() {
             return Err(OrderError::QuantityTooLow);
         }
-        if order.quantity() > self.max_quantity && self.max_quantity != S::new_zero() {
+        if quantity > self.max_quantity && self.max_quantity != Q::new_zero() {
             return Err(OrderError::QuantityTooHigh);
         }
-        if ((order.quantity() - self.min_quantity) % self.step_size) != S::new_zero() {
+        if ((quantity - self.min_quantity) % self.step_size) != Q::new_zero() {
             return Err(OrderError::InvalidQuantityStepSize);
         }
         Ok(())
@@ -73,24 +70,26 @@ mod tests {
             step_size: quote!(1),
         };
 
-        let order = Order::market(Side::Buy, quote!(50)).unwrap();
-        filter.validate_order(&order).unwrap();
+        let order = MarketOrder::new(Side::Buy, quote!(50)).unwrap();
+        filter
+            .validate_order_quantity(order.quantity().total())
+            .unwrap();
 
-        let order = Order::market(Side::Buy, quote!(5)).unwrap();
+        let order = MarketOrder::new(Side::Buy, quote!(5)).unwrap();
         assert_eq!(
-            filter.validate_order(&order),
+            filter.validate_order_quantity(order.quantity().total()),
             Err(OrderError::QuantityTooLow)
         );
 
-        let order = Order::market(Side::Buy, quote!(5000)).unwrap();
+        let order = MarketOrder::new(Side::Buy, quote!(5000)).unwrap();
         assert_eq!(
-            filter.validate_order(&order),
+            filter.validate_order_quantity(order.quantity().total()),
             Err(OrderError::QuantityTooHigh)
         );
 
-        let order = Order::market(Side::Buy, quote!(50.5)).unwrap();
+        let order = MarketOrder::new(Side::Buy, quote!(50.5)).unwrap();
         assert_eq!(
-            filter.validate_order(&order),
+            filter.validate_order_quantity(order.quantity().total()),
             Err(OrderError::InvalidQuantityStepSize)
         );
     }

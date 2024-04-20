@@ -32,7 +32,7 @@ fn main() {
     };
     let config = Config::new(starting_balance, 200, leverage!(1), contract_specification).unwrap();
     let mut exchange =
-        Exchange::<FullAccountTracker<BaseCurrency>, QuoteCurrency>::new(acc_tracker, config);
+        Exchange::<FullAccountTracker<BaseCurrency>, QuoteCurrency, ()>::new(acc_tracker, config);
 
     // load trades from csv file
     let prices = load_prices_from_csv("./data/Bitmex_XBTUSD_1M.csv").unwrap();
@@ -61,13 +61,13 @@ fn main() {
             let order_value: BaseCurrency = exchange.account().wallet_balance() * Dec!(0.1);
             let order_size = order_value.convert(exchange.market_state().bid());
             let order = if rng.gen() {
-                Order::market(Side::Sell, order_size).unwrap() // Sell using
-                                                               // market order
+                MarketOrder::new(Side::Sell, order_size).unwrap() // Sell using
+                                                                  // market order
             } else {
-                Order::market(Side::Buy, order_size).unwrap() // Buy using market order
+                MarketOrder::new(Side::Buy, order_size).unwrap() // Buy using market order
             };
             // Handle order error here if needed
-            match exchange.submit_order(order) {
+            match exchange.submit_market_order(order) {
                 Ok(order) => println!("succesfully submitted order: {:?}", order),
                 Err(order_err) => error!("an error has occurred: {}", order_err),
             }

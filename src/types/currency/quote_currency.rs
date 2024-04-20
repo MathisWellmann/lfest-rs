@@ -36,6 +36,7 @@ macro_rules! quote {
     Display,
     Into,
     From,
+    Hash,
 )]
 #[mul(forward)]
 #[div(forward)]

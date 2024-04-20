@@ -13,8 +13,8 @@ pub enum OrderError {
     #[error("The limit order price is lower than the minimum price filter.")]
     LimitPriceBelowMin,
 
-    #[error("The limit price is below zero")]
-    LimitPriceBelowZero,
+    #[error("The limit price is less than or equal zero.")]
+    LimitPriceLTEZero,
 
     #[error("The limit order price exceeds the maximum price multiple.")]
     LimitPriceAboveMultiple,
@@ -34,8 +34,8 @@ pub enum OrderError {
     #[error("Invalid trigger price for order. e.g.: sell stop market order trigger price > ask")]
     InvalidTriggerPrice,
 
-    #[error("order size must be > 0")]
-    OrderSizeMustBePositive,
+    #[error("order size is less than or equal zero.")]
+    OrderSizeLTEZero,
 
     #[error("The account does not have enough available balance to submit the order")]
     NotEnoughAvailableBalance,
