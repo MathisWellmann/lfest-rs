@@ -5,32 +5,34 @@ use crate::{
     order_margin::compute_order_margin,
     position::Position,
     prelude::AccountTracker,
-    types::{Currency, Error, Fee, Leverage, MarginCurrency, Order, OrderType, Result},
+    types::{Currency, Error, Fee, Leverage, LimitOrder, MarginCurrency, OrderId, Pending, Result},
 };
 
 /// The users account
 /// Generic over:
-/// S: The `Currency` representing the order quantity
+/// `M`: The `Currency` representing the margin currency.
+/// `UserOrderId`: The type for the user defined order id.
 #[derive(Debug, Clone, Getters, CopyGetters)]
-pub struct Account<M>
+pub struct Account<M, UserOrderId>
 where
     M: Currency + MarginCurrency,
+    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
     /// The wallet balance of the user denoted in the margin currency.
-    /// TODO: I don't really want this to be mutably accessible publically, but for now thats how we roll.
-    #[getset(get_copy = "pub", get_mut = "pub")]
+    #[getset(get_copy = "pub")]
     pub(crate) wallet_balance: M,
 
-    /// The current account `Position`.
+    /// Get the current position of the `Account`.
     #[getset(get = "pub")]
     pub(crate) position: Position<M>,
 
     /// Maps the order `id` to the actual `Order`.
     #[getset(get = "pub")]
-    pub(crate) active_limit_orders: HashMap<u64, Order<M::PairedCurrency>>,
+    pub(crate) active_limit_orders:
+        HashMap<u64, LimitOrder<M::PairedCurrency, UserOrderId, Pending>>,
 
-    /// Maps the `user_order_id` to the internal order nonce
-    pub(crate) lookup_order_nonce_from_user_order_id: HashMap<u64, u64>,
+    // Maps the `user_order_id` to the internal order nonce.
+    pub(crate) lookup_order_nonce_from_user_order_id: HashMap<UserOrderId, OrderId>,
 
     maker_fee: Fee,
 
@@ -40,9 +42,10 @@ where
 }
 
 #[cfg(test)]
-impl<M> Default for Account<M>
+impl<M, UserOrderId> Default for Account<M, UserOrderId>
 where
     M: Currency + MarginCurrency,
+    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
     fn default() -> Self {
         use crate::prelude::{fee, Dec, Decimal};
@@ -57,9 +60,10 @@ where
     }
 }
 
-impl<M> Account<M>
+impl<M, UserOrderId> Account<M, UserOrderId>
 where
     M: Currency + MarginCurrency,
+    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
     /// Create a new [`Account`] instance.
     pub(crate) fn new(starting_balance: M, leverage: Leverage, maker_fee: Fee) -> Self {
@@ -76,7 +80,6 @@ where
     }
 
     /// Return the available balance of the `Account`
-    #[inline(always)]
     pub fn available_balance(&self) -> M {
         // TODO: this call is expensive so maybe compute once and store
         let order_margin =
@@ -95,20 +98,27 @@ where
         todo!("Support `update_desired_leverage`")
     }
 
-    /// Cancel an active order based on the user_order_id of an Order
+    /// Cancel an active limit order based on the `user_order_id`.
+    ///
+    /// # Arguments:
+    /// `user_order_id`: The order id from the user.
+    /// `account_tracker`: Something to track this action.
     ///
     /// # Returns:
     /// the cancelled order if successfull, error when the `user_order_id` is
     /// not found
     pub(crate) fn cancel_order_by_user_id<A>(
         &mut self,
-        user_order_id: u64,
+        user_order_id: UserOrderId,
         account_tracker: &mut A,
-    ) -> Result<Order<M::PairedCurrency>>
+    ) -> Result<LimitOrder<M::PairedCurrency, UserOrderId, Pending>>
     where
         A: AccountTracker<M>,
     {
-        debug!("cancel_order_by_user_id: user_order_id: {}", user_order_id);
+        debug!(
+            "cancel_order_by_user_id: user_order_id: {:?}",
+            user_order_id
+        );
         let id: u64 = match self
             .lookup_order_nonce_from_user_order_id
             .remove(&user_order_id)
@@ -116,18 +126,18 @@ where
             None => return Err(Error::UserOrderIdNotFound),
             Some(id) => id,
         };
-        self.cancel_order(id, account_tracker)
+        self.cancel_limit_order(id, account_tracker)
     }
 
     /// Append a new limit order as active order
-    pub(crate) fn append_limit_order(&mut self, order: Order<M::PairedCurrency>) {
-        debug_assert!(matches!(order.order_type(), OrderType::Limit { .. }));
-
+    pub(crate) fn append_limit_order(
+        &mut self,
+        order: LimitOrder<M::PairedCurrency, UserOrderId, Pending>,
+    ) {
         debug!("append_limit_order: order: {:?}", order);
 
-        // self.account_tracker.log_limit_order_submission();
-        let order_id = order.id();
-        let user_order_id = order.user_order_id();
+        let order_id = order.state().meta().id();
+        let user_order_id = order.user_order_id().clone();
         match self.active_limit_orders.insert(order_id, order) {
             None => {}
             Some(_) => {
@@ -138,24 +148,19 @@ where
                 debug_assert!(false)
             }
         };
-        match user_order_id {
-            None => {}
-            Some(user_order_id) => {
-                self.lookup_order_nonce_from_user_order_id
-                    .insert(user_order_id, order_id);
-            }
-        };
+        self.lookup_order_nonce_from_user_order_id
+            .insert(user_order_id, order_id);
         self.order_margin =
             compute_order_margin(&self.position, &self.active_limit_orders, self.maker_fee);
     }
 
-    /// Cancel an active order
+    /// Cancel an active limit order.
     /// returns Some order if successful with given order_id
-    pub(crate) fn cancel_order<A>(
+    pub(crate) fn cancel_limit_order<A>(
         &mut self,
-        order_id: u64,
+        order_id: OrderId,
         account_tracker: &mut A,
-    ) -> Result<Order<M::PairedCurrency>>
+    ) -> Result<LimitOrder<M::PairedCurrency, UserOrderId, Pending>>
     where
         A: AccountTracker<M>,
     {
@@ -173,16 +178,14 @@ where
     }
 
     /// Removes an executed limit order from the list of active ones
-    pub(crate) fn remove_executed_order_from_active(&mut self, order_id: u64) {
+    pub(crate) fn remove_executed_order_from_active(&mut self, order_id: OrderId) {
         let order = self
             .active_limit_orders
             .remove(&order_id)
             .expect("The order must have been active; qed");
         self.order_margin =
             compute_order_margin(&self.position, &self.active_limit_orders, self.maker_fee);
-        if let Some(user_order_id) = order.user_order_id() {
-            self.lookup_order_nonce_from_user_order_id
-                .remove(&user_order_id);
-        }
+        self.lookup_order_nonce_from_user_order_id
+            .remove(order.user_order_id());
     }
 }

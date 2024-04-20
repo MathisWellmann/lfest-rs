@@ -14,8 +14,8 @@ fn inv_long_market_win_full() {
 
     let value: BaseCurrency = exchange.account().available_balance() * base!(0.8);
     let size = value.convert(exchange.market_state().ask());
-    let o = Order::market(Side::Buy, size).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Buy, size).unwrap();
+    exchange.submit_market_order(o).unwrap();
 
     let _ = exchange
         .update_state(1, bba!(quote!(1000), quote!(1001)))
@@ -55,8 +55,8 @@ fn inv_long_market_win_full() {
     let fee_base2 = size.fee_portion(exchange.config().contract_specification().fee_taker);
     let fee_asset2 = fee_base2.convert(quote!(2000.0));
 
-    let o = Order::market(Side::Sell, size).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Sell, size).unwrap();
+    exchange.submit_market_order(o).unwrap();
 
     assert_eq!(exchange.account().position().size(), quote!(0.0));
     assert_eq!(
@@ -86,8 +86,8 @@ fn inv_long_market_loss_full() {
         .update_state(0, bba!(quote!(999), quote!(1000)))
         .unwrap();
 
-    let o = Order::market(Side::Buy, quote!(800.0)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Buy, quote!(800.0)).unwrap();
+    exchange.submit_market_order(o).unwrap();
 
     assert_eq!(exchange.account().position().size(), quote!(800.0));
     assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
@@ -115,8 +115,8 @@ fn inv_long_market_loss_full() {
     );
 
     let size = quote!(800.0);
-    let o = Order::market(Side::Sell, size).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Sell, size).unwrap();
+    exchange.submit_market_order(o).unwrap();
 
     let fee_quote0 = size.fee_portion(exchange.config().contract_specification().fee_taker);
     let fee_base0 = fee_quote0.convert(quote!(1000.0));
@@ -154,8 +154,8 @@ fn inv_short_market_win_full() {
         .update_state(0, bba!(quote!(1000), quote!(1001)))
         .unwrap();
 
-    let o = Order::market(Side::Sell, quote!(800)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Sell, quote!(800)).unwrap();
+    exchange.submit_market_order(o).unwrap();
 
     assert_eq!(exchange.account().position().size(), quote!(-800));
 
@@ -171,8 +171,8 @@ fn inv_short_market_win_full() {
     );
 
     let size = quote!(800);
-    let o = Order::market(Side::Buy, size).unwrap();
-    let order_err = exchange.submit_order(o);
+    let o = MarketOrder::new(Side::Buy, size).unwrap();
+    let order_err = exchange.submit_market_order(o);
     assert!(order_err.is_ok());
     let _ = exchange
         .update_state(2, bba!(quote!(799), quote!(800)))
@@ -216,8 +216,8 @@ fn inv_short_market_loss_full() {
 
     let value: BaseCurrency = BaseCurrency::new(Dec!(0.4));
     let size = value.convert(exchange.market_state().bid());
-    let o = Order::market(Side::Sell, size).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Sell, size).unwrap();
+    exchange.submit_market_order(o).unwrap();
 
     let _ = exchange
         .update_state(1, bba!(quote!(999), quote!(1000)))
@@ -261,8 +261,8 @@ fn inv_short_market_loss_full() {
         base!(-0.2)
     );
 
-    let o = Order::market(Side::Buy, size).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Buy, size).unwrap();
+    exchange.submit_market_order(o).unwrap();
 
     let _ = exchange
         .update_state(3, bba!(quote!(1999), quote!(2000)))
@@ -298,8 +298,8 @@ fn inv_long_market_win_partial() {
 
     let value = BaseCurrency::new(Dec!(0.8));
     let size = value.convert(exchange.market_state().ask());
-    let o = Order::market(Side::Buy, size).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Buy, size).unwrap();
+    exchange.submit_market_order(o).unwrap();
 
     let _ = exchange
         .update_state(1, bba!(quote!(1000), quote!(1001)))
@@ -344,8 +344,8 @@ fn inv_long_market_win_partial() {
         Dec!(0.4)
     );
 
-    let o = Order::market(Side::Sell, size).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Sell, size).unwrap();
+    exchange.submit_market_order(o).unwrap();
 
     let _ = exchange
         .update_state(2, bba!(quote!(2000), quote!(2001)))
@@ -384,8 +384,8 @@ fn inv_long_market_loss_partial() {
         .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
         .unwrap();
 
-    let o = Order::market(Side::Buy, quote!(800.0)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Buy, quote!(800.0)).unwrap();
+    exchange.submit_market_order(o).unwrap();
     let _ = exchange
         .update_state(1, bba!(quote!(999), quote!(1000)))
         .unwrap();
@@ -403,8 +403,8 @@ fn inv_long_market_loss_partial() {
         base!(-0.2)
     );
 
-    let o = Order::market(Side::Sell, quote!(400.0)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Sell, quote!(400.0)).unwrap();
+    exchange.submit_market_order(o).unwrap();
     let _ = exchange
         .update_state(1, bba!(quote!(800), quote!(801)))
         .unwrap();
@@ -447,8 +447,8 @@ fn inv_short_market_win_partial() {
         .update_state(0, bba!(quote!(1000.0), quote!(1001.0)))
         .unwrap();
 
-    let o = Order::market(Side::Sell, quote!(800.0)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Sell, quote!(800.0)).unwrap();
+    exchange.submit_market_order(o).unwrap();
     let _ = exchange
         .update_state(1, bba!(quote!(999), quote!(1000)))
         .unwrap();
@@ -479,8 +479,8 @@ fn inv_short_market_win_partial() {
         base!(0.2)
     );
 
-    let o = Order::market(Side::Buy, quote!(400.0)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Buy, quote!(400.0)).unwrap();
+    exchange.submit_market_order(o).unwrap();
     let _ = exchange
         .update_state(3, bba!(quote!(799), quote!(800)))
         .unwrap();
@@ -525,8 +525,8 @@ fn inv_short_market_loss_partial() {
 
     let value = base!(0.8);
     let size: QuoteCurrency = value.convert(exchange.market_state().bid());
-    let o = Order::market(Side::Sell, size).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Sell, size).unwrap();
+    exchange.submit_market_order(o).unwrap();
 
     let _ = exchange
         .update_state(1, bba!(quote!(999), quote!(1000)))
@@ -567,8 +567,8 @@ fn inv_short_market_loss_partial() {
         base!(-0.4)
     );
 
-    let o = Order::market(Side::Buy, size).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = MarketOrder::new(Side::Buy, size).unwrap();
+    exchange.submit_market_order(o).unwrap();
 
     assert_eq!(exchange.account().position().size(), quote!(-400.0));
     assert_eq!(
@@ -600,15 +600,15 @@ fn inv_test_market_roundtrip() {
 
     let value: BaseCurrency = exchange.account().available_balance() * base!(0.9);
     let size = value.convert(exchange.market_state().ask());
-    let buy_order = Order::market(Side::Buy, size).unwrap();
-    exchange.submit_order(buy_order).unwrap();
+    let buy_order = MarketOrder::new(Side::Buy, size).unwrap();
+    exchange.submit_market_order(buy_order).unwrap();
     let _ = exchange
         .update_state(1, bba!(quote!(1000), quote!(1001)))
         .unwrap();
 
-    let sell_order = Order::market(Side::Sell, size).unwrap();
+    let sell_order = MarketOrder::new(Side::Sell, size).unwrap();
 
-    exchange.submit_order(sell_order).unwrap();
+    exchange.submit_market_order(sell_order).unwrap();
 
     let fee_quote = size.fee_portion(exchange.config().contract_specification().fee_taker);
     let fee_base: BaseCurrency = fee_quote.convert(quote!(1000.0));
@@ -637,16 +637,16 @@ fn inv_test_market_roundtrip() {
     );
 
     let size = quote!(900.0);
-    let buy_order = Order::market(Side::Buy, size).unwrap();
-    exchange.submit_order(buy_order).unwrap();
+    let buy_order = MarketOrder::new(Side::Buy, size).unwrap();
+    exchange.submit_market_order(buy_order).unwrap();
     let _ = exchange
         .update_state(3, bba!(quote!(1000.0), quote!(1001.0)))
         .unwrap();
 
     let size = quote!(950.0);
-    let sell_order = Order::market(Side::Sell, size).unwrap();
+    let sell_order = MarketOrder::new(Side::Sell, size).unwrap();
 
-    exchange.submit_order(sell_order).unwrap();
+    exchange.submit_market_order(sell_order).unwrap();
 
     let _ = exchange
         .update_state(4, bba!(quote!(998.0), quote!(1000.0)))
@@ -675,8 +675,8 @@ fn inv_execute_limit() {
         .update_state(0, bba!(quote!(1000.0), quote!(1001.0)))
         .unwrap();
 
-    let o = Order::limit(Side::Buy, quote!(900.0), quote!(450.0)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = LimitOrder::new(Side::Buy, quote!(900.0), quote!(450.0)).unwrap();
+    exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
     assert_eq!(exchange.account().wallet_balance(), base!(1.0));
     assert_eq!(exchange.account().available_balance(), base!(0.49990));
@@ -701,8 +701,8 @@ fn inv_execute_limit() {
     assert_eq!(exchange.account().position().position_margin(), base!(0.5));
     assert_eq!(exchange.account().order_margin(), base!(0));
 
-    let o = Order::limit(Side::Sell, quote!(1000), quote!(450)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = LimitOrder::new(Side::Sell, quote!(1000), quote!(450)).unwrap();
+    exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
 
     let _ = exchange
@@ -718,8 +718,8 @@ fn inv_execute_limit() {
     assert_eq!(exchange.account().wallet_balance(), base!(1.04981));
     assert_eq!(exchange.account().available_balance(), base!(1.04981));
 
-    let o = Order::limit(Side::Sell, quote!(1200), quote!(600)).unwrap();
-    exchange.submit_order(o).unwrap();
+    let o = LimitOrder::new(Side::Sell, quote!(1200), quote!(600)).unwrap();
+    exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
 
     let _ = exchange

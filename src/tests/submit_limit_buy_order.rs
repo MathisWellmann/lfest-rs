@@ -10,8 +10,8 @@ fn submit_limit_buy_order_no_position() {
         vec![]
     );
 
-    let mut order = Order::limit(Side::Buy, quote!(98), base!(5)).unwrap();
-    exchange.submit_order(order.clone()).unwrap();
+    let order = LimitOrder::new(Side::Buy, quote!(98), base!(5)).unwrap();
+    exchange.submit_limit_order(order.clone()).unwrap();
 
     assert_eq!(
         exchange.account().position,
@@ -24,8 +24,10 @@ fn submit_limit_buy_order_no_position() {
     );
 
     // Now fill the order
-    order.set_id(0);
-    order.mark_filled(order.limit_price().unwrap());
+    let meta = ExchangeOrderMeta::new(0, 0);
+    let order = order.into_pending(meta);
+    let limit_price = order.limit_price();
+    let order = order.into_filled(limit_price, 0);
     assert_eq!(
         exchange
             .update_state(0, trade!(quote!(98), base!(1), Side::Sell))
@@ -49,8 +51,8 @@ fn submit_limit_buy_order_no_position() {
     assert_eq!(exchange.account().available_balance(), quote!(510) - fee);
 
     // close the position again
-    let mut order = Order::limit(Side::Sell, quote!(98), base!(5)).unwrap();
-    exchange.submit_order(order.clone()).unwrap();
+    let order = LimitOrder::new(Side::Sell, quote!(98), base!(5)).unwrap();
+    exchange.submit_limit_order(order.clone()).unwrap();
 
     assert_eq!(
         exchange
@@ -59,8 +61,10 @@ fn submit_limit_buy_order_no_position() {
         vec![]
     );
 
-    order.set_id(1);
-    order.mark_filled(order.limit_price().unwrap());
+    let meta = ExchangeOrderMeta::new(1, 0);
+    let order = order.into_pending(meta);
+    let limit_price = order.limit_price();
+    let order = order.into_filled(limit_price, 0);
     exchange
         .update_state(0, bba!(quote!(96), quote!(98)))
         .unwrap();
@@ -97,23 +101,23 @@ fn submit_limit_buy_order_no_position_max() {
         vec![]
     );
 
-    let order = Order::limit(Side::Buy, quote!(100), base!(5)).unwrap();
-    exchange.submit_order(order.clone()).unwrap();
-    let order = Order::limit(Side::Buy, quote!(100), base!(4)).unwrap();
-    exchange.submit_order(order.clone()).unwrap();
-    let order = Order::limit(Side::Buy, quote!(100), base!(1)).unwrap();
+    let order = LimitOrder::new(Side::Buy, quote!(100), base!(5)).unwrap();
+    exchange.submit_limit_order(order.clone()).unwrap();
+    let order = LimitOrder::new(Side::Buy, quote!(100), base!(4)).unwrap();
+    exchange.submit_limit_order(order.clone()).unwrap();
+    let order = LimitOrder::new(Side::Buy, quote!(100), base!(1)).unwrap();
     assert_eq!(
-        exchange.submit_order(order.clone()),
+        exchange.submit_limit_order(order.clone()),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
     );
 
-    let order = Order::limit(Side::Sell, quote!(101), base!(5)).unwrap();
-    exchange.submit_order(order.clone()).unwrap();
-    let order = Order::limit(Side::Sell, quote!(101), base!(4)).unwrap();
-    exchange.submit_order(order.clone()).unwrap();
-    let order = Order::limit(Side::Sell, quote!(101), base!(1)).unwrap();
+    let order = LimitOrder::new(Side::Sell, quote!(101), base!(5)).unwrap();
+    exchange.submit_limit_order(order.clone()).unwrap();
+    let order = LimitOrder::new(Side::Sell, quote!(101), base!(4)).unwrap();
+    exchange.submit_limit_order(order.clone()).unwrap();
+    let order = LimitOrder::new(Side::Sell, quote!(101), base!(1)).unwrap();
     assert_eq!(
-        exchange.submit_order(order.clone()),
+        exchange.submit_limit_order(order.clone()),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
     );
 }
@@ -127,8 +131,8 @@ fn submit_limit_buy_order_with_long() {
             .unwrap(),
         vec![]
     );
-    let order = Order::market(Side::Buy, base!(9)).unwrap();
-    exchange.submit_order(order).unwrap();
+    let order = MarketOrder::new(Side::Buy, base!(9)).unwrap();
+    exchange.submit_market_order(order).unwrap();
 
     assert_eq!(
         exchange.account().position(),
@@ -148,18 +152,20 @@ fn submit_limit_buy_order_with_long() {
     );
 
     // Another buy limit order should not work
-    let order = Order::limit(Side::Buy, quote!(100), base!(1)).unwrap();
+    let order = LimitOrder::new(Side::Buy, quote!(100), base!(1)).unwrap();
     assert_eq!(
-        exchange.submit_order(order),
+        exchange.submit_limit_order(order),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
     );
 
     // But sell order should work
-    let mut order = Order::limit(Side::Sell, quote!(101), base!(9)).unwrap();
-    exchange.submit_order(order.clone()).unwrap();
+    let order = LimitOrder::new(Side::Sell, quote!(101), base!(9)).unwrap();
+    exchange.submit_limit_order(order.clone()).unwrap();
 
-    order.set_id(2);
-    order.mark_filled(order.limit_price().unwrap());
+    let meta = ExchangeOrderMeta::new(2, 0);
+    let order = order.into_pending(meta);
+    let limit_price = order.limit_price();
+    let order = order.into_filled(limit_price, 0);
     assert_eq!(
         exchange
             .update_state(0, trade!(quote!(101), base!(1), Side::Buy))
@@ -187,8 +193,8 @@ fn submit_limit_buy_order_with_short() {
             .unwrap(),
         vec![]
     );
-    let order = Order::market(Side::Sell, base!(9)).unwrap();
-    exchange.submit_order(order).unwrap();
+    let order = MarketOrder::new(Side::Sell, base!(9)).unwrap();
+    exchange.submit_market_order(order).unwrap();
 
     assert_eq!(
         exchange.account().position(),
@@ -201,18 +207,20 @@ fn submit_limit_buy_order_with_short() {
     );
 
     // Another sell limit order should not work
-    let order = Order::limit(Side::Sell, quote!(101), base!(1)).unwrap();
+    let order = LimitOrder::new(Side::Sell, quote!(101), base!(1)).unwrap();
     assert_eq!(
-        exchange.submit_order(order),
+        exchange.submit_limit_order(order),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
     );
 
     // But buy order should work
-    let mut order = Order::limit(Side::Buy, quote!(100), base!(9)).unwrap();
-    exchange.submit_order(order.clone()).unwrap();
+    let order = LimitOrder::new(Side::Buy, quote!(100), base!(9)).unwrap();
+    exchange.submit_limit_order(order.clone()).unwrap();
 
-    order.set_id(2);
-    order.mark_filled(order.limit_price().unwrap());
+    let meta = ExchangeOrderMeta::new(2, 0);
+    let order = order.into_pending(meta);
+    let limit_price = order.limit_price();
+    let order = order.into_filled(limit_price, 0);
     assert_eq!(
         exchange
             .update_state(0, trade!(quote!(100), base!(1), Side::Sell))
@@ -241,9 +249,9 @@ fn submit_limit_buy_order_above_ask() {
             .unwrap(),
         vec![]
     );
-    let order = Order::limit(Side::Buy, quote!(100), base!(9)).unwrap();
+    let order = LimitOrder::new(Side::Buy, quote!(100), base!(9)).unwrap();
     assert_eq!(
-        exchange.submit_order(order),
+        exchange.submit_limit_order(order),
         Err(Error::OrderError(OrderError::LimitPriceAboveAsk))
     );
 }
@@ -260,10 +268,10 @@ fn submit_limit_buy_order_turnaround_short() {
     //     vec![]
     // );
     // let order = Order::market(Side::Sell, base!(9)).unwrap();
-    // exchange.submit_order(order).unwrap();
+    // exchange.submit_limit_order(order).unwrap();
 
-    // let order = Order::limit(Side::Buy, quote!(100), base!(18)).unwrap();
-    // exchange.submit_order(order.clone()).unwrap();
+    // let order = LimitOrder::new(Side::Buy, quote!(100), base!(18)).unwrap();
+    // exchange.submit_limit_order(order.clone()).unwrap();
 
     // // Execute the limit buy order
     // assert_eq!(

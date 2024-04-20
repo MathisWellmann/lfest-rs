@@ -1,7 +1,7 @@
 use crate::{
     market_state::MarketState,
     prelude::Account,
-    types::{Currency, MarginCurrency, Order, QuoteCurrency},
+    types::{Currency, LimitOrder, MarginCurrency, MarketOrder, Pending, QuoteCurrency},
 };
 
 /// The error that the `RiskEngine` outputs, if any.
@@ -15,9 +15,10 @@ pub enum RiskError {
     Liquidate,
 }
 
-pub(crate) trait RiskEngine<M>
+pub(crate) trait RiskEngine<M, UserOrderId>
 where
     M: Currency + MarginCurrency,
+    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
     /// Checks if the account it able to satisfy the margin requirements for a new market order.
     ///
@@ -35,16 +36,16 @@ where
     /// If Err, the account cannot satisfy the margin requirements.
     fn check_market_order(
         &self,
-        account: &Account<M>,
-        order: &Order<M::PairedCurrency>,
+        account: &Account<M, UserOrderId>,
+        order: &MarketOrder<M::PairedCurrency, UserOrderId, Pending>,
         fill_price: QuoteCurrency,
     ) -> Result<(), RiskError>;
 
     /// Checks if the account it able to satisfy the margin requirements for a new limit order.
     fn check_limit_order(
         &self,
-        account: &Account<M>,
-        order: &Order<M::PairedCurrency>,
+        account: &Account<M, UserOrderId>,
+        order: &LimitOrder<M::PairedCurrency, UserOrderId, Pending>,
     ) -> Result<(), RiskError>;
 
     /// Ensure the account has enough maintenance margin, to keep the position open.
@@ -60,6 +61,6 @@ where
     fn check_maintenance_margin(
         &self,
         market_state: &MarketState,
-        account: &Account<M>,
+        account: &Account<M, UserOrderId>,
     ) -> Result<(), RiskError>;
 }

@@ -18,12 +18,13 @@ where
     /// `timestamp_ns`: timestamp of latest tick in nanoseconds
     /// `price`: price of latest tick
     /// `upnl`: unrealized profit and loss of account in current tick
-    fn update(
+    fn update<UserOrderId>(
         &mut self,
         timestamp_ns: TimestampNs,
         market_state: &MarketState,
-        account: &Account<M>,
-    );
+        account: &Account<M, UserOrderId>,
+    ) where
+        UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash;
 
     /// Log a realized profit and loss event
     ///

@@ -14,12 +14,14 @@ impl<M> AccountTracker<M> for NoAccountTracker
 where
     M: Currency + MarginCurrency,
 {
-    fn update(
+    fn update<UserOrderId>(
         &mut self,
         _timestamp: TimestampNs,
         _market_state: &MarketState,
-        _account: &Account<M>,
-    ) {
+        _account: &Account<M, UserOrderId>,
+    ) where
+        UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
+    {
     }
 
     fn log_rpnl(&mut self, _rpnl: M, _ts_ns: i64) {}

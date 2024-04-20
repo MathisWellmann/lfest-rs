@@ -18,7 +18,7 @@ fn lin_long_market_win_full() {
         .unwrap();
 
     exchange
-        .submit_order(Order::market(Side::Buy, base!(5.0)).unwrap())
+        .submit_market_order(MarketOrder::new(Side::Buy, base!(5.0)).unwrap())
         .unwrap();
     let _ = exchange
         .update_state(
@@ -64,7 +64,7 @@ fn lin_long_market_win_full() {
     );
 
     exchange
-        .submit_order(Order::market(Side::Sell, base!(5.0)).unwrap())
+        .submit_market_order(MarketOrder::new(Side::Sell, base!(5.0)).unwrap())
         .unwrap();
 
     assert_eq!(exchange.account().position().size(), base!(0.0));

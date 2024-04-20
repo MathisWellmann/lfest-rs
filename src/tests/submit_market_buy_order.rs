@@ -10,9 +10,9 @@ fn submit_market_buy_order_reject() {
         vec![]
     );
 
-    let order = Order::market(Side::Buy, base!(10)).unwrap();
+    let order = MarketOrder::new(Side::Buy, base!(10)).unwrap();
     assert_eq!(
-        exchange.submit_order(order),
+        exchange.submit_market_order(order),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
     );
 }
@@ -26,8 +26,8 @@ fn submit_market_buy_order_no_position() {
         vec![]
     );
 
-    let order = Order::market(Side::Buy, base!(5)).unwrap();
-    exchange.submit_order(order).unwrap();
+    let order = MarketOrder::new(Side::Buy, base!(5)).unwrap();
+    exchange.submit_market_order(order).unwrap();
 
     // make sure its excuted immediately
     assert_eq!(
@@ -57,12 +57,12 @@ fn submit_market_buy_order_with_long_position() {
     );
 
     // First enter a long position
-    let order = Order::market(Side::Buy, base!(5)).unwrap();
-    exchange.submit_order(order).unwrap();
+    let order = MarketOrder::new(Side::Buy, base!(5)).unwrap();
+    exchange.submit_market_order(order).unwrap();
 
     // Buy again
-    let order = Order::market(Side::Buy, base!(4)).unwrap();
-    exchange.submit_order(order).unwrap();
+    let order = MarketOrder::new(Side::Buy, base!(4)).unwrap();
+    exchange.submit_market_order(order).unwrap();
 
     assert_eq!(
         exchange.account().position,
@@ -91,12 +91,12 @@ fn submit_market_buy_order_with_short_position() {
     );
 
     // First enter a short position
-    let order = Order::market(Side::Sell, base!(9)).unwrap();
-    exchange.submit_order(order).unwrap();
+    let order = MarketOrder::new(Side::Sell, base!(9)).unwrap();
+    exchange.submit_market_order(order).unwrap();
 
     // Now close the position with a buy order
-    let order = Order::market(Side::Buy, base!(9)).unwrap();
-    exchange.submit_order(order).unwrap();
+    let order = MarketOrder::new(Side::Buy, base!(9)).unwrap();
+    exchange.submit_market_order(order).unwrap();
     assert_eq!(
         exchange.account().position,
         Position {
@@ -124,12 +124,12 @@ fn submit_market_buy_order_turnaround_short() {
     );
 
     // First enter a short position
-    let order = Order::market(Side::Sell, base!(9)).unwrap();
-    exchange.submit_order(order).unwrap();
+    let order = MarketOrder::new(Side::Sell, base!(9)).unwrap();
+    exchange.submit_market_order(order).unwrap();
 
     // Close the entire position and buy some more
-    let order = Order::market(Side::Buy, base!(18)).unwrap();
-    exchange.submit_order(order).unwrap();
+    let order = MarketOrder::new(Side::Buy, base!(18)).unwrap();
+    exchange.submit_market_order(order).unwrap();
     assert_eq!(
         exchange.account().position,
         Position {

@@ -542,12 +542,14 @@ impl<M> AccountTracker<M> for FullAccountTracker<M>
 where
     M: Currency + MarginCurrency + Send,
 {
-    fn update(
+    fn update<UserOrderId>(
         &mut self,
         timestamp_ns: TimestampNs,
         market_state: &MarketState,
-        account: &Account<M>,
-    ) {
+        account: &Account<M, UserOrderId>,
+    ) where
+        UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
+    {
         let price = market_state.mid_price();
         if price == quote!(0) {
             trace!("Price is 0, not updating the `FullAccountTracker`");
@@ -801,12 +803,12 @@ mod tests {
         at.update(
             0,
             &mock_market_state_from_mid_price(quote!(100.0)),
-            &Account::default(),
+            &Account::<_, ()>::default(),
         );
         at.update(
             0,
             &mock_market_state_from_mid_price(quote!(200.0)),
-            &Account::default(),
+            &Account::<_, ()>::default(),
         );
         assert_eq!(at.buy_and_hold_return(), quote!(100.0));
     }
@@ -817,12 +819,12 @@ mod tests {
         at.update(
             0,
             &mock_market_state_from_mid_price(quote!(100.0)),
-            &Account::default(),
+            &Account::<_, ()>::default(),
         );
         at.update(
             0,
             &mock_market_state_from_mid_price(quote!(50.0)),
-            &Account::default(),
+            &Account::<_, ()>::default(),
         );
         assert_eq!(at.sell_and_hold_return(), quote!(50.0));
     }
@@ -851,12 +853,12 @@ mod tests {
         acc_tracker.update(
             0,
             &mock_market_state_from_mid_price(quote!(100.0)),
-            &Account::default(),
+            &Account::<_, ()>::default(),
         );
         acc_tracker.update(
             0,
             &mock_market_state_from_mid_price(quote!(200.0)),
-            &Account::default(),
+            &Account::<_, ()>::default(),
         );
         assert_eq!(acc_tracker.buy_and_hold_return(), quote!(100.0));
     }
@@ -867,12 +869,12 @@ mod tests {
         acc_tracker.update(
             0,
             &mock_market_state_from_mid_price(quote!(100.0)),
-            &Account::default(),
+            &Account::<_, ()>::default(),
         );
         acc_tracker.update(
             0,
             &mock_market_state_from_mid_price(quote!(200.0)),
-            &Account::default(),
+            &Account::<_, ()>::default(),
         );
         assert_eq!(acc_tracker.sell_and_hold_return(), quote!(-100.0));
     }
