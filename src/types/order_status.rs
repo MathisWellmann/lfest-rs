@@ -30,30 +30,6 @@ where
             filled_quantity: FilledQuantity::Unfilled,
         }
     }
-
-    /// Used when an order get some `quantity` filled at a `price`.
-    pub(crate) fn fill(&mut self, price: QuoteCurrency, quantity: Q) {
-        match &mut self.filled_quantity {
-            FilledQuantity::Unfilled => {
-                self.filled_quantity = FilledQuantity::Filled {
-                    cumulative_qty: quantity,
-                    avg_price: price,
-                }
-            }
-            FilledQuantity::Filled {
-                cumulative_qty,
-                avg_price,
-            } => {
-                let new_qty = *cumulative_qty + quantity;
-                *avg_price = QuoteCurrency::new(
-                    ((cumulative_qty.inner() * avg_price.inner())
-                        + (price.inner() * quantity.inner()))
-                        / new_qty.inner(),
-                );
-                *cumulative_qty = new_qty;
-            }
-        }
-    }
 }
 
 /// Contains the filled order quantity along with the average fill price.
