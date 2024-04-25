@@ -2,15 +2,16 @@ use hashbrown::HashMap;
 
 use crate::{
     prelude::Position,
-    types::{Currency, Fee, LimitOrder, MarginCurrency, Pending, Side},
+    types::{Currency, Fee, LimitOrder, MarginCurrency, OrderId, Pending, Side},
     utils::{max, min},
 };
 
 /// Compute the current order margin requirement.
+#[allow(clippy::type_complexity)]
 pub(crate) fn compute_order_margin<M, UserOrderId>(
     position: &Position<M>,
     active_limit_orders: &HashMap<
-        u64,
+        OrderId,
         LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
     >,
     fee: Fee,

@@ -28,6 +28,7 @@ where
 
     /// Maps the order `id` to the actual `Order`.
     #[getset(get = "pub")]
+    #[allow(clippy::type_complexity)]
     pub(crate) active_limit_orders:
         HashMap<OrderId, LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>>,
 
