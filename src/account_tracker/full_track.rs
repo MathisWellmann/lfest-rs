@@ -1,6 +1,6 @@
 use std::{fmt::Display, iter::FromIterator};
 
-use fpdec::{Dec, Decimal};
+use fpdec::{CheckedDiv, Dec, Decimal};
 
 use super::d_ratio;
 use crate::{
@@ -293,7 +293,9 @@ where
 
         let target_downside_deviation = decimal_sqrt(avg_underperformance);
 
-        ((mean_acc_ret - target_return) * annualization_mult) / target_downside_deviation
+        ((mean_acc_ret - target_return) * annualization_mult)
+            .checked_div(&target_downside_deviation)
+            .unwrap_or_default()
     }
 
     /// Return the theoretical kelly leverage that would maximize the compounded growth rate,
