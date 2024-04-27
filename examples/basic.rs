@@ -56,7 +56,8 @@ fn main() {
 
         if i % 100 == 0 {
             // Trade a fraction of the available wallet balance
-            let order_value: BaseCurrency = exchange.account().wallet_balance() * Dec!(0.1);
+            let order_value: BaseCurrency =
+                exchange.account().available_wallet_balance() * Dec!(0.1);
             let order_size = order_value.convert(exchange.market_state().bid());
             let order = if rng.gen() {
                 MarketOrder::new(Side::Sell, order_size).unwrap() // Sell using

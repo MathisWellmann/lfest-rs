@@ -7,7 +7,7 @@ fn submit_market_sell_order_reject() {
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     let order = MarketOrder::new(Side::Sell, base!(10)).unwrap();
@@ -24,7 +24,7 @@ fn submit_market_sell_order() {
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     let order = MarketOrder::new(Side::Sell, base!(5)).unwrap();
@@ -40,7 +40,7 @@ fn submit_market_sell_order() {
         }
     );
     assert_eq!(
-        exchange.account().available_balance(),
+        exchange.account().available_wallet_balance(),
         // - fee
         quote!(500) - quote!(0.3)
     );
@@ -53,7 +53,7 @@ fn submit_market_sell_order_with_short_position() {
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     // First enter a short position
@@ -74,7 +74,7 @@ fn submit_market_sell_order_with_short_position() {
         }
     );
     assert_eq!(
-        exchange.account().available_balance(),
+        exchange.account().available_wallet_balance(),
         // - fee - fee - spread loss
         quote!(100) - quote!(0.3) - quote!(0.24)
     );
@@ -87,7 +87,7 @@ fn submit_market_sell_order_with_long_position() {
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     // First enter a long position
@@ -107,7 +107,7 @@ fn submit_market_sell_order_with_long_position() {
         }
     );
     assert_eq!(
-        exchange.account().available_balance(),
+        exchange.account().available_wallet_balance(),
         // - fee - fee - spread loss
         quote!(1000) - quote!(0.54) - quote!(0.5346) - quote!(9)
     );
@@ -141,7 +141,7 @@ fn submit_market_sell_order_turnaround_long() {
         }
     );
     assert_eq!(
-        exchange.account().available_balance(),
+        exchange.account().available_wallet_balance(),
         // - fee - fee - spread loss
         quote!(100) - quote!(0.5454) - quote!(1.08) - quote!(9)
     );

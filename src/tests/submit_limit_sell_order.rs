@@ -7,7 +7,7 @@ fn submit_limit_sell_order_no_position() {
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     let order = LimitOrder::new(Side::Sell, quote!(100), base!(9)).unwrap();
@@ -35,6 +35,8 @@ fn submit_limit_sell_order_no_position() {
             .unwrap(),
         vec![expected_order_update]
     );
+    let bid = quote!(101);
+    let ask = quote!(102);
     exchange
         .update_state(0, bba!(quote!(101), quote!(102)))
         .unwrap();
@@ -48,8 +50,11 @@ fn submit_limit_sell_order_no_position() {
         }
     );
     let fee = quote!(0.18);
-    assert_eq!(exchange.account().wallet_balance, quote!(1000) - fee);
-    assert_eq!(exchange.account().available_balance(), quote!(100) - fee);
+    assert_eq!(exchange.account().total_value(bid, ask), quote!(1000) - fee);
+    assert_eq!(
+        exchange.account().available_wallet_balance(),
+        quote!(100) - fee
+    );
 
     // close the position again
     let order = LimitOrder::new(Side::Buy, quote!(100), base!(9)).unwrap();
@@ -75,9 +80,12 @@ fn submit_limit_sell_order_no_position() {
             leverage: leverage!(1),
         }
     );
-    assert_eq!(exchange.account().wallet_balance, quote!(1000) - fee - fee);
     assert_eq!(
-        exchange.account().available_balance(),
+        exchange.account().total_value(bid, ask),
+        quote!(1000) - fee - fee
+    );
+    assert_eq!(
+        exchange.account().available_wallet_balance(),
         quote!(1000) - fee - fee
     );
 }
@@ -121,7 +129,7 @@ fn submit_limit_sell_order_below_bid() {
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
     let order = LimitOrder::new(Side::Sell, quote!(99), base!(9)).unwrap();
     assert_eq!(

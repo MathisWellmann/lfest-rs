@@ -6,7 +6,10 @@ use crate::{
     order_margin::compute_order_margin,
     position::Position,
     prelude::AccountTracker,
-    types::{Currency, Error, Leverage, LimitOrder, MarginCurrency, OrderId, Pending, Result},
+    types::{
+        Currency, Error, Leverage, LimitOrder, MarginCurrency, OrderId, Pending, QuoteCurrency,
+        Result,
+    },
 };
 
 /// The users account
@@ -19,9 +22,9 @@ where
     M: Currency + MarginCurrency,
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
-    /// The wallet balance of the user denoted in the margin currency.
+    /// The wallet balance of the user denoted in the margin `Currency`.
     #[getset(get_copy = "pub")]
-    pub(crate) wallet_balance: M,
+    pub(crate) available_wallet_balance: M,
 
     /// Get the current position of the `Account`.
     #[getset(get = "pub")]
@@ -50,7 +53,7 @@ where
     fn default() -> Self {
         use crate::prelude::{Dec, Decimal};
         Self {
-            wallet_balance: M::new(Dec!(1)),
+            available_wallet_balance: M::new(Dec!(1)),
             position: Position::default(),
             active_limit_orders: HashMap::default(),
             lookup_order_nonce_from_user_order_id: HashMap::default(),
@@ -69,7 +72,7 @@ where
         let position = Position::new(leverage);
 
         Self {
-            wallet_balance: starting_balance,
+            available_wallet_balance: starting_balance,
             position,
             active_limit_orders: HashMap::new(),
             lookup_order_nonce_from_user_order_id: HashMap::new(),
@@ -77,13 +80,9 @@ where
         }
     }
 
-    /// Return the available balance of the `Account`
-    pub fn available_balance(&self) -> M {
-        // TODO: this call is expensive so maybe compute once and store
-        let order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
-        let ab = self.wallet_balance - self.position.position_margin - order_margin;
-        debug_assert!(ab >= M::new_zero());
-        ab
+    /// All the account value denoted in the margin currency, which includes `wallet_balance` and position value.
+    pub fn total_value(&self, bid: QuoteCurrency, ask: QuoteCurrency) -> M {
+        self.available_wallet_balance + self.position.value(bid, ask)
     }
 
     /// Allows the user to update their desired leverage.

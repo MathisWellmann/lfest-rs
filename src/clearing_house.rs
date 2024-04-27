@@ -4,6 +4,7 @@ use fpdec::Decimal;
 
 use crate::{
     prelude::{Account, AccountTracker},
+    quote,
     types::{Currency, Fee, MarginCurrency, QuoteCurrency, Side},
 };
 
@@ -94,9 +95,17 @@ where
         fee: Fee,
         ts_ns: i64,
     ) {
+        debug_assert!(quantity >= M::PairedCurrency::new_zero());
+        debug_assert!(fill_price > quote!(0));
+
         let notional_value = quantity.convert(fill_price);
+        let margin_value = notional_value / account.position.leverage;
         let fee = notional_value * fee;
-        account.wallet_balance -= fee;
+        account.available_wallet_balance -= fee + margin_value;
+        debug_assert!(
+            account.available_wallet_balance >= M::new_zero(),
+            "`available_wallet_balance` must be greater or equal zero."
+        );
         account_tracker.log_fee(fee);
 
         if account.position.size() >= M::PairedCurrency::new_zero() {
@@ -106,7 +115,7 @@ where
             if quantity.into_negative() >= account.position.size {
                 // Strictly decrease the short position
                 let rpnl = account.position.decrease_short(quantity, fill_price);
-                account.wallet_balance += rpnl;
+                account.available_wallet_balance += rpnl;
                 account_tracker.log_rpnl(rpnl - fee, ts_ns);
             } else {
                 let new_long_size = quantity - account.position.size().abs();
@@ -115,7 +124,7 @@ where
                 let rpnl = account
                     .position
                     .decrease_short(account.position.size().abs(), fill_price);
-                account.wallet_balance += rpnl;
+                account.available_wallet_balance += rpnl;
                 account_tracker.log_rpnl(rpnl - fee, ts_ns);
 
                 // also open a long
@@ -133,16 +142,24 @@ where
         fee: Fee,
         ts_ns: i64,
     ) {
+        debug_assert!(quantity >= M::PairedCurrency::new_zero());
+        debug_assert!(fill_price > quote!(0));
+
         let notional_value = quantity.convert(fill_price);
+        let margin_value = notional_value / account.position.leverage;
         let fee = notional_value * fee;
-        account.wallet_balance -= fee;
+        account.available_wallet_balance -= fee + margin_value;
+        debug_assert!(
+            account.available_wallet_balance >= M::new_zero(),
+            "`available_wallet_balance` must be greater or equal zero."
+        );
         account_tracker.log_fee(fee);
 
         if account.position.size() > M::PairedCurrency::new_zero() {
             if quantity <= account.position.size() {
                 // Decrease the long only
                 let rpnl = account.position.decrease_long(quantity, fill_price);
-                account.wallet_balance += rpnl;
+                account.available_wallet_balance += rpnl;
                 account_tracker.log_rpnl(rpnl - fee, ts_ns);
             } else {
                 let new_short_size = quantity - account.position.size();
@@ -152,7 +169,7 @@ where
                     .position
                     .decrease_long(account.position.size(), fill_price);
 
-                account.wallet_balance += rpnl;
+                account.available_wallet_balance += rpnl;
                 account_tracker.log_rpnl(rpnl - fee, ts_ns);
 
                 // Open a short as well

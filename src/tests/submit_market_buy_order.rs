@@ -7,7 +7,7 @@ fn submit_market_buy_order_reject() {
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     let order = MarketOrder::new(Side::Buy, base!(10)).unwrap();
@@ -23,7 +23,7 @@ fn submit_market_buy_order_no_position() {
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     let order = MarketOrder::new(Side::Buy, base!(5)).unwrap();
@@ -40,7 +40,7 @@ fn submit_market_buy_order_no_position() {
         }
     );
     assert_eq!(
-        exchange.account().available_balance(),
+        exchange.account().available_wallet_balance(),
         // - fee
         quote!(495) - quote!(0.303)
     );
@@ -53,7 +53,7 @@ fn submit_market_buy_order_with_long_position() {
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     // First enter a long position
@@ -74,7 +74,7 @@ fn submit_market_buy_order_with_long_position() {
         }
     );
     assert_eq!(
-        exchange.account().available_balance(),
+        exchange.account().available_wallet_balance(),
         // - fee - fee - spread loss
         quote!(100) - quote!(0.3) - quote!(0.24)
     );
@@ -87,7 +87,7 @@ fn submit_market_buy_order_with_short_position() {
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     // First enter a short position
@@ -107,7 +107,7 @@ fn submit_market_buy_order_with_short_position() {
         }
     );
     assert_eq!(
-        exchange.account().available_balance(),
+        exchange.account().available_wallet_balance(),
         // - fee - fee - spread loss
         quote!(1000) - quote!(0.54) - quote!(0.5454) - quote!(9)
     );
@@ -120,7 +120,7 @@ fn submit_market_buy_order_turnaround_short() {
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     // First enter a short position
@@ -140,7 +140,7 @@ fn submit_market_buy_order_turnaround_short() {
         }
     );
     assert_eq!(
-        exchange.account().available_balance(),
+        exchange.account().available_wallet_balance(),
         // - fee - fee - spread loss
         quote!(100) - quote!(0.5346) - quote!(1.08) - quote!(9)
     );

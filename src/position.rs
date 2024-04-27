@@ -19,6 +19,7 @@ where
     #[getset(get_copy = "pub")]
     pub(crate) size: M::PairedCurrency,
 
+    // TODO: refactor this struct because if size == 0 it does not make sense to have `entry_price`.
     /// The entry price of the position
     #[getset(get_copy = "pub")]
     pub(crate) entry_price: QuoteCurrency,
@@ -45,7 +46,6 @@ where
 
     /// Returns the implied leverage of the position based on the position value and the collateral backing it.
     /// It is computed by dividing the total value of the position by the amount of margin required to hold that position.
-    #[inline]
     pub fn implied_leverage(&self, price: QuoteCurrency) -> Decimal {
         let value = self.size.convert(price);
         value.inner() / self.position_margin.inner()
@@ -63,6 +63,12 @@ where
         }
     }
 
+    /// The total position value including unrealized profit and loss.
+    /// Denoted in the margin `Currency`.
+    pub fn value(&self, bid: QuoteCurrency, ask: QuoteCurrency) -> M {
+        self.position_margin + self.unrealized_pnl(bid, ask)
+    }
+
     /// Create a new position with all fields custom.
     ///
     /// # Arguments:
@@ -71,7 +77,7 @@ where
     /// `entry_price`: The price at which the position was entered.
     ///
     pub(crate) fn open_position(&mut self, size: M::PairedCurrency, price: QuoteCurrency) {
-        debug_assert!(price > quote!(0));
+        debug_assert!(price > quote!(0), "Price must be greater than zero");
 
         self.size = size;
         self.entry_price = price;
@@ -120,9 +126,12 @@ where
         debug_assert!(quantity <= self.size, "Quantity larger than position size");
 
         self.size -= quantity;
-        self.position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
+        let new_position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
+        let freed_margin = self.position_margin - new_position_margin;
+        self.position_margin = new_position_margin;
+        debug_assert!(self.position_margin >= M::new_zero());
 
-        M::pnl(self.entry_price, price, quantity)
+        M::pnl(self.entry_price, price, quantity) + freed_margin
     }
 
     /// Increase a short position.
@@ -149,6 +158,7 @@ where
         );
         self.size = new_size;
         self.position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
+        debug_assert!(self.position_margin >= M::new_zero());
     }
 
     /// Reduce a short position
@@ -179,8 +189,11 @@ where
         );
 
         self.size += quantity;
-        self.position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
+        let new_position_margin = self.size.abs().convert(self.entry_price) / self.leverage;
+        let freed_margin = self.position_margin - new_position_margin;
+        self.position_margin = new_position_margin;
+        debug_assert!(self.position_margin >= M::new_zero());
 
-        M::pnl(self.entry_price, price, quantity.into_negative())
+        M::pnl(self.entry_price, price, quantity.into_negative()) + freed_margin
     }
 }
