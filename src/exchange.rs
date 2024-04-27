@@ -89,8 +89,10 @@ where
         market_update: U,
     ) -> Result<Vec<LimitOrderUpdate<Q, UserOrderId>>>
     where
-        U: MarketUpdate<Q, UserOrderId>,
+        U: MarketUpdate<Q, UserOrderId> + std::fmt::Debug,
     {
+        trace!("Exchange: update_state: timestamp_ns: {timestamp_ns}, market_update: {market_update:?}");
+
         self.market_state
             .update_state(timestamp_ns, &market_update)?;
         self.account_tracker
@@ -105,7 +107,7 @@ where
 
         // TODO: move into `Account`
         let mut changed_orders = Vec::new();
-        for mut order in self.account.active_limit_orders.clone().values().cloned() {
+        for mut order in self.account.active_limit_orders().clone().values().cloned() {
             if let Some(filled_qty) = market_update.limit_order_filled(&order) {
                 let qty = match order.side() {
                     Side::Buy => filled_qty,

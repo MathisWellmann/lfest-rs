@@ -49,20 +49,26 @@ where
         account: &Account<M, UserOrderId>,
         order: &LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
     ) -> Result<(), RiskError> {
-        let mut orders = account.active_limit_orders.clone();
+        let mut orders = account.active_limit_orders().clone();
         orders.insert(order.state().meta().id(), order.clone());
-        let new_order_margin = compute_order_margin(&account.position, &orders, account.leverage());
+        let new_order_margin =
+            compute_order_margin(account.position(), &orders, account.leverage());
+        debug!("IsolatedMargin: new_order_margin: {new_order_margin:?}");
 
         // TODO: this calculation does not allow a fully loaded long (or short) position
         // to be reversed into the opposite position of the same size,
         // which should be possible and requires a slightly modified calculation that
-        let available_balance = account.wallet_balance - account.position.margin;
+        let available_balance = account.available_wallet_balance() - account.position().margin();
         debug!(
             "new_order_margin: {}, available_balance: {}",
             new_order_margin, available_balance
         );
         let order_fees: M = fees_of_limit_orders(&orders, self.contract_spec.fee_maker);
-        if new_order_margin + order_fees > available_balance {
+        debug!("IsolatedMargin: new_order_margin: {new_order_margin:?}");
+
+        if new_order_margin + order_fees
+            > account.available_wallet_balance() + account.order_margin()
+        {
             return Err(RiskError::NotEnoughAvailableBalance);
         }
 
@@ -74,7 +80,7 @@ where
         market_state: &MarketState,
         account: &Account<M, UserOrderId>,
     ) -> Result<(), RiskError> {
-        if account.position.size() == M::PairedCurrency::new_zero() {
+        if account.position().size() == M::PairedCurrency::new_zero() {
             return Ok(());
         }
         let pos_value = account
@@ -85,7 +91,7 @@ where
         let maint_margin = account
             .position()
             .size()
-            .convert(account.position.entry_price)
+            .convert(account.position().entry_price())
             * self.contract_spec.maintenance_margin;
         if pos_value < maint_margin {
             return Err(RiskError::Liquidate);
@@ -111,29 +117,29 @@ where
     {
         debug_assert!(matches!(order.side(), Side::Buy));
 
-        if account.position.size() >= M::PairedCurrency::new_zero() {
+        if account.position().size() >= M::PairedCurrency::new_zero() {
             // A long position increases in size.
             let notional_value = order.quantity().convert(fill_price);
             let margin_req = notional_value / account.leverage();
             let fee = notional_value * self.contract_spec.fee_taker;
-            if margin_req + fee > account.available_balance() {
+            if margin_req + fee > account.available_wallet_balance() {
                 return Err(RiskError::NotEnoughAvailableBalance);
             }
             return Ok(());
         }
         // Else its a short position which needs to be reduced
-        if order.quantity() <= account.position.size().abs() {
+        if order.quantity() <= account.position().size().abs() {
             // The order strictly reduces the position, so no additional margin is required.
             return Ok(());
         }
         // The order reduces the short and puts on a long
-        let released_from_old_pos = account.position.margin;
+        let released_from_old_pos = account.position().margin;
 
-        let new_long_size = order.quantity() - account.position.size.abs();
+        let new_long_size = order.quantity() - account.position().size.abs();
         let new_notional_value = new_long_size.convert(fill_price);
         let new_margin_req = new_notional_value / account.leverage();
 
-        if new_margin_req > account.available_balance() + released_from_old_pos {
+        if new_margin_req > account.available_wallet_balance() + released_from_old_pos {
             return Err(RiskError::NotEnoughAvailableBalance);
         }
 
@@ -151,27 +157,27 @@ where
     {
         debug_assert!(matches!(order.side(), Side::Sell));
 
-        if account.position.size() <= M::PairedCurrency::new_zero() {
+        if account.position().size() <= M::PairedCurrency::new_zero() {
             let notional_value = order.quantity().convert(fill_price);
             let margin_req = notional_value / account.leverage();
             let fee = notional_value * self.contract_spec.fee_taker;
-            if margin_req + fee > account.available_balance() {
+            if margin_req + fee > account.available_wallet_balance() {
                 return Err(RiskError::NotEnoughAvailableBalance);
             }
             return Ok(());
         }
         // Else its a long position which needs to be reduced
-        if order.quantity() <= account.position.size() {
+        if order.quantity() <= account.position().size() {
             // The order strictly reduces the position, so no additional margin is required.
             return Ok(());
         }
         // The order reduces the long position and opens a short.
-        let released_from_old_pos = account.position.margin;
+        let released_from_old_pos = account.position().margin;
 
-        let new_short_size = order.quantity() - account.position.size();
+        let new_short_size = order.quantity() - account.position().size();
         let new_margin_req = new_short_size.convert(fill_price) / account.leverage();
 
-        if new_margin_req > account.available_balance() + released_from_old_pos {
+        if new_margin_req > account.available_wallet_balance() + released_from_old_pos {
             return Err(RiskError::NotEnoughAvailableBalance);
         }
 

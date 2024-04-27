@@ -1,21 +1,23 @@
 use crate::{mock_exchange_linear, prelude::*, trade};
 
 #[test]
+#[tracing_test::traced_test]
 fn submit_limit_buy_order_no_position() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
-    let order = LimitOrder::new(Side::Buy, quote!(98), base!(5)).unwrap();
+    let limit_price = quote!(98);
+    let order = LimitOrder::new(Side::Buy, limit_price, base!(5)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(0),
             entry_price: quote!(0),
             margin: quote!(0),
@@ -34,22 +36,30 @@ fn submit_limit_buy_order_no_position() {
             .unwrap(),
         vec![expected_order_update]
     );
-    exchange
-        .update_state(0, bba!(quote!(96), quote!(99)))
-        .unwrap();
+    let bid = quote!(96);
+    let ask = quote!(99);
+    let order_updates = exchange.update_state(0, bba!(bid, ask)).unwrap();
+    assert!(order_updates.is_empty());
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(5),
             entry_price: quote!(98),
             margin: quote!(490),
         }
     );
     let fee = quote!(0.098);
-    assert_eq!(exchange.account().wallet_balance, quote!(1000) - fee);
-    assert_eq!(exchange.account().available_balance(), quote!(510) - fee);
+    assert_eq!(
+        // Bid is deliberately the same as the entry price
+        exchange.account().total_value(limit_price, ask),
+        quote!(1000) - fee
+    );
+    assert_eq!(
+        exchange.account().available_wallet_balance(),
+        quote!(510) - fee
+    );
 
-    // close the position again
+    // close the position again with a limit order.
     let order = LimitOrder::new(Side::Sell, quote!(98), base!(5)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
@@ -57,7 +67,7 @@ fn submit_limit_buy_order_no_position() {
         exchange
             .update_state(0, bba!(quote!(96), quote!(97)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     let meta = ExchangeOrderMeta::new(1, 0);
@@ -65,26 +75,23 @@ fn submit_limit_buy_order_no_position() {
     let limit_price = order.limit_price();
     order.fill(limit_price, order.quantity());
     let expected_order_update = LimitOrderUpdate::FullyFilled(order.into_filled(limit_price, 0));
-    exchange
-        .update_state(0, bba!(quote!(96), quote!(98)))
-        .unwrap();
     assert_eq!(
         exchange
-            .update_state(0, trade!(quote!(98), base!(5), Side::Buy))
+            .update_state(0, trade!(quote!(99), base!(5), Side::Buy))
             .unwrap(),
         vec![expected_order_update]
     );
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(0),
+            // TODO: does not really make sense to have an `entry_price` with a `size` of zero.
             entry_price: quote!(98),
             margin: quote!(0),
         }
     );
-    assert_eq!(exchange.account().wallet_balance, quote!(1000) - fee - fee);
     assert_eq!(
-        exchange.account().available_balance(),
+        exchange.account().total_value(bid, ask),
         quote!(1000) - fee - fee
     );
 }
@@ -97,7 +104,7 @@ fn submit_limit_buy_order_no_position_max() {
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     let order = LimitOrder::new(Side::Buy, quote!(100), base!(5)).unwrap();
@@ -128,7 +135,7 @@ fn submit_limit_buy_order_with_long() {
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
     let order = MarketOrder::new(Side::Buy, base!(9)).unwrap();
     exchange.submit_market_order(order).unwrap();
@@ -146,7 +153,7 @@ fn submit_limit_buy_order_with_long() {
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     // Another buy limit order should not work

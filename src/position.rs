@@ -16,6 +16,7 @@ where
     #[getset(get_copy = "pub")]
     pub(crate) size: M::PairedCurrency,
 
+    // TODO: refactor this struct because if size == 0 it does not make sense to have `entry_price`.
     /// The entry price of the position
     #[getset(get_copy = "pub")]
     pub(crate) entry_price: QuoteCurrency,
@@ -32,7 +33,6 @@ where
 {
     /// Returns the implied leverage of the position based on the position value and the collateral backing it.
     /// It is computed by dividing the total value of the position by the amount of margin required to hold that position.
-    #[inline]
     pub fn implied_leverage(&self, price: QuoteCurrency) -> Decimal {
         let value = self.size.convert(price);
         value.inner() / self.margin.inner()
@@ -48,5 +48,11 @@ where
         } else {
             M::pnl(self.entry_price, ask, self.size)
         }
+    }
+
+    /// The total position value including unrealized profit and loss.
+    /// Denoted in the margin `Currency`.
+    pub fn value(&self, bid: QuoteCurrency, ask: QuoteCurrency) -> M {
+        self.margin + self.unrealized_pnl(bid, ask)
     }
 }

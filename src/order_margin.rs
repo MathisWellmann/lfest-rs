@@ -1,5 +1,4 @@
 use hashbrown::HashMap;
-use tracing::debug;
 
 use crate::{
     prelude::Position,
@@ -36,7 +35,6 @@ where
             .filter(|order| matches!(order.side(), Side::Buy)),
     );
     buys.sort_by_key(|order| order.limit_price());
-    debug!("buys: {:?}", buys);
 
     let mut sells = Vec::from_iter(
         active_limit_orders
@@ -44,7 +42,6 @@ where
             .filter(|order| matches!(order.side(), Side::Sell)),
     );
     sells.sort_by_key(|order| order.limit_price());
-    debug!("sells: {:?}", sells);
 
     // accumulate notional value (+fee) of buy orders which are not offset by the position
     let mut buy_margin_req = M::new_zero();
@@ -92,7 +89,11 @@ mod tests {
         let mut account = Account::new(quote!(1000), leverage);
 
         assert_eq!(
-            compute_order_margin(account.position(), &account.active_limit_orders, leverage),
+            compute_order_margin(
+                account.position(),
+                account.active_limit_orders(),
+                account.leverage(),
+            ),
             quote!(0)
         );
 
@@ -101,7 +102,11 @@ mod tests {
         let order = order.into_pending(meta);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(90)
         );
 
@@ -110,7 +115,11 @@ mod tests {
         let order = order.into_pending(meta);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                &account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(100)
         );
 
@@ -119,7 +128,11 @@ mod tests {
         let order = order.into_pending(meta);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                &account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(220)
         );
     }
@@ -127,15 +140,18 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn order_margin_with_long() {
-        let leverage = leverage!(1);
-        let mut account = Account::new(quote!(1000), leverage);
-        account.position = Position {
+        let mut account = Account::new(quote!(1000), leverage!(1));
+        *account.position_mut() = Position {
             size: base!(1),
             entry_price: quote!(100),
             margin: quote!(100),
         };
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(0)
         );
 
@@ -144,7 +160,11 @@ mod tests {
         let order = order.into_pending(meta);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(90)
         );
 
@@ -153,7 +173,11 @@ mod tests {
         let order = order.into_pending(meta);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(90)
         );
 
@@ -162,7 +186,11 @@ mod tests {
         let order = order.into_pending(meta);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(120)
         );
 
@@ -171,7 +199,11 @@ mod tests {
         let order = order.into_pending(meta);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(185)
         );
     }
@@ -179,15 +211,18 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn order_margin_with_short() {
-        let leverage = leverage!(1);
-        let mut account = Account::new(quote!(1000), leverage);
-        account.position = Position {
+        let mut account = Account::new(quote!(1000), leverage!(1));
+        *account.position_mut() = Position {
             size: base!(-1),
             entry_price: quote!(100),
             margin: quote!(100),
         };
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(0)
         );
 
@@ -196,7 +231,11 @@ mod tests {
         let order = order.into_pending(meta);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(0)
         );
 
@@ -205,7 +244,11 @@ mod tests {
         let order = order.into_pending(meta);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(100)
         );
 
@@ -214,7 +257,11 @@ mod tests {
         let order = order.into_pending(meta);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(220)
         );
 
@@ -223,7 +270,11 @@ mod tests {
         let order = order.into_pending(meta);
         account.append_limit_order(order);
         assert_eq!(
-            compute_order_margin(&account.position, &account.active_limit_orders, leverage),
+            compute_order_margin(
+                account.position(),
+                account.active_limit_orders(),
+                account.leverage()
+            ),
             quote!(220)
         );
     }

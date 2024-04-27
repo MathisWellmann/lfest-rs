@@ -7,29 +7,24 @@ use lfest::{mock_exchange_linear, prelude::*, trade};
 fn limit_orders_only() {
     let mut exchange = mock_exchange_linear();
 
-    let exec_orders = exchange
-        .update_state(
-            0,
-            Bba {
-                bid: quote!(100),
-                ask: quote!(101),
-            },
-        )
-        .unwrap();
+    let bid = quote!(100);
+    let ask = quote!(101);
+    let exec_orders = exchange.update_state(0, bba!(bid, ask)).unwrap();
     assert_eq!(exec_orders.len(), 0);
 
     let o = LimitOrder::new(Side::Buy, quote!(100), base!(9.9)).unwrap();
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.account().order_margin(), quote!(990));
-    assert_eq!(exchange.account().available_balance(), quote!(10));
+    assert_eq!(exchange.account().available_wallet_balance(), quote!(10));
 
-    let exec_orders = exchange
+    let order_updates = exchange
         .update_state(1, trade!(quote!(100), base!(10), Side::Sell))
         .unwrap();
-    let _ = exchange
+    assert_eq!(order_updates.len(), 1);
+    let order_updates = exchange
         .update_state(1, bba!(quote!(98), quote!(99)))
         .unwrap();
-    assert_eq!(exec_orders.len(), 1);
+    assert!(order_updates.is_empty());
 
     assert_eq!(exchange.account().position().size(), base!(9.9));
     assert_eq!(exchange.account().position().entry_price(), quote!(100));
@@ -42,32 +37,33 @@ fn limit_orders_only() {
         quote!(-19.8)
     );
 
-    assert_eq!(exchange.account().wallet_balance(), quote!(999.802));
     assert_eq!(exchange.account().position().margin(), quote!(990));
+    assert_eq!(exchange.account().total_value(bid, ask), quote!(999.802));
     assert_eq!(exchange.account().order_margin(), quote!(0.0));
-    assert_eq!(exchange.account().available_balance(), quote!(9.802));
+    assert_eq!(exchange.account().available_wallet_balance(), quote!(9.802));
 
     let o = LimitOrder::new(Side::Sell, quote!(105), base!(9.9)).unwrap();
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.account().order_margin(), quote!(0));
 
-    let exec_orders = exchange
+    let order_updates = exchange
         .update_state(2, trade!(quote!(105), base!(10), Side::Buy))
         .unwrap();
-    let _ = exchange
+    assert!(!order_updates.is_empty());
+    let order_updates = exchange
         .update_state(2, bba!(quote!(106), quote!(107)))
         .unwrap();
-    assert!(!exec_orders.is_empty());
+    assert!(order_updates.is_empty());
 
     assert_eq!(exchange.account().position().size(), base!(0.0));
     assert_eq!(
-        exchange.account().wallet_balance(),
+        exchange.account().total_value(bid, ask),
         quote!(1049.5) - quote!(0.198) - quote!(0.2079)
     );
     assert_eq!(exchange.account().position().margin(), quote!(0.0));
     assert_eq!(exchange.account().order_margin(), quote!(0.0));
     assert_eq!(
-        exchange.account().available_balance(),
+        exchange.account().available_wallet_balance(),
         quote!(1049.5) - quote!(0.198) - quote!(0.2079)
     );
 }
