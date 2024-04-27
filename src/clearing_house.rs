@@ -4,7 +4,8 @@ use fpdec::Decimal;
 
 use crate::{
     prelude::{Account, AccountTracker},
-    types::{Currency, Fee, MarginCurrency, QuoteCurrency, Side},
+    quote,
+    types::{Currency, Fee, MarginCurrency, QuoteCurrency, Side, TimestampNs},
 };
 
 /// A clearing house acts as an intermediary in futures transactions.
@@ -62,7 +63,7 @@ where
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
         fee: Fee,
-        ts_ns: i64,
+        ts_ns: TimestampNs,
     ) {
         let side = if quantity > M::PairedCurrency::new_zero() {
             Side::Buy
@@ -92,32 +93,36 @@ where
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
         fee: Fee,
-        ts_ns: i64,
+        ts_ns: TimestampNs,
     ) {
+        debug_assert!(quantity > M::PairedCurrency::new_zero());
+        debug_assert!(fill_price > quote!(0));
+
         let notional_value = quantity.convert(fill_price);
         let fee = notional_value * fee;
-        account.wallet_balance -= fee;
         account_tracker.log_fee(fee);
+        account.detract_fee(fee);
 
-        if account.position.size() >= M::PairedCurrency::new_zero() {
+        if account.position().size() >= M::PairedCurrency::new_zero() {
             account.increase_long(quantity, fill_price);
         } else {
             // Position must be short
-            if quantity.into_negative() >= account.position.size {
+            if quantity.into_negative() >= account.position().size {
                 // Strictly decrease the short position
-                let rpnl = account.decrease_short(quantity, fill_price);
-                account.wallet_balance += rpnl;
-                account_tracker.log_rpnl(rpnl - fee, ts_ns);
+                account.decrease_short(quantity, fill_price, account_tracker, ts_ns);
             } else {
-                let new_long_size = quantity - account.position.size().abs();
+                let new_long_size = quantity - account.position().size().abs();
 
                 // decrease the short first
-                let rpnl = account.decrease_short(account.position.size().abs(), fill_price);
-                account.wallet_balance += rpnl;
-                account_tracker.log_rpnl(rpnl - fee, ts_ns);
+                account.decrease_short(
+                    account.position().size().abs(),
+                    fill_price,
+                    account_tracker,
+                    ts_ns,
+                );
 
                 // also open a long
-                account.open_position(new_long_size, fill_price);
+                account.increase_long(new_long_size, fill_price);
             }
         }
     }
@@ -129,30 +134,31 @@ where
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
         fee: Fee,
-        ts_ns: i64,
+        ts_ns: TimestampNs,
     ) {
+        debug_assert!(quantity > M::PairedCurrency::new_zero());
+        debug_assert!(fill_price > quote!(0));
+
         let notional_value = quantity.convert(fill_price);
         let fee = notional_value * fee;
-        account.wallet_balance -= fee;
         account_tracker.log_fee(fee);
+        account.detract_fee(fee);
 
-        if account.position.size() > M::PairedCurrency::new_zero() {
-            if quantity <= account.position.size() {
-                // Decrease the long only
-                let rpnl = account.decrease_long(quantity, fill_price);
-                account.wallet_balance += rpnl;
-                account_tracker.log_rpnl(rpnl - fee, ts_ns);
+        if account.position().size() > M::PairedCurrency::new_zero() {
+            if quantity <= account.position().size() {
+                account.decrease_long(quantity, fill_price, account_tracker, ts_ns);
             } else {
-                let new_short_size = quantity - account.position.size();
+                let new_short_size = quantity - account.position().size();
 
-                // Close the long
-                let rpnl = account.decrease_long(account.position.size(), fill_price);
-
-                account.wallet_balance += rpnl;
-                account_tracker.log_rpnl(rpnl - fee, ts_ns);
+                account.decrease_long(
+                    account.position().size(),
+                    fill_price,
+                    account_tracker,
+                    ts_ns,
+                );
 
                 // Open a short as well
-                account.open_position(new_short_size.into_negative(), fill_price);
+                account.increase_short(new_short_size, fill_price);
             }
         } else {
             // Increase short position
