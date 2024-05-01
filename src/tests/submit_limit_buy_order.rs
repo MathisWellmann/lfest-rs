@@ -14,8 +14,8 @@ fn submit_limit_buy_order_no_position() {
     exchange.submit_limit_order(order.clone()).unwrap();
 
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(0),
             entry_price: quote!(0),
             margin: quote!(0),
@@ -39,8 +39,8 @@ fn submit_limit_buy_order_no_position() {
     let order_updates = exchange.update_state(0, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(5),
             entry_price: quote!(98),
             margin: quote!(490),
@@ -76,8 +76,8 @@ fn submit_limit_buy_order_no_position() {
         vec![expected_order_update]
     );
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(0),
             // TODO: does not really make sense to have an `entry_price` with a `size` of zero.
             entry_price: quote!(98),

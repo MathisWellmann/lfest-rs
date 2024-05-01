@@ -14,8 +14,8 @@ fn submit_limit_sell_order_no_position() {
     exchange.submit_limit_order(order.clone()).unwrap();
 
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(0),
             entry_price: quote!(0),
             margin: quote!(0),
@@ -40,8 +40,8 @@ fn submit_limit_sell_order_no_position() {
         .update_state(0, bba!(quote!(101), quote!(102)))
         .unwrap();
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(-9),
             entry_price: quote!(100),
             margin: quote!(900),
@@ -70,8 +70,8 @@ fn submit_limit_sell_order_no_position() {
         vec![expected_order_update]
     );
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(0),
             entry_price: quote!(100),
             margin: quote!(0),

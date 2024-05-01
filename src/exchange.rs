@@ -112,7 +112,7 @@ where
                 side,
             } => {
                 let mut changed_orders = Vec::new();
-                for mut order in self.account.active_limit_orders.clone().values().cloned() {
+                for mut order in self.account.active_limit_orders().clone().values().cloned() {
                     // The execution criteria.
                     if match order.side() {
                         Side::Buy => price <= order.limit_price() && matches!(side, Side::Sell),
@@ -164,7 +164,7 @@ where
             } => {
                 let mut changed_orders = Vec::new();
                 // As a simplifying assumption, the order always get executed fully when using candles.
-                for order in self.account.active_limit_orders.clone().values() {
+                for order in self.account.active_limit_orders().clone().values() {
                     // The execution criteria.
                     if match order.side() {
                         Side::Buy => low < order.limit_price(),

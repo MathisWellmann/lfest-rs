@@ -31,8 +31,8 @@ fn submit_market_buy_order_no_position() {
 
     // make sure its excuted immediately
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(5),
             entry_price: quote!(101),
             margin: quote!(505),
@@ -64,8 +64,8 @@ fn submit_market_buy_order_with_long_position() {
     exchange.submit_market_order(order).unwrap();
 
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(9),
             entry_price: quote!(100),
             margin: quote!(900),
@@ -96,8 +96,8 @@ fn submit_market_buy_order_with_short_position() {
     let order = MarketOrder::new(Side::Buy, base!(9)).unwrap();
     exchange.submit_market_order(order).unwrap();
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(0),
             entry_price: quote!(100),
             margin: quote!(0),
@@ -128,8 +128,8 @@ fn submit_market_buy_order_turnaround_short() {
     let order = MarketOrder::new(Side::Buy, base!(18)).unwrap();
     exchange.submit_market_order(order).unwrap();
     assert_eq!(
-        exchange.account().position,
-        Position {
+        exchange.account().position(),
+        &Position {
             size: base!(9),
             entry_price: quote!(100),
             margin: quote!(900),

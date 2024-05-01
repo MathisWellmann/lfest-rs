@@ -1,4 +1,4 @@
-use getset::{CopyGetters, Getters};
+use getset::{CopyGetters, Getters, MutGetters};
 use hashbrown::HashMap;
 use tracing::{debug, error};
 
@@ -9,7 +9,7 @@ use crate::{
     quote,
     types::{
         Currency, Error, Leverage, LimitOrder, MarginCurrency, OrderId, Pending, QuoteCurrency,
-        Result,
+        Result, TimestampNs,
     },
 };
 
@@ -17,7 +17,7 @@ use crate::{
 /// Generic over:
 /// `M`: The `Currency` representing the margin currency.
 /// `UserOrderId`: The type for the user defined order id.
-#[derive(Debug, Clone, Getters, CopyGetters)]
+#[derive(Debug, Clone, Getters, CopyGetters, MutGetters)]
 pub struct Account<M, UserOrderId>
 where
     M: Currency + MarginCurrency,
@@ -25,24 +25,25 @@ where
 {
     /// The position leverage,
     #[getset(get_copy = "pub")]
-    pub(crate) leverage: Leverage,
+    leverage: Leverage,
 
     /// The wallet balance of the user denoted in the margin `Currency`.
     #[getset(get_copy = "pub")]
-    pub(crate) available_wallet_balance: M,
+    available_wallet_balance: M,
 
     /// Get the current position of the `Account`.
     #[getset(get = "pub")]
-    pub(crate) position: Position<M>,
+    #[cfg_attr(test, getset(get_mut = "pub(crate)"))]
+    position: Position<M>,
 
     /// Maps the order `id` to the actual `Order`.
     #[getset(get = "pub")]
     #[allow(clippy::type_complexity)]
-    pub(crate) active_limit_orders:
+    active_limit_orders:
         HashMap<OrderId, LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>>,
 
     // Maps the `user_order_id` to the internal order nonce.
-    pub(crate) lookup_order_nonce_from_user_order_id: HashMap<UserOrderId, OrderId>,
+    lookup_order_nonce_from_user_order_id: HashMap<UserOrderId, OrderId>,
 
     /// The current order margin used by the user `Account`.
     #[getset(get_copy = "pub")]
@@ -241,10 +242,15 @@ where
     /// `amount`: The amount to decrease the position by, must be smaller or equal to the position size.
     /// `price`: The price at which it is sold.
     ///
-    /// # Returns:
-    /// If Ok, the net realized profit and loss for that specific futures contract.
-    #[must_use]
-    pub(crate) fn decrease_long(&mut self, quantity: M::PairedCurrency, price: QuoteCurrency) -> M {
+    pub(crate) fn decrease_long<A>(
+        &mut self,
+        quantity: M::PairedCurrency,
+        price: QuoteCurrency,
+        account_tracker: &mut A,
+        ts_ns: TimestampNs,
+    ) where
+        A: AccountTracker<M>,
+    {
         debug_assert!(
             self.position.size > M::PairedCurrency::new_zero(),
             "Open short or no position"
@@ -262,7 +268,9 @@ where
         self.position.margin = new_position_margin;
         debug_assert!(self.position.margin >= M::new_zero());
 
-        M::pnl(self.position.entry_price, price, quantity) + freed_margin
+        let rpnl = M::pnl(self.position.entry_price, price, quantity);
+        account_tracker.log_rpnl(rpnl, ts_ns);
+        self.available_wallet_balance += rpnl + freed_margin;
     }
 
     /// Increase a short position.
@@ -301,13 +309,15 @@ where
     ///     Must be smaller or equal to the open position size.
     /// `price`: The entry price.
     ///
-    /// # Returns:
-    /// If Ok, the net realized profit and loss for that specific futures contract.
-    pub(crate) fn decrease_short(
+    pub(crate) fn decrease_short<A>(
         &mut self,
         quantity: M::PairedCurrency,
         price: QuoteCurrency,
-    ) -> M {
+        account_tracker: &mut A,
+        ts_ns: TimestampNs,
+    ) where
+        A: AccountTracker<M>,
+    {
         debug_assert!(
             quantity > M::PairedCurrency::new_zero(),
             "Amount must be positive; qed"
@@ -328,6 +338,9 @@ where
         self.position.margin = new_position_margin;
         debug_assert!(self.position.margin >= M::new_zero());
 
-        M::pnl(self.position.entry_price, price, quantity.into_negative()) + freed_margin
+        let rpnl = M::pnl(self.position.entry_price, price, quantity.into_negative());
+        account_tracker.log_rpnl(rpnl, ts_ns);
+
+        self.available_wallet_balance += rpnl + freed_margin;
     }
 }
