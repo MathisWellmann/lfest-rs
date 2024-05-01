@@ -6,7 +6,11 @@ use crate::{
     order_margin::compute_order_margin,
     position::Position,
     prelude::AccountTracker,
-    types::{Currency, Error, Leverage, LimitOrder, MarginCurrency, OrderId, Pending, Result},
+    quote,
+    types::{
+        Currency, Error, Leverage, LimitOrder, MarginCurrency, OrderId, Pending, QuoteCurrency,
+        Result,
+    },
 };
 
 /// The users account
@@ -181,5 +185,137 @@ where
         self.order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
         self.lookup_order_nonce_from_user_order_id
             .remove(order.user_order_id());
+    }
+
+    /// Create a new position with all fields custom.
+    ///
+    /// # Arguments:
+    /// `size`: The position size, negative denoting a negative position.
+    ///     The `size` must have been approved by the `RiskEngine`.
+    /// `entry_price`: The price at which the position was entered.
+    ///
+    pub(crate) fn open_position(&mut self, size: M::PairedCurrency, price: QuoteCurrency) {
+        debug_assert!(price > quote!(0), "Price must be greater than zero");
+
+        self.position.size = size;
+        self.position.entry_price = price;
+        self.position.position_margin =
+            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+    }
+
+    /// Increase a long (or neutral) position.
+    ///
+    /// # Arguments:
+    /// `amount`: The absolute amount to increase the position by.
+    ///     The `amount` must have been approved by the `RiskEngine`.
+    /// `price`: The price at which it is sold.
+    ///
+    pub(crate) fn increase_long(&mut self, quantity: M::PairedCurrency, price: QuoteCurrency) {
+        debug_assert!(
+            quantity > M::PairedCurrency::new_zero(),
+            "`amount` must be positive"
+        );
+        debug_assert!(
+            self.position.size >= M::PairedCurrency::new_zero(),
+            "Short is open"
+        );
+
+        let new_size = self.position.size + quantity;
+        self.position.entry_price = QuoteCurrency::new(
+            (self.position.entry_price * self.position.size.inner() + price * quantity.inner())
+                .inner()
+                / new_size.inner(),
+        );
+
+        self.position.size = new_size;
+        self.position.position_margin =
+            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+    }
+
+    /// Reduce a long position.
+    ///
+    /// # Arguments:
+    /// `amount`: The amount to decrease the position by, must be smaller or equal to the position size.
+    /// `price`: The price at which it is sold.
+    ///
+    /// # Returns:
+    /// If Ok, the net realized profit and loss for that specific futures contract.
+    #[must_use]
+    pub(crate) fn decrease_long(&mut self, quantity: M::PairedCurrency, price: QuoteCurrency) -> M {
+        debug_assert!(
+            self.position.size > M::PairedCurrency::new_zero(),
+            "Open short or no position"
+        );
+        debug_assert!(quantity > M::PairedCurrency::new_zero());
+        debug_assert!(
+            quantity <= self.position.size,
+            "Quantity larger than position size"
+        );
+        self.position.size -= quantity;
+        self.position.position_margin =
+            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+
+        M::pnl(self.position.entry_price, price, quantity)
+    }
+
+    /// Increase a short position.
+    ///
+    /// # Arguments:
+    /// `amount`: The absolute amount to increase the short position by.
+    ///     The `amount` must have been approved by the `RiskEngine`.
+    /// `price`: The entry price.
+    ///
+    pub(crate) fn increase_short(&mut self, quantity: M::PairedCurrency, price: QuoteCurrency) {
+        debug_assert!(
+            quantity > M::PairedCurrency::new_zero(),
+            "Amount must be positive; qed"
+        );
+        debug_assert!(
+            self.position.size <= M::PairedCurrency::new_zero(),
+            "Position must not be long; qed"
+        );
+        let new_size = self.position.size - quantity;
+        self.position.entry_price = QuoteCurrency::new(
+            (self.position.entry_price.inner() * self.position.size.inner().abs()
+                + price.inner() * quantity.inner())
+                / new_size.inner().abs(),
+        );
+        self.position.size = new_size;
+        self.position.position_margin =
+            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+    }
+
+    /// Reduce a short position
+    ///
+    /// # Arguments:
+    /// `amount`: The absolute amount to decrease the short position by.
+    ///     Must be smaller or equal to the open position size.
+    /// `price`: The entry price.
+    ///
+    /// # Returns:
+    /// If Ok, the net realized profit and loss for that specific futures contract.
+    pub(crate) fn decrease_short(
+        &mut self,
+        quantity: M::PairedCurrency,
+        price: QuoteCurrency,
+    ) -> M {
+        debug_assert!(
+            quantity > M::PairedCurrency::new_zero(),
+            "Amount must be positive; qed"
+        );
+        debug_assert!(
+            self.position.size < M::PairedCurrency::new_zero(),
+            "Position must be short!"
+        );
+        debug_assert!(
+            quantity <= self.position.size.abs(),
+            "Amount must be smaller than short position; qed"
+        );
+
+        self.position.size += quantity;
+        self.position.position_margin =
+            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+
+        M::pnl(self.position.entry_price, price, quantity.into_negative())
     }
 }
