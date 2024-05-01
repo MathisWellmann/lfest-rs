@@ -35,7 +35,7 @@ fn submit_market_buy_order_no_position() {
         Position {
             size: base!(5),
             entry_price: quote!(101),
-            position_margin: quote!(505),
+            margin: quote!(505),
             leverage: leverage!(1)
         }
     );
@@ -69,7 +69,7 @@ fn submit_market_buy_order_with_long_position() {
         Position {
             size: base!(9),
             entry_price: quote!(100),
-            position_margin: quote!(900),
+            margin: quote!(900),
             leverage: leverage!(1),
         }
     );
@@ -102,7 +102,7 @@ fn submit_market_buy_order_with_short_position() {
         Position {
             size: base!(0),
             entry_price: quote!(100),
-            position_margin: quote!(0),
+            margin: quote!(0),
             leverage: leverage!(1),
         }
     );
@@ -135,7 +135,7 @@ fn submit_market_buy_order_turnaround_short() {
         Position {
             size: base!(9),
             entry_price: quote!(100),
-            position_margin: quote!(900),
+            margin: quote!(900),
             leverage: leverage!(1),
         }
     );

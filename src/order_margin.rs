@@ -129,7 +129,7 @@ mod tests {
         account.position = Position {
             size: base!(1),
             entry_price: quote!(100),
-            position_margin: quote!(100),
+            margin: quote!(100),
             leverage: leverage!(1),
         };
         assert_eq!(
@@ -181,7 +181,7 @@ mod tests {
         account.position = Position {
             size: base!(-1),
             entry_price: quote!(100),
-            position_margin: quote!(100),
+            margin: quote!(100),
             leverage: leverage!(1),
         };
         assert_eq!(

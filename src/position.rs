@@ -22,9 +22,8 @@ where
     pub(crate) entry_price: QuoteCurrency,
 
     /// The position margin of account, same denotation as wallet_balance
-    /// TODO: rename to `margin`.
     #[getset(get_copy = "pub")]
-    pub(crate) position_margin: M,
+    pub(crate) margin: M,
 
     /// The position leverage,
     /// TODO: move this field into `Account`.
@@ -47,7 +46,7 @@ where
     /// It is computed by dividing the total value of the position by the amount of margin required to hold that position.
     pub fn implied_leverage(&self, price: QuoteCurrency) -> Decimal {
         let value = self.size.convert(price);
-        value.inner() / self.position_margin.inner()
+        value.inner() / self.margin.inner()
     }
 
     /// Return the positions unrealized profit and loss
@@ -65,6 +64,6 @@ where
     /// The total position value including unrealized profit and loss.
     /// Denoted in the margin `Currency`.
     pub fn value(&self, bid: QuoteCurrency, ask: QuoteCurrency) -> M {
-        self.position_margin + self.unrealized_pnl(bid, ask)
+        self.margin + self.unrealized_pnl(bid, ask)
     }
 }

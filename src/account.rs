@@ -195,7 +195,7 @@ where
 
         self.position.size = size;
         self.position.entry_price = price;
-        self.position.position_margin =
+        self.position.margin =
             self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
     }
 
@@ -224,7 +224,7 @@ where
         );
 
         self.position.size = new_size;
-        self.position.position_margin =
+        self.position.margin =
             self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
     }
 
@@ -251,9 +251,9 @@ where
         self.position.size -= quantity;
         let new_position_margin =
             self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
-        let freed_margin = self.position.position_margin - new_position_margin;
-        self.position.position_margin = new_position_margin;
-        debug_assert!(self.position.position_margin >= M::new_zero());
+        let freed_margin = self.position.margin - new_position_margin;
+        self.position.margin = new_position_margin;
+        debug_assert!(self.position.margin >= M::new_zero());
 
         M::pnl(self.position.entry_price, price, quantity) + freed_margin
     }
@@ -282,9 +282,9 @@ where
                 / new_size.inner().abs(),
         );
         self.position.size = new_size;
-        self.position.position_margin =
+        self.position.margin =
             self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
-        debug_assert!(self.position.position_margin >= M::new_zero());
+        debug_assert!(self.position.margin >= M::new_zero());
     }
 
     /// Reduce a short position
@@ -317,9 +317,9 @@ where
         self.position.size += quantity;
         let new_position_margin =
             self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
-        let freed_margin = self.position.position_margin - new_position_margin;
-        self.position.position_margin = new_position_margin;
-        debug_assert!(self.position.position_margin >= M::new_zero());
+        let freed_margin = self.position.margin - new_position_margin;
+        self.position.margin = new_position_margin;
+        debug_assert!(self.position.margin >= M::new_zero());
 
         M::pnl(self.position.entry_price, price, quantity.into_negative()) + freed_margin
     }
