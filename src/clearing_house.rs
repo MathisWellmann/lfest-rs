@@ -99,7 +99,7 @@ where
         debug_assert!(fill_price > quote!(0));
 
         let notional_value = quantity.convert(fill_price);
-        let margin_value = notional_value / account.position.leverage;
+        let margin_value = notional_value / account.leverage;
         let fee = notional_value * fee;
         account.available_wallet_balance -= fee + margin_value;
         debug_assert!(
@@ -144,7 +144,7 @@ where
         debug_assert!(fill_price > quote!(0));
 
         let notional_value = quantity.convert(fill_price);
-        let margin_value = notional_value / account.position.leverage;
+        let margin_value = notional_value / account.leverage;
         let fee = notional_value * fee;
         account.available_wallet_balance -= fee + margin_value;
         debug_assert!(

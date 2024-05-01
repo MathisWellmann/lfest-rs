@@ -19,7 +19,6 @@ fn submit_limit_buy_order_no_position() {
             size: base!(0),
             entry_price: quote!(0),
             margin: quote!(0),
-            leverage: leverage!(1),
         }
     );
 
@@ -45,7 +44,6 @@ fn submit_limit_buy_order_no_position() {
             size: base!(5),
             entry_price: quote!(98),
             margin: quote!(490),
-            leverage: leverage!(1),
         }
     );
     let fee = quote!(0.098);
@@ -84,7 +82,6 @@ fn submit_limit_buy_order_no_position() {
             // TODO: does not really make sense to have an `entry_price` with a `size` of zero.
             entry_price: quote!(98),
             margin: quote!(0),
-            leverage: leverage!(1),
         }
     );
     assert_eq!(
@@ -143,7 +140,6 @@ fn submit_limit_buy_order_with_long() {
             size: base!(9),
             entry_price: quote!(100),
             margin: quote!(900),
-            leverage: leverage!(1),
         }
     );
 
@@ -183,7 +179,6 @@ fn submit_limit_buy_order_with_long() {
             size: base!(0),
             entry_price: quote!(100),
             margin: quote!(0),
-            leverage: leverage!(1),
         }
     );
 }
@@ -206,7 +201,6 @@ fn submit_limit_buy_order_with_short() {
             size: base!(-9),
             entry_price: quote!(100),
             margin: quote!(900),
-            leverage: leverage!(1),
         }
     );
 
@@ -239,7 +233,6 @@ fn submit_limit_buy_order_with_short() {
             size: base!(0),
             entry_price: quote!(100),
             margin: quote!(0),
-            leverage: leverage!(1),
         }
     );
 }
@@ -252,7 +245,7 @@ fn submit_limit_buy_order_above_ask() {
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
     let order = LimitOrder::new(Side::Buy, quote!(100), base!(9)).unwrap();
     assert_eq!(

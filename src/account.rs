@@ -23,6 +23,10 @@ where
     M: Currency + MarginCurrency,
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
+    /// The position leverage,
+    #[getset(get_copy = "pub")]
+    pub(crate) leverage: Leverage,
+
     /// The wallet balance of the user denoted in the margin `Currency`.
     #[getset(get_copy = "pub")]
     pub(crate) available_wallet_balance: M,
@@ -52,13 +56,14 @@ where
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
     fn default() -> Self {
-        use crate::prelude::{Dec, Decimal};
+        use crate::prelude::{leverage, Dec, Decimal};
         Self {
             available_wallet_balance: M::new(Dec!(1)),
             position: Position::default(),
             active_limit_orders: HashMap::default(),
             lookup_order_nonce_from_user_order_id: HashMap::default(),
             order_margin: M::new(Dec!(0)),
+            leverage: leverage!(1),
         }
     }
 }
@@ -70,14 +75,13 @@ where
 {
     /// Create a new [`Account`] instance.
     pub(crate) fn new(starting_balance: M, leverage: Leverage) -> Self {
-        let position = Position::new(leverage);
-
         Self {
             available_wallet_balance: starting_balance,
-            position,
+            position: Position::default(),
             active_limit_orders: HashMap::new(),
             lookup_order_nonce_from_user_order_id: HashMap::new(),
             order_margin: M::new_zero(),
+            leverage,
         }
     }
 
@@ -147,7 +151,8 @@ where
         };
         self.lookup_order_nonce_from_user_order_id
             .insert(user_order_id, order_id);
-        self.order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
+        self.order_margin =
+            compute_order_margin(&self.position, &self.active_limit_orders, self.leverage);
     }
 
     /// Cancel an active limit order.
@@ -165,7 +170,8 @@ where
             .active_limit_orders
             .remove(&order_id)
             .ok_or(Error::OrderIdNotFound)?;
-        self.order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
+        self.order_margin =
+            compute_order_margin(&self.position, &self.active_limit_orders, self.leverage);
 
         account_tracker.log_limit_order_cancellation();
 
@@ -178,7 +184,8 @@ where
             .active_limit_orders
             .remove(&order_id)
             .expect("The order must have been active; qed");
-        self.order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
+        self.order_margin =
+            compute_order_margin(&self.position, &self.active_limit_orders, self.leverage);
         self.lookup_order_nonce_from_user_order_id
             .remove(order.user_order_id());
     }
@@ -196,7 +203,7 @@ where
         self.position.size = size;
         self.position.entry_price = price;
         self.position.margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
     }
 
     /// Increase a long (or neutral) position.
@@ -225,7 +232,7 @@ where
 
         self.position.size = new_size;
         self.position.margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
     }
 
     /// Reduce a long position.
@@ -250,7 +257,7 @@ where
 
         self.position.size -= quantity;
         let new_position_margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
         let freed_margin = self.position.margin - new_position_margin;
         self.position.margin = new_position_margin;
         debug_assert!(self.position.margin >= M::new_zero());
@@ -283,7 +290,7 @@ where
         );
         self.position.size = new_size;
         self.position.margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
         debug_assert!(self.position.margin >= M::new_zero());
     }
 
@@ -316,7 +323,7 @@ where
 
         self.position.size += quantity;
         let new_position_margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
         let freed_margin = self.position.margin - new_position_margin;
         self.position.margin = new_position_margin;
         debug_assert!(self.position.margin >= M::new_zero());

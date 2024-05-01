@@ -19,7 +19,6 @@ fn submit_limit_sell_order_no_position() {
             size: base!(0),
             entry_price: quote!(0),
             margin: quote!(0),
-            leverage: leverage!(1),
         }
     );
 
@@ -46,7 +45,6 @@ fn submit_limit_sell_order_no_position() {
             size: base!(-9),
             entry_price: quote!(100),
             margin: quote!(900),
-            leverage: leverage!(1),
         }
     );
     let fee = quote!(0.18);
@@ -77,7 +75,6 @@ fn submit_limit_sell_order_no_position() {
             size: base!(0),
             entry_price: quote!(100),
             margin: quote!(0),
-            leverage: leverage!(1),
         }
     );
     assert_eq!(
@@ -98,7 +95,7 @@ fn submit_limit_sell_order_no_position_max() {
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
             .unwrap(),
-        vec![]
+        Vec::new()
     );
 
     let order = LimitOrder::new(Side::Sell, quote!(100), base!(5)).unwrap();
