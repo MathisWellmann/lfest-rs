@@ -1,11 +1,11 @@
 //! Test if a pure limit order strategy works correctly
 
-use lfest::{mock_exchange_base, prelude::*, trade};
+use lfest::{mock_exchange_linear, prelude::*, trade};
 
 #[test]
 #[tracing_test::traced_test]
 fn limit_orders_only() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
 
     let bid = quote!(100);
     let ask = quote!(101);
@@ -71,7 +71,7 @@ fn limit_orders_only() {
 #[test]
 #[tracing_test::traced_test]
 fn limit_orders_2() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
 
     let exec_orders = exchange
         .update_state(

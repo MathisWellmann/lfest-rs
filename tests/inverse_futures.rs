@@ -1,12 +1,12 @@
 //! Test file for the inverse futures mode of the exchange
 
 use fpdec::Decimal;
-use lfest::{mock_exchange_quote, prelude::*, trade};
+use lfest::{mock_exchange_inverse, prelude::*, trade};
 
 #[test]
 #[tracing_test::traced_test]
 fn inv_long_market_win_full() {
-    let mut exchange = mock_exchange_quote(base!(1));
+    let mut exchange = mock_exchange_inverse(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
         .unwrap();
@@ -81,7 +81,7 @@ fn inv_long_market_win_full() {
 #[test]
 #[tracing_test::traced_test]
 fn inv_long_market_loss_full() {
-    let mut exchange = mock_exchange_quote(base!(1));
+    let mut exchange = mock_exchange_inverse(base!(1));
     let bid = quote!(999);
     let ask = quote!(1000);
     let order_updates = exchange.update_state(0, bba!(bid, ask)).unwrap();
@@ -147,7 +147,7 @@ fn inv_long_market_loss_full() {
 #[test]
 #[tracing_test::traced_test]
 fn inv_short_market_win_full() {
-    let mut exchange = mock_exchange_quote(base!(1));
+    let mut exchange = mock_exchange_inverse(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(1000), quote!(1001)))
         .unwrap();
@@ -205,7 +205,7 @@ fn inv_short_market_win_full() {
 #[test]
 #[tracing_test::traced_test]
 fn inv_short_market_loss_full() {
-    let mut exchange = mock_exchange_quote(base!(1));
+    let mut exchange = mock_exchange_inverse(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(1000), quote!(1001)))
         .unwrap();
@@ -284,7 +284,7 @@ fn inv_short_market_loss_full() {
 #[test]
 #[tracing_test::traced_test]
 fn inv_long_market_win_partial() {
-    let mut exchange = mock_exchange_quote(base!(1));
+    let mut exchange = mock_exchange_inverse(base!(1));
     let order_updates = exchange
         .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
         .unwrap();
@@ -369,7 +369,7 @@ fn inv_long_market_win_partial() {
 #[test]
 #[tracing_test::traced_test]
 fn inv_long_market_loss_partial() {
-    let mut exchange = mock_exchange_quote(base!(1));
+    let mut exchange = mock_exchange_inverse(base!(1));
     let order_updates = exchange
         .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
         .unwrap();
@@ -435,7 +435,7 @@ fn inv_long_market_loss_partial() {
 #[test]
 #[tracing_test::traced_test]
 fn inv_short_market_win_partial() {
-    let mut exchange = mock_exchange_quote(base!(1));
+    let mut exchange = mock_exchange_inverse(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(1000.0), quote!(1001.0)))
         .unwrap();
@@ -513,7 +513,7 @@ fn inv_short_market_win_partial() {
 #[test]
 #[tracing_test::traced_test]
 fn inv_short_market_loss_partial() {
-    let mut exchange = mock_exchange_quote(base!(1));
+    let mut exchange = mock_exchange_inverse(base!(1));
     let order_updates = exchange
         .update_state(0, bba!(quote!(1000), quote!(1001)))
         .unwrap();
@@ -584,7 +584,7 @@ fn inv_short_market_loss_partial() {
 #[test]
 #[tracing_test::traced_test]
 fn inv_test_market_roundtrip() {
-    let mut exchange = mock_exchange_quote(base!(1));
+    let mut exchange = mock_exchange_inverse(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(999), quote!(1000)))
         .unwrap();
@@ -662,7 +662,7 @@ fn inv_test_market_roundtrip() {
 #[test]
 #[tracing_test::traced_test]
 fn inv_execute_limit() {
-    let mut exchange = mock_exchange_quote(base!(1));
+    let mut exchange = mock_exchange_inverse(base!(1));
     let bid = quote!(1000);
     let ask = quote!(1001);
     let _ = exchange.update_state(0, bba!(bid, ask)).unwrap();
