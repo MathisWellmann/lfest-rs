@@ -1,6 +1,6 @@
 use getset::{CopyGetters, Getters, MutGetters};
 use hashbrown::HashMap;
-use tracing::{debug, error};
+use tracing::{debug, error, trace};
 
 use crate::{
     order_margin::compute_order_margin,
@@ -88,7 +88,7 @@ where
 
     /// All the account value denoted in the margin currency, which includes `wallet_balance` and position value.
     pub fn total_value(&self, bid: QuoteCurrency, ask: QuoteCurrency) -> M {
-        self.available_wallet_balance + self.position.value(bid, ask)
+        self.available_wallet_balance + self.order_margin + self.position.value(bid, ask)
     }
 
     /// Allows the user to update their desired leverage.
@@ -152,8 +152,12 @@ where
         };
         self.lookup_order_nonce_from_user_order_id
             .insert(user_order_id, order_id);
-        self.order_margin =
+        let new_order_margin =
             compute_order_margin(&self.position, &self.active_limit_orders, self.leverage);
+        let order_margin_delta = new_order_margin - self.order_margin;
+        self.order_margin = new_order_margin;
+        self.available_wallet_balance -= order_margin_delta;
+        debug_assert!(self.available_wallet_balance >= M::new_zero());
     }
 
     /// Cancel an active limit order.
@@ -171,8 +175,12 @@ where
             .active_limit_orders
             .remove(&order_id)
             .ok_or(Error::OrderIdNotFound)?;
-        self.order_margin =
+        let new_order_margin =
             compute_order_margin(&self.position, &self.active_limit_orders, self.leverage);
+        let order_margin_delta = self.order_margin - new_order_margin;
+        debug_assert!(order_margin_delta > M::new_zero());
+        self.order_margin = new_order_margin;
+        self.available_wallet_balance += order_margin_delta;
 
         account_tracker.log_limit_order_cancellation();
 
@@ -185,55 +193,64 @@ where
             .active_limit_orders
             .remove(&order_id)
             .expect("The order must have been active; qed");
-        self.order_margin =
+        let new_order_margin =
             compute_order_margin(&self.position, &self.active_limit_orders, self.leverage);
+        let order_margin_delta = self.order_margin - new_order_margin;
+        self.order_margin = new_order_margin;
+        self.available_wallet_balance += order_margin_delta;
+        debug_assert!(self.available_wallet_balance >= M::new_zero());
+
         self.lookup_order_nonce_from_user_order_id
             .remove(order.user_order_id());
     }
 
-    /// Create a new position with all fields custom.
-    ///
-    /// # Arguments:
-    /// `size`: The position size, negative denoting a negative position.
-    ///     The `size` must have been approved by the `RiskEngine`.
-    /// `entry_price`: The price at which the position was entered.
-    ///
-    pub(crate) fn open_position(&mut self, size: M::PairedCurrency, price: QuoteCurrency) {
-        debug_assert!(price > quote!(0), "Price must be greater than zero");
-
-        self.position.size = size;
-        self.position.entry_price = price;
-        self.position.margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
+    /// Detract a fee amount from `available_wallet_balance`
+    pub(crate) fn detract_fee(&mut self, fee: M) {
+        self.available_wallet_balance -= fee;
+        debug_assert!(self.available_wallet_balance >= M::new_zero());
     }
 
     /// Increase a long (or neutral) position.
     ///
     /// # Arguments:
-    /// `amount`: The absolute amount to increase the position by.
+    /// `quantity`: The absolute amount to increase the position by.
     ///     The `amount` must have been approved by the `RiskEngine`.
     /// `price`: The price at which it is sold.
     ///
     pub(crate) fn increase_long(&mut self, quantity: M::PairedCurrency, price: QuoteCurrency) {
+        trace!("Account.increase_long: quantity: {quantity:?}, price: {price:?}");
+
         debug_assert!(
             quantity > M::PairedCurrency::new_zero(),
-            "`amount` must be positive"
+            "`quantity` must be positive"
         );
+        debug_assert!(price > quote!(0), "Price must be greater than zero");
+
         debug_assert!(
             self.position.size >= M::PairedCurrency::new_zero(),
             "Short is open"
         );
 
         let new_size = self.position.size + quantity;
+        trace!("new_size: {new_size}");
+        debug_assert!(new_size > M::PairedCurrency::new_zero());
+
         self.position.entry_price = QuoteCurrency::new(
             (self.position.entry_price * self.position.size.inner() + price * quantity.inner())
                 .inner()
                 / new_size.inner(),
         );
+        debug_assert!(self.position.entry_price > quote!(0));
 
         self.position.size = new_size;
-        self.position.margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
+        let pos_margin =
+            margin_for_position(self.position.size, self.position.entry_price, self.leverage);
+        let margin_delta = pos_margin - self.position.margin;
+        self.position.margin = pos_margin;
+        debug_assert!(self.position.margin >= M::new_zero());
+
+        self.available_wallet_balance -= margin_delta;
+        debug_assert!(self.available_wallet_balance >= M::new_zero());
     }
 
     /// Reduce a long position.
@@ -251,11 +268,13 @@ where
     ) where
         A: AccountTracker<M>,
     {
+        debug_assert!(quantity > M::PairedCurrency::new_zero());
+        debug_assert!(price > quote!(0), "Price must be greater than zero");
+
         debug_assert!(
             self.position.size > M::PairedCurrency::new_zero(),
             "Open short or no position"
         );
-        debug_assert!(quantity > M::PairedCurrency::new_zero());
         debug_assert!(
             quantity <= self.position.size,
             "Quantity larger than position size"
@@ -263,7 +282,7 @@ where
 
         self.position.size -= quantity;
         let new_position_margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
+            margin_for_position(self.position.size, self.position.entry_price, self.leverage);
         let freed_margin = self.position.margin - new_position_margin;
         self.position.margin = new_position_margin;
         debug_assert!(self.position.margin >= M::new_zero());
@@ -271,9 +290,10 @@ where
         let rpnl = M::pnl(self.position.entry_price, price, quantity);
         account_tracker.log_rpnl(rpnl, ts_ns);
         self.available_wallet_balance += rpnl + freed_margin;
+        assert!(self.available_wallet_balance >= M::new_zero());
     }
 
-    /// Increase a short position.
+    /// Increase a short (or neutral) position.
     ///
     /// # Arguments:
     /// `amount`: The absolute amount to increase the short position by.
@@ -281,10 +301,14 @@ where
     /// `price`: The entry price.
     ///
     pub(crate) fn increase_short(&mut self, quantity: M::PairedCurrency, price: QuoteCurrency) {
+        trace!("Account.increase_short: quantity: {quantity:?}, price: {price:?}");
+
         debug_assert!(
             quantity > M::PairedCurrency::new_zero(),
             "Amount must be positive; qed"
         );
+        debug_assert!(price > quote!(0), "Price must be greater than zero");
+
         debug_assert!(
             self.position.size <= M::PairedCurrency::new_zero(),
             "Position must not be long; qed"
@@ -297,12 +321,26 @@ where
                 / new_size.inner().abs(),
         );
         self.position.size = new_size;
-        self.position.margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
-        debug_assert!(self.position.margin >= M::new_zero());
+        let new_pos_margin =
+            margin_for_position(self.position.size, self.position.entry_price, self.leverage);
+        trace!("new_pos_margin: {new_pos_margin:?}");
+        debug_assert!(new_pos_margin >= M::new_zero());
+
+        let margin_delta = new_pos_margin - self.position.margin;
+        debug_assert!(margin_delta >= M::new_zero());
+
+        self.position.margin = new_pos_margin;
+        trace!("position.margin: {:?}", self.position.margin);
+
+        self.available_wallet_balance -= margin_delta;
+        trace!(
+            "available_wallet_balance: {:?}",
+            self.available_wallet_balance
+        );
+        debug_assert!(self.available_wallet_balance >= M::new_zero());
     }
 
-    /// Reduce a short position
+    /// Reduce a short position.
     ///
     /// # Arguments:
     /// `amount`: The absolute amount to decrease the short position by.
@@ -322,6 +360,8 @@ where
             quantity > M::PairedCurrency::new_zero(),
             "Amount must be positive; qed"
         );
+        debug_assert!(price > quote!(0), "Price must be greater than zero");
+
         debug_assert!(
             self.position.size < M::PairedCurrency::new_zero(),
             "Position must be short!"
@@ -332,15 +372,30 @@ where
         );
 
         self.position.size += quantity;
-        let new_position_margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
-        let freed_margin = self.position.margin - new_position_margin;
-        self.position.margin = new_position_margin;
+        let new_pos_margin =
+            margin_for_position(self.position.size, self.position.entry_price, self.leverage);
+        let margin_delta = self.position.margin - new_pos_margin;
+        debug_assert!(margin_delta > M::new_zero());
+
+        self.position.margin = new_pos_margin;
         debug_assert!(self.position.margin >= M::new_zero());
 
         let rpnl = M::pnl(self.position.entry_price, price, quantity.into_negative());
         account_tracker.log_rpnl(rpnl, ts_ns);
 
-        self.available_wallet_balance += rpnl + freed_margin;
+        self.available_wallet_balance += rpnl + margin_delta;
     }
+}
+
+/// Compute the required margin for a position of a given size.
+fn margin_for_position<Q>(
+    pos_size: Q,
+    entry_price: QuoteCurrency,
+    leverage: Leverage,
+) -> Q::PairedCurrency
+where
+    Q: Currency,
+    Q::PairedCurrency: MarginCurrency,
+{
+    pos_size.abs().convert(entry_price) / leverage
 }

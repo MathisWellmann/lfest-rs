@@ -1,6 +1,7 @@
 use crate::{mock_exchange_linear, prelude::*, trade};
 
 #[test]
+#[tracing_test::traced_test]
 fn submit_limit_buy_order_no_position() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
@@ -10,7 +11,8 @@ fn submit_limit_buy_order_no_position() {
         Vec::new()
     );
 
-    let order = LimitOrder::new(Side::Buy, quote!(98), base!(5)).unwrap();
+    let limit_price = quote!(98);
+    let order = LimitOrder::new(Side::Buy, limit_price, base!(5)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
     assert_eq!(
@@ -34,7 +36,7 @@ fn submit_limit_buy_order_no_position() {
             .unwrap(),
         vec![expected_order_update]
     );
-    let bid = quote!(98);
+    let bid = quote!(96);
     let ask = quote!(99);
     let order_updates = exchange.update_state(0, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
@@ -47,19 +49,18 @@ fn submit_limit_buy_order_no_position() {
         }
     );
     let fee = quote!(0.098);
-    assert_eq!(exchange.account().total_value(bid, ask), quote!(1000) - fee);
+    assert_eq!(
+        // Bid is deliberately the same as the entry price
+        exchange.account().total_value(limit_price, ask),
+        quote!(1000) - fee
+    );
     assert_eq!(
         exchange.account().available_wallet_balance(),
         quote!(510) - fee
     );
 
     // close the position again with a limit order.
-
-    // close the position again with a limit order.
-    let order = LimitOrder::new(Side::Sell, quote!(99), base!(5)).unwrap();
-    exchange.submit_limit_order(order.clone()).unwrap();
-
-    let order = LimitOrder::new(Side::Sell, quote!(99), base!(5)).unwrap();
+    let order = LimitOrder::new(Side::Sell, quote!(98), base!(5)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
     assert_eq!(

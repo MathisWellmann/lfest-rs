@@ -93,10 +93,16 @@ fn inv_long_market_loss_full() {
     assert_eq!(exchange.account().position().size(), quote!(800.0));
     assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
     assert_eq!(
-        exchange.account().position().unrealized_pnl(bid, ask),
+        exchange
+            .account()
+            .position()
+            .unrealized_pnl(quote!(1000), ask),
         base!(0.0)
     );
-    assert_eq!(exchange.account().total_value(bid, ask), base!(0.99952));
+    assert_eq!(
+        exchange.account().total_value(quote!(1000), ask),
+        base!(0.99952)
+    );
     assert_eq!(
         exchange.account().available_wallet_balance(),
         base!(0.19952)
@@ -313,10 +319,10 @@ fn inv_long_market_win_partial() {
         exchange.account().total_value(bid, ask),
         base!(1.0) - fee_base1
     );
-    assert_eq!(exchange.account().position().margin().inner(), Dec!(0.8));
+    assert_eq!(exchange.account().position().margin(), base!(0.8));
     assert_eq!(
-        exchange.account().available_wallet_balance().inner(),
-        Dec!(0.19952)
+        exchange.account().available_wallet_balance(),
+        base!(0.19952)
     );
 
     let order_updates = exchange
@@ -345,21 +351,17 @@ fn inv_long_market_win_partial() {
     let order_updates = exchange.update_state(2, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    assert_eq!(exchange.account().position().size().inner(), Dec!(400.0));
+    assert_eq!(exchange.account().position().size(), quote!(400.0));
     assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
     assert_eq!(
-        exchange
-            .account()
-            .position()
-            .unrealized_pnl(quote!(2000), quote!(2001))
-            .inner(),
-        Dec!(0.2)
+        exchange.account().position().unrealized_pnl(bid, ask),
+        base!(0.2)
     );
     assert_eq!(
         exchange.account().total_value(bid, ask),
         base!(1.2) - fee_base1 - fee_base2
     );
-    assert_eq!(exchange.account().position().margin().inner(), Dec!(0.4));
+    assert_eq!(exchange.account().position().margin(), base!(0.4));
     assert_eq!(
         exchange.account().available_wallet_balance().inner(),
         (base!(0.8) - fee_base1 - fee_base2).inner()
@@ -423,7 +425,7 @@ fn inv_long_market_loss_partial() {
     );
     assert_eq!(
         exchange.account().total_value(bid, ask),
-        (base!(0.9) - fee_combined)
+        (base!(0.8) - fee_combined)
     );
     assert_eq!(exchange.account().position().margin(), base!(0.4));
     assert_eq!(
@@ -501,7 +503,7 @@ fn inv_short_market_win_partial() {
     );
     assert_eq!(
         exchange.account().total_value(bid, ask),
-        (base!(1.1) - fee_combined)
+        (base!(1.2) - fee_combined)
     );
     assert_eq!(exchange.account().position().margin(), base!(0.4));
     assert_eq!(

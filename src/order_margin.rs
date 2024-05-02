@@ -1,5 +1,4 @@
 use hashbrown::HashMap;
-use tracing::debug;
 
 use crate::{
     prelude::Position,
@@ -36,7 +35,6 @@ where
             .filter(|order| matches!(order.side(), Side::Buy)),
     );
     buys.sort_by_key(|order| order.limit_price());
-    debug!("buys: {:?}", buys);
 
     let mut sells = Vec::from_iter(
         active_limit_orders
@@ -44,7 +42,6 @@ where
             .filter(|order| matches!(order.side(), Side::Sell)),
     );
     sells.sort_by_key(|order| order.limit_price());
-    debug!("sells: {:?}", sells);
 
     // accumulate notional value (+fee) of buy orders which are not offset by the position
     let mut buy_margin_req = M::new_zero();

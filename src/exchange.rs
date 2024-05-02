@@ -89,6 +89,8 @@ where
         timestamp_ns: TimestampNs,
         market_update: MarketUpdate<Q>,
     ) -> Result<Vec<LimitOrderUpdate<Q, UserOrderId>>> {
+        trace!("Exchange: update_state: timestamp_ns: {timestamp_ns}, market_update: {market_update:?}");
+
         self.market_state
             .update_state(timestamp_ns, &market_update)?;
         self.account_tracker
@@ -146,6 +148,7 @@ where
                 for update in changed_orders.iter() {
                     match update {
                         LimitOrderUpdate::FullyFilled(limit_order) => {
+                            // TODO: the order_margin needs to be freed before the position is even changed. Do inside `Account`
                             self.account
                                 .remove_executed_order_from_active(limit_order.state().meta().id());
                             // TODO: we could potentially log partial fills as well...

@@ -64,7 +64,11 @@ where
             new_order_margin, available_balance
         );
         let order_fees: M = fees_of_limit_orders(&orders, self.contract_spec.fee_maker);
-        if new_order_margin + order_fees > available_balance {
+        debug!("IsolatedMargin: new_order_margin: {new_order_margin:?}");
+
+        if new_order_margin + order_fees
+            > account.available_wallet_balance() + account.order_margin()
+        {
             return Err(RiskError::NotEnoughAvailableBalance);
         }
 

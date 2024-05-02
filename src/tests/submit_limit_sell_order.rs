@@ -1,6 +1,7 @@
 use crate::{mock_exchange_linear, prelude::*, trade};
 
 #[test]
+#[tracing_test::traced_test]
 fn submit_limit_sell_order_no_position() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
@@ -10,7 +11,8 @@ fn submit_limit_sell_order_no_position() {
         Vec::new()
     );
 
-    let order = LimitOrder::new(Side::Sell, quote!(100), base!(9)).unwrap();
+    let limit_price = quote!(100);
+    let order = LimitOrder::new(Side::Sell, limit_price, base!(9)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
     assert_eq!(
@@ -30,7 +32,7 @@ fn submit_limit_sell_order_no_position() {
     let expected_order_update = LimitOrderUpdate::FullyFilled(order.into_filled(limit_price, 0));
     assert_eq!(
         exchange
-            .update_state(0, trade!(quote!(100), base!(9), Side::Buy))
+            .update_state(0, trade!(limit_price, base!(9), Side::Buy))
             .unwrap(),
         vec![expected_order_update]
     );
@@ -48,7 +50,11 @@ fn submit_limit_sell_order_no_position() {
         }
     );
     let fee = quote!(0.18);
-    assert_eq!(exchange.account().total_value(bid, ask), quote!(1000) - fee);
+    assert_eq!(
+        // The `ask` is deliberately the `limit_price` here to make it easier to reason about.
+        exchange.account().total_value(bid, limit_price),
+        quote!(1000) - fee
+    );
     assert_eq!(
         exchange.account().available_wallet_balance(),
         quote!(100) - fee
@@ -89,6 +95,7 @@ fn submit_limit_sell_order_no_position() {
 
 // Test there is a maximum quantity of buy orders the account can post.
 #[test]
+#[tracing_test::traced_test]
 fn submit_limit_sell_order_no_position_max() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
@@ -120,6 +127,7 @@ fn submit_limit_sell_order_no_position_max() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn submit_limit_sell_order_below_bid() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
@@ -138,6 +146,7 @@ fn submit_limit_sell_order_below_bid() {
 // With a long position open, be able to open a short position of equal size using a limit order
 // TODO: this requires a change in the `IsolatedMarginRiskEngine`
 #[test]
+#[tracing_test::traced_test]
 fn submit_limit_sell_order_turnaround_long() {
     // let mut exchange = mock_exchange_base();
     // assert_eq!(

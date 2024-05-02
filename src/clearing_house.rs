@@ -95,18 +95,13 @@ where
         fee: Fee,
         ts_ns: TimestampNs,
     ) {
-        debug_assert!(quantity >= M::PairedCurrency::new_zero());
+        debug_assert!(quantity > M::PairedCurrency::new_zero());
         debug_assert!(fill_price > quote!(0));
 
-        // let notional_value = quantity.convert(fill_price);
-        // let margin_value = notional_value / account.leverage();
-        // let fee = notional_value * fee;
-        // account.available_wallet_balance -= fee + margin_value;
-        // debug_assert!(
-        //     account.available_wallet_balance() >= M::new_zero(),
-        //     "`available_wallet_balance` must be greater or equal zero."
-        // );
-        // account_tracker.log_fee(fee);
+        let notional_value = quantity.convert(fill_price);
+        let fee = notional_value * fee;
+        account_tracker.log_fee(fee);
+        account.detract_fee(fee);
 
         if account.position().size() >= M::PairedCurrency::new_zero() {
             account.increase_long(quantity, fill_price);
@@ -127,7 +122,7 @@ where
                 );
 
                 // also open a long
-                account.open_position(new_long_size, fill_price);
+                account.increase_long(new_long_size, fill_price);
             }
         }
     }
@@ -141,18 +136,13 @@ where
         fee: Fee,
         ts_ns: TimestampNs,
     ) {
-        debug_assert!(quantity >= M::PairedCurrency::new_zero());
+        debug_assert!(quantity > M::PairedCurrency::new_zero());
         debug_assert!(fill_price > quote!(0));
 
-        // let notional_value = quantity.convert(fill_price);
-        // let margin_value = notional_value / account.leverage();
-        // let fee = notional_value * fee;
-        // account.available_wallet_balance -= fee + margin_value;
-        // debug_assert!(
-        //     account.available_wallet_balance() >= M::new_zero(),
-        //     "`available_wallet_balance` must be greater or equal zero."
-        // );
-        // account_tracker.log_fee(fee);
+        let notional_value = quantity.convert(fill_price);
+        let fee = notional_value * fee;
+        account_tracker.log_fee(fee);
+        account.detract_fee(fee);
 
         if account.position().size() > M::PairedCurrency::new_zero() {
             if quantity <= account.position().size() {
@@ -168,7 +158,7 @@ where
                 );
 
                 // Open a short as well
-                account.open_position(new_short_size.into_negative(), fill_price);
+                account.increase_short(new_short_size, fill_price);
             }
         } else {
             // Increase short position
