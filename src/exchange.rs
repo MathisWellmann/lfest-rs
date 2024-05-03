@@ -175,8 +175,8 @@ where
                     } {
                         // Order is executed fully with candles.
                         let qty = match order.side() {
-                            Side::Buy => order.quantity(),
-                            Side::Sell => order.quantity().into_negative(),
+                            Side::Buy => order.remaining_quantity(),
+                            Side::Sell => order.remaining_quantity().into_negative(),
                         };
                         self.clearing_house.settle_filled_order(
                             &mut self.account,
@@ -224,7 +224,7 @@ where
         self.config
             .contract_specification()
             .quantity_filter
-            .validate_order_quantity(order.quantity())?;
+            .validate_order_quantity(order.remaining_quantity())?;
         self.config
             .contract_specification()
             .price_filter

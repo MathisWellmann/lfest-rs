@@ -28,7 +28,7 @@ fn submit_limit_sell_order_no_position() {
     let meta = ExchangeOrderMeta::new(0, 0);
     let mut order = order.into_pending(meta);
     let limit_price = order.limit_price();
-    order.fill(limit_price, order.quantity());
+    order.fill(limit_price, order.remaining_quantity());
     let expected_order_update = LimitOrderUpdate::FullyFilled(order.into_filled(limit_price, 0));
     assert_eq!(
         exchange
@@ -67,7 +67,7 @@ fn submit_limit_sell_order_no_position() {
     let meta = ExchangeOrderMeta::new(1, 0);
     let mut order = order.into_pending(meta);
     let limit_price = order.limit_price();
-    order.fill(limit_price, order.quantity());
+    order.fill(limit_price, order.remaining_quantity());
     let expected_order_update = LimitOrderUpdate::FullyFilled(order.into_filled(limit_price, 0));
     assert_eq!(
         exchange
