@@ -29,9 +29,9 @@ where
     #[getset(get_copy = "pub")]
     limit_price: QuoteCurrency,
 
-    /// The amount of Currency `S` the order is for and fill information.
+    /// The remaining amount of Currency `S` the order is for.
     #[getset(get_copy = "pub")]
-    quantity: Q,
+    remaining_quantity: Q,
 
     /// Depending on the status, different information is available.
     #[getset(get = "pub")]
@@ -63,7 +63,7 @@ where
             user_order_id: (),
             state: NewOrder,
             limit_price,
-            quantity,
+            remaining_quantity: quantity,
             side,
         })
     }
@@ -101,7 +101,7 @@ where
             user_order_id,
             state: NewOrder,
             limit_price,
-            quantity,
+            remaining_quantity: quantity,
             side,
         })
     }
@@ -115,9 +115,14 @@ where
             user_order_id: self.user_order_id,
             side: self.side,
             limit_price: self.limit_price,
-            quantity: self.quantity,
+            remaining_quantity: self.remaining_quantity,
             state: Pending::new(meta),
         }
+    }
+
+    /// Get the total quantity that this order is for.
+    pub fn total_quantity(&self) -> Q {
+        self.remaining_quantity
     }
 }
 
@@ -135,14 +140,14 @@ where
     ) -> LimitOrder<Q, UserOrderId, Filled> {
         debug_assert!(match self.state.filled_quantity {
             FilledQuantity::Unfilled => false,
-            FilledQuantity::Filled{cumulative_qty, avg_price: _} => cumulative_qty == self.quantity
+            FilledQuantity::Filled{cumulative_qty, avg_price: _} => cumulative_qty == self.remaining_quantity
         }, "The `FilledQuantity` must be have the entire outstanding quantity filled. Call `fill` first.");
 
         LimitOrder {
             user_order_id: self.user_order_id,
             state: Filled::new(self.state.meta().clone(), ts_ns_executed, fill_price),
             limit_price: self.limit_price,
-            quantity: self.quantity,
+            remaining_quantity: self.remaining_quantity,
             side: self.side,
         }
     }
@@ -153,7 +158,7 @@ where
     /// `true` if order quantity is fully filled.
     pub(crate) fn fill(&mut self, price: QuoteCurrency, quantity: Q) -> bool {
         debug_assert!(
-            quantity <= self.quantity,
+            quantity <= self.remaining_quantity,
             "The filled quantity can not be greater than the limit order quantity"
         );
         debug_assert!(
@@ -167,13 +172,13 @@ where
                     cumulative_qty: quantity,
                     avg_price: price,
                 };
-                quantity == self.quantity
+                quantity == self.remaining_quantity
             }
             FilledQuantity::Filled {
                 cumulative_qty,
                 avg_price,
             } => {
-                debug_assert!(quantity <= (self.quantity - *cumulative_qty), "The filled quantity can not be greater than the outstanding limit order quantity.");
+                debug_assert!(quantity <= (self.remaining_quantity - *cumulative_qty), "The filled quantity can not be greater than the outstanding limit order quantity.");
 
                 let new_qty = *cumulative_qty + quantity;
                 *avg_price = QuoteCurrency::new(
@@ -183,8 +188,19 @@ where
                 );
                 *cumulative_qty = new_qty;
 
-                *cumulative_qty == self.quantity
+                *cumulative_qty == self.remaining_quantity
             }
+        }
+    }
+
+    /// Get the total quantity that this order is for.
+    pub fn total_quantity(&self) -> Q {
+        match self.state.filled_quantity {
+            FilledQuantity::Unfilled => self.remaining_quantity,
+            FilledQuantity::Filled {
+                cumulative_qty,
+                avg_price: _,
+            } => self.remaining_quantity + cumulative_qty,
         }
     }
 }

@@ -90,7 +90,7 @@ where
             Side::Sell => self.price >= order.limit_price() && matches!(self.side, Side::Buy),
         } {
             // Execute up to the quantity of the incoming `Trade`.
-            let filled_qty = min(self.quantity, order.quantity());
+            let filled_qty = min(self.quantity, order.remaining_quantity());
             Some(filled_qty)
         } else {
             None
@@ -135,8 +135,8 @@ where
         } {
             // Order is executed fully with candles.
             Some(match order.side() {
-                Side::Buy => order.quantity(),
-                Side::Sell => order.quantity().into_negative(),
+                Side::Buy => order.remaining_quantity(),
+                Side::Sell => order.remaining_quantity().into_negative(),
             })
         } else {
             None

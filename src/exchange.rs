@@ -89,10 +89,8 @@ where
         market_update: U,
     ) -> Result<Vec<LimitOrderUpdate<Q, UserOrderId>>>
     where
-        U: MarketUpdate<Q, UserOrderId> + std::fmt::Debug,
+        U: MarketUpdate<Q, UserOrderId>,
     {
-        trace!("Exchange: update_state: timestamp_ns: {timestamp_ns}, market_update: {market_update:?}");
-
         self.market_state
             .update_state(timestamp_ns, &market_update)?;
         self.account_tracker
@@ -160,7 +158,7 @@ where
         self.config
             .contract_specification()
             .quantity_filter
-            .validate_order_quantity(order.quantity())?;
+            .validate_order_quantity(order.remaining_quantity())?;
         self.config
             .contract_specification()
             .price_filter
