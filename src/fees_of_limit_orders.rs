@@ -17,7 +17,7 @@ where
     UserOrderId: Clone,
 {
     active_limit_orders.values().fold(M::new_zero(), |acc, o| {
-        acc + (o.quantity().convert(o.limit_price()) * maker_fee)
+        acc + (o.remaining_quantity().convert(o.limit_price()) * maker_fee)
     })
 }
 
