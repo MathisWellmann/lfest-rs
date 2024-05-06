@@ -23,6 +23,10 @@ where
     M: Currency + MarginCurrency,
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
+    /// The position leverage,
+    #[getset(get_copy = "pub")]
+    leverage: Leverage,
+
     /// The wallet balance of the user denoted in the margin currency.
     #[getset(get_copy = "pub")]
     pub(crate) wallet_balance: M,
@@ -52,8 +56,9 @@ where
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
     fn default() -> Self {
-        use crate::prelude::{Dec, Decimal};
+        use crate::prelude::{leverage, Dec, Decimal};
         Self {
+            leverage: leverage!(1),
             wallet_balance: M::new(Dec!(1)),
             position: Position::default(),
             active_limit_orders: HashMap::default(),
@@ -70,11 +75,10 @@ where
 {
     /// Create a new [`Account`] instance.
     pub(crate) fn new(starting_balance: M, leverage: Leverage) -> Self {
-        let position = Position::new(leverage);
-
         Self {
+            leverage,
             wallet_balance: starting_balance,
-            position,
+            position: Position::default(),
             active_limit_orders: HashMap::new(),
             lookup_order_nonce_from_user_order_id: HashMap::new(),
             order_margin: M::new_zero(),
@@ -84,7 +88,8 @@ where
     /// Return the available balance of the `Account`
     pub fn available_balance(&self) -> M {
         // TODO: this call is expensive so maybe compute once and store
-        let order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
+        let order_margin =
+            compute_order_margin(&self.position, &self.active_limit_orders, self.leverage);
         let ab = self.wallet_balance - self.position.position_margin - order_margin;
         debug_assert!(ab >= M::new_zero());
         ab
@@ -151,7 +156,8 @@ where
         };
         self.lookup_order_nonce_from_user_order_id
             .insert(user_order_id, order_id);
-        self.order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
+        self.order_margin =
+            compute_order_margin(&self.position, &self.active_limit_orders, self.leverage);
     }
 
     /// Cancel an active limit order.
@@ -169,7 +175,8 @@ where
             .active_limit_orders
             .remove(&order_id)
             .ok_or(Error::OrderIdNotFound)?;
-        self.order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
+        self.order_margin =
+            compute_order_margin(&self.position, &self.active_limit_orders, self.leverage);
 
         account_tracker.log_limit_order_cancellation();
 
@@ -182,7 +189,8 @@ where
             .active_limit_orders
             .remove(&order_id)
             .expect("The order must have been active; qed");
-        self.order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
+        self.order_margin =
+            compute_order_margin(&self.position, &self.active_limit_orders, self.leverage);
         self.lookup_order_nonce_from_user_order_id
             .remove(order.user_order_id());
     }
@@ -200,7 +208,7 @@ where
         self.position.size = size;
         self.position.entry_price = price;
         self.position.position_margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
     }
 
     /// Increase a long (or neutral) position.
@@ -229,7 +237,7 @@ where
 
         self.position.size = new_size;
         self.position.position_margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
     }
 
     /// Reduce a long position.
@@ -253,7 +261,7 @@ where
         );
         self.position.size -= quantity;
         self.position.position_margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
 
         M::pnl(self.position.entry_price, price, quantity)
     }
@@ -282,7 +290,7 @@ where
         );
         self.position.size = new_size;
         self.position.position_margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
     }
 
     /// Reduce a short position
@@ -314,7 +322,7 @@ where
 
         self.position.size += quantity;
         self.position.position_margin =
-            self.position.size.abs().convert(self.position.entry_price) / self.position.leverage;
+            self.position.size.abs().convert(self.position.entry_price) / self.leverage;
 
         M::pnl(self.position.entry_price, price, quantity.into_negative())
     }

@@ -51,7 +51,7 @@ where
     ) -> Result<(), RiskError> {
         let mut orders = account.active_limit_orders.clone();
         orders.insert(order.state().meta().id(), order.clone());
-        let new_order_margin = compute_order_margin(&account.position, &orders);
+        let new_order_margin = compute_order_margin(&account.position, &orders, account.leverage());
 
         // TODO: this calculation does not allow a fully loaded long (or short) position
         // to be reversed into the opposite position of the same size,
@@ -114,7 +114,7 @@ where
         if account.position.size() >= M::PairedCurrency::new_zero() {
             // A long position increases in size.
             let notional_value = order.quantity().convert(fill_price);
-            let margin_req = notional_value / account.position.leverage;
+            let margin_req = notional_value / account.leverage();
             let fee = notional_value * self.contract_spec.fee_taker;
             if margin_req + fee > account.available_balance() {
                 return Err(RiskError::NotEnoughAvailableBalance);
@@ -131,7 +131,7 @@ where
 
         let new_long_size = order.quantity() - account.position.size.abs();
         let new_notional_value = new_long_size.convert(fill_price);
-        let new_margin_req = new_notional_value / account.position.leverage;
+        let new_margin_req = new_notional_value / account.leverage();
 
         if new_margin_req > account.available_balance() + released_from_old_pos {
             return Err(RiskError::NotEnoughAvailableBalance);
@@ -153,7 +153,7 @@ where
 
         if account.position.size() <= M::PairedCurrency::new_zero() {
             let notional_value = order.quantity().convert(fill_price);
-            let margin_req = notional_value / account.position.leverage;
+            let margin_req = notional_value / account.leverage();
             let fee = notional_value * self.contract_spec.fee_taker;
             if margin_req + fee > account.available_balance() {
                 return Err(RiskError::NotEnoughAvailableBalance);
@@ -169,7 +169,7 @@ where
         let released_from_old_pos = account.position.position_margin;
 
         let new_short_size = order.quantity() - account.position.size();
-        let new_margin_req = new_short_size.convert(fill_price) / account.position.leverage;
+        let new_margin_req = new_short_size.convert(fill_price) / account.leverage();
 
         if new_margin_req > account.available_balance() + released_from_old_pos {
             return Err(RiskError::NotEnoughAvailableBalance);

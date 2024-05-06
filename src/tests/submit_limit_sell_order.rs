@@ -19,7 +19,6 @@ fn submit_limit_sell_order_no_position() {
             size: base!(0),
             entry_price: quote!(0),
             position_margin: quote!(0),
-            leverage: leverage!(1),
         }
     );
 
@@ -44,7 +43,6 @@ fn submit_limit_sell_order_no_position() {
             size: base!(-9),
             entry_price: quote!(100),
             position_margin: quote!(900),
-            leverage: leverage!(1),
         }
     );
     let fee = quote!(0.18);
@@ -72,7 +70,6 @@ fn submit_limit_sell_order_no_position() {
             size: base!(0),
             entry_price: quote!(100),
             position_margin: quote!(0),
-            leverage: leverage!(1),
         }
     );
     assert_eq!(exchange.account().wallet_balance, quote!(1000) - fee - fee);

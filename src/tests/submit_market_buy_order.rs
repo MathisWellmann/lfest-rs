@@ -36,7 +36,6 @@ fn submit_market_buy_order_no_position() {
             size: base!(5),
             entry_price: quote!(101),
             position_margin: quote!(505),
-            leverage: leverage!(1)
         }
     );
     assert_eq!(
@@ -70,7 +69,6 @@ fn submit_market_buy_order_with_long_position() {
             size: base!(9),
             entry_price: quote!(100),
             position_margin: quote!(900),
-            leverage: leverage!(1),
         }
     );
     assert_eq!(
@@ -103,7 +101,6 @@ fn submit_market_buy_order_with_short_position() {
             size: base!(0),
             entry_price: quote!(100),
             position_margin: quote!(0),
-            leverage: leverage!(1),
         }
     );
     assert_eq!(
@@ -136,7 +133,6 @@ fn submit_market_buy_order_turnaround_short() {
             size: base!(9),
             entry_price: quote!(100),
             position_margin: quote!(900),
-            leverage: leverage!(1),
         }
     );
     assert_eq!(
