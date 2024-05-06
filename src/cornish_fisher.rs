@@ -69,8 +69,8 @@ mod tests {
     use crate::{quote, test_helpers::LN_RETS_H};
 
     #[test]
+    #[tracing_test::traced_test]
     fn test_cornish_fisher_value_at_risk() {
-        let _ = pretty_env_logger::try_init();
         // Comparison to the original implementation at <https://github.com/JDE65/D-ratio>.
         assert_eq!(
             cornish_fisher_value_at_risk(&LnReturns(&LN_RETS_H), quote!(1000.0), 0.05).unwrap(),

@@ -3,9 +3,8 @@
 use lfest::{mock_exchange_base, prelude::*};
 
 #[test]
+#[tracing_test::traced_test]
 fn lin_long_market_win_full() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_base();
     let _ = exchange
         .update_state(

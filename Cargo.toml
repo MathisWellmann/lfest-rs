@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.51.0"
+version = "0.51.1"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2021"
 license-file = "LICENSE"
@@ -12,8 +12,8 @@ categories = ["finance", "simulation"]
 exclude = ["/img", "/data", "/.idea", "/vendor", "/.direnv"]
 
 [dependencies]
-log = { version = "0.4", features = ["release_max_level_info"] }
-pretty_env_logger = "0.5"
+tracing = { version = "0.1", features = ["release_max_level_info"] }
+tracing-subscriber = "0.3"
 serde = { version = "1", features = ["derive"] }
 thiserror = "1"
 hashbrown = "0.14"
@@ -28,3 +28,4 @@ csv = "1"
 rand = "0.8"
 rand_distr = "0.4"
 test-case = "3"
+tracing-test = "0.2"
