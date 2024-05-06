@@ -3,9 +3,6 @@
 
 mod load_trades;
 
-#[macro_use]
-extern crate log;
-
 use std::{convert::TryInto, time::Instant};
 
 use lfest::{
@@ -14,6 +11,7 @@ use lfest::{
 };
 use load_trades::load_prices_from_csv;
 use rand::{thread_rng, Rng};
+use tracing::error;
 
 fn main() {
     let t0 = Instant::now();

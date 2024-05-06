@@ -5,8 +5,6 @@
 //! lfest - leveraged futures exchange for simulated trading
 
 #[macro_use]
-extern crate log;
-#[macro_use]
 extern crate serde;
 
 mod account;

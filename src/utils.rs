@@ -136,9 +136,8 @@ pub(crate) mod tests {
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn test_decimal_to_f64() {
-        let _ = pretty_env_logger::try_init();
-
         assert_eq!(decimal_to_f64(Decimal::ZERO), 0.0);
         assert_eq!(decimal_to_f64(Decimal::ONE), 1.0);
         assert_eq!(decimal_to_f64(Decimal::TWO), 2.0);

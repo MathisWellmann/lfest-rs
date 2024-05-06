@@ -1,6 +1,7 @@
 use std::{fmt::Display, iter::FromIterator};
 
 use fpdec::{CheckedDiv, Dec, Decimal};
+use tracing::{debug, trace};
 
 use super::d_ratio;
 use crate::{
@@ -882,9 +883,8 @@ mod tests {
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn acc_tracker_historical_value_at_risk() {
-        if let Err(_e) = pretty_env_logger::try_init() {}
-
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
@@ -905,9 +905,8 @@ mod tests {
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn acc_tracker_historical_value_at_risk_from_n_hourly_returns() {
-        if let Err(_) = pretty_env_logger::try_init() {}
-
         let mut at = FullAccountTracker::new(quote!(100.0));
         at.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
@@ -928,9 +927,8 @@ mod tests {
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn acc_tracker_cornish_fisher_value_at_risk() {
-        if let Err(_e) = pretty_env_logger::try_init() {}
-
         let mut acc_tracker = FullAccountTracker::new(quote!(100.0));
         acc_tracker.hist_ln_returns_hourly_acc = LN_RETS_H.into();
 
@@ -961,9 +959,8 @@ mod tests {
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn acc_tracker_sortino() {
-        if let Err(_) = pretty_env_logger::try_init() {}
-
         let mut at = FullAccountTracker::new(quote!(100.0));
 
         at.hist_returns_hourly_acc = Vec::<QuoteCurrency>::from_iter(

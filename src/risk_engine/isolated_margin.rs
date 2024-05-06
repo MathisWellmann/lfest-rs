@@ -1,3 +1,5 @@
+use tracing::debug;
+
 use super::{risk_engine_trait::RiskError, RiskEngine};
 use crate::{
     contract_specification::ContractSpecification,

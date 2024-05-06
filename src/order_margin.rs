@@ -1,4 +1,5 @@
 use hashbrown::HashMap;
+use tracing::debug;
 
 use crate::{
     prelude::Position,
@@ -84,6 +85,7 @@ mod tests {
     use crate::prelude::*;
 
     #[test]
+    #[tracing_test::traced_test]
     fn order_margin_no_position() {
         let mut account = Account::new(quote!(1000), leverage!(1));
 
@@ -121,9 +123,8 @@ mod tests {
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn order_margin_with_long() {
-        let _ = pretty_env_logger::try_init();
-
         let mut account = Account::new(quote!(1000), leverage!(1));
         account.position = Position {
             size: base!(1),
@@ -174,9 +175,8 @@ mod tests {
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn order_margin_with_short() {
-        let _ = pretty_env_logger::try_init();
-
         let mut account = Account::new(quote!(1000), leverage!(1));
         account.position = Position {
             size: base!(-1),

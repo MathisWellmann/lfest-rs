@@ -3,9 +3,8 @@
 use lfest::{mock_exchange_base, prelude::*, trade};
 
 #[test]
+#[tracing_test::traced_test]
 fn limit_orders_only() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_base();
 
     let exec_orders = exchange
@@ -74,9 +73,8 @@ fn limit_orders_only() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn limit_orders_2() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_base();
 
     let exec_orders = exchange

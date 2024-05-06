@@ -4,9 +4,8 @@ use fpdec::Decimal;
 use lfest::{mock_exchange_quote, prelude::*, trade};
 
 #[test]
+#[tracing_test::traced_test]
 fn inv_long_market_win_full() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
@@ -78,9 +77,8 @@ fn inv_long_market_win_full() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn inv_long_market_loss_full() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(999), quote!(1000)))
@@ -146,9 +144,8 @@ fn inv_long_market_loss_full() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn inv_short_market_win_full() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(1000), quote!(1001)))
@@ -206,9 +203,8 @@ fn inv_short_market_win_full() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn inv_short_market_loss_full() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(1000), quote!(1001)))
@@ -288,9 +284,8 @@ fn inv_short_market_loss_full() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn inv_long_market_win_partial() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
@@ -376,9 +371,8 @@ fn inv_long_market_win_partial() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn inv_long_market_loss_partial() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
@@ -439,9 +433,8 @@ fn inv_long_market_loss_partial() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn inv_short_market_win_partial() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(1000.0), quote!(1001.0)))
@@ -515,9 +508,8 @@ fn inv_short_market_win_partial() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn inv_short_market_loss_partial() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(1000), quote!(1001)))
@@ -590,9 +582,8 @@ fn inv_short_market_loss_partial() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn inv_test_market_roundtrip() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(999), quote!(1000)))
@@ -667,9 +658,8 @@ fn inv_test_market_roundtrip() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn inv_execute_limit() {
-    if let Err(_) = pretty_env_logger::try_init() {}
-
     let mut exchange = mock_exchange_quote(base!(1));
     let _ = exchange
         .update_state(0, bba!(quote!(1000.0), quote!(1001.0)))

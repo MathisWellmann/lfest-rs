@@ -1,5 +1,6 @@
 use getset::{CopyGetters, Getters};
 use hashbrown::HashMap;
+use tracing::{debug, error};
 
 use crate::{
     order_margin::compute_order_margin,
