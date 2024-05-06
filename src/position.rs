@@ -1,7 +1,7 @@
 use fpdec::Decimal;
 use getset::{CopyGetters, Getters};
 
-use crate::types::{Currency, Leverage, MarginCurrency, QuoteCurrency};
+use crate::types::{Currency, MarginCurrency, QuoteCurrency};
 
 /// Describes the position information of the account.
 /// It assumes isolated margining mechanism, because the margin is directly associated with the position.
@@ -24,24 +24,12 @@ where
     /// TODO: rename to `margin`.
     #[getset(get_copy = "pub")]
     pub(crate) position_margin: M,
-
-    /// The position leverage,
-    /// TODO: move this field into `Account`.
-    #[getset(get_copy = "pub")]
-    pub(crate) leverage: Leverage,
 }
 
 impl<M> Position<M>
 where
     M: Currency + MarginCurrency,
 {
-    pub(crate) fn new(leverage: Leverage) -> Self {
-        Self {
-            leverage,
-            ..Default::default()
-        }
-    }
-
     /// Returns the implied leverage of the position based on the position value and the collateral backing it.
     /// It is computed by dividing the total value of the position by the amount of margin required to hold that position.
     #[inline]
