@@ -23,7 +23,7 @@ where
     /// The position margin of account, same denotation as wallet_balance
     /// TODO: rename to `margin`.
     #[getset(get_copy = "pub")]
-    pub(crate) position_margin: M,
+    pub(crate) margin: M,
 }
 
 impl<M> Position<M>
@@ -35,7 +35,7 @@ where
     #[inline]
     pub fn implied_leverage(&self, price: QuoteCurrency) -> Decimal {
         let value = self.size.convert(price);
-        value.inner() / self.position_margin.inner()
+        value.inner() / self.margin.inner()
     }
 
     /// Return the positions unrealized profit and loss

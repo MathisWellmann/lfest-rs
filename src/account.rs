@@ -90,7 +90,7 @@ where
         // TODO: this call is expensive so maybe compute once and store
         let order_margin =
             compute_order_margin(&self.position, &self.active_limit_orders, self.leverage);
-        let ab = self.wallet_balance - self.position.position_margin - order_margin;
+        let ab = self.wallet_balance - self.position.margin - order_margin;
         debug_assert!(ab >= M::new_zero());
         ab
     }
@@ -207,7 +207,7 @@ where
 
         self.position.size = size;
         self.position.entry_price = price;
-        self.position.position_margin =
+        self.position.margin =
             self.position.size.abs().convert(self.position.entry_price) / self.leverage;
     }
 
@@ -236,7 +236,7 @@ where
         );
 
         self.position.size = new_size;
-        self.position.position_margin =
+        self.position.margin =
             self.position.size.abs().convert(self.position.entry_price) / self.leverage;
     }
 
@@ -260,7 +260,7 @@ where
             "Quantity larger than position size"
         );
         self.position.size -= quantity;
-        self.position.position_margin =
+        self.position.margin =
             self.position.size.abs().convert(self.position.entry_price) / self.leverage;
 
         M::pnl(self.position.entry_price, price, quantity)
@@ -289,7 +289,7 @@ where
                 / new_size.inner().abs(),
         );
         self.position.size = new_size;
-        self.position.position_margin =
+        self.position.margin =
             self.position.size.abs().convert(self.position.entry_price) / self.leverage;
     }
 
@@ -321,7 +321,7 @@ where
         );
 
         self.position.size += quantity;
-        self.position.position_margin =
+        self.position.margin =
             self.position.size.abs().convert(self.position.entry_price) / self.leverage;
 
         M::pnl(self.position.entry_price, price, quantity.into_negative())

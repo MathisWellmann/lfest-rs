@@ -39,10 +39,7 @@ fn lin_long_market_win_full() {
         quote!(0.0)
     );
     assert_eq!(exchange.account().wallet_balance(), quote!(999.7));
-    assert_eq!(
-        exchange.account().position().position_margin(),
-        quote!(500.0)
-    );
+    assert_eq!(exchange.account().position().margin(), quote!(500.0));
     assert_eq!(exchange.account().available_balance(), quote!(499.7));
 
     let _ = exchange
@@ -76,6 +73,6 @@ fn lin_long_market_win_full() {
         quote!(0.0)
     );
     assert_eq!(exchange.account().wallet_balance(), quote!(1499.1));
-    assert_eq!(exchange.account().position().position_margin(), quote!(0.0));
+    assert_eq!(exchange.account().position().margin(), quote!(0.0));
     assert_eq!(exchange.account().available_balance(), quote!(1499.1));
 }

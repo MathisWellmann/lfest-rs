@@ -18,7 +18,7 @@ fn submit_limit_buy_order_no_position() {
         Position {
             size: base!(0),
             entry_price: quote!(0),
-            position_margin: quote!(0),
+            margin: quote!(0),
         }
     );
 
@@ -42,7 +42,7 @@ fn submit_limit_buy_order_no_position() {
         Position {
             size: base!(5),
             entry_price: quote!(98),
-            position_margin: quote!(490),
+            margin: quote!(490),
         }
     );
     let fee = quote!(0.098);
@@ -79,7 +79,7 @@ fn submit_limit_buy_order_no_position() {
         Position {
             size: base!(0),
             entry_price: quote!(98),
-            position_margin: quote!(0),
+            margin: quote!(0),
         }
     );
     assert_eq!(exchange.account().wallet_balance, quote!(1000) - fee - fee);
@@ -138,7 +138,7 @@ fn submit_limit_buy_order_with_long() {
         &Position {
             size: base!(9),
             entry_price: quote!(100),
-            position_margin: quote!(900),
+            margin: quote!(900),
         }
     );
 
@@ -177,7 +177,7 @@ fn submit_limit_buy_order_with_long() {
         &Position {
             size: base!(0),
             entry_price: quote!(100),
-            position_margin: quote!(0),
+            margin: quote!(0),
         }
     );
 }
@@ -199,7 +199,7 @@ fn submit_limit_buy_order_with_short() {
         &Position {
             size: base!(-9),
             entry_price: quote!(100),
-            position_margin: quote!(900),
+            margin: quote!(900),
         }
     );
 
@@ -231,7 +231,7 @@ fn submit_limit_buy_order_with_short() {
         &Position {
             size: base!(0),
             entry_price: quote!(100),
-            position_margin: quote!(0),
+            margin: quote!(0),
         }
     );
 }
