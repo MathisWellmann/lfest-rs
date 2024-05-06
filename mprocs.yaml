@@ -9,3 +9,5 @@ procs:
     shell: "cargo clippy"
   cargo-doc:
     shell: "cargo doc"
+  taplo:
+    shell: "taplo fmt"
