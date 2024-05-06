@@ -23,3 +23,8 @@ steps:
     command: nix develop --command bash -c "cargo doc --no-deps --workspace"
     agents: 
       queue: nixos
+
+  - label: ":nixos: :rust: :buildkite: taplo fmt"
+    command: nix develop --command bash -c "taplo fmt --check"
+    agents: 
+      queue: nixos
