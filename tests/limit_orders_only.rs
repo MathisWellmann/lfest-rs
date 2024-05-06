@@ -43,7 +43,7 @@ fn limit_orders_only() {
     );
 
     assert_eq!(exchange.account().wallet_balance(), quote!(999.802));
-    assert_eq!(exchange.account().position().position_margin(), quote!(990));
+    assert_eq!(exchange.account().position().margin(), quote!(990));
     assert_eq!(exchange.account().order_margin(), quote!(0.0));
     assert_eq!(exchange.account().available_balance(), quote!(9.802));
 
@@ -64,7 +64,7 @@ fn limit_orders_only() {
         exchange.account().wallet_balance(),
         quote!(1049.5) - quote!(0.198) - quote!(0.2079)
     );
-    assert_eq!(exchange.account().position().position_margin(), quote!(0.0));
+    assert_eq!(exchange.account().position().margin(), quote!(0.0));
     assert_eq!(exchange.account().order_margin(), quote!(0.0));
     assert_eq!(
         exchange.account().available_balance(),

@@ -56,7 +56,7 @@ where
         // TODO: this calculation does not allow a fully loaded long (or short) position
         // to be reversed into the opposite position of the same size,
         // which should be possible and requires a slightly modified calculation that
-        let available_balance = account.wallet_balance - account.position.position_margin;
+        let available_balance = account.wallet_balance - account.position.margin;
         debug!(
             "new_order_margin: {}, available_balance: {}",
             new_order_margin, available_balance
@@ -127,7 +127,7 @@ where
             return Ok(());
         }
         // The order reduces the short and puts on a long
-        let released_from_old_pos = account.position.position_margin;
+        let released_from_old_pos = account.position.margin;
 
         let new_long_size = order.quantity() - account.position.size.abs();
         let new_notional_value = new_long_size.convert(fill_price);
@@ -166,7 +166,7 @@ where
             return Ok(());
         }
         // The order reduces the long position and opens a short.
-        let released_from_old_pos = account.position.position_margin;
+        let released_from_old_pos = account.position.margin;
 
         let new_short_size = order.quantity() - account.position.size();
         let new_margin_req = new_short_size.convert(fill_price) / account.leverage();
