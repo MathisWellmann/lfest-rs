@@ -1,8 +1,8 @@
-use crate::{mock_exchange_base, prelude::*, risk_engine::RiskError};
+use crate::{mock_exchange_linear, prelude::*, risk_engine::RiskError};
 
 #[test]
 fn submit_market_sell_order_reject() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
@@ -19,7 +19,7 @@ fn submit_market_sell_order_reject() {
 
 #[test]
 fn submit_market_sell_order() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
@@ -47,7 +47,7 @@ fn submit_market_sell_order() {
 
 #[test]
 fn submit_market_sell_order_with_short_position() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
@@ -80,7 +80,7 @@ fn submit_market_sell_order_with_short_position() {
 
 #[test]
 fn submit_market_sell_order_with_long_position() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
@@ -112,7 +112,7 @@ fn submit_market_sell_order_with_long_position() {
 
 #[test]
 fn submit_market_sell_order_turnaround_long() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))

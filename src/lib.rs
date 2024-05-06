@@ -28,7 +28,7 @@ mod tests;
 mod types;
 mod utils;
 
-pub use mock_exchange::{mock_exchange_base, mock_exchange_quote};
+pub use mock_exchange::{mock_exchange_inverse, mock_exchange_linear};
 pub use types::Result;
 
 /// Exports common types

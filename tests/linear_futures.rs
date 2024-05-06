@@ -1,11 +1,11 @@
 //! Test file for the linear futures mode of the exchange
 
-use lfest::{mock_exchange_base, prelude::*};
+use lfest::{mock_exchange_linear, prelude::*};
 
 #[test]
 #[tracing_test::traced_test]
 fn lin_long_market_win_full() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
     let _ = exchange
         .update_state(
             0,
