@@ -13,7 +13,8 @@ use crate::{
 #[macro_export]
 macro_rules! base {
     ( $a:literal ) => {{
-        BaseCurrency::new($crate::prelude::fpdec::Dec!($a))
+        use $crate::prelude::fpdec::Decimal;
+        $crate::prelude::BaseCurrency::new($crate::prelude::fpdec::Dec!($a))
     }};
 }
 

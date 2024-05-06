@@ -4,6 +4,7 @@ use super::OrderId;
 
 /// Additional data about the order filled in by the exchange.
 #[derive(Debug, Clone, PartialEq, Eq, CopyGetters)]
+#[cfg_attr(test, derive(Default))]
 pub struct ExchangeOrderMeta {
     /// The global order sequence number assigned by the exchange upon receiving it.
     #[getset(get_copy = "pub")]

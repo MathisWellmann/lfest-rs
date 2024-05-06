@@ -1,6 +1,7 @@
 use super::{risk_engine_trait::RiskError, RiskEngine};
 use crate::{
     contract_specification::ContractSpecification,
+    fees_of_limit_orders::fees_of_limit_orders,
     market_state::MarketState,
     order_margin::compute_order_margin,
     prelude::Account,
@@ -48,8 +49,7 @@ where
     ) -> Result<(), RiskError> {
         let mut orders = account.active_limit_orders.clone();
         orders.insert(order.state().meta().id(), order.clone());
-        let new_order_margin =
-            compute_order_margin(&account.position, &orders, self.contract_spec.fee_maker);
+        let new_order_margin = compute_order_margin(&account.position, &orders);
 
         // TODO: this calculation does not allow a fully loaded long (or short) position
         // to be reversed into the opposite position of the same size,
@@ -59,7 +59,8 @@ where
             "new_order_margin: {}, available_balance: {}",
             new_order_margin, available_balance
         );
-        if new_order_margin > available_balance {
+        let order_fees: M = fees_of_limit_orders(&orders, self.contract_spec.fee_maker);
+        if new_order_margin + order_fees > available_balance {
             return Err(RiskError::NotEnoughAvailableBalance);
         }
 

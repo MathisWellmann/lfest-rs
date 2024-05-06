@@ -66,11 +66,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        prelude::{Decimal, QuoteCurrency},
-        quote,
-        test_helpers::LN_RETS_H,
-    };
+    use crate::{quote, test_helpers::LN_RETS_H};
 
     #[test]
     fn test_cornish_fisher_value_at_risk() {

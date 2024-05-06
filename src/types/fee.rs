@@ -5,7 +5,8 @@ use fpdec::Decimal;
 #[macro_export]
 macro_rules! fee {
     ( $a:literal) => {{
-        Fee::new($crate::prelude::fpdec::Dec!($a))
+        use $crate::prelude::fpdec::Decimal;
+        $crate::prelude::Fee::new($crate::prelude::fpdec::Dec!($a))
     }};
 }
 
