@@ -16,6 +16,7 @@ mod config;
 mod contract_specification;
 mod cornish_fisher;
 mod exchange;
+mod fees_of_limit_orders;
 mod market_state;
 mod mock_exchange;
 mod order_filters;

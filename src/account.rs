@@ -5,7 +5,7 @@ use crate::{
     order_margin::compute_order_margin,
     position::Position,
     prelude::AccountTracker,
-    types::{Currency, Error, Fee, Leverage, LimitOrder, MarginCurrency, OrderId, Pending, Result},
+    types::{Currency, Error, Leverage, LimitOrder, MarginCurrency, OrderId, Pending, Result},
 };
 
 /// The users account
@@ -35,8 +35,6 @@ where
     // Maps the `user_order_id` to the internal order nonce.
     pub(crate) lookup_order_nonce_from_user_order_id: HashMap<UserOrderId, OrderId>,
 
-    maker_fee: Fee,
-
     /// The current order margin used by the user `Account`.
     #[getset(get_copy = "pub")]
     order_margin: M,
@@ -49,13 +47,12 @@ where
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
     fn default() -> Self {
-        use crate::prelude::{fee, Dec, Decimal};
+        use crate::prelude::{Dec, Decimal};
         Self {
             wallet_balance: M::new(Dec!(1)),
             position: Position::default(),
             active_limit_orders: HashMap::default(),
             lookup_order_nonce_from_user_order_id: HashMap::default(),
-            maker_fee: fee!(0.0),
             order_margin: M::new(Dec!(0)),
         }
     }
@@ -67,7 +64,7 @@ where
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
     /// Create a new [`Account`] instance.
-    pub(crate) fn new(starting_balance: M, leverage: Leverage, maker_fee: Fee) -> Self {
+    pub(crate) fn new(starting_balance: M, leverage: Leverage) -> Self {
         let position = Position::new(leverage);
 
         Self {
@@ -75,7 +72,6 @@ where
             position,
             active_limit_orders: HashMap::new(),
             lookup_order_nonce_from_user_order_id: HashMap::new(),
-            maker_fee,
             order_margin: M::new_zero(),
         }
     }
@@ -83,8 +79,7 @@ where
     /// Return the available balance of the `Account`
     pub fn available_balance(&self) -> M {
         // TODO: this call is expensive so maybe compute once and store
-        let order_margin =
-            compute_order_margin(&self.position, &self.active_limit_orders, self.maker_fee);
+        let order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
         let ab = self.wallet_balance - self.position.position_margin - order_margin;
         debug_assert!(ab >= M::new_zero());
         ab
@@ -151,8 +146,7 @@ where
         };
         self.lookup_order_nonce_from_user_order_id
             .insert(user_order_id, order_id);
-        self.order_margin =
-            compute_order_margin(&self.position, &self.active_limit_orders, self.maker_fee);
+        self.order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
     }
 
     /// Cancel an active limit order.
@@ -170,8 +164,7 @@ where
             .active_limit_orders
             .remove(&order_id)
             .ok_or(Error::OrderIdNotFound)?;
-        self.order_margin =
-            compute_order_margin(&self.position, &self.active_limit_orders, self.maker_fee);
+        self.order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
 
         account_tracker.log_limit_order_cancellation();
 
@@ -184,8 +177,7 @@ where
             .active_limit_orders
             .remove(&order_id)
             .expect("The order must have been active; qed");
-        self.order_margin =
-            compute_order_margin(&self.position, &self.active_limit_orders, self.maker_fee);
+        self.order_margin = compute_order_margin(&self.position, &self.active_limit_orders);
         self.lookup_order_nonce_from_user_order_id
             .remove(order.user_order_id());
     }

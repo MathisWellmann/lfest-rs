@@ -57,11 +57,7 @@ where
     /// as infomation source
     pub fn new(account_tracker: A, config: Config<Q::PairedCurrency>) -> Self {
         let market_state = MarketState::new(config.contract_specification().price_filter.clone());
-        let account = Account::new(
-            config.starting_balance(),
-            config.initial_leverage(),
-            config.contract_specification().fee_maker,
-        );
+        let account = Account::new(config.starting_balance(), config.initial_leverage());
         let risk_engine = IsolatedMarginRiskEngine::<Q::PairedCurrency>::new(
             config.contract_specification().clone(),
         );

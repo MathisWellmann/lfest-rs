@@ -1,4 +1,3 @@
-use fpdec::Decimal;
 use getset::{CopyGetters, Getters};
 
 use crate::{

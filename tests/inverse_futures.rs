@@ -679,9 +679,9 @@ fn inv_execute_limit() {
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.account().active_limit_orders().len(), 1);
     assert_eq!(exchange.account().wallet_balance(), base!(1.0));
-    assert_eq!(exchange.account().available_balance(), base!(0.49990));
+    assert_eq!(exchange.account().available_balance(), base!(0.5));
     assert_eq!(exchange.account().position().position_margin(), base!(0.0));
-    assert_eq!(exchange.account().order_margin(), base!(0.5001)); // this includes the fee too
+    assert_eq!(exchange.account().order_margin(), base!(0.5));
 
     let order_updates = exchange
         .update_state(1, trade!(quote!(900.0), quote!(450.0), Side::Sell))

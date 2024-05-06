@@ -21,8 +21,8 @@ fn limit_orders_only() {
 
     let o = LimitOrder::new(Side::Buy, quote!(100), base!(9.9)).unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.account().order_margin(), quote!(990.198));
-    assert_eq!(exchange.account().available_balance(), quote!(9.802));
+    assert_eq!(exchange.account().order_margin(), quote!(990));
+    assert_eq!(exchange.account().available_balance(), quote!(10));
 
     let exec_orders = exchange
         .update_state(1, trade!(quote!(100), base!(10), Side::Sell))
