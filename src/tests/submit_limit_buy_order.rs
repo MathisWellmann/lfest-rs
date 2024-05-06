@@ -1,8 +1,8 @@
-use crate::{mock_exchange_base, prelude::*, trade};
+use crate::{mock_exchange_linear, prelude::*, trade};
 
 #[test]
 fn submit_limit_buy_order_no_position() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
@@ -92,7 +92,7 @@ fn submit_limit_buy_order_no_position() {
 // Test there is a maximum quantity of buy orders the account can post.
 #[test]
 fn submit_limit_buy_order_no_position_max() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
@@ -123,7 +123,7 @@ fn submit_limit_buy_order_no_position_max() {
 
 #[test]
 fn submit_limit_buy_order_with_long() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
@@ -184,7 +184,7 @@ fn submit_limit_buy_order_with_long() {
 
 #[test]
 fn submit_limit_buy_order_with_short() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
@@ -239,7 +239,7 @@ fn submit_limit_buy_order_with_short() {
 // test rejection if the limit price >= ask
 #[test]
 fn submit_limit_buy_order_above_ask() {
-    let mut exchange = mock_exchange_base();
+    let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
