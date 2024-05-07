@@ -10,7 +10,7 @@ fn limit_orders_only() {
     let exec_orders = exchange
         .update_state(
             0,
-            MarketUpdate::Bba {
+            Bba {
                 bid: quote!(100),
                 ask: quote!(101),
             },
@@ -80,7 +80,7 @@ fn limit_orders_2() {
     let exec_orders = exchange
         .update_state(
             0,
-            MarketUpdate::Bba {
+            Bba {
                 bid: quote!(100),
                 ask: quote!(101),
             },

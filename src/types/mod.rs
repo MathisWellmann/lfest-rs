@@ -16,7 +16,7 @@ pub use fee::{Fee, FeeType};
 pub use leverage::Leverage;
 pub use limit_order::LimitOrder;
 pub use market_order::MarketOrder;
-pub use market_update::MarketUpdate;
+pub use market_update::{Bba, Candle, MarketUpdate, Trade};
 pub use order_meta::ExchangeOrderMeta;
 pub use order_status::{Filled, FilledQuantity, NewOrder, Pending};
 pub use order_update::LimitOrderUpdate;

@@ -187,15 +187,4 @@ where
             }
         }
     }
-
-    /// Return the unfilled quantity.
-    pub(crate) fn unfilled_quantity(&self) -> Q {
-        match self.state.filled_quantity {
-            FilledQuantity::Unfilled => self.quantity,
-            FilledQuantity::Filled {
-                cumulative_qty,
-                avg_price: _,
-            } => self.quantity - cumulative_qty,
-        }
-    }
 }

@@ -9,7 +9,7 @@ fn lin_long_market_win_full() {
     let _ = exchange
         .update_state(
             0,
-            MarketUpdate::Bba {
+            Bba {
                 bid: quote!(99.0),
                 ask: quote!(100.0),
             },
@@ -22,7 +22,7 @@ fn lin_long_market_win_full() {
     let _ = exchange
         .update_state(
             0,
-            MarketUpdate::Bba {
+            Bba {
                 bid: quote!(100.0),
                 ask: quote!(101.0),
             },
@@ -45,7 +45,7 @@ fn lin_long_market_win_full() {
     let _ = exchange
         .update_state(
             0,
-            MarketUpdate::Bba {
+            Bba {
                 bid: quote!(200),
                 ask: quote!(201),
             },

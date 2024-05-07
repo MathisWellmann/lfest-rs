@@ -13,7 +13,6 @@ use crate::{
         MarketOrder, MarketUpdate, NewOrder, OrderError, OrderId, Pending, Result, Side,
         TimestampNs,
     },
-    utils::min,
 };
 
 /// The main leveraged futures exchange for simulated trading
@@ -84,11 +83,14 @@ where
     ///
     /// ### Returns:
     /// If Ok, returns updates regarding limit orders, wether partially filled or fully.
-    pub fn update_state(
+    pub fn update_state<U>(
         &mut self,
         timestamp_ns: TimestampNs,
-        market_update: MarketUpdate<Q>,
-    ) -> Result<Vec<LimitOrderUpdate<Q, UserOrderId>>> {
+        market_update: U,
+    ) -> Result<Vec<LimitOrderUpdate<Q, UserOrderId>>>
+    where
+        U: MarketUpdate<Q, UserOrderId>,
+    {
         self.market_state
             .update_state(timestamp_ns, &market_update)?;
         self.account_tracker
@@ -101,108 +103,43 @@ where
             return Err(e.into());
         };
 
-        match market_update {
-            MarketUpdate::Bba { bid: _, ask: _ } => {
-                // We don't fill orders when a new best bid and ask price is being set.
-                Ok(Vec::new())
-            }
-            MarketUpdate::Trade {
-                price,
-                quantity,
-                side,
-            } => {
-                let mut changed_orders = Vec::new();
-                for mut order in self.account.active_limit_orders.clone().values().cloned() {
-                    // The execution criteria.
-                    if match order.side() {
-                        Side::Buy => price <= order.limit_price() && matches!(side, Side::Sell),
-                        Side::Sell => price >= order.limit_price() && matches!(side, Side::Buy),
-                    } {
-                        // Execute up to the quantity of the incoming `Trade`.
-
-                        let filled_qty = min(quantity, order.unfilled_quantity());
-                        let qty = match order.side() {
-                            Side::Buy => filled_qty,
-                            Side::Sell => filled_qty.into_negative(),
-                        };
-                        self.clearing_house.settle_filled_order(
-                            &mut self.account,
-                            &mut self.account_tracker,
-                            qty,
-                            order.limit_price(),
-                            self.config.contract_specification().fee_maker,
-                            self.market_state.current_timestamp_ns(),
-                        );
-                        // Fill order and check if it is fully filled.
-                        if order.fill(order.limit_price(), filled_qty) {
-                            let filled_order =
-                                order.clone().into_filled(order.limit_price(), timestamp_ns);
-                            changed_orders.push(LimitOrderUpdate::FullyFilled(filled_order));
-                            continue;
-                        }
-                        changed_orders.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
-                    }
+        // TODO: move into `Account`
+        let mut changed_orders = Vec::new();
+        for mut order in self.account.active_limit_orders.clone().values().cloned() {
+            if let Some(filled_qty) = market_update.limit_order_filled(&order) {
+                let qty = match order.side() {
+                    Side::Buy => filled_qty,
+                    Side::Sell => filled_qty.into_negative(),
+                };
+                self.clearing_house.settle_filled_order(
+                    &mut self.account,
+                    &mut self.account_tracker,
+                    qty,
+                    order.limit_price(),
+                    self.config.contract_specification().fee_maker,
+                    self.market_state.current_timestamp_ns(),
+                );
+                // Fill order and check if it is fully filled.
+                if order.fill(order.limit_price(), filled_qty) {
+                    let filled_order = order.clone().into_filled(order.limit_price(), timestamp_ns);
+                    changed_orders.push(LimitOrderUpdate::FullyFilled(filled_order));
+                    continue;
                 }
-                for update in changed_orders.iter() {
-                    match update {
-                        LimitOrderUpdate::FullyFilled(limit_order) => {
-                            self.account
-                                .remove_executed_order_from_active(limit_order.state().meta().id());
-                            // TODO: we could potentially log partial fills as well...
-                            self.account_tracker.log_limit_order_fill();
-                        }
-                        LimitOrderUpdate::PartiallyFilled(_) => {}
-                    }
-                }
-                Ok(changed_orders)
-            }
-            MarketUpdate::Candle {
-                bid: _,
-                ask: _,
-                low,
-                high,
-            } => {
-                let mut changed_orders = Vec::new();
-                // As a simplifying assumption, the order always get executed fully when using candles.
-                for order in self.account.active_limit_orders.clone().values() {
-                    // The execution criteria.
-                    if match order.side() {
-                        Side::Buy => low < order.limit_price(),
-                        Side::Sell => high > order.limit_price(),
-                    } {
-                        // Order is executed fully with candles.
-                        let qty = match order.side() {
-                            Side::Buy => order.quantity(),
-                            Side::Sell => order.quantity().into_negative(),
-                        };
-                        self.clearing_house.settle_filled_order(
-                            &mut self.account,
-                            &mut self.account_tracker,
-                            qty,
-                            order.limit_price(),
-                            self.config.contract_specification().fee_maker,
-                            self.market_state.current_timestamp_ns(),
-                        );
-                        let filled_order =
-                            order.clone().into_filled(order.limit_price(), timestamp_ns);
-                        changed_orders.push(LimitOrderUpdate::FullyFilled(filled_order));
-                    }
-                }
-                for update in changed_orders.iter() {
-                    match update {
-                        LimitOrderUpdate::FullyFilled(limit_order) => {
-                            self.account
-                                .remove_executed_order_from_active(limit_order.state().meta().id());
-                            self.account_tracker.log_limit_order_fill();
-                        }
-                        LimitOrderUpdate::PartiallyFilled(_) => {
-                            panic!("Here we only get fully executed limit orders; qed")
-                        }
-                    }
-                }
-                Ok(changed_orders)
+                changed_orders.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
             }
         }
+        for update in changed_orders.iter() {
+            match update {
+                LimitOrderUpdate::FullyFilled(limit_order) => {
+                    self.account
+                        .remove_executed_order_from_active(limit_order.state().meta().id());
+                    // TODO: we could potentially log partial fills as well...
+                    self.account_tracker.log_limit_order_fill();
+                }
+                LimitOrderUpdate::PartiallyFilled(_) => {}
+            }
+        }
+        Ok(changed_orders)
     }
 
     /// # Arguments:
