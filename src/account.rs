@@ -11,6 +11,7 @@ use crate::{
         Currency, Error, Fee, Leverage, LimitOrder, LimitOrderUpdate, MarginCurrency, MarketUpdate,
         OrderId, Pending, QuoteCurrency, Result, Side, TimestampNs,
     },
+    utils::margin_for_position,
 };
 
 /// The users account
@@ -400,6 +401,7 @@ where
     /// `fill_price`: The execution price of the trade
     /// `fee`: The fee fraction for this type of order settlement.
     ///
+    #[deprecated]
     pub(crate) fn settle_filled_order<A>(
         &mut self,
         account_tracker: &mut A,
@@ -424,6 +426,7 @@ where
         }
     }
 
+    #[deprecated]
     fn settle_buy_order<A>(
         &mut self,
         account_tracker: &mut A,
@@ -466,6 +469,7 @@ where
         }
     }
 
+    #[deprecated]
     fn settle_sell_order<A>(
         &mut self,
         account_tracker: &mut A,
@@ -547,17 +551,4 @@ where
         }
         changed_orders
     }
-}
-
-/// Compute the required margin for a position of a given size.
-fn margin_for_position<Q>(
-    pos_size: Q,
-    entry_price: QuoteCurrency,
-    leverage: Leverage,
-) -> Q::PairedCurrency
-where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
-{
-    pos_size.abs().convert(entry_price) / leverage
 }
