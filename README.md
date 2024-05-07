@@ -28,6 +28,7 @@ or implement your own using the [`AccountTracker`](https://docs.rs/lfest/latest/
 [`PriceFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.PriceFilter.html)     
 [`QuantityFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuantityFilter.html)    
 - `IsolatedMarginRiskEngine`
+- Double-Entry Bookkeeping is used to ensure correct balance transfers.
 
 ### Order Types
 The supported order types are:
@@ -74,16 +75,17 @@ For an example see [examples](examples/basic.rs)
 - Orderbook support (with `MatchingEngine`)
 - Funding rate (support `settle_funding_period` in `ClearingHouse`)
 - Multiple accounts (low priority)
-- Multiple markets
+- Multiple markets (low priority)
 - Portfolio `RiskEngine` for multiple markets
 - Split out `FullAccountTracker` into smaller and easier to test units (Good first contribution).
-- Support `update_desired_leverage` in `Account`
-- CI pipeline on Github
+- Support for updating leverage of a position.
 - Support auto-deleveraging
-- Make the `user_order_id` type in `Order` generic (eg. support both `String` and `u64` for more user flexibility)
+- Benchmarking
+- more unit tests.
+- fuzz testing?
 
 ### Contributions
-If you have time available to contribute to the project, feel free to contact me and maybe we can arrange a **mutually benefitial aggreement**.
+Would love to see you use and contribute to this project. Even just adding more tests is welcome.
 
 ### Donations :moneybag: :money_with_wings:
 I you would like to support the development of this crate, feel free to send over a donation:

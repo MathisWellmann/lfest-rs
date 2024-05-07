@@ -27,11 +27,11 @@ pub trait Currency:
     + std::ops::Div<Decimal, Output = Self>
     + std::ops::Div<Leverage, Output = Self>
     + std::ops::Mul<Fee, Output = Self>
-    + std::ops::Add<Fee, Output = Self>
     + std::ops::AddAssign
     + std::ops::SubAssign
     + PartialEq
     + PartialOrd
+    + AsRef<Decimal>
 {
     /// The paired currency.
     /// e.g.: for the BTCUSD market the BTC currency is paired with USD, so the
@@ -43,9 +43,6 @@ pub trait Currency:
     #[must_use]
     fn new(val: Decimal) -> Self;
 
-    /// Return the inner `Decimal`
-    fn inner(self) -> Decimal;
-
     /// Create a new currency instance with zero value
     #[must_use]
     fn new_zero() -> Self;
@@ -56,9 +53,6 @@ pub trait Currency:
     /// TODO: it may be smart to remove this here and use another type that can
     /// be negative Get the absolute value
     fn abs(self) -> Self;
-
-    /// Compute the fee denoted in the currency
-    fn fee_portion(&self, fee: Fee) -> Self;
 
     /// Convert this `Currency`'s value into its pair at the conversion `rate`.
     /// E.g:

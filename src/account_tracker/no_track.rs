@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{
     account_tracker::AccountTracker,
-    prelude::{Account, MarketState},
+    prelude::MarketState,
     types::{Currency, MarginCurrency, QuoteCurrency, Side, TimestampNs},
 };
 
@@ -14,15 +14,7 @@ impl<M> AccountTracker<M> for NoAccountTracker
 where
     M: Currency + MarginCurrency,
 {
-    fn update<UserOrderId>(
-        &mut self,
-        _timestamp: TimestampNs,
-        _market_state: &MarketState,
-        _account: &Account<M, UserOrderId>,
-    ) where
-        UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
-    {
-    }
+    fn update(&mut self, _timestamp: TimestampNs, _market_state: &MarketState, _upnl: M) {}
 
     fn log_rpnl(&mut self, _rpnl: M, _ts_ns: i64) {}
 

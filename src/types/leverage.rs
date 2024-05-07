@@ -1,4 +1,5 @@
 use derive_more::Display;
+use fpdec::{Dec, Decimal};
 
 use crate::types::errors::{Error, Result};
 
@@ -9,27 +10,28 @@ use crate::types::errors::{Error, Result};
 #[macro_export]
 macro_rules! leverage {
     ( $a:literal ) => {{
-        Leverage::new($a).expect("I have read the panic comment and know the leverage must be > 0.")
+        use $crate::prelude::fpdec::Decimal;
+        $crate::prelude::Leverage::new($crate::prelude::fpdec::Dec!($a))
+            .expect("I have read the panic comment and know the leverage must be > 0.")
     }};
 }
 
 /// Leverage
 #[derive(Default, Debug, Clone, Copy, PartialEq, Display, Eq)]
-pub struct Leverage(u8);
+pub struct Leverage(Decimal);
 
 impl Leverage {
     /// Create a new instance from a `Decimal` value
-    #[inline]
-    pub fn new(val: u8) -> Result<Self> {
-        if val < 1 {
+    pub fn new(val: Decimal) -> Result<Self> {
+        if val < Dec!(1) {
             Err(Error::InvalidLeverage)?
         }
         Ok(Self(val))
     }
+}
 
-    /// Get access to the inner `Decimal`
-    #[inline(always)]
-    pub fn inner(&self) -> u8 {
-        self.0
+impl AsRef<Decimal> for Leverage {
+    fn as_ref(&self) -> &Decimal {
+        &self.0
     }
 }

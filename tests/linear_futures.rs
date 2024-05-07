@@ -24,25 +24,30 @@ fn lin_long_market_win_full() {
     let order_updates = exchange.update_state(0, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    assert_eq!(exchange.account().position().size(), base!(5.0));
-    assert_eq!(exchange.account().position().entry_price(), bid);
     assert_eq!(
-        exchange.account().position().unrealized_pnl(bid, ask),
-        quote!(0.0)
+        exchange.position(),
+        &Position::Long(PositionInner::new(base!(5.0), bid))
     );
-    assert_eq!(exchange.account().position().margin(), quote!(500.0));
-    assert_eq!(exchange.account().total_value(bid, ask), quote!(999.7));
-    assert_eq!(exchange.account().available_wallet_balance(), quote!(499.7));
+    assert_eq!(
+        exchange.position(),
+        &Position::Long(PositionInner::new(base!(5.0), bid))
+    );
+    assert_eq!(exchange.position().unrealized_pnl(bid, ask), quote!(0.0));
+    assert_eq!(
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(499.7),
+            position_margin: quote!(500),
+            order_margin: quote!(0)
+        }
+    );
 
     let bid = quote!(200);
     let ask = quote!(201);
     let order_updates = exchange.update_state(0, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
-        exchange
-            .account()
-            .position()
-            .unrealized_pnl(quote!(200), quote!(201)),
+        exchange.position().unrealized_pnl(quote!(200), quote!(201)),
         quote!(500.0)
     );
 
@@ -50,19 +55,17 @@ fn lin_long_market_win_full() {
         .submit_market_order(MarketOrder::new(Side::Sell, base!(5.0)).unwrap())
         .unwrap();
 
-    assert_eq!(exchange.account().position().size(), base!(0.0));
-    assert_eq!(exchange.account().position().entry_price(), quote!(100.0));
+    assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
-        exchange
-            .account()
-            .position()
-            .unrealized_pnl(quote!(200), quote!(201)),
+        exchange.position().unrealized_pnl(quote!(200), quote!(201)),
         quote!(0.0)
     );
-    assert_eq!(exchange.account().position().margin(), quote!(0.0));
-    assert_eq!(exchange.account().total_value(bid, ask), quote!(1499.1));
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        quote!(1499.1)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(1499.1),
+            position_margin: quote!(0),
+            order_margin: quote!(0)
+        }
     );
 }

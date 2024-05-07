@@ -1,6 +1,9 @@
 use fpdec::{Dec, Decimal};
 
-use crate::types::{Currency, Leverage, MarginCurrency, QuoteCurrency};
+use crate::{
+    prelude::{TransactionAccounting, USER_WALLET_ACCOUNT},
+    types::{Currency, Leverage, MarginCurrency, QuoteCurrency},
+};
 
 /// Return the minimum of two values
 #[inline(always)]
@@ -115,6 +118,20 @@ where
     Q::PairedCurrency: MarginCurrency,
 {
     pos_size.abs().convert(entry_price) / leverage
+}
+
+/// Asserts that the users wallet balance is greater than zero.
+pub(crate) fn assert_user_wallet_balance<T, M>(transaction_accounting: &T)
+where
+    T: TransactionAccounting<M>,
+    M: MarginCurrency,
+{
+    assert!(
+        transaction_accounting
+            .margin_balance_of(USER_WALLET_ACCOUNT)
+            .expect("is valid")
+            >= M::new_zero()
+    );
 }
 
 #[cfg(test)]

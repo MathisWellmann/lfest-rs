@@ -1,6 +1,9 @@
 use hashbrown::HashMap;
 
-use crate::{mock_exchange_linear, prelude::*, risk_engine::RiskError};
+use crate::{
+    exchange::UserBalances, mock_exchange_linear, position::PositionInner, prelude::*,
+    risk_engine::RiskError,
+};
 
 #[test]
 #[tracing_test::traced_test]
@@ -35,17 +38,16 @@ fn submit_market_buy_order_no_position() {
 
     // make sure its excuted immediately
     assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(5),
-            entry_price: quote!(101),
-            margin: quote!(505),
-        }
+        exchange.position(),
+        &Position::Long(PositionInner::new(base!(5), quote!(101),))
     );
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        // - fee
-        quote!(495) - quote!(0.303)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(495) - quote!(0.303), // - fee ofc
+            position_margin: quote!(505),
+            order_margin: quote!(0)
+        }
     );
 }
 
@@ -65,58 +67,36 @@ fn submit_market_buy_order_with_long_position() {
     exchange.submit_market_order(order).unwrap();
     let fee0 = quote!(0.3);
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        quote!(500) - fee0
+        exchange.position(),
+        &Position::Long(PositionInner::new(base!(5), quote!(100),))
     );
+    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
     assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(5),
-            entry_price: quote!(100),
-            margin: quote!(500)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(500) - fee0,
+            position_margin: quote!(500),
+            order_margin: quote!(0)
         }
     );
-    assert_eq!(
-        exchange.account().active_limit_orders(),
-        &HashMap::default()
-    );
-    assert_eq!(exchange.account().order_margin(), quote!(0));
 
     // Buy again
     let order = MarketOrder::new(Side::Buy, base!(4)).unwrap();
     exchange.submit_market_order(order).unwrap();
     let fee1 = quote!(0.24);
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        quote!(100) - fee0 - fee1
-    );
-    assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(9),
-            entry_price: quote!(100),
-            margin: quote!(900)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(100) - fee0 - fee1,
+            position_margin: quote!(900),
+            order_margin: quote!(0)
         }
     );
     assert_eq!(
-        exchange.account().active_limit_orders(),
-        &HashMap::default()
+        exchange.position(),
+        &Position::Long(PositionInner::new(base!(9), quote!(100)))
     );
-    assert_eq!(exchange.account().order_margin(), quote!(0));
-
-    assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(9),
-            entry_price: quote!(100),
-            margin: quote!(900),
-        }
-    );
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        // - fee - fee - spread loss
-        quote!(100) - quote!(0.3) - quote!(0.24)
-    );
+    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 }
 
 #[test]
@@ -135,38 +115,30 @@ fn submit_market_buy_order_with_short_position() {
     exchange.submit_market_order(order).unwrap();
     let fee0 = quote!(0.54);
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        quote!(100) - fee0
-    );
-    assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(-9),
-            entry_price: quote!(100),
-            margin: quote!(900)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(100) - fee0,
+            position_margin: quote!(900),
+            order_margin: quote!(0)
         }
     );
     assert_eq!(
-        exchange.account().active_limit_orders(),
-        &HashMap::default()
+        exchange.position(),
+        &Position::Short(PositionInner::new(base!(9), quote!(100),))
     );
-    assert_eq!(exchange.account().order_margin(), quote!(0));
+    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 
     // Now close the position with a buy order
     let order = MarketOrder::new(Side::Buy, base!(9)).unwrap();
     exchange.submit_market_order(order).unwrap();
+    assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(0),
-            entry_price: quote!(100),
-            margin: quote!(0),
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(1000) - quote!(0.54) - quote!(0.5454) - quote!(9),
+            position_margin: quote!(0),
+            order_margin: quote!(0)
         }
-    );
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        // - fee - fee - spread loss
-        quote!(1000) - quote!(0.54) - quote!(0.5454) - quote!(9)
     );
 }
 
@@ -189,16 +161,20 @@ fn submit_market_buy_order_turnaround_short() {
     let order = MarketOrder::new(Side::Buy, base!(18)).unwrap();
     exchange.submit_market_order(order).unwrap();
     assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(9),
-            entry_price: quote!(100),
-            margin: quote!(900),
-        }
+        exchange.position(),
+        &Position::Long(PositionInner::new(
+            base!(9),
+            quote!(100),
+            // margin: quote!(900),
+        ))
     );
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        // - fee - fee - spread loss
-        quote!(100) - quote!(0.5346) - quote!(1.08) - quote!(9)
+        exchange.user_balances(),
+        UserBalances {
+            // - fee - fee - spread loss
+            available_wallet_balance: quote!(100) - quote!(0.5346) - quote!(1.08) - quote!(9),
+            position_margin: quote!(900),
+            order_margin: quote!(0)
+        }
     );
 }

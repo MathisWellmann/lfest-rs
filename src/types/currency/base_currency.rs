@@ -1,6 +1,6 @@
 use std::ops::{Add, Div, Mul, Rem, Sub};
 
-use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
+use derive_more::{Add, AddAssign, Div, From, Into, Mul, Sub, SubAssign};
 use fpdec::Decimal;
 
 use super::MarginCurrency;
@@ -34,7 +34,6 @@ macro_rules! base {
     Div,
     AddAssign,
     SubAssign,
-    Display,
     Into,
     From,
     Hash,
@@ -49,11 +48,6 @@ impl Currency for BaseCurrency {
     #[inline(always)]
     fn new(val: Decimal) -> Self {
         Self(val)
-    }
-
-    #[inline(always)]
-    fn inner(self) -> Decimal {
-        self.0
     }
 
     #[inline(always)]
@@ -72,13 +66,8 @@ impl Currency for BaseCurrency {
     }
 
     #[inline(always)]
-    fn fee_portion(&self, fee: Fee) -> Self {
-        Self(self.0 * fee.inner())
-    }
-
-    #[inline(always)]
     fn convert(&self, rate: QuoteCurrency) -> Self::PairedCurrency {
-        QuoteCurrency::new(self.0 * rate.inner())
+        QuoteCurrency::new(self.0 * rate.as_ref())
     }
 
     #[inline(always)]
@@ -101,6 +90,12 @@ impl MarginCurrency for BaseCurrency {
             return S::PairedCurrency::new_zero();
         }
         quantity.convert(entry_price) - quantity.convert(exit_price)
+    }
+}
+
+impl AsRef<Decimal> for BaseCurrency {
+    fn as_ref(&self) -> &Decimal {
+        &self.0
     }
 }
 
@@ -149,7 +144,7 @@ impl Div<Leverage> for BaseCurrency {
     type Output = Self;
 
     fn div(self, rhs: Leverage) -> Self::Output {
-        Self(self.0 / rhs.inner())
+        Self(self.0 / *rhs.as_ref())
     }
 }
 
@@ -157,15 +152,13 @@ impl Mul<Fee> for BaseCurrency {
     type Output = Self;
 
     fn mul(self, rhs: Fee) -> Self::Output {
-        Self(self.0 * rhs.inner())
+        Self(self.0 * rhs.as_ref())
     }
 }
 
-impl Add<Fee> for BaseCurrency {
-    type Output = Self;
-
-    fn add(self, rhs: Fee) -> Self::Output {
-        Self(self.0 + rhs.inner())
+impl std::fmt::Display for BaseCurrency {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} BASE", self.0)
     }
 }
 

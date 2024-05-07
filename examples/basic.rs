@@ -18,19 +18,22 @@ fn main() {
 
     let starting_balance = base!(10);
     let acc_tracker = FullAccountTracker::new(starting_balance);
-    let contract_specification = ContractSpecification {
-        ticker: "TESTUSD".to_string(),
-        initial_margin: Dec!(0.01),
-        maintenance_margin: Dec!(0.02),
-        mark_method: MarkMethod::MidPrice,
-        price_filter: PriceFilter::default(),
-        quantity_filter: QuantityFilter::default(),
-        fee_maker: fee!(0.0002),
-        fee_taker: fee!(0.0006),
-    };
-    let config = Config::new(starting_balance, 200, leverage!(1), contract_specification).unwrap();
-    let mut exchange =
-        Exchange::<FullAccountTracker<BaseCurrency>, QuoteCurrency, ()>::new(acc_tracker, config);
+    let contract_spec = ContractSpecification::new(
+        leverage!(1),
+        Dec!(0.5),
+        PriceFilter::default(),
+        QuantityFilter::default(),
+        fee!(0.0002),
+        fee!(0.0006),
+    )
+    .expect("is valid");
+    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
+    let mut exchange = Exchange::<
+        FullAccountTracker<BaseCurrency>,
+        QuoteCurrency,
+        (),
+        InMemoryTransactionAccounting<BaseCurrency>,
+    >::new(acc_tracker, config);
 
     // load trades from csv file
     let prices = load_prices_from_csv("./data/Bitmex_XBTUSD_1M.csv").unwrap();
@@ -57,7 +60,7 @@ fn main() {
         if i % 100 == 0 {
             // Trade a fraction of the available wallet balance
             let order_value: BaseCurrency =
-                exchange.account().available_wallet_balance() * Dec!(0.1);
+                exchange.user_balances().available_wallet_balance * Dec!(0.1);
             let order_size = order_value.convert(exchange.market_state().bid());
             let order = if rng.gen() {
                 MarketOrder::new(Side::Sell, order_size).unwrap() // Sell using

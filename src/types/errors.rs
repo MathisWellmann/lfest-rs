@@ -134,6 +134,12 @@ pub enum Error {
 
     #[error(transparent)]
     Decimal(#[from] fpdec::DecimalError),
+
+    #[error("Failed to lookup account.")]
+    AccountLookupFailure,
+
+    #[error("The maintenance margin fraction is invalid")]
+    InvalidMaintenanceMarginFraction,
 }
 
 /// This is defined as a convenience.
