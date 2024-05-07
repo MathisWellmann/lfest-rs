@@ -8,8 +8,8 @@ use crate::{
     prelude::AccountTracker,
     quote,
     types::{
-        Currency, Error, Fee, Leverage, LimitOrder, LimitOrderUpdate, MarginCurrency, MarketUpdate,
-        OrderId, Pending, QuoteCurrency, Result, Side, TimestampNs,
+        Currency, Error, Fee, Filled, Leverage, LimitOrder, LimitOrderUpdate, MarginCurrency,
+        MarketOrder, MarketUpdate, OrderId, Pending, QuoteCurrency, Result, Side, TimestampNs,
     },
     utils::margin_for_position,
 };
@@ -51,6 +51,8 @@ where
     order_margin: M,
 
     fee_maker: Fee,
+
+    fee_taker: Fee,
 }
 
 #[cfg(test)]
@@ -69,6 +71,7 @@ where
             order_margin: M::new(Dec!(0)),
             leverage: leverage!(1),
             fee_maker: fee!(0.0002),
+            fee_taker: fee!(0.0006),
         }
     }
 }
@@ -79,7 +82,12 @@ where
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
 {
     /// Create a new [`Account`] instance.
-    pub(crate) fn new(starting_balance: M, leverage: Leverage, fee_maker: Fee) -> Self {
+    pub(crate) fn new(
+        starting_balance: M,
+        leverage: Leverage,
+        fee_maker: Fee,
+        fee_taker: Fee,
+    ) -> Self {
         Self {
             available_wallet_balance: starting_balance,
             position: Position::default(),
@@ -88,6 +96,7 @@ where
             order_margin: M::new_zero(),
             leverage,
             fee_maker,
+            fee_taker,
         }
     }
 
@@ -402,12 +411,11 @@ where
     /// `fee`: The fee fraction for this type of order settlement.
     ///
     #[deprecated]
-    pub(crate) fn settle_filled_order<A>(
+    pub(crate) fn settle_filled_limit_order<A>(
         &mut self,
         account_tracker: &mut A,
         quantity: M::PairedCurrency,
         fill_price: QuoteCurrency,
-        fee: Fee,
         ts_ns: TimestampNs,
     ) where
         A: AccountTracker<M>,
@@ -420,10 +428,52 @@ where
         account_tracker.log_trade(side, fill_price, quantity);
 
         if quantity > M::PairedCurrency::new_zero() {
-            self.settle_buy_order(account_tracker, quantity, fill_price, fee, ts_ns);
+            self.settle_buy_order(account_tracker, quantity, fill_price, self.fee_maker, ts_ns);
         } else {
-            self.settle_sell_order(account_tracker, quantity.abs(), fill_price, fee, ts_ns);
+            self.settle_sell_order(
+                account_tracker,
+                quantity.abs(),
+                fill_price,
+                self.fee_maker,
+                ts_ns,
+            );
         }
+    }
+
+    pub(crate) fn settle_filled_market_order<A>(
+        &mut self,
+        account_tracker: &mut A,
+        order: MarketOrder<M::PairedCurrency, UserOrderId, Filled>,
+        ts_ns: TimestampNs,
+    ) where
+        A: AccountTracker<M>,
+    {
+        let quantity = match order.side() {
+            Side::Buy => order.quantity(),
+            Side::Sell => order.quantity().into_negative(),
+        };
+
+        let side = if quantity > M::PairedCurrency::new_zero() {
+            Side::Buy
+        } else {
+            Side::Sell
+        };
+        let fill_price = order.state().avg_fill_price();
+        account_tracker.log_trade(side, fill_price, quantity);
+
+        if quantity > M::PairedCurrency::new_zero() {
+            self.settle_buy_order(account_tracker, quantity, fill_price, self.fee_taker, ts_ns);
+        } else {
+            self.settle_sell_order(
+                account_tracker,
+                quantity.abs(),
+                fill_price,
+                self.fee_taker,
+                ts_ns,
+            );
+        }
+
+        account_tracker.log_market_order_fill();
     }
 
     #[deprecated]
@@ -523,13 +573,7 @@ where
                     Side::Buy => filled_qty,
                     Side::Sell => filled_qty.into_negative(),
                 };
-                self.settle_filled_order(
-                    account_tracker,
-                    qty,
-                    order.limit_price(),
-                    self.fee_maker,
-                    ts_ns,
-                );
+                self.settle_filled_limit_order(account_tracker, qty, order.limit_price(), ts_ns);
                 // Fill order and check if it is fully filled.
                 if order.fill(order.limit_price(), filled_qty) {
                     let filled_order = order.clone().into_filled(order.limit_price(), ts_ns);

@@ -59,6 +59,7 @@ where
             config.starting_balance(),
             config.initial_leverage(),
             config.contract_specification().fee_maker,
+            config.contract_specification().fee_taker,
         );
         let risk_engine = IsolatedMarginRiskEngine::<Q::PairedCurrency>::new(
             config.contract_specification().clone(),
@@ -185,21 +186,16 @@ where
         };
         self.risk_engine
             .check_market_order(&self.account, &order, fill_price)?;
-        let quantity = match order.side() {
-            Side::Buy => order.quantity(),
-            Side::Sell => order.quantity().into_negative(),
-        };
+
         // From here on, everything is infallible
-        self.account.settle_filled_order(
+        let filled_order = order.into_filled(fill_price, self.market_state.current_timestamp_ns());
+        self.account.settle_filled_market_order(
             &mut self.account_tracker,
-            quantity,
-            fill_price,
-            self.config.contract_specification().fee_taker,
+            filled_order.clone(),
             self.market_state.current_timestamp_ns(),
         );
-        self.account_tracker.log_market_order_fill();
 
-        Ok(order.into_filled(fill_price, self.market_state.current_timestamp_ns()))
+        Ok(filled_order)
     }
 
     #[inline]
