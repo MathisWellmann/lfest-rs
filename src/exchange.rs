@@ -4,7 +4,6 @@ use tracing::trace;
 use crate::{
     account::Account,
     account_tracker::AccountTracker,
-    clearing_house::ClearingHouse,
     config::Config,
     market_state::MarketState,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
@@ -41,8 +40,6 @@ where
 
     risk_engine: IsolatedMarginRiskEngine<Q::PairedCurrency>,
 
-    clearing_house: ClearingHouse<A, Q::PairedCurrency, UserOrderId>,
-
     next_order_id: u64,
 }
 
@@ -61,12 +58,10 @@ where
         let risk_engine = IsolatedMarginRiskEngine::<Q::PairedCurrency>::new(
             config.contract_specification().clone(),
         );
-        let clearing_house = ClearingHouse::new();
 
         Self {
             config,
             market_state,
-            clearing_house,
             risk_engine,
             account,
             account_tracker,
@@ -103,7 +98,6 @@ where
             return Err(e.into());
         };
 
-        // TODO: move into `Account`
         let mut changed_orders = Vec::new();
         for mut order in self.account.active_limit_orders().clone().values().cloned() {
             if let Some(filled_qty) = market_update.limit_order_filled(&order) {
@@ -111,8 +105,7 @@ where
                     Side::Buy => filled_qty,
                     Side::Sell => filled_qty.into_negative(),
                 };
-                self.clearing_house.settle_filled_order(
-                    &mut self.account,
+                self.account.settle_filled_order(
                     &mut self.account_tracker,
                     qty,
                     order.limit_price(),
@@ -224,8 +217,7 @@ where
             Side::Sell => order.quantity().into_negative(),
         };
         // From here on, everything is infallible
-        self.clearing_house.settle_filled_order(
-            &mut self.account,
+        self.account.settle_filled_order(
             &mut self.account_tracker,
             quantity,
             fill_price,

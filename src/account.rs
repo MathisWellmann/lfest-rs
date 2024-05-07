@@ -8,8 +8,8 @@ use crate::{
     prelude::AccountTracker,
     quote,
     types::{
-        Currency, Error, Leverage, LimitOrder, MarginCurrency, OrderId, Pending, QuoteCurrency,
-        Result, TimestampNs,
+        Currency, Error, Fee, Leverage, LimitOrder, MarginCurrency, OrderId, Pending,
+        QuoteCurrency, Result, Side, TimestampNs,
     },
 };
 
@@ -384,6 +384,117 @@ where
         account_tracker.log_rpnl(rpnl, ts_ns);
 
         self.available_wallet_balance += rpnl + margin_delta;
+    }
+
+    /// Settlement referes to the actual transfer of funds or assets between the buyer and seller to fulfill the trade.
+    /// As the `ClearingHouse` is the central counterparty to every trade,
+    /// it is the buyer of every sell order,
+    /// and the seller of every buy order.
+    ///
+    /// # Arguments:
+    /// `quantity`: The number of contract traded, where a negative number indicates a sell.
+    /// `fill_price`: The execution price of the trade
+    /// `fee`: The fee fraction for this type of order settlement.
+    ///
+    pub(crate) fn settle_filled_order<A>(
+        &mut self,
+        account_tracker: &mut A,
+        quantity: M::PairedCurrency,
+        fill_price: QuoteCurrency,
+        fee: Fee,
+        ts_ns: TimestampNs,
+    ) where
+        A: AccountTracker<M>,
+    {
+        let side = if quantity > M::PairedCurrency::new_zero() {
+            Side::Buy
+        } else {
+            Side::Sell
+        };
+        account_tracker.log_trade(side, fill_price, quantity);
+
+        if quantity > M::PairedCurrency::new_zero() {
+            self.settle_buy_order(account_tracker, quantity, fill_price, fee, ts_ns);
+        } else {
+            self.settle_sell_order(account_tracker, quantity.abs(), fill_price, fee, ts_ns);
+        }
+    }
+
+    fn settle_buy_order<A>(
+        &mut self,
+        account_tracker: &mut A,
+        quantity: M::PairedCurrency,
+        fill_price: QuoteCurrency,
+        fee: Fee,
+        ts_ns: TimestampNs,
+    ) where
+        A: AccountTracker<M>,
+    {
+        debug_assert!(quantity > M::PairedCurrency::new_zero());
+        debug_assert!(fill_price > quote!(0));
+
+        let notional_value = quantity.convert(fill_price);
+        let fee = notional_value * fee;
+        account_tracker.log_fee(fee);
+        self.detract_fee(fee);
+
+        if self.position().size() >= M::PairedCurrency::new_zero() {
+            self.increase_long(quantity, fill_price);
+        } else {
+            // Position must be short
+            if quantity.into_negative() >= self.position().size {
+                // Strictly decrease the short position
+                self.decrease_short(quantity, fill_price, account_tracker, ts_ns);
+            } else {
+                let new_long_size = quantity - self.position().size().abs();
+
+                // decrease the short first
+                self.decrease_short(
+                    self.position().size().abs(),
+                    fill_price,
+                    account_tracker,
+                    ts_ns,
+                );
+
+                // also open a long
+                self.increase_long(new_long_size, fill_price);
+            }
+        }
+    }
+
+    fn settle_sell_order<A>(
+        &mut self,
+        account_tracker: &mut A,
+        quantity: M::PairedCurrency,
+        fill_price: QuoteCurrency,
+        fee: Fee,
+        ts_ns: TimestampNs,
+    ) where
+        A: AccountTracker<M>,
+    {
+        debug_assert!(quantity > M::PairedCurrency::new_zero());
+        debug_assert!(fill_price > quote!(0));
+
+        let notional_value = quantity.convert(fill_price);
+        let fee = notional_value * fee;
+        account_tracker.log_fee(fee);
+        self.detract_fee(fee);
+
+        if self.position().size() > M::PairedCurrency::new_zero() {
+            if quantity <= self.position().size() {
+                self.decrease_long(quantity, fill_price, account_tracker, ts_ns);
+            } else {
+                let new_short_size = quantity - self.position().size();
+
+                self.decrease_long(self.position().size(), fill_price, account_tracker, ts_ns);
+
+                // Open a short as well
+                self.increase_short(new_short_size, fill_price);
+            }
+        } else {
+            // Increase short position
+            self.increase_short(quantity, fill_price);
+        }
     }
 }
 
