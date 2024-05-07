@@ -86,7 +86,7 @@ mod tests {
     #[tracing_test::traced_test]
     fn order_margin_no_position() {
         let leverage = leverage!(1);
-        let mut account = Account::new(quote!(1000), leverage, fee!(0.0002));
+        let mut account = Account::new(quote!(1000), leverage, fee!(0.0002), fee!(0.0006));
 
         assert_eq!(
             compute_order_margin(
@@ -140,7 +140,7 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn order_margin_with_long() {
-        let mut account = Account::new(quote!(1000), leverage!(1), fee!(0.0002));
+        let mut account = Account::new(quote!(1000), leverage!(1), fee!(0.0002), fee!(0.0006));
         *account.position_mut() = Position {
             size: base!(1),
             entry_price: quote!(100),
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn order_margin_with_short() {
-        let mut account = Account::new(quote!(1000), leverage!(1), fee!(0.0002));
+        let mut account = Account::new(quote!(1000), leverage!(1), fee!(0.0002), fee!(0.0006));
         *account.position_mut() = Position {
             size: base!(-1),
             entry_price: quote!(100),
