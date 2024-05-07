@@ -1,4 +1,4 @@
-use getset::{CopyGetters, Getters};
+use getset::{CopyGetters, Getters, Setters};
 
 use crate::{
     prelude::PriceFilter,
@@ -7,18 +7,18 @@ use crate::{
 };
 
 /// Some information regarding the state of the market.
-#[derive(Debug, Clone, Getters, CopyGetters)]
+#[derive(Debug, Clone, Getters, CopyGetters, Setters)]
 pub struct MarketState {
     /// Used to validate states
     // TODO: remove here and pass through were needed
     price_filter: PriceFilter,
 
     /// The current bid
-    #[getset(get_copy = "pub")]
+    #[getset(get_copy = "pub", set = "pub(crate)")]
     bid: QuoteCurrency,
 
     /// The current ask
-    #[getset(get_copy = "pub")]
+    #[getset(get_copy = "pub", set = "pub(crate)")]
     ask: QuoteCurrency,
 
     /// The current timestamp in nanoseconds
@@ -48,27 +48,19 @@ impl MarketState {
     ///     and if setting order timestamps is enabled in the config.
     /// `market_update`: Newest market information
     ///
-    pub(crate) fn update_state<S>(
+    pub(crate) fn update_state<U, Q, UserOrderId>(
         &mut self,
         timestamp_ns: TimestampNs,
-        market_update: &MarketUpdate<S>,
+        market_update: &U,
     ) -> Result<()>
     where
-        S: Currency,
+        U: MarketUpdate<Q, UserOrderId>,
+        Q: Currency,
+        UserOrderId: Clone,
     {
-        self.price_filter.validate_market_update(market_update)?;
+        market_update.validate_market_update(&self.price_filter)?;
+        market_update.update_market_state(self);
 
-        match market_update {
-            MarketUpdate::Bba { bid, ask } => {
-                self.bid = *bid;
-                self.ask = *ask;
-            }
-            MarketUpdate::Trade { .. } => {}
-            MarketUpdate::Candle { bid, ask, .. } => {
-                self.bid = *bid;
-                self.ask = *ask;
-            }
-        }
         self.current_ts_ns = timestamp_ns;
         self.step += 1;
 

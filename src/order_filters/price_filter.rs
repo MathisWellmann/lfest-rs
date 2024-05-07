@@ -3,7 +3,7 @@ use fpdec::Decimal;
 use crate::{
     prelude::{Error, OrderError},
     quote,
-    types::{Currency, LimitOrder, MarketUpdate, NewOrder, QuoteCurrency},
+    types::{Currency, LimitOrder, NewOrder, QuoteCurrency},
 };
 
 /// The `PriceFilter` defines the price rules for a symbol
@@ -78,60 +78,10 @@ impl PriceFilter {
         }
         Ok(())
     }
-
-    /// Make sure the market update conforms to the `PriceFilter` rules
-    pub(crate) fn validate_market_update<S>(
-        &self,
-        market_update: &MarketUpdate<S>,
-    ) -> Result<(), Error>
-    where
-        S: Currency,
-    {
-        match market_update {
-            MarketUpdate::Bba { bid, ask } => {
-                enforce_min_price(self.min_price, *bid)?;
-                enforce_min_price(self.min_price, *ask)?;
-                enforce_max_price(self.max_price, *bid)?;
-                enforce_max_price(self.max_price, *ask)?;
-                enforce_step_size(self.tick_size, *bid)?;
-                enforce_step_size(self.tick_size, *ask)?;
-                enforce_bid_ask_spread(*bid, *ask)?;
-            }
-            // We don't validate the `quantity` in the price filter, rather in the `QuantityFilter`.
-            MarketUpdate::Trade { price, .. } => {
-                enforce_min_price(self.min_price, *price)?;
-                enforce_max_price(self.max_price, *price)?;
-                enforce_step_size(self.tick_size, *price)?;
-            }
-            MarketUpdate::Candle {
-                bid,
-                ask,
-                low,
-                high,
-            } => {
-                enforce_min_price(self.min_price, *bid)?;
-                enforce_min_price(self.min_price, *ask)?;
-                enforce_min_price(self.min_price, *low)?;
-                enforce_min_price(self.min_price, *high)?;
-                enforce_max_price(self.max_price, *bid)?;
-                enforce_max_price(self.max_price, *ask)?;
-                enforce_max_price(self.max_price, *low)?;
-                enforce_max_price(self.max_price, *high)?;
-                enforce_step_size(self.tick_size, *bid)?;
-                enforce_step_size(self.tick_size, *ask)?;
-                enforce_step_size(self.tick_size, *low)?;
-                enforce_step_size(self.tick_size, *high)?;
-                enforce_bid_ask_spread(*bid, *ask)?;
-                enforce_bid_ask_spread(*low, *high)?;
-            }
-        }
-        Ok(())
-    }
 }
 
 /// Errors if there is no bid-ask spread
-#[inline]
-fn enforce_bid_ask_spread(bid: QuoteCurrency, ask: QuoteCurrency) -> Result<(), Error> {
+pub(crate) fn enforce_bid_ask_spread(bid: QuoteCurrency, ask: QuoteCurrency) -> Result<(), Error> {
     if bid >= ask {
         return Err(Error::InvalidMarketUpdateBidAskSpread);
     }
@@ -140,8 +90,10 @@ fn enforce_bid_ask_spread(bid: QuoteCurrency, ask: QuoteCurrency) -> Result<(), 
 
 /// Make sure the price is not too low
 /// Disabled if `min_price` == 0
-#[inline]
-fn enforce_min_price(min_price: QuoteCurrency, price: QuoteCurrency) -> Result<(), Error> {
+pub(crate) fn enforce_min_price(
+    min_price: QuoteCurrency,
+    price: QuoteCurrency,
+) -> Result<(), Error> {
     if price < min_price && min_price != quote!(0) {
         return Err(Error::MarketUpdatePriceTooLow);
     }
@@ -150,8 +102,10 @@ fn enforce_min_price(min_price: QuoteCurrency, price: QuoteCurrency) -> Result<(
 
 /// Make sure the price is not too high
 /// Disabled if `max_price` == 0
-#[inline]
-fn enforce_max_price(max_price: QuoteCurrency, price: QuoteCurrency) -> Result<(), Error> {
+pub(crate) fn enforce_max_price(
+    max_price: QuoteCurrency,
+    price: QuoteCurrency,
+) -> Result<(), Error> {
     if price > max_price && max_price != quote!(0) {
         return Err(Error::MarketUpdatePriceTooHigh);
     }
@@ -159,8 +113,10 @@ fn enforce_max_price(max_price: QuoteCurrency, price: QuoteCurrency) -> Result<(
 }
 
 /// Make sure the price conforms to the step size
-#[inline]
-fn enforce_step_size(step_size: QuoteCurrency, price: QuoteCurrency) -> Result<(), Error> {
+pub(crate) fn enforce_step_size(
+    step_size: QuoteCurrency,
+    price: QuoteCurrency,
+) -> Result<(), Error> {
     if (price % step_size) != QuoteCurrency::new_zero() {
         return Err(Error::MarketUpdatePriceStepSize);
     }

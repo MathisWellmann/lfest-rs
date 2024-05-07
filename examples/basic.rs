@@ -44,10 +44,10 @@ fn main() {
         let exec_orders = exchange
             .update_state(
                 i as i64,
-                MarketUpdate::Bba {
-                    bid: QuoteCurrency::new(price_decimal),
-                    ask: QuoteCurrency::new(price_decimal + spread),
-                },
+                bba!(
+                    QuoteCurrency::new(price_decimal),
+                    QuoteCurrency::new(price_decimal + spread)
+                ),
             )
             .expect("Got REKT. Try again next time :D");
         if !exec_orders.is_empty() {
