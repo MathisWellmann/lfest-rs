@@ -11,7 +11,7 @@ fn inv_long_market_win_full() {
         .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
         .unwrap();
 
-    let value: BaseCurrency = exchange.account().available_wallet_balance() * base!(0.8);
+    let value: BaseCurrency = exchange.user_balances().available_wallet_balance * base!(0.8);
     let size = value.convert(exchange.market_state().ask());
     let o = MarketOrder::new(Side::Buy, size).unwrap();
     exchange.submit_market_order(o).unwrap();
@@ -21,23 +21,21 @@ fn inv_long_market_win_full() {
     let order_updates = exchange.update_state(1, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_quote = size.fee_portion(exchange.config().contract_specification().fee_taker);
-    let fee_base1 = fee_quote.convert(exchange.market_state().bid());
+    let fee_quote: QuoteCurrency = size * exchange.config().contract_spec().fee_taker();
+    let fee_base1: BaseCurrency = fee_quote.convert(exchange.market_state().bid());
 
-    assert_eq!(exchange.account().position().size(), size);
-    assert_eq!(exchange.account().position().entry_price(), bid);
     assert_eq!(
-        exchange.account().position().unrealized_pnl(bid, ask),
-        base!(0.0)
+        exchange.position(),
+        &Position::Long(PositionInner::new(size, bid))
     );
-    assert_eq!(exchange.account().position().margin(), base!(0.8));
+    assert_eq!(exchange.position().unrealized_pnl(bid, ask), base!(0.0));
     assert_eq!(
-        exchange.account().total_value(bid, ask),
-        base!(1.0) - fee_base1
-    );
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        (base!(0.2) - fee_base1)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.2) - fee_base1,
+            position_margin: base!(0.8),
+            order_margin: base!(0)
+        }
     );
 
     let bid = quote!(2000);
@@ -46,35 +44,32 @@ fn inv_long_market_win_full() {
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange
-            .account()
             .position()
             .unrealized_pnl(quote!(2000), quote!(2001)),
         base!(0.4)
     );
 
     let size = quote!(800.0);
-    let fee_base2 = size.fee_portion(exchange.config().contract_specification().fee_taker);
-    let fee_asset2 = fee_base2.convert(quote!(2000.0));
+    let fee_quote2: QuoteCurrency = size * exchange.config().contract_spec().fee_taker();
+    let fee_base2: BaseCurrency = fee_quote2.convert(quote!(2000.0));
 
     let o = MarketOrder::new(Side::Sell, size).unwrap();
     exchange.submit_market_order(o).unwrap();
 
-    assert_eq!(exchange.account().position().size(), quote!(0.0));
+    assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         exchange
-            .account()
             .position()
             .unrealized_pnl(quote!(2000), quote!(2001)),
         base!(0.0)
     );
     assert_eq!(
-        exchange.account().total_value(bid, ask),
-        (base!(1.4) - fee_base1 - fee_asset2)
-    );
-    assert_eq!(exchange.account().position().margin(), base!(0.0));
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        (base!(1.4) - fee_base1 - fee_asset2)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(1.4) - fee_base1 - fee_base2,
+            position_margin: base!(0),
+            order_margin: base!(0)
+        }
     );
 }
 
@@ -90,35 +85,29 @@ fn inv_long_market_loss_full() {
     let o = MarketOrder::new(Side::Buy, quote!(800.0)).unwrap();
     exchange.submit_market_order(o).unwrap();
 
-    assert_eq!(exchange.account().position().size(), quote!(800.0));
-    assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
     assert_eq!(
-        exchange
-            .account()
-            .position()
-            .unrealized_pnl(quote!(1000), ask),
+        exchange.position(),
+        &Position::Long(PositionInner::new(quote!(800), quote!(1000)))
+    );
+    assert_eq!(
+        exchange.position().unrealized_pnl(quote!(1000), ask),
         base!(0.0)
     );
     assert_eq!(
-        exchange.account().total_value(quote!(1000), ask),
-        base!(0.99952)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.19952),
+            position_margin: base!(0.8),
+            order_margin: base!(0)
+        }
     );
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        base!(0.19952)
-    );
-    assert_eq!(exchange.account().order_margin(), base!(0.0));
-    assert_eq!(exchange.account().position().margin(), base!(0.8));
 
     let bid = quote!(800);
     let ask = quote!(801);
     let order_updates = exchange.update_state(2, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
-        exchange
-            .account()
-            .position()
-            .unrealized_pnl(quote!(800), quote!(801)),
+        exchange.position().unrealized_pnl(quote!(800), quote!(801)),
         base!(-0.2)
     );
 
@@ -126,27 +115,23 @@ fn inv_long_market_loss_full() {
     let o = MarketOrder::new(Side::Sell, size).unwrap();
     exchange.submit_market_order(o).unwrap();
 
-    let fee_quote0 = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote0 = size * exchange.config().contract_spec().fee_taker();
     let fee_base0 = fee_quote0.convert(quote!(1000.0));
 
-    let fee_quote1 = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote1 = size * exchange.config().contract_spec().fee_taker();
     let fee_base1 = fee_quote1.convert(quote!(800.0));
 
     let fee_combined = fee_base0 + fee_base1;
 
-    assert_eq!(exchange.account().position().size(), quote!(0.0));
+    assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(exchange.position().unrealized_pnl(bid, ask), base!(0.0));
     assert_eq!(
-        exchange.account().position().unrealized_pnl(bid, ask),
-        base!(0.0)
-    );
-    assert_eq!(
-        exchange.account().total_value(bid, ask),
-        (base!(0.8) - fee_combined)
-    );
-    assert_eq!(exchange.account().position().margin(), base!(0.0));
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        (base!(0.8) - fee_combined)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.8) - fee_combined,
+            position_margin: base!(0),
+            order_margin: base!(0)
+        }
     );
 }
 
@@ -161,14 +146,16 @@ fn inv_short_market_win_full() {
     let o = MarketOrder::new(Side::Sell, quote!(800)).unwrap();
     exchange.submit_market_order(o).unwrap();
 
-    assert_eq!(exchange.account().position().size(), quote!(-800));
+    assert_eq!(
+        exchange.position(),
+        &Position::Short(PositionInner::new(quote!(800), quote!(1000)))
+    );
 
     let _ = exchange
         .update_state(1, bba!(quote!(799), quote!(800)))
         .unwrap();
     assert_eq!(
         exchange
-            .account()
             .position()
             .unrealized_pnl(exchange.market_state().bid(), exchange.market_state().ask()),
         base!(0.2)
@@ -184,27 +171,23 @@ fn inv_short_market_win_full() {
     let order_updates = exchange.update_state(2, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_quote0 = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote0 = size * exchange.config().contract_spec().fee_taker();
     let fee_base0 = fee_quote0.convert(quote!(1000));
 
-    let fee_quote1 = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote1 = size * exchange.config().contract_spec().fee_taker();
     let fee_base1 = fee_quote1.convert(quote!(800));
 
     let fee_combined: BaseCurrency = fee_base0 + fee_base1;
 
-    assert_eq!(exchange.account().position().size(), quote!(0.0));
+    assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(exchange.position().unrealized_pnl(bid, ask), base!(0.0));
     assert_eq!(
-        exchange.account().position().unrealized_pnl(bid, ask),
-        base!(0.0)
-    );
-    assert_eq!(
-        exchange.account().total_value(bid, ask),
-        base!(1.2) - fee_combined
-    );
-    assert_eq!(exchange.account().position().margin(), base!(0.0));
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        base!(1.2) - fee_combined
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(1.2) - fee_combined,
+            position_margin: base!(0),
+            order_margin: base!(0)
+        }
     );
 }
 
@@ -225,26 +208,26 @@ fn inv_short_market_loss_full() {
     let ask = quote!(1000);
     let _ = exchange.update_state(1, bba!(bid, ask)).unwrap();
 
-    let fee_quote1 = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote1 = size * exchange.config().contract_spec().fee_taker();
     let fee_base1 = fee_quote1.convert(ask);
 
-    assert_eq!(exchange.account().position().size(), size.into_negative());
-    assert_eq!(exchange.account().position().entry_price(), ask);
+    assert_eq!(
+        exchange.position(),
+        &Position::Short(PositionInner::new(size, ask))
+    );
     assert_eq!(
         exchange
-            .account()
             .position()
             .unrealized_pnl(quote!(999), quote!(1000)),
         base!(0.0)
     );
     assert_eq!(
-        exchange.account().total_value(bid, ask),
-        base!(1.0) - fee_base1
-    );
-    assert_eq!(exchange.account().position().margin().inner(), Dec!(0.4));
-    assert_eq!(
-        exchange.account().available_wallet_balance().inner(),
-        Dec!(0.59976)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.59976),
+            position_margin: base!(0.4),
+            order_margin: base!(0)
+        }
     );
 
     let _ = exchange
@@ -252,12 +235,11 @@ fn inv_short_market_loss_full() {
         .unwrap();
 
     let size = quote!(400.0);
-    let fee_quote2 = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote2 = size * exchange.config().contract_spec().fee_taker();
     let fee_base2: BaseCurrency = fee_quote2.convert(quote!(2000.0));
 
     assert_eq!(
         exchange
-            .account()
             .position()
             .unrealized_pnl(quote!(1999), quote!(2000)),
         base!(-0.2)
@@ -271,19 +253,15 @@ fn inv_short_market_loss_full() {
     let order_updates = exchange.update_state(3, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    assert_eq!(exchange.account().position().size(), quote!(0.0));
+    assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(exchange.position().unrealized_pnl(bid, ask), base!(0.0));
     assert_eq!(
-        exchange.account().position().unrealized_pnl(bid, ask),
-        base!(0.0)
-    );
-    assert_eq!(
-        exchange.account().total_value(bid, ask),
-        (base!(0.8) - fee_base1 - fee_base2)
-    );
-    assert_eq!(exchange.account().position().margin(), base!(0.0));
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        (base!(0.8) - fee_base1 - fee_base2)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.8) - fee_base1 - fee_base2,
+            position_margin: base!(0),
+            order_margin: base!(0)
+        }
     );
 }
 
@@ -306,23 +284,21 @@ fn inv_long_market_win_partial() {
     let order_updates = exchange.update_state(1, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_quote = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote = size * exchange.config().contract_spec().fee_taker();
     let fee_base1: BaseCurrency = fee_quote.convert(exchange.market_state().bid());
 
-    assert_eq!(exchange.account().position().size(), size);
-    assert_eq!(exchange.account().position().entry_price(), bid);
     assert_eq!(
-        exchange.account().position().unrealized_pnl(bid, ask),
-        base!(0.0)
+        exchange.position(),
+        &Position::Long(PositionInner::new(size, bid))
     );
+    assert_eq!(exchange.position().unrealized_pnl(bid, ask), base!(0.0));
     assert_eq!(
-        exchange.account().total_value(bid, ask),
-        base!(1.0) - fee_base1
-    );
-    assert_eq!(exchange.account().position().margin(), base!(0.8));
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        base!(0.19952)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.19952),
+            position_margin: base!(0.8),
+            order_margin: base!(0)
+        }
     );
 
     let order_updates = exchange
@@ -331,16 +307,14 @@ fn inv_long_market_win_partial() {
     assert!(order_updates.is_empty());
 
     let size = quote!(400.0);
-    let fee_quote2 = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote2 = size * exchange.config().contract_spec().fee_taker();
     let fee_base2: BaseCurrency = fee_quote2.convert(quote!(2000.0));
 
     assert_eq!(
         exchange
-            .account()
             .position()
-            .unrealized_pnl(quote!(2000), quote!(2001))
-            .inner(),
-        Dec!(0.4)
+            .unrealized_pnl(quote!(2000), quote!(2001)),
+        base!(0.4)
     );
 
     let o = MarketOrder::new(Side::Sell, size).unwrap();
@@ -351,20 +325,18 @@ fn inv_long_market_win_partial() {
     let order_updates = exchange.update_state(2, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    assert_eq!(exchange.account().position().size(), quote!(400.0));
-    assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
     assert_eq!(
-        exchange.account().position().unrealized_pnl(bid, ask),
-        base!(0.2)
+        exchange.position(),
+        &Position::Long(PositionInner::new(quote!(400), quote!(1000)))
     );
+    assert_eq!(exchange.position().unrealized_pnl(bid, ask), base!(0.2));
     assert_eq!(
-        exchange.account().total_value(bid, ask),
-        base!(1.2) - fee_base1 - fee_base2
-    );
-    assert_eq!(exchange.account().position().margin(), base!(0.4));
-    assert_eq!(
-        exchange.account().available_wallet_balance().inner(),
-        (base!(0.8) - fee_base1 - fee_base2).inner()
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.8) - fee_base1 - fee_base2,
+            position_margin: base!(0.4),
+            order_margin: base!(0)
+        }
     );
 }
 
@@ -372,18 +344,18 @@ fn inv_long_market_win_partial() {
 #[tracing_test::traced_test]
 fn inv_long_market_loss_partial() {
     let mut exchange = mock_exchange_inverse(base!(1));
-    let order_updates = exchange
-        .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
-        .unwrap();
+    let bid = quote!(999);
+    let order_updates = exchange.update_state(0, bba!(bid, quote!(1000.0))).unwrap();
     assert!(order_updates.is_empty());
 
     let o = MarketOrder::new(Side::Buy, quote!(800.0)).unwrap();
     exchange.submit_market_order(o).unwrap();
-    let _ = exchange
-        .update_state(1, bba!(quote!(999), quote!(1000)))
-        .unwrap();
+    let _ = exchange.update_state(1, bba!(bid, quote!(1000))).unwrap();
 
-    assert_eq!(exchange.account().position().size(), quote!(800.0));
+    assert_eq!(
+        exchange.position(),
+        &Position::Long(PositionInner::new(quote!(800.0), bid))
+    );
 
     let order_updates = exchange
         .update_state(1, bba!(quote!(800.0), quote!(801.0)))
@@ -391,7 +363,6 @@ fn inv_long_market_loss_partial() {
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange
-            .account()
             .position()
             .unrealized_pnl(exchange.market_state().bid(), exchange.market_state().ask()),
         base!(-0.2)
@@ -405,32 +376,29 @@ fn inv_long_market_loss_partial() {
     let order_updates = exchange.update_state(1, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_quote0 =
-        quote!(800.0).fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote0 = quote!(800.0) * exchange.config().contract_spec().fee_taker();
     let fee_base0: BaseCurrency = fee_quote0.convert(quote!(1000.0));
 
-    let fee_quote1 =
-        quote!(400.0).fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote1 = quote!(400.0) * exchange.config().contract_spec().fee_taker();
     let fee_base1: BaseCurrency = fee_quote1.convert(quote!(800.0));
 
     let fee_combined: BaseCurrency = fee_base0 + fee_base1;
 
-    assert_eq!(exchange.account().position().size(), quote!(400.0));
     assert_eq!(
-        exchange
-            .account()
-            .position()
-            .unrealized_pnl(quote!(800), quote!(801)),
+        exchange.position(),
+        &Position::Long(PositionInner::new(quote!(400.0), bid))
+    );
+    assert_eq!(
+        exchange.position().unrealized_pnl(quote!(800), quote!(801)),
         base!(-0.1)
     );
     assert_eq!(
-        exchange.account().total_value(bid, ask),
-        (base!(0.8) - fee_combined)
-    );
-    assert_eq!(exchange.account().position().margin(), base!(0.4));
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        (base!(0.5) - fee_combined)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.5) - fee_combined,
+            position_margin: base!(0.4),
+            order_margin: base!(0)
+        }
     );
 }
 
@@ -449,19 +417,19 @@ fn inv_short_market_win_partial() {
     let order_updates = exchange.update_state(1, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    assert_eq!(exchange.account().position().size(), quote!(-800.0));
-    assert_eq!(exchange.account().position().entry_price(), ask);
     assert_eq!(
-        exchange.account().position().unrealized_pnl(bid, ask),
-        base!(0.0)
+        exchange.position(),
+        &Position::Short(PositionInner::new(quote!(800), ask))
     );
-    assert_eq!(exchange.account().total_value(bid, ask), base!(0.99952));
+    assert_eq!(exchange.position().unrealized_pnl(bid, ask), base!(0.0));
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        base!(0.19952)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.19952),
+            position_margin: base!(0.8),
+            order_margin: base!(0)
+        }
     );
-    assert_eq!(exchange.account().order_margin(), base!(0.0));
-    assert_eq!(exchange.account().position().margin(), base!(0.8));
 
     let order_updates = exchange
         .update_state(2, bba!(quote!(799), quote!(800)))
@@ -469,10 +437,7 @@ fn inv_short_market_win_partial() {
     assert!(order_updates.is_empty());
 
     assert_eq!(
-        exchange
-            .account()
-            .position()
-            .unrealized_pnl(quote!(799), quote!(800)),
+        exchange.position().unrealized_pnl(quote!(799), quote!(800)),
         base!(0.2)
     );
 
@@ -483,32 +448,29 @@ fn inv_short_market_win_partial() {
     let order_updates = exchange.update_state(3, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_quote0 =
-        quote!(800.0).fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote0 = quote!(800.0) * exchange.config().contract_spec().fee_taker();
     let fee_base0: BaseCurrency = fee_quote0.convert(quote!(1000.0));
 
-    let fee_quote1 =
-        quote!(400.0).fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote1 = quote!(400.0) * exchange.config().contract_spec().fee_taker();
     let fee_base1: BaseCurrency = fee_quote1.convert(quote!(800.0));
 
     let fee_combined = fee_base0 + fee_base1;
 
-    assert_eq!(exchange.account().position().size(), quote!(-400.0));
     assert_eq!(
-        exchange
-            .account()
-            .position()
-            .unrealized_pnl(quote!(799), quote!(800)),
+        exchange.position(),
+        &Position::Short(PositionInner::new(quote!(400), quote!(800)))
+    );
+    assert_eq!(
+        exchange.position().unrealized_pnl(quote!(799), quote!(800)),
         base!(0.1)
     );
     assert_eq!(
-        exchange.account().total_value(bid, ask),
-        (base!(1.2) - fee_combined)
-    );
-    assert_eq!(exchange.account().position().margin(), base!(0.4));
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        (base!(0.7) - fee_combined)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.7) - fee_combined,
+            position_margin: base!(0.4),
+            order_margin: base!(0)
+        }
     );
 }
 
@@ -531,23 +493,21 @@ fn inv_short_market_loss_partial() {
     let order_updates = exchange.update_state(1, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_quote1 = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote1 = size * exchange.config().contract_spec().fee_taker();
     let fee_base1: BaseCurrency = fee_quote1.convert(ask);
 
-    assert_eq!(exchange.account().position().size(), size.into_negative());
-    assert_eq!(exchange.account().position().entry_price(), ask);
     assert_eq!(
-        exchange.account().position().unrealized_pnl(bid, ask),
-        base!(0.0)
+        exchange.position(),
+        &Position::Short(PositionInner::new(size, ask))
     );
-    assert_eq!(exchange.account().position().margin(), base!(0.8));
+    assert_eq!(exchange.position().unrealized_pnl(bid, ask), base!(0.0));
     assert_eq!(
-        exchange.account().total_value(bid, ask),
-        base!(1.0) - fee_base1
-    );
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        (base!(0.2) - fee_base1)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.2) - fee_base1,
+            position_margin: base!(0.8),
+            order_margin: base!(0)
+        }
     );
 
     let bid = quote!(1999);
@@ -556,30 +516,26 @@ fn inv_short_market_loss_partial() {
     assert!(order_updates.is_empty());
 
     let size = quote!(400.0);
-    let fee_quote2 = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote2 = size * exchange.config().contract_spec().fee_taker();
     let fee_base2: BaseCurrency = fee_quote2.convert(ask);
 
-    assert_eq!(
-        exchange.account().position().unrealized_pnl(bid, ask),
-        base!(-0.4)
-    );
+    assert_eq!(exchange.position().unrealized_pnl(bid, ask), base!(-0.4));
 
     let o = MarketOrder::new(Side::Buy, size).unwrap();
     exchange.submit_market_order(o).unwrap();
 
-    assert_eq!(exchange.account().position().size(), quote!(-400.0));
     assert_eq!(
-        exchange.account().position().unrealized_pnl(bid, ask),
-        base!(-0.2)
+        exchange.position(),
+        &Position::Short(PositionInner::new(quote!(400), bid))
     );
+    assert_eq!(exchange.position().unrealized_pnl(bid, ask), base!(-0.2));
     assert_eq!(
-        exchange.account().total_value(bid, ask),
-        (base!(0.8) - fee_base1 - fee_base2)
-    );
-    assert_eq!(exchange.account().position().margin(), base!(0.4));
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        (base!(0.4) - fee_base1 - fee_base2)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.4) - fee_base1 - fee_base2,
+            position_margin: base!(0.4),
+            order_margin: base!(0)
+        }
     );
 }
 
@@ -591,7 +547,7 @@ fn inv_test_market_roundtrip() {
         .update_state(0, bba!(quote!(999), quote!(1000)))
         .unwrap();
 
-    let value: BaseCurrency = exchange.account().available_wallet_balance() * base!(0.9);
+    let value: BaseCurrency = exchange.user_balances().available_wallet_balance * base!(0.9);
     let size = value.convert(exchange.market_state().ask());
     let buy_order = MarketOrder::new(Side::Buy, size).unwrap();
     exchange.submit_market_order(buy_order).unwrap();
@@ -603,7 +559,7 @@ fn inv_test_market_roundtrip() {
 
     exchange.submit_market_order(sell_order).unwrap();
 
-    let fee_quote = size.fee_portion(exchange.config().contract_specification().fee_taker);
+    let fee_quote = size * exchange.config().contract_spec().fee_taker();
     let fee_base: BaseCurrency = fee_quote.convert(quote!(1000.0));
 
     let bid = quote!(1000);
@@ -611,23 +567,20 @@ fn inv_test_market_roundtrip() {
     let order_updates = exchange.update_state(2, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    assert_eq!(exchange.account().position().size(), quote!(0.0));
-    assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
+    assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         exchange
-            .account()
             .position()
             .unrealized_pnl(quote!(1000), quote!(1001)),
         base!(0.0)
     );
     assert_eq!(
-        exchange.account().total_value(bid, ask),
-        base!(1.0) - base!(2.0) * fee_base
-    );
-    assert_eq!(exchange.account().position().margin(), base!(0.0));
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        base!(1.0) - base!(2.0) * fee_base
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(1) - base!(2) * fee_base,
+            position_margin: base!(0),
+            order_margin: base!(0)
+        }
     );
 
     let size = quote!(900.0);
@@ -647,18 +600,19 @@ fn inv_test_market_roundtrip() {
     let order_updates = exchange.update_state(4, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    assert_eq!(exchange.account().position().size(), quote!(-50.0));
-    assert_eq!(exchange.account().position().entry_price(), quote!(1000.0));
+    assert_eq!(
+        exchange.position(),
+        &Position::Short(PositionInner::new(quote!(50), quote!(1000)))
+    );
     assert_eq!(
         exchange
-            .account()
             .position()
             .unrealized_pnl(quote!(998), quote!(1000)),
         base!(0.0)
     );
-    assert_eq!(exchange.account().position().margin(), base!(0.05));
-    assert!(exchange.account().total_value(bid, ask) < base!(1.0));
-    assert!(exchange.account().available_wallet_balance() < base!(1.0));
+    // assert_eq!(exchange.account().position().margin(), base!(0.05));
+    assert!(exchange.user_balances().available_wallet_balance < base!(1.0));
+    todo!("compare `UserBalances`");
 }
 
 #[test]
@@ -671,11 +625,15 @@ fn inv_execute_limit() {
 
     let o = LimitOrder::new(Side::Buy, quote!(900.0), quote!(450.0)).unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.account().active_limit_orders().len(), 1);
-    assert_eq!(exchange.account().position().margin(), base!(0.0));
-    assert_eq!(exchange.account().total_value(bid, ask), base!(1.0));
-    assert_eq!(exchange.account().available_wallet_balance(), base!(0.5));
-    assert_eq!(exchange.account().order_margin(), base!(0.5));
+    assert_eq!(exchange.active_limit_orders().len(), 1);
+    assert_eq!(
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.5),
+            position_margin: base!(0),
+            order_margin: base!(0.5)
+        }
+    );
 
     let order_updates = exchange
         .update_state(1, trade!(quote!(900.0), quote!(450.0), Side::Sell))
@@ -688,17 +646,23 @@ fn inv_execute_limit() {
 
     assert_eq!(exchange.market_state().bid(), quote!(750));
     assert_eq!(exchange.market_state().ask(), quote!(751));
-    assert_eq!(exchange.account().active_limit_orders().len(), 0);
-    assert_eq!(exchange.account().position().size(), quote!(450));
-    assert_eq!(exchange.account().position().entry_price(), quote!(900));
-    assert_eq!(exchange.account().position().margin(), base!(0.5));
-    assert_eq!(exchange.account().total_value(bid, ask), base!(0.9999));
-    assert_eq!(exchange.account().available_wallet_balance(), base!(0.4999));
-    assert_eq!(exchange.account().order_margin(), base!(0));
+    assert_eq!(exchange.active_limit_orders().len(), 0);
+    assert_eq!(
+        exchange.position(),
+        &Position::Long(PositionInner::new(quote!(450), quote!(900)))
+    );
+    assert_eq!(
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.4999),
+            position_margin: base!(0.5),
+            order_margin: base!(0)
+        }
+    );
 
     let o = LimitOrder::new(Side::Sell, quote!(1000), quote!(450)).unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.account().active_limit_orders().len(), 1);
+    assert_eq!(exchange.active_limit_orders().len(), 1);
 
     let order_updates = exchange
         .update_state(1, trade!(quote!(1000), quote!(450), Side::Buy))
@@ -709,18 +673,20 @@ fn inv_execute_limit() {
     let order_updates = exchange.update_state(1, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    assert_eq!(exchange.account().active_limit_orders().len(), 0);
-    assert_eq!(exchange.account().position().size(), quote!(0));
-    assert_eq!(exchange.account().position().margin(), base!(0));
-    assert_eq!(exchange.account().total_value(bid, ask), base!(1.04981));
+    assert_eq!(exchange.active_limit_orders().len(), 0);
+    assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        base!(1.04981)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(1.04981),
+            position_margin: base!(0),
+            order_margin: base!(0)
+        }
     );
 
     let o = LimitOrder::new(Side::Sell, quote!(1200), quote!(600)).unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.account().active_limit_orders().len(), 1);
+    assert_eq!(exchange.active_limit_orders().len(), 1);
 
     let order_updates = exchange
         .update_state(2, trade!(quote!(1200), quote!(600), Side::Buy))
@@ -730,11 +696,16 @@ fn inv_execute_limit() {
     let ask = quote!(1202);
     let order_updates = exchange.update_state(2, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
-    assert_eq!(exchange.account().position().size(), quote!(-600.0));
-    assert_eq!(exchange.account().position().margin(), base!(0.5));
-    assert_eq!(exchange.account().total_value(bid, ask), base!(1.04971));
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        base!(0.54971)
+        exchange.position(),
+        &Position::Short(PositionInner::new(quote!(600), bid))
+    );
+    assert_eq!(
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: base!(0.54971),
+            position_margin: base!(0.5),
+            order_margin: base!(0)
+        }
     );
 }

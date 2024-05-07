@@ -7,8 +7,8 @@
 #[macro_use]
 extern crate serde;
 
-mod account;
 pub mod account_tracker;
+mod accounting;
 mod config;
 mod contract_specification;
 mod cornish_fisher;
@@ -36,16 +36,16 @@ pub mod prelude {
     pub use fpdec::{self, Dec, Decimal};
 
     pub use crate::{
-        account::Account,
         account_tracker::AccountTracker,
+        accounting::*,
         base, bba,
         config::Config,
         contract_specification::*,
-        exchange::Exchange,
+        exchange::{Exchange, UserBalances},
         fee, leverage,
         market_state::MarketState,
         order_filters::{PriceFilter, QuantityFilter},
-        position::Position,
+        position::{Position, PositionInner},
         quote,
         risk_engine::RiskError,
         types::*,

@@ -7,7 +7,7 @@ use super::d_ratio;
 use crate::{
     account_tracker::AccountTracker,
     cornish_fisher::cornish_fisher_value_at_risk,
-    prelude::{Account, MarketState},
+    prelude::MarketState,
     quote,
     types::{Currency, LnReturns, MarginCurrency, QuoteCurrency, Side, TimestampNs},
     utils::{decimal_pow, decimal_sqrt, decimal_sum, decimal_to_f64, min, variance},
@@ -169,7 +169,7 @@ where
         if self.total_loss == M::new_zero() {
             return Decimal::MAX;
         }
-        (self.total_profit / self.total_loss).inner()
+        *(self.total_profit / self.total_loss).as_ref()
     }
 
     /// Cumulative fees paid to the exchange
@@ -211,7 +211,7 @@ where
             ReturnsSource::Hourly => Dec!(93.59487), // sqrt(365 * 24)
         };
         let n: Decimal = (rets_acc.len() as u64).into();
-        let mean_ret_acc: Decimal = decimal_sum(rets_acc.iter().map(|v| v.inner())) / n;
+        let mean_ret_acc: Decimal = decimal_sum(rets_acc.iter().map(|v| *v.as_ref())) / n;
 
         if risk_free_is_buy_and_hold {
             // Compute the mean buy and hold returns
@@ -219,11 +219,13 @@ where
                 ReturnsSource::Daily => &self.hist_returns_daily_bnh,
                 ReturnsSource::Hourly => &self.hist_returns_hourly_bnh,
             };
-            let mean_bnh_ret = decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n;
+            let mean_bnh_ret = decimal_sum(rets_bnh.iter().map(|v| *v.as_ref())) / n;
 
             // compute the difference of returns of account and market
-            let diff_returns: Vec<Decimal> =
-                rets_acc.iter().map(|v| v.inner() - mean_bnh_ret).collect();
+            let diff_returns: Vec<Decimal> = rets_acc
+                .iter()
+                .map(|v| *v.as_ref() - mean_bnh_ret)
+                .collect();
             let var = variance(&diff_returns);
             if var == Decimal::ZERO {
                 return Decimal::ZERO;
@@ -232,7 +234,7 @@ where
 
             annualization_mult * mean_ret_acc / std_dev
         } else {
-            let var = variance(&rets_acc.iter().map(|v| v.inner()).collect::<Vec<_>>());
+            let var = variance(&rets_acc.iter().map(|v| *v.as_ref()).collect::<Vec<_>>());
             if var == Decimal::ZERO {
                 return Decimal::ZERO;
             }
@@ -276,18 +278,18 @@ where
                 "The buy and hold returns should not be empty at this point"
             );
             let n: Decimal = (rets_bnh.len() as u64).into();
-            decimal_sum(rets_bnh.iter().map(|v| v.inner())) / n
+            decimal_sum(rets_bnh.iter().map(|v| *v.as_ref())) / n
         } else {
             Decimal::ZERO
         };
 
         let n: Decimal = (rets_acc.len() as u64).into();
-        let mean_acc_ret = decimal_sum(rets_acc.iter().map(|v| v.inner())) / n;
+        let mean_acc_ret = decimal_sum(rets_acc.iter().map(|v| *v.as_ref())) / n;
 
         let underperformance = Vec::<Decimal>::from_iter(
             rets_acc
                 .iter()
-                .map(|v| decimal_pow(min(Decimal::ZERO, v.inner() - target_return), 2)),
+                .map(|v| decimal_pow(min(Decimal::ZERO, *v.as_ref() - target_return), 2)),
         );
 
         let avg_underperformance = decimal_sum(underperformance.iter().cloned()) / n;
@@ -310,8 +312,8 @@ where
             ReturnsSource::Hourly => &self.hist_returns_hourly_acc,
         };
         let n: Decimal = (rets_acc.len() as u64).into();
-        let mean_return = decimal_sum(rets_acc.iter().map(|v| v.inner())) / n;
-        let rets_dec = Vec::<Decimal>::from_iter(rets_acc.iter().map(|v| v.inner()));
+        let mean_return = decimal_sum(rets_acc.iter().map(|v| *v.as_ref())) / n;
+        let rets_dec = Vec::<Decimal>::from_iter(rets_acc.iter().map(|v| *v.as_ref()));
         let variance = variance(&rets_dec);
         if variance == Decimal::ZERO {
             return Decimal::ZERO;
@@ -338,8 +340,8 @@ where
         let idx = (rets.len() as f64 * percentile) as usize;
         match rets.get(idx) {
             Some(r) => {
-                decimal_to_f64(self.wallet_balance_start.inner())
-                    - (decimal_to_f64(self.wallet_balance_start.inner()) * r.exp())
+                decimal_to_f64(*self.wallet_balance_start.as_ref())
+                    - (decimal_to_f64(*self.wallet_balance_start.as_ref()) * r.exp())
             }
             None => 0.0,
         }
@@ -374,8 +376,8 @@ where
         let idx = (ret_streaks.len() as f64 * percentile) as usize;
         match ret_streaks.get(idx) {
             Some(r) => {
-                decimal_to_f64(self.wallet_balance_start.inner())
-                    - (decimal_to_f64(self.wallet_balance_start.inner()) * r)
+                decimal_to_f64(*self.wallet_balance_start.as_ref())
+                    - (decimal_to_f64(*self.wallet_balance_start.as_ref()) * r)
             }
             None => 0.0,
         }
@@ -441,7 +443,7 @@ where
         };
         let power: u32 = 365 / num_trading_days;
         decimal_pow(
-            Dec!(1) + self.total_rpnl.inner() / self.wallet_balance_start.inner(),
+            Dec!(1) + *self.total_rpnl.as_ref() / *self.wallet_balance_start.as_ref(),
             power,
         )
     }
@@ -545,14 +547,7 @@ impl<M> AccountTracker<M> for FullAccountTracker<M>
 where
     M: Currency + MarginCurrency + Send,
 {
-    fn update<UserOrderId>(
-        &mut self,
-        timestamp_ns: TimestampNs,
-        market_state: &MarketState,
-        account: &Account<M, UserOrderId>,
-    ) where
-        UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
-    {
+    fn update(&mut self, timestamp_ns: TimestampNs, market_state: &MarketState, upnl: M) {
         let price = market_state.mid_price();
         if price == quote!(0) {
             trace!("Price is 0, not updating the `FullAccountTracker`");
@@ -576,9 +571,6 @@ where
             self.ts_first = timestamp_ns;
         }
         self.ts_last = timestamp_ns;
-        let upnl = account
-            .position()
-            .unrealized_pnl(market_state.bid(), market_state.ask());
         if timestamp_ns > self.next_daily_trigger_ts {
             self.next_daily_trigger_ts = timestamp_ns + DAILY_NS;
 
@@ -588,9 +580,9 @@ where
 
             // calculate daily log return of account
             let ln_ret: f64 = decimal_to_f64(
-                ((self.wallet_balance_last + upnl)
+                *((self.wallet_balance_last + upnl)
                     / (self.wallet_balance_start + self.last_daily_pnl))
-                    .inner(),
+                    .as_ref(),
             )
             .ln();
             self.hist_ln_returns_daily_acc.push(ln_ret);
@@ -601,7 +593,7 @@ where
             self.hist_returns_daily_bnh.push(pnl_bnh);
 
             // calculate daily log return of market
-            let ln_ret = decimal_to_f64((price / self.price_a_day_ago).inner()).ln();
+            let ln_ret = decimal_to_f64(*(price / self.price_a_day_ago).as_ref()).ln();
             self.hist_ln_returns_daily_bnh.push(ln_ret);
 
             self.last_daily_pnl = self.total_rpnl + upnl;
@@ -616,9 +608,9 @@ where
 
             // calculate hourly logarithmic return of account
             let ln_ret: f64 = decimal_to_f64(
-                ((self.wallet_balance_last + upnl)
+                *((self.wallet_balance_last + upnl)
                     / (self.wallet_balance_start + self.last_hourly_pnl))
-                    .inner(),
+                    .as_ref(),
             )
             .ln();
             self.hist_ln_returns_hourly_acc.push(ln_ret);
@@ -629,7 +621,7 @@ where
             self.hist_returns_hourly_bnh.push(pnl_bnh);
 
             // calculate hourly logarithmic return of buy_and_hold
-            let ln_ret = decimal_to_f64((price / self.price_an_hour_ago).inner()).ln();
+            let ln_ret = decimal_to_f64(*(price / self.price_an_hour_ago).as_ref()).ln();
             self.hist_ln_returns_hourly_bnh.push(ln_ret);
 
             self.last_hourly_pnl = self.total_rpnl + upnl;
@@ -642,7 +634,7 @@ where
         // update max_drawdown_total
         let curr_dd = (self.wallet_balance_high - (self.wallet_balance_last + upnl))
             / self.wallet_balance_high;
-        let curr_dd = curr_dd.inner();
+        let curr_dd = *curr_dd.as_ref();
         if curr_dd > self.max_drawdown_total {
             self.max_drawdown_total = curr_dd;
         }
@@ -666,7 +658,7 @@ where
             self.high_water_mark_ts = ts_ns;
         }
         let dd = (self.wallet_balance_high - self.wallet_balance_last) / self.wallet_balance_high;
-        let dd = dd.inner();
+        let dd = *dd.as_ref();
         if dd > self.max_drawdown_wallet_balance {
             self.max_drawdown_wallet_balance = dd;
         }
@@ -806,12 +798,12 @@ mod tests {
         at.update(
             0,
             &mock_market_state_from_mid_price(quote!(100.0)),
-            &Account::<_, ()>::default(),
+            quote!(0),
         );
         at.update(
             0,
             &mock_market_state_from_mid_price(quote!(200.0)),
-            &Account::<_, ()>::default(),
+            quote!(0),
         );
         assert_eq!(at.buy_and_hold_return(), quote!(100.0));
     }
@@ -822,12 +814,12 @@ mod tests {
         at.update(
             0,
             &mock_market_state_from_mid_price(quote!(100.0)),
-            &Account::<_, ()>::default(),
+            quote!(0),
         );
         at.update(
             0,
             &mock_market_state_from_mid_price(quote!(50.0)),
-            &Account::<_, ()>::default(),
+            quote!(0),
         );
         assert_eq!(at.sell_and_hold_return(), quote!(50.0));
     }
@@ -856,12 +848,12 @@ mod tests {
         acc_tracker.update(
             0,
             &mock_market_state_from_mid_price(quote!(100.0)),
-            &Account::<_, ()>::default(),
+            quote!(0),
         );
         acc_tracker.update(
             0,
             &mock_market_state_from_mid_price(quote!(200.0)),
-            &Account::<_, ()>::default(),
+            quote!(0),
         );
         assert_eq!(acc_tracker.buy_and_hold_return(), quote!(100.0));
     }
@@ -872,12 +864,12 @@ mod tests {
         acc_tracker.update(
             0,
             &mock_market_state_from_mid_price(quote!(100.0)),
-            &Account::<_, ()>::default(),
+            quote!(0),
         );
         acc_tracker.update(
             0,
             &mock_market_state_from_mid_price(quote!(200.0)),
-            &Account::<_, ()>::default(),
+            quote!(0),
         );
         assert_eq!(acc_tracker.sell_and_hold_return(), quote!(-100.0));
     }
@@ -935,10 +927,10 @@ mod tests {
         assert_eq!(
             round(
                 decimal_to_f64(
-                    acc_tracker
+                    *acc_tracker
                         .cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.05)
                         .unwrap()
-                        .inner()
+                        .as_ref()
                 ),
                 3
             ),
@@ -947,10 +939,10 @@ mod tests {
         assert_eq!(
             round(
                 decimal_to_f64(
-                    acc_tracker
+                    *acc_tracker
                         .cornish_fisher_value_at_risk(ReturnsSource::Hourly, 0.01)
                         .unwrap()
-                        .inner()
+                        .as_ref()
                 ),
                 3
             ),

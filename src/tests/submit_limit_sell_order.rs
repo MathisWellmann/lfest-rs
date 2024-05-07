@@ -1,4 +1,6 @@
-use crate::{mock_exchange_linear, prelude::*, trade};
+use crate::{
+    exchange::UserBalances, mock_exchange_linear, position::PositionInner, prelude::*, trade,
+};
 
 #[test]
 #[tracing_test::traced_test]
@@ -15,21 +17,17 @@ fn submit_limit_sell_order_no_position() {
     let order = LimitOrder::new(Side::Sell, limit_price, base!(9)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
-    assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(0),
-            entry_price: quote!(0),
-            margin: quote!(0),
-        }
-    );
+    assert_eq!(exchange.position(), &Position::Neutral,);
 
     // Now fill the order
-    let meta = ExchangeOrderMeta::new(0, 0);
+    let ts = 0;
+    let meta = ExchangeOrderMeta::new(0, ts);
     let mut order = order.into_pending(meta);
     let limit_price = order.limit_price();
-    order.fill(limit_price, order.remaining_quantity());
-    let expected_order_update = LimitOrderUpdate::FullyFilled(order.into_filled(limit_price, 0));
+    let filled_order = order
+        .fill(order.remaining_quantity(), ts)
+        .expect("order is fully filled.");
+    let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
             .update_state(0, trade!(limit_price, base!(9), Side::Buy))
@@ -42,54 +40,44 @@ fn submit_limit_sell_order_no_position() {
         .update_state(0, bba!(quote!(101), quote!(102)))
         .unwrap();
     assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(-9),
-            entry_price: quote!(100),
-            margin: quote!(900),
-        }
+        exchange.position(),
+        &Position::Short(PositionInner::new(base!(9), quote!(100),))
     );
     let fee = quote!(0.18);
     assert_eq!(
-        // The `ask` is deliberately the `limit_price` here to make it easier to reason about.
-        exchange.account().total_value(bid, limit_price),
-        quote!(1000) - fee
-    );
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        quote!(100) - fee
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(100) - fee,
+            position_margin: quote!(900),
+            order_margin: quote!(0)
+        }
     );
 
     // close the position again
     let order = LimitOrder::new(Side::Buy, quote!(100), base!(9)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
-    let meta = ExchangeOrderMeta::new(1, 0);
+    let meta = ExchangeOrderMeta::new(1, ts);
     let mut order = order.into_pending(meta);
     let limit_price = order.limit_price();
-    order.fill(limit_price, order.remaining_quantity());
-    let expected_order_update = LimitOrderUpdate::FullyFilled(order.into_filled(limit_price, 0));
+    let filled_order = order
+        .fill(order.remaining_quantity(), ts)
+        .expect("order is fully filled.");
+    let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
             .update_state(0, trade!(quote!(100), base!(9), Side::Sell))
             .unwrap(),
         vec![expected_order_update]
     );
+    assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(0),
-            entry_price: quote!(100),
-            margin: quote!(0),
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(1000) - fee - fee,
+            position_margin: quote!(0),
+            order_margin: quote!(0)
         }
-    );
-    assert_eq!(
-        exchange.account().total_value(bid, ask),
-        quote!(1000) - fee - fee
-    );
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        quote!(1000) - fee - fee
     );
 }
 

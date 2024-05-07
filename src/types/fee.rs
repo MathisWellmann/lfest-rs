@@ -1,5 +1,9 @@
+use std::ops::Mul;
+
 use derive_more::Display;
 use fpdec::Decimal;
+
+use super::{Currency, QuoteCurrency};
 
 /// Allows the quick construction of `Fee`
 #[macro_export]
@@ -20,11 +24,22 @@ impl Fee {
     pub fn new(val: Decimal) -> Self {
         Self(val)
     }
+}
 
-    /// Get access to the inner `Decimal`
-    #[inline(always)]
-    pub fn inner(self) -> Decimal {
-        self.0
+impl<C> Mul<C> for Fee
+where
+    C: Currency,
+{
+    type Output = QuoteCurrency;
+
+    fn mul(self, rhs: C) -> Self::Output {
+        QuoteCurrency::new(self.0 * rhs.as_ref())
+    }
+}
+
+impl AsRef<Decimal> for Fee {
+    fn as_ref(&self) -> &Decimal {
+        &self.0
     }
 }
 

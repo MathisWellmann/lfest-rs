@@ -1,6 +1,6 @@
 use std::ops::{Add, Div, Mul, Rem, Sub};
 
-use derive_more::{Add, AddAssign, Display, Div, From, Into, Mul, Sub, SubAssign};
+use derive_more::{Add, AddAssign, Div, From, Into, Mul, Sub, SubAssign};
 use fpdec::Decimal;
 
 use super::MarginCurrency;
@@ -34,7 +34,6 @@ macro_rules! quote {
     Div,
     AddAssign,
     SubAssign,
-    Display,
     Into,
     From,
     Hash,
@@ -52,11 +51,6 @@ impl Currency for QuoteCurrency {
     }
 
     #[inline(always)]
-    fn inner(self) -> Decimal {
-        self.0
-    }
-
-    #[inline(always)]
     fn new_zero() -> Self {
         Self::new(Decimal::ZERO)
     }
@@ -69,11 +63,6 @@ impl Currency for QuoteCurrency {
     #[inline(always)]
     fn abs(self) -> Self {
         Self(self.0.abs())
-    }
-
-    #[inline(always)]
-    fn fee_portion(&self, fee: Fee) -> Self {
-        Self(self.0 * fee.inner())
     }
 
     #[inline(always)]
@@ -101,6 +90,12 @@ impl MarginCurrency for QuoteCurrency {
             return S::PairedCurrency::new_zero();
         }
         quantity.convert(exit_price) - quantity.convert(entry_price)
+    }
+}
+
+impl AsRef<Decimal> for QuoteCurrency {
+    fn as_ref(&self) -> &Decimal {
+        &self.0
     }
 }
 
@@ -149,7 +144,7 @@ impl Div<Leverage> for QuoteCurrency {
     type Output = Self;
 
     fn div(self, rhs: Leverage) -> Self::Output {
-        Self(self.0 / rhs.inner())
+        Self(self.0 / *rhs.as_ref())
     }
 }
 
@@ -157,15 +152,13 @@ impl Mul<Fee> for QuoteCurrency {
     type Output = Self;
 
     fn mul(self, rhs: Fee) -> Self::Output {
-        Self(self.0 * rhs.inner())
+        Self(self.0 * rhs.as_ref())
     }
 }
 
-impl Add<Fee> for QuoteCurrency {
-    type Output = Self;
-
-    fn add(self, rhs: Fee) -> Self::Output {
-        Self(self.0 + rhs.inner())
+impl std::fmt::Display for QuoteCurrency {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} QUOTE", self.0)
     }
 }
 

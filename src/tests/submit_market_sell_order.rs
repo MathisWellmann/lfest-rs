@@ -1,6 +1,9 @@
 use hashbrown::HashMap;
 
-use crate::{mock_exchange_linear, prelude::*, risk_engine::RiskError};
+use crate::{
+    exchange::UserBalances, mock_exchange_linear, position::PositionInner, prelude::*,
+    risk_engine::RiskError,
+};
 
 #[test]
 fn submit_market_sell_order_reject() {
@@ -33,17 +36,20 @@ fn submit_market_sell_order() {
     exchange.submit_market_order(order).unwrap();
     // make sure its excuted immediately
     assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(-5),
-            entry_price: quote!(100),
-            margin: quote!(500),
-        }
+        exchange.position(),
+        &Position::Short(PositionInner::new(
+            base!(5),
+            quote!(100),
+            // margin: quote!(500),
+        ))
     );
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        // - fee
-        quote!(500) - quote!(0.3)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(500) - quote!(0.3),
+            position_margin: quote!(500),
+            order_margin: quote!(0)
+        }
     );
 }
 
@@ -62,44 +68,36 @@ fn submit_market_sell_order_with_short_position() {
     exchange.submit_market_order(order).unwrap();
     let fee0 = quote!(0.3);
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        quote!(500) - fee0
-    );
-    assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(-5),
-            entry_price: quote!(100),
-            margin: quote!(500)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(500) - fee0,
+            position_margin: quote!(500),
+            order_margin: quote!(0)
         }
     );
     assert_eq!(
-        exchange.account().active_limit_orders(),
-        &HashMap::default()
+        exchange.position(),
+        &Position::Short(PositionInner::new(base!(5), quote!(100),))
     );
-    assert_eq!(exchange.account().order_margin(), quote!(0));
+    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 
     // Sell again
     let order = MarketOrder::new(Side::Sell, base!(4)).unwrap();
     exchange.submit_market_order(order).unwrap();
     let fee1 = quote!(0.24);
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        quote!(100) - fee0 - fee1
-    );
-    assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(-9),
-            entry_price: quote!(100),
-            margin: quote!(900)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(100) - fee0 - fee1,
+            position_margin: quote!(900),
+            order_margin: quote!(0)
         }
     );
     assert_eq!(
-        exchange.account().active_limit_orders(),
-        &HashMap::default()
+        exchange.position(),
+        &Position::Short(PositionInner::new(base!(9), quote!(100),))
     );
-    assert_eq!(exchange.account().order_margin(), quote!(0));
+    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 }
 
 #[test]
@@ -119,18 +117,15 @@ fn submit_market_sell_order_with_long_position() {
     // Now close the position with a sell order
     let order = MarketOrder::new(Side::Sell, base!(9)).unwrap();
     exchange.submit_market_order(order).unwrap();
+    assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(0),
-            entry_price: quote!(100),
-            margin: quote!(0),
+        exchange.user_balances(),
+        UserBalances {
+            // - fee - fee - spread loss
+            available_wallet_balance: quote!(1000) - quote!(0.54) - quote!(0.5346) - quote!(9),
+            position_margin: quote!(0),
+            order_margin: quote!(0)
         }
-    );
-    assert_eq!(
-        exchange.account().available_wallet_balance(),
-        // - fee - fee - spread loss
-        quote!(1000) - quote!(0.54) - quote!(0.5346) - quote!(9)
     );
 }
 
@@ -149,42 +144,34 @@ fn submit_market_sell_order_turnaround_long() {
     exchange.submit_market_order(order).unwrap();
     let fee0 = quote!(0.54);
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        quote!(100) - fee0
-    );
-    assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(9),
-            entry_price: quote!(100),
-            margin: quote!(900)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(100) - fee0,
+            position_margin: quote!(900),
+            order_margin: quote!(0)
         }
     );
     assert_eq!(
-        exchange.account().active_limit_orders(),
-        &HashMap::default()
+        exchange.position(),
+        &Position::Long(PositionInner::new(base!(9), quote!(100),))
     );
-    assert_eq!(exchange.account().order_margin(), quote!(0));
+    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 
     // Now reverse the position
     let order = MarketOrder::new(Side::Sell, base!(18)).unwrap();
     exchange.submit_market_order(order).unwrap();
     let fee1 = quote!(1.0692);
     assert_eq!(
-        exchange.account().available_wallet_balance(),
-        quote!(100) - fee0 - fee1
-    );
-    assert_eq!(
-        exchange.account().position(),
-        &Position {
-            size: base!(-9),
-            entry_price: quote!(99),
-            margin: quote!(891)
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(100) - fee0 - fee1,
+            position_margin: quote!(891),
+            order_margin: quote!(0)
         }
     );
     assert_eq!(
-        exchange.account().active_limit_orders(),
-        &HashMap::default()
+        exchange.position(),
+        &Position::Short(PositionInner::new(base!(9), quote!(99),))
     );
-    assert_eq!(exchange.account().order_margin(), quote!(0));
+    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 }
