@@ -37,8 +37,8 @@ where
 
     match position {
         Position::Neutral => max(buy_margin_req, sell_margin_req),
-        Position::Long(pos) => max(buy_margin_req, sell_margin_req - position_margin),
-        Position::Short(pos) => max(buy_margin_req - position_margin, sell_margin_req),
+        Position::Long(_) => max(buy_margin_req, sell_margin_req - position_margin),
+        Position::Short(_) => max(buy_margin_req - position_margin, sell_margin_req),
     }
 }
 

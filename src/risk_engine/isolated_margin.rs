@@ -193,7 +193,7 @@ where
 
                 let fee = new_notional_value * self.contract_spec.fee_taker();
 
-                if new_margin_req > available_wallet_balance + released_from_old_pos {
+                if new_margin_req + fee > available_wallet_balance + released_from_old_pos {
                     return Err(RiskError::NotEnoughAvailableBalance);
                 }
             }

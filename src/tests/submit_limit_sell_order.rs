@@ -1,6 +1,4 @@
-use crate::{
-    exchange::UserBalances, mock_exchange_linear, position::PositionInner, prelude::*, trade,
-};
+use crate::{mock_exchange_linear, position::PositionInner, prelude::*, trade};
 
 #[test]
 #[tracing_test::traced_test]

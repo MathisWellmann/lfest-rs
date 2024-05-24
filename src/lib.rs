@@ -41,7 +41,7 @@ pub mod prelude {
         base, bba,
         config::Config,
         contract_specification::*,
-        exchange::{Exchange, UserBalances},
+        exchange::Exchange,
         fee, leverage,
         market_state::MarketState,
         order_filters::{PriceFilter, QuantityFilter},
