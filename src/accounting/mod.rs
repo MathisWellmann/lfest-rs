@@ -9,7 +9,7 @@ pub use transaction::Transaction;
 use crate::{types::MarginCurrency, Result};
 
 /// The trait for settling transactions.
-pub(crate) trait TransactionAccounting<M>
+pub trait TransactionAccounting<M>
 where
     M: MarginCurrency,
 {

@@ -1,10 +1,8 @@
 use super::{risk_engine_trait::RiskError, RiskEngine};
 use crate::{
     contract_specification::ContractSpecification,
-    exchange::ActiveLimitOrders,
-    fees_of_limit_orders::fees_of_limit_orders,
     market_state::MarketState,
-    order_margin::compute_order_margin,
+    order_margin::OrderMarginOnline,
     prelude::Position,
     types::{Currency, LimitOrder, MarginCurrency, MarketOrder, Pending, QuoteCurrency, Side},
 };
@@ -30,7 +28,7 @@ where
 impl<M, UserOrderId> RiskEngine<M, UserOrderId> for IsolatedMarginRiskEngine<M>
 where
     M: Currency + MarginCurrency,
-    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
+    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default,
 {
     fn check_market_order(
         &self,
@@ -64,22 +62,21 @@ where
         position_margin: M,
         order: &LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
         available_wallet_balance: M,
-        active_limit_orders: &ActiveLimitOrders<M::PairedCurrency, UserOrderId>,
-        order_margin: M,
+        order_margin_online: &OrderMarginOnline<M::PairedCurrency, UserOrderId>,
     ) -> Result<(), RiskError> {
-        let mut orders = active_limit_orders.clone();
-        orders.insert(order.state().meta().id(), order.clone());
-        let new_order_margin = compute_order_margin(
+        let order_margin = order_margin_online.order_margin(
+            self.contract_spec.init_margin_req(),
             position,
             position_margin,
-            &orders,
+        );
+        let new_order_margin = order_margin_online.order_margin_with_order(
+            order,
             self.contract_spec.init_margin_req(),
+            position,
+            position_margin,
         );
 
-        // TODO: this calculation does not allow a fully loaded long (or short) position
-        // to be reversed into the opposite position of the same size,
-        // which should be possible and requires a slightly modified calculation that
-        let order_fees: M = fees_of_limit_orders(&orders, self.contract_spec.fee_maker());
+        let order_fees: M = order_margin_online.cumulative_order_fees();
 
         if new_order_margin + order_fees > available_wallet_balance + order_margin {
             return Err(RiskError::NotEnoughAvailableBalance);

@@ -22,6 +22,7 @@ fn submit_market_sell_order_reject() {
 #[test]
 fn submit_market_sell_order() {
     let mut exchange = mock_exchange_linear();
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
@@ -33,11 +34,12 @@ fn submit_market_sell_order() {
     exchange.submit_market_order(order).unwrap();
     // make sure its excuted immediately
     assert_eq!(
-        exchange.position(),
-        &Position::Short(PositionInner::new(
+        exchange.position().clone(),
+        Position::Short(PositionInner::new(
             base!(5),
             quote!(100),
-            // margin: quote!(500),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
         ))
     );
     assert_eq!(
@@ -53,6 +55,7 @@ fn submit_market_sell_order() {
 #[test]
 fn submit_market_sell_order_with_short_position() {
     let mut exchange = mock_exchange_linear();
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
@@ -73,8 +76,13 @@ fn submit_market_sell_order_with_short_position() {
         }
     );
     assert_eq!(
-        exchange.position(),
-        &Position::Short(PositionInner::new(base!(5), quote!(100),))
+        exchange.position().clone(),
+        Position::Short(PositionInner::new(
+            base!(5),
+            quote!(100),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
+        ))
     );
     assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 
@@ -91,8 +99,13 @@ fn submit_market_sell_order_with_short_position() {
         }
     );
     assert_eq!(
-        exchange.position(),
-        &Position::Short(PositionInner::new(base!(9), quote!(100),))
+        exchange.position().clone(),
+        Position::Short(PositionInner::new(
+            base!(9),
+            quote!(100),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
+        ))
     );
     assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 }
@@ -129,12 +142,11 @@ fn submit_market_sell_order_with_long_position() {
 #[test]
 fn submit_market_sell_order_turnaround_long() {
     let mut exchange = mock_exchange_linear();
-    assert_eq!(
-        exchange
-            .update_state(0, bba!(quote!(99), quote!(100)))
-            .unwrap(),
-        Vec::new()
-    );
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
+    assert!(exchange
+        .update_state(0, bba!(quote!(99), quote!(100)))
+        .unwrap()
+        .is_empty());
 
     // First enter a long position
     let order = MarketOrder::new(Side::Buy, base!(9)).unwrap();
@@ -149,8 +161,13 @@ fn submit_market_sell_order_turnaround_long() {
         }
     );
     assert_eq!(
-        exchange.position(),
-        &Position::Long(PositionInner::new(base!(9), quote!(100),))
+        exchange.position().clone(),
+        Position::Long(PositionInner::new(
+            base!(9),
+            quote!(100),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
+        ))
     );
     assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 
@@ -167,8 +184,13 @@ fn submit_market_sell_order_turnaround_long() {
         }
     );
     assert_eq!(
-        exchange.position(),
-        &Position::Short(PositionInner::new(base!(9), quote!(99),))
+        exchange.position().clone(),
+        Position::Short(PositionInner::new(
+            base!(9),
+            quote!(99),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
+        ))
     );
     assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 }

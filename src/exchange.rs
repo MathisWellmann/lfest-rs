@@ -1,13 +1,13 @@
 use getset::Getters;
 use hashbrown::HashMap;
-use tracing::{debug, error, trace};
+use tracing::{debug, trace};
 
 use crate::{
     account_tracker::AccountTracker,
     accounting::TransactionAccounting,
     config::Config,
     market_state::MarketState,
-    order_margin::compute_order_margin,
+    order_margin::OrderMarginOnline,
     prelude::{
         Position, Transaction, EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT,
         USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
@@ -31,7 +31,7 @@ pub struct Exchange<A, Q, UserOrderId, TransactionAccountingT>
 where
     Q: Currency,
     Q::PairedCurrency: MarginCurrency,
-    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
+    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default,
 {
     /// The exchange configuration.
     #[getset(get = "pub")]
@@ -41,7 +41,6 @@ where
     #[getset(get = "pub")]
     market_state: MarketState,
 
-    // TODO: maybe move back into `Account`.
     /// A performance tracker for the user account.
     #[getset(get = "pub")]
     account_tracker: A,
@@ -51,7 +50,7 @@ where
     next_order_id: u64,
 
     /// Does the accounting for transactions, moving balances between accounts.
-    transaction_accounting: TransactionAccountingT,
+    pub transaction_accounting: TransactionAccountingT,
 
     /// Get the current position of the user.
     #[getset(get = "pub")]
@@ -61,11 +60,12 @@ where
     /// Active limit orders of the user.
     /// Maps the order `id` to the actual `Order`.
     #[getset(get = "pub")]
-    #[allow(clippy::type_complexity)]
     active_limit_orders: ActiveLimitOrders<Q, UserOrderId>,
 
     // Maps the `user_order_id` to the internal order nonce.
     lookup_order_nonce_from_user_order_id: HashMap<UserOrderId, OrderId>,
+
+    order_margin: OrderMarginOnline<Q, UserOrderId>,
 }
 
 impl<A, Q, UserOrderId, TransactionAccountingT> Exchange<A, Q, UserOrderId, TransactionAccountingT>
@@ -73,7 +73,7 @@ where
     A: AccountTracker<Q::PairedCurrency>,
     Q: Currency,
     Q::PairedCurrency: MarginCurrency,
-    UserOrderId: Clone + Eq + PartialEq + std::hash::Hash + std::fmt::Debug,
+    UserOrderId: Clone + Eq + PartialEq + std::hash::Hash + std::fmt::Debug + Default,
     TransactionAccountingT: TransactionAccounting<Q::PairedCurrency>,
 {
     /// Create a new Exchange with the desired config and whether to use candles
@@ -94,6 +94,7 @@ where
             position: Position::default(),
             active_limit_orders: HashMap::default(),
             lookup_order_nonce_from_user_order_id: HashMap::default(),
+            order_margin: OrderMarginOnline::default(),
         }
     }
 
@@ -133,6 +134,110 @@ where
         };
 
         Ok(self.check_active_orders(market_update, timestamp_ns))
+    }
+
+    /// Submit a new `MarketOrder` to the exchange.
+    ///
+    /// # Arguments:
+    /// `order`: The order that is being submitted.
+    ///
+    /// # Returns:
+    /// If Ok, the order with timestamp and id filled in.
+    /// Else its an error.
+    pub fn submit_market_order(
+        &mut self,
+        order: MarketOrder<Q, UserOrderId, NewOrder>,
+    ) -> Result<MarketOrder<Q, UserOrderId, Filled>> {
+        // Basic checks
+        self.config
+            .contract_spec()
+            .quantity_filter()
+            .validate_order_quantity(order.quantity())?;
+
+        let meta = ExchangeOrderMeta::new(
+            self.next_order_id(),
+            self.market_state.current_timestamp_ns(),
+        );
+        let order = order.into_pending(meta);
+
+        let fill_price = match order.side() {
+            Side::Buy => self.market_state.ask(),
+            Side::Sell => self.market_state.bid(),
+        };
+        let position_margin = self
+            .transaction_accounting
+            .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)?;
+        let available_wallet_balance = self
+            .transaction_accounting
+            .margin_balance_of(USER_WALLET_ACCOUNT)?;
+        self.risk_engine.check_market_order(
+            &self.position,
+            position_margin,
+            &order,
+            fill_price,
+            available_wallet_balance,
+        )?;
+
+        // From here on, everything is infallible
+        let filled_order = order.into_filled(fill_price, self.market_state.current_timestamp_ns());
+        self.settle_filled_market_order(filled_order.clone());
+
+        Ok(filled_order)
+    }
+
+    fn settle_filled_market_order(&mut self, order: MarketOrder<Q, UserOrderId, Filled>) {
+        let filled_qty = order.quantity();
+        assert!(filled_qty > Q::new_zero());
+        let fill_price = order.state().avg_fill_price();
+        assert!(fill_price > quote!(0));
+        Self::detract_fee(
+            &mut self.transaction_accounting,
+            filled_qty.convert(fill_price),
+            self.config.contract_spec().fee_taker(),
+        );
+
+        self.position.change_position(
+            filled_qty,
+            fill_price,
+            order.side(),
+            &mut self.transaction_accounting,
+            self.config.contract_spec().init_margin_req(),
+        );
+        self.account_tracker
+            .log_trade(order.side(), fill_price, filled_qty);
+    }
+
+    #[inline]
+    fn next_order_id(&mut self) -> OrderId {
+        self.next_order_id += 1;
+        self.next_order_id - 1
+    }
+
+    /// Cancel an active limit order based on the `user_order_id`.
+    ///
+    /// # Arguments:
+    /// `user_order_id`: The order id from the user.
+    /// `account_tracker`: Something to track this action.
+    ///
+    /// # Returns:
+    /// the cancelled order if successfull, error when the `user_order_id` is
+    /// not found
+    pub fn cancel_order_by_user_id(
+        &mut self,
+        user_order_id: UserOrderId,
+    ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
+        debug!(
+            "cancel_order_by_user_id: user_order_id: {:?}",
+            user_order_id
+        );
+        let id: u64 = match self
+            .lookup_order_nonce_from_user_order_id
+            .remove(&user_order_id)
+        {
+            None => return Err(Error::UserOrderIdNotFound),
+            Some(id) => id,
+        };
+        self.cancel_limit_order(id)
     }
 
     /// # Arguments:
@@ -181,16 +286,12 @@ where
         let available_wallet_balance = self
             .transaction_accounting
             .margin_balance_of(USER_WALLET_ACCOUNT)?;
-        let order_margin = self
-            .transaction_accounting
-            .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)?;
         self.risk_engine.check_limit_order(
             &self.position,
             position_margin,
             &order,
             available_wallet_balance,
-            &self.active_limit_orders,
-            order_margin,
+            &self.order_margin,
         )?;
         self.append_limit_order(order.clone());
         self.account_tracker.log_limit_order_submission();
@@ -198,118 +299,23 @@ where
         Ok(order)
     }
 
-    /// Submit a new `MarketOrder` to the exchange.
-    ///
-    /// # Arguments:
-    /// `order`: The order that is being submitted.
-    ///
-    /// # Returns:
-    /// If Ok, the order with timestamp and id filled in.
-    /// Else its an error.
-    pub fn submit_market_order(
-        &mut self,
-        order: MarketOrder<Q, UserOrderId, NewOrder>,
-    ) -> Result<MarketOrder<Q, UserOrderId, Filled>> {
-        // Basic checks
-        self.config
-            .contract_spec()
-            .quantity_filter()
-            .validate_order_quantity(order.quantity())?;
-
-        let meta = ExchangeOrderMeta::new(
-            self.next_order_id(),
-            self.market_state.current_timestamp_ns(),
-        );
-        let order = order.into_pending(meta);
-
-        let fill_price = match order.side() {
-            Side::Buy => self.market_state.ask(),
-            Side::Sell => self.market_state.bid(),
-        };
-        let position_margin = self
-            .transaction_accounting
-            .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)?;
-        let available_wallet_balance = self
-            .transaction_accounting
-            .margin_balance_of(USER_WALLET_ACCOUNT)?;
-        self.risk_engine.check_market_order(
-            &self.position,
-            position_margin,
-            &order,
-            fill_price,
-            available_wallet_balance,
-        )?;
-
-        // From here on, everything is infallible
-        let filled_order = order.into_filled(fill_price, self.market_state.current_timestamp_ns());
-        self.settle_filled_market_order(
-            filled_order.clone(),
-            self.market_state.current_timestamp_ns(),
-        );
-
-        Ok(filled_order)
-    }
-
-    #[inline]
-    fn next_order_id(&mut self) -> OrderId {
-        self.next_order_id += 1;
-        self.next_order_id - 1
-    }
-
-    /// Cancel an active limit order based on the `user_order_id`.
-    ///
-    /// # Arguments:
-    /// `user_order_id`: The order id from the user.
-    /// `account_tracker`: Something to track this action.
-    ///
-    /// # Returns:
-    /// the cancelled order if successfull, error when the `user_order_id` is
-    /// not found
-    pub fn cancel_order_by_user_id(
-        &mut self,
-        user_order_id: UserOrderId,
-    ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
-        debug!(
-            "cancel_order_by_user_id: user_order_id: {:?}",
-            user_order_id
-        );
-        let id: u64 = match self
-            .lookup_order_nonce_from_user_order_id
-            .remove(&user_order_id)
-        {
-            None => return Err(Error::UserOrderIdNotFound),
-            Some(id) => id,
-        };
-        self.cancel_limit_order(id)
-    }
-
     /// Append a new limit order as active order
-    pub(crate) fn append_limit_order(&mut self, order: LimitOrder<Q, UserOrderId, Pending<Q>>) {
+    fn append_limit_order(&mut self, order: LimitOrder<Q, UserOrderId, Pending<Q>>) {
         debug!("append_limit_order: order: {:?}", order);
 
-        let order_id = order.state().meta().id();
+        let order_id = order.id();
         let user_order_id = order.user_order_id().clone();
-        match self.active_limit_orders.insert(order_id, order) {
-            None => {}
-            Some(_) => {
-                error!(
-                    "there already was an order with this id in active_limit_orders. \
-            This should not happen as order id should be incrementing"
-                );
-                debug_assert!(false)
-            }
-        };
+        self.order_margin.update_order(order);
         self.lookup_order_nonce_from_user_order_id
             .insert(user_order_id, order_id);
         let position_margin = self
             .transaction_accounting
             .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
             .expect("is valid");
-        let new_order_margin: Q::PairedCurrency = compute_order_margin(
+        let new_order_margin = self.order_margin.order_margin(
+            self.config.contract_spec().init_margin_req(),
             &self.position,
             position_margin,
-            &self.active_limit_orders,
-            self.config.contract_spec().init_margin_req(),
         );
         let order_margin = self
             .transaction_accounting
@@ -357,11 +363,18 @@ where
             .transaction_accounting
             .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
             .expect("is valid");
-        let new_order_margin = compute_order_margin(
+        assert_eq!(
+            order_margin,
+            self.order_margin.order_margin(
+                self.config.contract_spec().init_margin_req(),
+                &self.position,
+                position_margin
+            )
+        );
+        let new_order_margin = self.order_margin.order_margin(
+            self.config.contract_spec().init_margin_req(),
             &self.position,
             position_margin,
-            &self.active_limit_orders,
-            self.config.contract_spec().init_margin_req(),
         );
 
         assert!(new_order_margin <= order_margin, "When cancelling a limit order, the new order margin is smaller or equal the old order margin");
@@ -407,82 +420,8 @@ where
         assert_user_wallet_balance(transaction_accounting);
     }
 
-    pub(crate) fn settle_filled_market_order(
-        &mut self,
-        order: MarketOrder<Q, UserOrderId, Filled>,
-        ts_ns: TimestampNs,
-    ) {
-        let filled_qty = order.quantity();
-        assert!(filled_qty > Q::new_zero());
-        let fill_price = order.state().avg_fill_price();
-        assert!(fill_price > quote!(0));
-        Self::detract_fee(
-            &mut self.transaction_accounting,
-            filled_qty.convert(fill_price),
-            self.config.contract_spec().fee_maker(),
-        );
-
-        let init_margin_req = self.config.contract_spec().init_margin_req();
-        let transaction = match (&self.position, order.side()) {
-            (Position::Neutral, Side::Buy)
-            | (Position::Neutral, Side::Sell)
-            | (Position::Long(_), Side::Buy)
-            | (Position::Short(_), Side::Sell) => {
-                let notional_value = filled_qty.convert(fill_price);
-                let margin = notional_value * init_margin_req;
-                Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin)
-            }
-            (Position::Long(pos_inner), Side::Sell) => {
-                if filled_qty <= pos_inner.quantity() {
-                    let freed_margin: Q::PairedCurrency =
-                        filled_qty.convert(fill_price) * init_margin_req;
-                    Transaction::new(
-                        USER_WALLET_ACCOUNT,
-                        USER_POSITION_MARGIN_ACCOUNT,
-                        freed_margin,
-                    )
-                } else {
-                    let freed_margin: Q::PairedCurrency =
-                        (filled_qty - pos_inner.quantity()).convert(fill_price) * init_margin_req;
-                    Transaction::new(
-                        USER_WALLET_ACCOUNT,
-                        USER_POSITION_MARGIN_ACCOUNT,
-                        freed_margin,
-                    )
-                }
-            }
-            (Position::Short(pos_inner), Side::Buy) => {
-                if filled_qty <= pos_inner.quantity() {
-                    let freed_margin: Q::PairedCurrency =
-                        filled_qty.convert(fill_price) * init_margin_req;
-                    Transaction::new(
-                        USER_WALLET_ACCOUNT,
-                        USER_POSITION_MARGIN_ACCOUNT,
-                        freed_margin,
-                    )
-                } else {
-                    let freed_margin: Q::PairedCurrency =
-                        (filled_qty - pos_inner.quantity()).convert(fill_price) * init_margin_req;
-                    Transaction::new(
-                        USER_WALLET_ACCOUNT,
-                        USER_POSITION_MARGIN_ACCOUNT,
-                        freed_margin,
-                    )
-                }
-            }
-        };
-        self.transaction_accounting
-            .create_margin_transfer(transaction)
-            .expect("margin transfer works");
-
-        self.position
-            .change_position(filled_qty, fill_price, order.side());
-        self.account_tracker
-            .log_trade(order.side(), fill_price, filled_qty);
-    }
-
     /// Checks for the execution of active limit orders in the account.
-    pub(crate) fn check_active_orders<U>(
+    fn check_active_orders<U>(
         &mut self,
         market_update: U,
         ts_ns: TimestampNs,
@@ -500,14 +439,14 @@ where
                     order.total_quantity()
                 );
 
-                Self::detract_fee(
-                    &mut self.transaction_accounting,
-                    filled_qty.convert(order.limit_price()),
-                    self.config.contract_spec().fee_maker(),
-                );
-
-                self.position
-                    .change_position(filled_qty, order.limit_price(), order.side());
+                let order_margin = self
+                    .transaction_accounting
+                    .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
+                    .expect("is valid");
+                let position_margin = self
+                    .transaction_accounting
+                    .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
+                    .expect("is valid");
 
                 if let Some(filled_order) = order.fill(filled_qty, ts_ns) {
                     trace!("fully filled order {}", order.id());
@@ -515,51 +454,57 @@ where
 
                     ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill();
+                    self.order_margin.remove_order(order);
                 } else {
                     order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
+                    self.order_margin.update_order(order.clone());
                     // TODO: we could potentially log partial fills as well...
                 }
+
+                Self::detract_fee(
+                    &mut self.transaction_accounting,
+                    filled_qty.convert(order.limit_price()),
+                    self.config.contract_spec().fee_maker(),
+                );
+
+                let new_order_margin = self.order_margin.order_margin(
+                    self.config.contract_spec().init_margin_req(),
+                    &self.position,
+                    position_margin,
+                );
+                trace!("order_margin: {order_margin}, new_order_margin: {new_order_margin}");
+                assert!(
+                    new_order_margin <= order_margin,
+                    "The order margin does not increase with a filled limit order event."
+                );
+
+                if new_order_margin < order_margin {
+                    let delta = order_margin - new_order_margin;
+                    // margin flows into position margin account, (from order margin account).
+                    let transaction = Transaction::new(
+                        USER_POSITION_MARGIN_ACCOUNT,
+                        USER_ORDER_MARGIN_ACCOUNT,
+                        delta,
+                    );
+                    self.transaction_accounting
+                        .create_margin_transfer(transaction)
+                        .expect("margin transfer works");
+                }
+
+                assert_user_wallet_balance(&self.transaction_accounting);
+
+                self.position.change_position(
+                    filled_qty,
+                    order.limit_price(),
+                    order.side(),
+                    &mut self.transaction_accounting,
+                    self.config.contract_spec().init_margin_req(),
+                );
             }
         }
         ids_to_remove
             .into_iter()
             .for_each(|id| self.remove_executed_order_from_active(id));
-
-        let order_margin = self
-            .transaction_accounting
-            .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
-            .expect("is valid");
-        let position_margin = self
-            .transaction_accounting
-            .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
-            .expect("is valid");
-        let new_order_margin = compute_order_margin(
-            &self.position,
-            position_margin,
-            &self.active_limit_orders,
-            self.config.contract_spec().init_margin_req(),
-        );
-
-        trace!("order_margin: {order_margin}, new_order_margin: {new_order_margin}");
-        assert!(
-            new_order_margin <= order_margin,
-            "The order margin does not increase with a filled limit order event."
-        );
-
-        if new_order_margin < order_margin {
-            let delta = order_margin - new_order_margin;
-            // margin flows into position margin account, (from order margin account).
-            let transaction = Transaction::new(
-                USER_POSITION_MARGIN_ACCOUNT,
-                USER_ORDER_MARGIN_ACCOUNT,
-                delta,
-            );
-            self.transaction_accounting
-                .create_margin_transfer(transaction)
-                .expect("margin transfer works");
-        }
-
-        assert_user_wallet_balance(&self.transaction_accounting);
 
         order_updates
     }

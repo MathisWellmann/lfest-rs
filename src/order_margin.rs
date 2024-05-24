@@ -1,14 +1,126 @@
 use fpdec::{Dec, Decimal};
+use getset::CopyGetters;
 
 use crate::{
     exchange::ActiveLimitOrders,
     prelude::Position,
-    types::{Currency, MarginCurrency, Side},
+    types::{Currency, LimitOrder, MarginCurrency, Pending, Side},
     utils::max,
 };
 
+/// An implementation for computing the order margin online, aka with every change to the active orders.
+#[derive(Debug, Clone, Default, CopyGetters)]
+pub(crate) struct OrderMarginOnline<Q, UserOrderId>
+where
+    Q: Currency,
+    UserOrderId: Clone + Default,
+{
+    cumulative_buy_value: Q::PairedCurrency,
+    cumulative_sell_value: Q::PairedCurrency,
+    #[getset(get_copy = "pub(crate)")]
+    cumulative_order_fees: Q::PairedCurrency,
+    active_limit_orders: ActiveLimitOrders<Q, UserOrderId>,
+}
+
+impl<Q, UserOrderId> OrderMarginOnline<Q, UserOrderId>
+where
+    Q: Currency,
+    Q::PairedCurrency: MarginCurrency,
+    UserOrderId: Clone + std::fmt::Debug + std::cmp::PartialEq + Default,
+{
+    pub(crate) fn update_order(&mut self, order: LimitOrder<Q, UserOrderId, Pending<Q>>) {
+        if let Some(active_order) = self.active_limit_orders.get(&order.id()) {
+            assert!(order.remaining_quantity() < active_order.remaining_quantity(), "An update to an existing order must mean the new order has less quantity than the tracked order.");
+            assert_eq!(order.id(), active_order.id());
+
+            let qty_delta: Q = active_order.remaining_quantity() - order.remaining_quantity();
+            assert!(qty_delta > Q::new_zero());
+
+            let notional_delta = qty_delta.convert(order.limit_price());
+
+            match order.side() {
+                Side::Buy => self.cumulative_buy_value -= notional_delta,
+                Side::Sell => self.cumulative_sell_value -= notional_delta,
+            }
+        } else {
+            let notional_value = order.remaining_quantity().convert(order.limit_price());
+            match order.side() {
+                Side::Buy => self.cumulative_buy_value += notional_value,
+                Side::Sell => self.cumulative_sell_value += notional_value,
+            }
+            self.active_limit_orders.insert(order.id(), order);
+        }
+    }
+
+    /// Remove an order from being tracked for margin purposes.
+    pub(crate) fn remove_order(&mut self, order: &LimitOrder<Q, UserOrderId, Pending<Q>>) {
+        let removed_order = self
+            .active_limit_orders
+            .remove(&order.id())
+            .expect("Its an internal method call; it must work");
+        assert_eq!(&removed_order, order);
+
+        let notional_value = order.remaining_quantity().convert(order.limit_price());
+        match order.side() {
+            Side::Buy => {
+                self.cumulative_buy_value -= notional_value;
+                assert!(self.cumulative_buy_value >= Q::PairedCurrency::new_zero());
+            }
+
+            Side::Sell => {
+                self.cumulative_sell_value -= notional_value;
+                assert!(self.cumulative_sell_value >= Q::PairedCurrency::new_zero());
+            }
+        }
+    }
+
+    /// The margin requirement for all the tracked orders.
+    pub(crate) fn order_margin(
+        &self,
+        init_margin_req: Decimal,
+        position: &Position<Q>,
+        position_margin: Q::PairedCurrency,
+    ) -> Q::PairedCurrency {
+        let buy_margin_req = self.cumulative_buy_value * init_margin_req;
+        let sell_margin_req = self.cumulative_sell_value * init_margin_req;
+        match position {
+            Position::Neutral => max(buy_margin_req, sell_margin_req),
+            Position::Long(_) => max(buy_margin_req, sell_margin_req - position_margin),
+            Position::Short(_) => max(buy_margin_req - position_margin, sell_margin_req),
+        }
+    }
+
+    /// Get the order margin if a new order were to be added.
+    pub(crate) fn order_margin_with_order(
+        &self,
+        order: &LimitOrder<Q, UserOrderId, Pending<Q>>,
+        init_margin_req: Decimal,
+        position: &Position<Q>,
+        position_margin: Q::PairedCurrency,
+    ) -> Q::PairedCurrency {
+        let notional_value = order.remaining_quantity().convert(order.limit_price());
+        let margin_req = notional_value * init_margin_req;
+
+        let mut buy_margin_req = self.cumulative_buy_value * init_margin_req;
+        let mut sell_margin_req = self.cumulative_sell_value * init_margin_req;
+
+        match order.side() {
+            Side::Buy => buy_margin_req += margin_req,
+            Side::Sell => sell_margin_req += margin_req,
+        }
+
+        match position {
+            Position::Neutral => max(buy_margin_req, sell_margin_req),
+            Position::Long(_) => max(buy_margin_req, sell_margin_req - position_margin),
+            Position::Short(_) => max(buy_margin_req - position_margin, sell_margin_req),
+        }
+    }
+}
+
 /// Compute the current order margin requirement, offset by the existing position if any.
-pub(crate) fn compute_order_margin<Q, UserOrderId>(
+#[allow(unused)] // The reference algorithm that `OrderMarginOnline` uses.
+#[deprecated]
+pub(crate) fn compute_order_margin_from_active_orders<Q, UserOrderId>(
     position: &Position<Q>,
     position_margin: Q::PairedCurrency,
     active_limit_orders: &ActiveLimitOrders<Q, UserOrderId>,
@@ -58,7 +170,7 @@ mod tests {
         let init_margin_req = Dec!(1);
 
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -73,7 +185,7 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -88,7 +200,7 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -103,7 +215,7 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -116,13 +228,20 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn order_margin_with_long() {
-        let position = Position::Long(PositionInner::new(base!(1), quote!(100)));
+        let mut accounting = InMemoryTransactionAccounting::new(quote!(1000));
+        let init_margin_req = Dec!(1);
+        let position = Position::Long(PositionInner::new(
+            base!(1),
+            quote!(100),
+            &mut accounting,
+            init_margin_req,
+        ));
         let position_margin = quote!(100);
         let mut active_limit_orders = HashMap::default();
         let init_margin_req = Dec!(1);
 
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -137,7 +256,7 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -152,7 +271,7 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -167,7 +286,7 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -182,7 +301,7 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -195,13 +314,20 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn order_margin_with_short() {
-        let position = Position::Short(PositionInner::new(base!(1), quote!(100)));
+        let mut accounting = InMemoryTransactionAccounting::new(quote!(1000));
+        let init_margin_req = Dec!(1);
+        let position = Position::Short(PositionInner::new(
+            base!(1),
+            quote!(100),
+            &mut accounting,
+            init_margin_req,
+        ));
         let position_margin = quote!(100);
         let mut active_limit_orders = HashMap::default();
         let init_margin_req = Dec!(1);
 
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -216,7 +342,7 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -231,7 +357,7 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -246,7 +372,7 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
@@ -261,7 +387,7 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(
+            compute_order_margin_from_active_orders(
                 &position,
                 position_margin,
                 &active_limit_orders,
