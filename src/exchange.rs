@@ -17,7 +17,7 @@ use crate::{
     types::{
         Currency, Error, ExchangeOrderMeta, Fee, Filled, LimitOrder, LimitOrderUpdate,
         MarginCurrency, MarketOrder, MarketUpdate, NewOrder, OrderError, OrderId, Pending, Result,
-        Side, TimestampNs,
+        Side, TimestampNs, UserBalances,
     },
     utils::assert_user_wallet_balance,
 };
@@ -353,17 +353,26 @@ where
             .transaction_accounting
             .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
             .expect("is valid");
+        let order_margin = self
+            .transaction_accounting
+            .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
+            .expect("is valid");
         let new_order_margin = compute_order_margin(
             &self.position,
             position_margin,
             &self.active_limit_orders,
             self.config.contract_spec().init_margin_req(),
         );
-        todo!("margin should be done in accounting.");
-        // let order_margin_delta = self.order_margin - new_order_margin;
-        // debug_assert!(order_margin_delta > M::new_zero());
-        // self.order_margin = new_order_margin;
-        // self.available_wallet_balance += order_margin_delta;
+
+        assert!(new_order_margin <= order_margin, "When cancelling a limit order, the new order margin is smaller or equal the old order margin");
+        if new_order_margin < order_margin {
+            let delta = order_margin - new_order_margin;
+            let transaction =
+                Transaction::new(USER_WALLET_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT, delta);
+            self.transaction_accounting
+                .create_margin_transfer(transaction)
+                .expect("margin transfer works.");
+        }
 
         self.account_tracker.log_limit_order_cancellation();
 
@@ -567,19 +576,4 @@ where
                 .expect("is a valid account"),
         }
     }
-}
-
-// TODO: move to other file.
-/// The user balances.
-#[derive(Debug, Clone, getset::CopyGetters, Eq, PartialEq)]
-pub struct UserBalances<M>
-where
-    M: MarginCurrency,
-{
-    /// The available wallet balance that is used to provide margin for positions and orders.
-    pub available_wallet_balance: M,
-    /// The margin reserved for the position.
-    pub position_margin: M,
-    /// The margin reserved for the open limit orders.
-    pub order_margin: M,
 }

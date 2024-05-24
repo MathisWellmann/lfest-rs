@@ -30,3 +30,17 @@ pub type OrderId = u64;
 
 /// The type of a timestamp that is measured in nanoseconds.
 pub type TimestampNs = i64;
+
+/// The user balances.
+#[derive(Debug, Clone, getset::CopyGetters, Eq, PartialEq)]
+pub struct UserBalances<M>
+where
+    M: MarginCurrency,
+{
+    /// The available wallet balance that is used to provide margin for positions and orders.
+    pub available_wallet_balance: M,
+    /// The margin reserved for the position.
+    pub position_margin: M,
+    /// The margin reserved for the open limit orders.
+    pub order_margin: M,
+}
