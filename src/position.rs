@@ -204,10 +204,19 @@ mod tests {
 
     #[test]
     fn position_inner_new_avg_entry_price() {
-        let mut pos = PositionInner {
+        let pos = PositionInner {
             quantity: base!(0.1),
             entry_price: quote!(100),
         };
-        todo!()
+        assert_eq!(pos.new_avg_entry_price(base!(0.1), quote!(50)), quote!(75));
+        assert_eq!(pos.new_avg_entry_price(base!(0.1), quote!(90)), quote!(95));
+        assert_eq!(
+            pos.new_avg_entry_price(base!(0.1), quote!(150)),
+            quote!(125)
+        );
+        assert_eq!(
+            pos.new_avg_entry_price(base!(0.3), quote!(200)),
+            quote!(175)
+        );
     }
 }
