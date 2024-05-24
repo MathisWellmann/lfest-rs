@@ -515,9 +515,10 @@ where
 
                     ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill();
+                } else {
+                    order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
+                    // TODO: we could potentially log partial fills as well...
                 }
-                order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
-                // TODO: we could potentially log partial fills as well...
             }
         }
         ids_to_remove
@@ -547,8 +548,12 @@ where
 
         if new_order_margin < order_margin {
             let delta = order_margin - new_order_margin;
-            let transaction =
-                Transaction::new(USER_WALLET_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT, delta);
+            // margin flows into position margin account, (from order margin account).
+            let transaction = Transaction::new(
+                USER_POSITION_MARGIN_ACCOUNT,
+                USER_ORDER_MARGIN_ACCOUNT,
+                delta,
+            );
             self.transaction_accounting
                 .create_margin_transfer(transaction)
                 .expect("margin transfer works");
