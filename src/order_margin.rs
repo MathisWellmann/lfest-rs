@@ -1,5 +1,4 @@
 use fpdec::{Dec, Decimal};
-use tracing::trace;
 
 use crate::{
     exchange::ActiveLimitOrders,
@@ -8,9 +7,10 @@ use crate::{
     utils::max,
 };
 
-/// Compute the current order margin requirement.
+/// Compute the current order margin requirement, offset by the existing position if any.
 pub(crate) fn compute_order_margin<Q, UserOrderId>(
     position: &Position<Q>,
+    position_margin: Q::PairedCurrency,
     active_limit_orders: &ActiveLimitOrders<Q, UserOrderId>,
     init_margin_req: Decimal,
 ) -> Q::PairedCurrency
@@ -19,6 +19,7 @@ where
     Q::PairedCurrency: MarginCurrency,
     UserOrderId: Clone,
 {
+    // TODO: create a new type for `init_margin_req`.
     assert!(init_margin_req > Dec!(0));
 
     let (buy_margin_req, sell_margin_req) = active_limit_orders.values().fold(
@@ -33,18 +34,11 @@ where
             }
         },
     );
-    trace!("order_margin: buy_margin_req: {buy_margin_req}, sell_margin_req: {sell_margin_req}");
 
     match position {
         Position::Neutral => max(buy_margin_req, sell_margin_req),
-        Position::Long(pos) => {
-            let pos_margin = pos.quantity().convert(pos.entry_price()) * init_margin_req;
-            max(buy_margin_req, sell_margin_req - pos_margin)
-        }
-        Position::Short(pos) => {
-            let pos_margin = pos.quantity().convert(pos.entry_price()) * init_margin_req;
-            max(buy_margin_req - pos_margin, sell_margin_req)
-        }
+        Position::Long(pos) => max(buy_margin_req, sell_margin_req - position_margin),
+        Position::Short(pos) => max(buy_margin_req - position_margin, sell_margin_req),
     }
 }
 
@@ -59,11 +53,17 @@ mod tests {
     #[tracing_test::traced_test]
     fn order_margin_no_position() {
         let position = Position::default();
+        let position_margin = quote!(0);
         let mut active_limit_orders = HashMap::default();
         let init_margin_req = Dec!(1);
 
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req,),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req,
+            ),
             quote!(0)
         );
 
@@ -73,7 +73,12 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req,),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req,
+            ),
             quote!(90)
         );
 
@@ -83,7 +88,12 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req,),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req,
+            ),
             quote!(100)
         );
 
@@ -93,7 +103,12 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req
+            ),
             quote!(220)
         );
     }
@@ -102,11 +117,17 @@ mod tests {
     #[tracing_test::traced_test]
     fn order_margin_with_long() {
         let position = Position::Long(PositionInner::new(base!(1), quote!(100)));
+        let position_margin = quote!(100);
         let mut active_limit_orders = HashMap::default();
         let init_margin_req = Dec!(1);
 
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req,),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req,
+            ),
             quote!(0)
         );
 
@@ -116,7 +137,12 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req
+            ),
             quote!(90)
         );
 
@@ -126,7 +152,12 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req
+            ),
             quote!(90)
         );
 
@@ -136,7 +167,12 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req
+            ),
             quote!(120)
         );
 
@@ -146,7 +182,12 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req
+            ),
             quote!(185)
         );
     }
@@ -155,11 +196,17 @@ mod tests {
     #[tracing_test::traced_test]
     fn order_margin_with_short() {
         let position = Position::Short(PositionInner::new(base!(1), quote!(100)));
+        let position_margin = quote!(100);
         let mut active_limit_orders = HashMap::default();
         let init_margin_req = Dec!(1);
 
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req
+            ),
             quote!(0)
         );
 
@@ -169,7 +216,12 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req
+            ),
             quote!(0)
         );
 
@@ -179,7 +231,12 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req,),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req,
+            ),
             quote!(100)
         );
 
@@ -189,7 +246,12 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req,),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req,
+            ),
             quote!(220)
         );
 
@@ -199,7 +261,12 @@ mod tests {
         let order_id = order.state().meta().id();
         active_limit_orders.insert(order_id, order);
         assert_eq!(
-            compute_order_margin(&position, &active_limit_orders, init_margin_req,),
+            compute_order_margin(
+                &position,
+                position_margin,
+                &active_limit_orders,
+                init_margin_req,
+            ),
             quote!(220)
         );
     }

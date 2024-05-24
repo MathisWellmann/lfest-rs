@@ -37,31 +37,6 @@ where
     Q: Currency,
     Q::PairedCurrency: MarginCurrency,
 {
-    // TODO: remove
-    // /// The quantity of the position.
-    // pub fn quantity(&self) -> Q {
-    //     match self {
-    //         Position::Neutral => Q::new_zero(),
-    //         Position::Long(inner) => inner.quantity,
-    //         Position::Short(inner) => inner.quantity,
-    //     }
-    // }
-
-    // TODO: remove
-    /// The value of the position denoted in the margin currency.
-    // pub fn value(&self, bid: QuoteCurrency, ask: QuoteCurrency) -> Q::PairedCurrency {
-    //     match self {
-    //         Position::Neutral => Q::PairedCurrency::new_zero(),
-    //         Position::Long(inner) => inner.value(bid, Dec!(1)),
-    //         Position::Short(inner) => inner.value(ask, Dec!(-1)),
-    //     }
-    // }
-
-    /// Closes a position, making it neutrally positioned.
-    pub(crate) fn close_position(&mut self) {
-        *self = Self::Neutral;
-    }
-
     /// Return the positions unrealized profit and loss.
     pub fn unrealized_pnl(&self, bid: QuoteCurrency, ask: QuoteCurrency) -> Q::PairedCurrency {
         match self {

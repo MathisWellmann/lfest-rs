@@ -69,8 +69,12 @@ where
     ) -> Result<(), RiskError> {
         let mut orders = active_limit_orders.clone();
         orders.insert(order.state().meta().id(), order.clone());
-        let new_order_margin =
-            compute_order_margin(position, &orders, self.contract_spec.init_margin_req());
+        let new_order_margin = compute_order_margin(
+            position,
+            position_margin,
+            &orders,
+            self.contract_spec.init_margin_req(),
+        );
 
         // TODO: this calculation does not allow a fully loaded long (or short) position
         // to be reversed into the opposite position of the same size,

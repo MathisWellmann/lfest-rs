@@ -265,10 +265,9 @@ where
     /// # Returns:
     /// the cancelled order if successfull, error when the `user_order_id` is
     /// not found
-    pub(crate) fn cancel_order_by_user_id(
+    pub fn cancel_order_by_user_id(
         &mut self,
         user_order_id: UserOrderId,
-        account_tracker: &mut A,
     ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
         debug!(
             "cancel_order_by_user_id: user_order_id: {:?}",
@@ -281,7 +280,7 @@ where
             None => return Err(Error::UserOrderIdNotFound),
             Some(id) => id,
         };
-        self.cancel_limit_order(id, account_tracker)
+        self.cancel_limit_order(id)
     }
 
     /// Append a new limit order as active order
@@ -302,8 +301,13 @@ where
         };
         self.lookup_order_nonce_from_user_order_id
             .insert(user_order_id, order_id);
+        let position_margin = self
+            .transaction_accounting
+            .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
+            .expect("is valid");
         let new_order_margin: Q::PairedCurrency = compute_order_margin(
             &self.position,
+            position_margin,
             &self.active_limit_orders,
             self.config.contract_spec().init_margin_req(),
         );
@@ -336,18 +340,22 @@ where
 
     /// Cancel an active limit order.
     /// returns Some order if successful with given order_id
-    pub(crate) fn cancel_limit_order(
+    pub fn cancel_limit_order(
         &mut self,
         order_id: OrderId,
-        account_tracker: &mut A,
     ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
         debug!("cancel_order: {}", order_id);
         let removed_order = self
             .active_limit_orders
             .remove(&order_id)
             .ok_or(Error::OrderIdNotFound)?;
+        let position_margin = self
+            .transaction_accounting
+            .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
+            .expect("is valid");
         let new_order_margin = compute_order_margin(
             &self.position,
+            position_margin,
             &self.active_limit_orders,
             self.config.contract_spec().init_margin_req(),
         );
@@ -357,7 +365,7 @@ where
         // self.order_margin = new_order_margin;
         // self.available_wallet_balance += order_margin_delta;
 
-        account_tracker.log_limit_order_cancellation();
+        self.account_tracker.log_limit_order_cancellation();
 
         Ok(removed_order)
     }
@@ -511,8 +519,13 @@ where
             .transaction_accounting
             .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
             .expect("is valid");
+        let position_margin = self
+            .transaction_accounting
+            .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
+            .expect("is valid");
         let new_order_margin = compute_order_margin(
             &self.position,
+            position_margin,
             &self.active_limit_orders,
             self.config.contract_spec().init_margin_req(),
         );
