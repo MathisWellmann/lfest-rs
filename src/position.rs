@@ -50,26 +50,17 @@ where
         trace!("old position: {}", self);
         match self {
             Position::Neutral => match side {
-                Side::Buy => {
-                    *self = Position::Long(PositionInner {
-                        quantity: filled_qty,
-                        entry_price: fill_price,
-                    })
-                }
-                Side::Sell => {
-                    *self = Position::Short(PositionInner {
-                        quantity: filled_qty,
-                        entry_price: fill_price,
-                    })
-                }
+                Side::Buy => *self = Position::Long(PositionInner::new(filled_qty, fill_price)),
+                Side::Sell => *self = Position::Short(PositionInner::new(filled_qty, fill_price)),
             },
             Position::Long(inner) => match side {
                 Side::Buy => inner.increase_contracts(filled_qty, fill_price),
                 Side::Sell => {
                     if filled_qty > inner.quantity {
                         let new_short_qty = filled_qty - inner.quantity;
-                        inner.decrease_contracts(inner.quantity);
-                        inner.increase_contracts(new_short_qty, fill_price);
+                        *self = Position::Short(PositionInner::new(new_short_qty, fill_price));
+                    } else if filled_qty == inner.quantity {
+                        *self = Position::Neutral;
                     } else {
                         inner.decrease_contracts(filled_qty);
                     }
@@ -79,8 +70,9 @@ where
                 Side::Buy => {
                     if filled_qty > inner.quantity {
                         let new_long_qty = filled_qty - inner.quantity;
-                        inner.decrease_contracts(inner.quantity);
-                        inner.increase_contracts(new_long_qty, fill_price);
+                        *self = Position::Long(PositionInner::new(new_long_qty, fill_price));
+                    } else if filled_qty == inner.quantity {
+                        *self = Position::Neutral;
                     } else {
                         inner.decrease_contracts(filled_qty);
                     }

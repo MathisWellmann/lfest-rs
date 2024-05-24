@@ -1,3 +1,5 @@
+use tracing::trace;
+
 use super::{
     account::Account, transaction::Transaction, utils::assert_accounting_equation, AccountId,
     TransactionAccounting,
@@ -48,6 +50,7 @@ where
     }
 
     fn create_margin_transfer(&mut self, transaction: Transaction<M>) -> Result<()> {
+        trace!("create_margin_transfer: {transaction:?}");
         let mut debit_account = self
             .margin_accounts
             .get(transaction.debit_account_id())
