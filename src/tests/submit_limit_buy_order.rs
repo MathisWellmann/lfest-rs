@@ -4,12 +4,10 @@ use crate::{mock_exchange_linear, position::PositionInner, prelude::*, trade};
 #[tracing_test::traced_test]
 fn submit_limit_buy_order_no_position() {
     let mut exchange = mock_exchange_linear();
-    assert_eq!(
-        exchange
-            .update_state(0, bba!(quote!(99), quote!(100)))
-            .unwrap(),
-        Vec::new()
-    );
+    assert!(exchange
+        .update_state(0, bba!(quote!(99), quote!(100)))
+        .unwrap()
+        .is_empty());
 
     let limit_price = quote!(98);
     let order = LimitOrder::new(Side::Buy, limit_price, base!(5)).unwrap();
@@ -41,9 +39,16 @@ fn submit_limit_buy_order_no_position() {
     let bid = quote!(96);
     let ask = quote!(99);
     assert!(exchange.update_state(0, bba!(bid, ask)).unwrap().is_empty());
+    let mut accounting = InMemoryTransactionAccounting::new(quote!(1000));
+    let init_margin_req = Dec!(1);
     assert_eq!(
         exchange.position(),
-        &Position::Long(PositionInner::new(base!(5), quote!(98)))
+        &Position::Long(PositionInner::new(
+            base!(5),
+            quote!(98),
+            &mut accounting,
+            init_margin_req
+        ))
     );
     let fee = quote!(0.098);
     assert_eq!(
@@ -81,14 +86,13 @@ fn submit_limit_buy_order_no_position() {
 
 // Test there is a maximum quantity of buy orders the account can post.
 #[test]
+#[tracing_test::traced_test]
 fn submit_limit_buy_order_no_position_max() {
     let mut exchange = mock_exchange_linear();
-    assert_eq!(
-        exchange
-            .update_state(0, bba!(quote!(100), quote!(101)))
-            .unwrap(),
-        Vec::new()
-    );
+    assert!(exchange
+        .update_state(0, bba!(quote!(100), quote!(101)))
+        .unwrap()
+        .is_empty());
 
     let order = LimitOrder::new(Side::Buy, quote!(100), base!(5)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
@@ -114,22 +118,30 @@ fn submit_limit_buy_order_no_position_max() {
 #[test]
 fn submit_limit_buy_order_with_long() {
     let mut exchange = mock_exchange_linear();
-    assert_eq!(
-        exchange
-            .update_state(0, bba!(quote!(99), quote!(100)))
-            .unwrap(),
-        Vec::new()
-    );
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
+    assert!(exchange
+        .update_state(0, bba!(quote!(99), quote!(100)))
+        .unwrap()
+        .is_empty());
     let order = MarketOrder::new(Side::Buy, base!(9)).unwrap();
     exchange.submit_market_order(order).unwrap();
 
     assert_eq!(
-        exchange.position(),
-        &Position::Long(PositionInner::new(
+        exchange.position().clone(),
+        Position::Long(PositionInner::new(
             base!(9),
             quote!(100),
-            // margin: quote!(900),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
         )),
+    );
+    assert_eq!(
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(100) - quote!(0.54),
+            position_margin: quote!(900),
+            order_margin: quote!(0)
+        }
     );
 
     assert_eq!(
@@ -170,22 +182,30 @@ fn submit_limit_buy_order_with_long() {
 #[test]
 fn submit_limit_buy_order_with_short() {
     let mut exchange = mock_exchange_linear();
-    assert_eq!(
-        exchange
-            .update_state(0, bba!(quote!(100), quote!(101)))
-            .unwrap(),
-        Vec::new(),
-    );
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
+    assert!(exchange
+        .update_state(0, bba!(quote!(100), quote!(101)))
+        .unwrap()
+        .is_empty());
     let order = MarketOrder::new(Side::Sell, base!(9)).unwrap();
     exchange.submit_market_order(order).unwrap();
 
     assert_eq!(
-        exchange.position(),
-        &Position::Short(PositionInner::new(
+        exchange.position().clone(),
+        Position::Short(PositionInner::new(
             base!(9),
             quote!(100),
-            // margin: quote!(900),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
         ))
+    );
+    assert_eq!(
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(100) - quote!(0.54),
+            position_margin: quote!(900),
+            order_margin: quote!(0)
+        }
     );
 
     // Another sell limit order should not work

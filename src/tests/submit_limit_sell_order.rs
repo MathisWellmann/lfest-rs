@@ -4,12 +4,11 @@ use crate::{mock_exchange_linear, position::PositionInner, prelude::*, trade};
 #[tracing_test::traced_test]
 fn submit_limit_sell_order_no_position() {
     let mut exchange = mock_exchange_linear();
-    assert_eq!(
-        exchange
-            .update_state(0, bba!(quote!(99), quote!(100)))
-            .unwrap(),
-        Vec::new()
-    );
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
+    assert!(exchange
+        .update_state(0, bba!(quote!(99), quote!(100)))
+        .unwrap()
+        .is_empty());
 
     let limit_price = quote!(100);
     let order = LimitOrder::new(Side::Sell, limit_price, base!(9)).unwrap();
@@ -36,8 +35,13 @@ fn submit_limit_sell_order_no_position() {
         .update_state(0, bba!(quote!(101), quote!(102)))
         .unwrap();
     assert_eq!(
-        exchange.position(),
-        &Position::Short(PositionInner::new(base!(9), quote!(100),))
+        exchange.position().clone(),
+        Position::Short(PositionInner::new(
+            base!(9),
+            quote!(100),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
+        ))
     );
     let fee = quote!(0.18);
     assert_eq!(
@@ -81,12 +85,10 @@ fn submit_limit_sell_order_no_position() {
 #[tracing_test::traced_test]
 fn submit_limit_sell_order_no_position_max() {
     let mut exchange = mock_exchange_linear();
-    assert_eq!(
-        exchange
-            .update_state(0, bba!(quote!(99), quote!(100)))
-            .unwrap(),
-        vec![]
-    );
+    assert!(exchange
+        .update_state(0, bba!(quote!(99), quote!(100)))
+        .unwrap()
+        .is_empty());
 
     let order = LimitOrder::new(Side::Sell, quote!(100), base!(5)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();

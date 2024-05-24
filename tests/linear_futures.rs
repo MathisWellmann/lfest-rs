@@ -6,6 +6,7 @@ use lfest::{mock_exchange_linear, prelude::*};
 #[tracing_test::traced_test]
 fn lin_long_market_win_full() {
     let mut exchange = mock_exchange_linear();
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
         .update_state(
             0,
@@ -25,12 +26,22 @@ fn lin_long_market_win_full() {
     assert!(order_updates.is_empty());
 
     assert_eq!(
-        exchange.position(),
-        &Position::Long(PositionInner::new(base!(5.0), bid))
+        exchange.position().clone(),
+        Position::Long(PositionInner::new(
+            base!(5.0),
+            bid,
+            &mut exchange.transaction_accounting,
+            init_margin_req,
+        ))
     );
     assert_eq!(
-        exchange.position(),
-        &Position::Long(PositionInner::new(base!(5.0), bid))
+        exchange.position().clone(),
+        Position::Long(PositionInner::new(
+            base!(5.0),
+            bid,
+            &mut exchange.transaction_accounting,
+            init_margin_req,
+        ))
     );
     assert_eq!(exchange.position().unrealized_pnl(bid, ask), quote!(0.0));
     assert_eq!(

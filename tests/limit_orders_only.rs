@@ -6,6 +6,7 @@ use lfest::{mock_exchange_linear, prelude::*, trade};
 #[tracing_test::traced_test]
 fn limit_orders_only() {
     let mut exchange = mock_exchange_linear();
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
 
     let bid = quote!(100);
     let ask = quote!(101);
@@ -33,8 +34,13 @@ fn limit_orders_only() {
     assert!(order_updates.is_empty());
 
     assert_eq!(
-        exchange.position(),
-        &Position::Long(PositionInner::new(base!(9.9), quote!(100)))
+        exchange.position().clone(),
+        Position::Long(PositionInner::new(
+            base!(9.9),
+            quote!(100),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
+        ))
     );
 
     assert_eq!(

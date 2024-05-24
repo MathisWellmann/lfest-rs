@@ -23,20 +23,24 @@ fn submit_market_buy_order_reject() {
 #[tracing_test::traced_test]
 fn submit_market_buy_order_no_position() {
     let mut exchange = mock_exchange_linear();
-    assert_eq!(
-        exchange
-            .update_state(0, bba!(quote!(100), quote!(101)))
-            .unwrap(),
-        Vec::new()
-    );
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
+    assert!(exchange
+        .update_state(0, bba!(quote!(100), quote!(101)))
+        .unwrap()
+        .is_empty());
 
     let order = MarketOrder::new(Side::Buy, base!(5)).unwrap();
     exchange.submit_market_order(order).unwrap();
 
     // make sure its excuted immediately
     assert_eq!(
-        exchange.position(),
-        &Position::Long(PositionInner::new(base!(5), quote!(101),))
+        exchange.position().clone(),
+        Position::Long(PositionInner::new(
+            base!(5),
+            quote!(101),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
+        ))
     );
     assert_eq!(
         exchange.user_balances(),
@@ -52,6 +56,7 @@ fn submit_market_buy_order_no_position() {
 #[tracing_test::traced_test]
 fn submit_market_buy_order_with_long_position() {
     let mut exchange = mock_exchange_linear();
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
@@ -64,8 +69,13 @@ fn submit_market_buy_order_with_long_position() {
     exchange.submit_market_order(order).unwrap();
     let fee0 = quote!(0.3);
     assert_eq!(
-        exchange.position(),
-        &Position::Long(PositionInner::new(base!(5), quote!(100),))
+        exchange.position().clone(),
+        Position::Long(PositionInner::new(
+            base!(5),
+            quote!(100),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
+        ))
     );
     assert_eq!(exchange.active_limit_orders(), &HashMap::default());
     assert_eq!(
@@ -90,8 +100,13 @@ fn submit_market_buy_order_with_long_position() {
         }
     );
     assert_eq!(
-        exchange.position(),
-        &Position::Long(PositionInner::new(base!(9), quote!(100)))
+        exchange.position().clone(),
+        Position::Long(PositionInner::new(
+            base!(9),
+            quote!(100),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
+        ))
     );
     assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 }
@@ -100,6 +115,7 @@ fn submit_market_buy_order_with_long_position() {
 #[tracing_test::traced_test]
 fn submit_market_buy_order_with_short_position() {
     let mut exchange = mock_exchange_linear();
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(100), quote!(101)))
@@ -120,8 +136,13 @@ fn submit_market_buy_order_with_short_position() {
         }
     );
     assert_eq!(
-        exchange.position(),
-        &Position::Short(PositionInner::new(base!(9), quote!(100),))
+        exchange.position().clone(),
+        Position::Short(PositionInner::new(
+            base!(9),
+            quote!(100),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
+        ))
     );
     assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 
@@ -143,6 +164,7 @@ fn submit_market_buy_order_with_short_position() {
 #[tracing_test::traced_test]
 fn submit_market_buy_order_turnaround_short() {
     let mut exchange = mock_exchange_linear();
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
             .update_state(0, bba!(quote!(99), quote!(100)))
@@ -158,11 +180,12 @@ fn submit_market_buy_order_turnaround_short() {
     let order = MarketOrder::new(Side::Buy, base!(18)).unwrap();
     exchange.submit_market_order(order).unwrap();
     assert_eq!(
-        exchange.position(),
-        &Position::Long(PositionInner::new(
+        exchange.position().clone(),
+        Position::Long(PositionInner::new(
             base!(9),
             quote!(100),
-            // margin: quote!(900),
+            &mut exchange.transaction_accounting,
+            init_margin_req,
         ))
     );
     assert_eq!(

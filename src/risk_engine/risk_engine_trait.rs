@@ -1,6 +1,6 @@
 use crate::{
-    exchange::ActiveLimitOrders,
     market_state::MarketState,
+    order_margin::OrderMarginOnline,
     prelude::Position,
     types::{Currency, LimitOrder, MarginCurrency, MarketOrder, Pending, QuoteCurrency},
 };
@@ -19,7 +19,7 @@ pub enum RiskError {
 pub(crate) trait RiskEngine<M, UserOrderId>
 where
     M: Currency + MarginCurrency,
-    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
+    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default,
 {
     /// Checks if the account it able to satisfy the margin requirements for a new market order.
     ///
@@ -51,8 +51,7 @@ where
         position_margin: M,
         order: &LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
         available_wallet_balance: M,
-        active_limit_orders: &ActiveLimitOrders<M::PairedCurrency, UserOrderId>,
-        order_margin: M,
+        order_margin: &OrderMarginOnline<M::PairedCurrency, UserOrderId>,
     ) -> Result<(), RiskError>;
 
     /// Ensure the account has enough maintenance margin, to keep the position open.
