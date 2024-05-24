@@ -2,7 +2,7 @@ use fpdec::{Dec, Decimal};
 
 use crate::{
     prelude::{TransactionAccounting, USER_WALLET_ACCOUNT},
-    types::{Currency, Leverage, MarginCurrency, QuoteCurrency},
+    types::MarginCurrency,
 };
 
 /// Return the minimum of two values
@@ -105,19 +105,6 @@ pub(crate) fn variance(vals: &[Decimal]) -> Decimal {
     let n: Decimal = (vals.len() as u64).into();
     let avg: Decimal = decimal_sum(vals.iter().cloned()) / n;
     decimal_sum(vals.iter().map(|v| (v - avg) * (v - avg))) / n
-}
-
-/// Compute the required margin for a position of a given size.
-pub(crate) fn margin_for_position<Q>(
-    pos_size: Q,
-    entry_price: QuoteCurrency,
-    leverage: Leverage,
-) -> Q::PairedCurrency
-where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
-{
-    pos_size.abs().convert(entry_price) / leverage
 }
 
 /// Asserts that the users wallet balance is greater than zero.

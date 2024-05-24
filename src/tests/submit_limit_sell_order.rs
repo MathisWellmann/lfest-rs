@@ -34,8 +34,6 @@ fn submit_limit_sell_order_no_position() {
             .unwrap(),
         vec![expected_order_update]
     );
-    let bid = quote!(101);
-    let ask = quote!(102);
     exchange
         .update_state(0, bba!(quote!(101), quote!(102)))
         .unwrap();
@@ -59,7 +57,6 @@ fn submit_limit_sell_order_no_position() {
 
     let meta = ExchangeOrderMeta::new(1, ts);
     let mut order = order.into_pending(meta);
-    let limit_price = order.limit_price();
     let filled_order = order
         .fill(order.remaining_quantity(), ts)
         .expect("order is fully filled.");
