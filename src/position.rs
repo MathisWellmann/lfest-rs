@@ -42,8 +42,8 @@ where
     pub fn unrealized_pnl(&self, bid: QuoteCurrency, ask: QuoteCurrency) -> Q::PairedCurrency {
         match self {
             Position::Neutral => Q::PairedCurrency::new_zero(),
-            Position::Long(inner) => inner.unrealized_pnl(bid, Dec!(1)),
-            Position::Short(inner) => inner.unrealized_pnl(ask, Dec!(-1)).into_negative(),
+            Position::Long(inner) => inner.unrealized_pnl(bid),
+            Position::Short(inner) => inner.unrealized_pnl(ask).into_negative(),
         }
     }
 

@@ -68,31 +68,8 @@ where
     /// Return the positions unrealized profit and loss
     /// denoted in QUOTE when using linear futures,
     /// denoted in BASE when using inverse futures
-    pub fn unrealized_pnl(
-        &self,
-        mark_to_market_price: QuoteCurrency,
-        direction_multiplier: Decimal,
-    ) -> Q::PairedCurrency {
-        debug_assert!(
-            direction_multiplier == Dec!(1) || direction_multiplier == Dec!(-1),
-            "Multiplier must be one of those."
-        );
-        Q::PairedCurrency::pnl(
-            self.entry_price,
-            mark_to_market_price,
-            self.quantity * direction_multiplier,
-        )
-    }
-
-    /// The total position value including unrealized profit and loss.
-    /// Denoted in the margin `Currency`.
-    pub fn value(
-        &self,
-        mark_to_market_price: QuoteCurrency,
-        direction_multiplier: Decimal,
-    ) -> Q::PairedCurrency {
-        self.quantity.convert(self.entry_price)
-            + self.unrealized_pnl(mark_to_market_price, direction_multiplier)
+    pub fn unrealized_pnl(&self, mark_to_market_price: QuoteCurrency) -> Q::PairedCurrency {
+        Q::PairedCurrency::pnl(self.entry_price, mark_to_market_price, self.quantity)
     }
 
     /// Add contracts to the position.
