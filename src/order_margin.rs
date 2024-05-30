@@ -71,9 +71,10 @@ where
             .active_limit_orders
             .remove(&order.id())
             .expect("Its an internal method call; it must work");
-        assert_eq!(&removed_order, order);
 
-        let notional_value = order.remaining_quantity().convert(order.limit_price());
+        let notional_value = removed_order
+            .remaining_quantity()
+            .convert(removed_order.limit_price());
         match order.side() {
             Side::Buy => {
                 self.cumulative_buy_value -= notional_value;
