@@ -408,13 +408,16 @@ fn inv_long_market_loss_partial() {
 
     let o = MarketOrder::new(Side::Buy, quote!(800.0)).unwrap();
     exchange.submit_market_order(o).unwrap();
-    let _ = exchange.update_state(1, bba!(bid, quote!(1000))).unwrap();
+    assert!(exchange
+        .update_state(1, bba!(bid, quote!(1000)))
+        .unwrap()
+        .is_empty());
 
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
-            quote!(800.0),
-            bid,
+            quote!(800),
+            quote!(1000),
             &mut accounting,
             init_margin_req
         ))
@@ -439,19 +442,19 @@ fn inv_long_market_loss_partial() {
     let order_updates = exchange.update_state(1, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_quote0 = quote!(800.0) * exchange.config().contract_spec().fee_taker();
-    let fee_base0: BaseCurrency = fee_quote0.convert(quote!(1000.0));
+    let fee_quote0 = quote!(800) * exchange.config().contract_spec().fee_taker();
+    let fee_base0: BaseCurrency = fee_quote0.convert(quote!(1000));
 
-    let fee_quote1 = quote!(400.0) * exchange.config().contract_spec().fee_taker();
-    let fee_base1: BaseCurrency = fee_quote1.convert(quote!(800.0));
+    let fee_quote1 = quote!(400) * exchange.config().contract_spec().fee_taker();
+    let fee_base1: BaseCurrency = fee_quote1.convert(quote!(800));
 
     let fee_combined: BaseCurrency = fee_base0 + fee_base1;
 
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
-            quote!(400.0),
-            bid,
+            quote!(400),
+            quote!(1000),
             &mut accounting,
             init_margin_req
         ))
@@ -523,11 +526,11 @@ fn inv_short_market_win_partial() {
     let order_updates = exchange.update_state(3, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_quote0 = quote!(800.0) * exchange.config().contract_spec().fee_taker();
-    let fee_base0: BaseCurrency = fee_quote0.convert(quote!(1000.0));
+    let fee_quote0 = quote!(800) * exchange.config().contract_spec().fee_taker();
+    let fee_base0: BaseCurrency = fee_quote0.convert(quote!(1000));
 
-    let fee_quote1 = quote!(400.0) * exchange.config().contract_spec().fee_taker();
-    let fee_base1: BaseCurrency = fee_quote1.convert(quote!(800.0));
+    let fee_quote1 = quote!(400) * exchange.config().contract_spec().fee_taker();
+    let fee_base1: BaseCurrency = fee_quote1.convert(quote!(800));
 
     let fee_combined = fee_base0 + fee_base1;
 
@@ -535,7 +538,7 @@ fn inv_short_market_win_partial() {
         exchange.position().clone(),
         Position::Short(PositionInner::new(
             quote!(400),
-            quote!(800),
+            quote!(1000),
             &mut accounting,
             init_margin_req
         ))
@@ -615,7 +618,7 @@ fn inv_short_market_loss_partial() {
         exchange.position().clone(),
         Position::Short(PositionInner::new(
             quote!(400),
-            bid,
+            quote!(1000),
             &mut accounting,
             init_margin_req,
         ))
