@@ -182,6 +182,23 @@ fn submit_market_buy_order_turnaround_short() {
     // First enter a short position
     let order = MarketOrder::new(Side::Sell, base!(9)).unwrap();
     exchange.submit_market_order(order).unwrap();
+    assert_eq!(
+        exchange.position().clone(),
+        Position::Short(PositionInner::new(
+            base!(9),
+            quote!(99),
+            &mut accounting,
+            init_margin_req,
+        ))
+    );
+    assert_eq!(
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(109) - quote!(0.5346),
+            position_margin: quote!(891),
+            order_margin: quote!(0)
+        }
+    );
 
     // Close the entire position and buy some more
     let order = MarketOrder::new(Side::Buy, base!(18)).unwrap();

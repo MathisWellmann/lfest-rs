@@ -11,7 +11,7 @@ pub trait MarginCurrency: Currency {
     /// # Arguments:
     /// `entry_price`: The price at which the position was initiated.
     /// `exit_prie`: The price at which the position was exited.
-    /// `quantity`: The amount of contracts traded.
+    /// `quantity`: The amount of contracts traded. must be negative if short.
     ///
     /// # Arguments:
     /// Returns the profit and loss measured in the `PairedCurrency` of the size
