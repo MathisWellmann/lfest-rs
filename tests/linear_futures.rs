@@ -1,11 +1,12 @@
 //! Test file for the linear futures mode of the exchange
 
-use lfest::{mock_exchange_linear, prelude::*};
+use lfest::{mock_exchange_linear, prelude::*, MockTransactionAccounting};
 
 #[test]
 #[tracing_test::traced_test]
 fn lin_long_market_win_full() {
     let mut exchange = mock_exchange_linear();
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
         .update_state(
@@ -30,7 +31,7 @@ fn lin_long_market_win_full() {
         Position::Long(PositionInner::new(
             base!(5.0),
             bid,
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -39,7 +40,7 @@ fn lin_long_market_win_full() {
         Position::Long(PositionInner::new(
             base!(5.0),
             bid,
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );

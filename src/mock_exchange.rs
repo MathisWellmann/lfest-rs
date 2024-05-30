@@ -44,3 +44,24 @@ pub fn mock_exchange_inverse(
     let config = Config::new(starting_balance, 200, contract_spec).unwrap();
     Exchange::new(acc_tracker, config)
 }
+
+/// Mocks `TransactionAccounting` for testing purposes.
+#[derive(Default, Clone)]
+pub struct MockTransactionAccounting;
+
+impl<M> TransactionAccounting<M> for MockTransactionAccounting
+where
+    M: MarginCurrency,
+{
+    fn new(_user_starting_wallet_balance: M) -> Self {
+        Self {}
+    }
+
+    fn create_margin_transfer(&mut self, _transaction: Transaction<M>) -> Result<()> {
+        Ok(())
+    }
+
+    fn margin_balance_of(&self, _account: AccountId) -> Result<M> {
+        Ok(M::new_zero())
+    }
+}
