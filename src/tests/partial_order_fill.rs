@@ -14,6 +14,7 @@ fn partial_limit_order_fill(price: QuoteCurrency, qty: BaseCurrency, side: Side)
         .is_empty());
     let order = LimitOrder::new(side, price, qty).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
+    assert_eq!(exchange.active_limit_orders().len(), 1);
 
     let exec_orders = exchange
         .update_state(1, trade!(price, qty / base!(2), side.inverted()))

@@ -305,7 +305,8 @@ where
 
         let order_id = order.id();
         let user_order_id = order.user_order_id().clone();
-        self.order_margin.update_order(order);
+        self.order_margin.update_order(order.clone());
+        self.active_limit_orders.insert(order_id, order);
         self.lookup_order_nonce_from_user_order_id
             .insert(user_order_id, order_id);
         let position_margin = self
@@ -480,17 +481,12 @@ where
 
                 if new_order_margin < order_margin {
                     let delta = order_margin - new_order_margin;
-                    // margin flows into position margin account, (from order margin account).
-                    let transaction = Transaction::new(
-                        USER_POSITION_MARGIN_ACCOUNT,
-                        USER_ORDER_MARGIN_ACCOUNT,
-                        delta,
-                    );
+                    let transaction =
+                        Transaction::new(USER_WALLET_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT, delta);
                     self.transaction_accounting
                         .create_margin_transfer(transaction)
                         .expect("margin transfer works");
                 }
-
                 assert_user_wallet_balance(&self.transaction_accounting);
 
                 self.position.change_position(
