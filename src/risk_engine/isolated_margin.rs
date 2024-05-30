@@ -101,10 +101,14 @@ where
         if pos_inner.quantity() == M::PairedCurrency::new_zero() {
             return Ok(());
         }
-        let pos_value = pos_inner.quantity().abs().convert(market_state.mid_price());
+        let mtm_price = market_state.mid_price();
+        let pos_value = pos_inner.quantity().convert(mtm_price);
         let maint_margin = pos_inner.quantity().convert(pos_inner.entry_price())
             * self.contract_spec.maintenance_margin();
-        if pos_value < maint_margin {
+        let upnl = pos_inner.unrealized_pnl(mtm_price);
+
+        trace!("check_maintenance_margin: pos_value: {pos_value}, main_margin: {maint_margin}, upnl: {upnl}");
+        if pos_value + upnl < maint_margin {
             return Err(RiskError::Liquidate);
         }
 

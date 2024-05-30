@@ -352,10 +352,10 @@ fn inv_long_market_win_partial() {
         }
     );
 
-    let order_updates = exchange
+    assert!(exchange
         .update_state(1, bba!(quote!(2000), quote!(2001)))
-        .unwrap();
-    assert!(order_updates.is_empty());
+        .unwrap()
+        .is_empty());
 
     let size = quote!(400.0);
     let fee_quote2 = size * exchange.config().contract_spec().fee_taker();
