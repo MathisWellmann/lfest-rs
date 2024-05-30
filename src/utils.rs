@@ -113,12 +113,11 @@ where
     T: TransactionAccounting<M>,
     M: MarginCurrency,
 {
-    assert!(
-        transaction_accounting
-            .margin_balance_of(USER_WALLET_ACCOUNT)
-            .expect("is valid")
-            >= M::new_zero()
-    );
+    let wallet_balance = transaction_accounting
+        .margin_balance_of(USER_WALLET_ACCOUNT)
+        .expect("is valid");
+    tracing::trace!("wallet_balance: {wallet_balance}");
+    assert!(wallet_balance >= M::new_zero());
 }
 
 #[cfg(test)]

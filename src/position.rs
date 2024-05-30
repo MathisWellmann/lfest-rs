@@ -93,14 +93,14 @@ where
                 }
                 Side::Sell => {
                     if filled_qty > inner.quantity {
+                        let new_short_qty = filled_qty - inner.quantity;
                         inner.decrease_contracts(
-                            filled_qty,
+                            inner.quantity,
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
                             Dec!(1),
                         );
-                        let new_short_qty = filled_qty - inner.quantity;
                         *self = Position::Short(PositionInner::new(
                             new_short_qty,
                             fill_price,
@@ -130,14 +130,14 @@ where
             Position::Short(inner) => match side {
                 Side::Buy => {
                     if filled_qty > inner.quantity {
+                        let new_long_qty = filled_qty - inner.quantity;
                         inner.decrease_contracts(
-                            filled_qty,
+                            inner.quantity,
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
                             Dec!(-1),
                         );
-                        let new_long_qty = filled_qty - inner.quantity;
                         *self = Position::Long(PositionInner::new(
                             new_long_qty,
                             fill_price,
@@ -207,7 +207,7 @@ where
     /// # Panics:
     /// if `quantity` or `entry_price` are invalid.
     pub fn new<T>(
-        quantity: Q,
+        qty: Q,
         entry_price: QuoteCurrency,
         accounting: &mut T,
         init_margin_req: Decimal,
@@ -215,10 +215,11 @@ where
     where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
-        assert!(quantity > Q::new_zero());
+        trace!("new position: qty {qty} @ {entry_price}");
+        assert!(qty > Q::new_zero());
         assert!(entry_price > quote!(0));
 
-        let margin = quantity.convert(entry_price) * init_margin_req;
+        let margin = qty.convert(entry_price) * init_margin_req;
         let transaction =
             Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
         accounting
@@ -226,7 +227,7 @@ where
             .expect("margin transfer for opening a new position works.");
 
         Self {
-            quantity,
+            quantity: qty,
             entry_price,
         }
     }
@@ -264,20 +265,21 @@ where
     /// Add contracts to the position.
     pub(crate) fn increase_contracts<T>(
         &mut self,
-        to_add: Q,
+        qty: Q,
         entry_price: QuoteCurrency,
         accounting: &mut T,
         init_margin_req: Decimal,
     ) where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
-        assert!(to_add > Q::new_zero());
+        trace!("increase_contracts: qty: {qty} @ {entry_price}");
+        assert!(qty > Q::new_zero());
         assert!(entry_price > quote!(0));
 
-        self.quantity += to_add;
-        self.entry_price = self.new_avg_entry_price(to_add, entry_price);
+        self.quantity += qty;
+        self.entry_price = self.new_avg_entry_price(qty, entry_price);
 
-        let margin = to_add.convert(entry_price) * init_margin_req;
+        let margin = qty.convert(entry_price) * init_margin_req;
         let transaction =
             Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
         accounting
@@ -296,6 +298,7 @@ where
     ) where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
+        trace!("decrease_contracts: qty: {qty} @ {liquidation_price}");
         assert!(qty > Q::new_zero());
         assert!(qty <= self.quantity);
         debug_assert!(direction_multiplier == Dec!(1) || direction_multiplier == Dec!(-1));
@@ -308,11 +311,17 @@ where
             liquidation_price,
             qty * direction_multiplier,
         );
-        let transaction = Transaction::new(USER_WALLET_ACCOUNT, TREASURY_ACCOUNT, pnl);
-        accounting
-            .create_margin_transfer(transaction)
-            .expect("margin transfer must work");
-
+        if pnl > Q::PairedCurrency::new_zero() {
+            let transaction = Transaction::new(USER_WALLET_ACCOUNT, TREASURY_ACCOUNT, pnl);
+            accounting
+                .create_margin_transfer(transaction)
+                .expect("margin transfer must work");
+        } else if pnl < Q::PairedCurrency::new_zero() {
+            let transaction = Transaction::new(TREASURY_ACCOUNT, USER_WALLET_ACCOUNT, pnl.abs());
+            accounting
+                .create_margin_transfer(transaction)
+                .expect("margin transfer must work");
+        }
         let margin_to_free = qty.convert(self.entry_price) * init_margin_req;
         let transaction = Transaction::new(
             USER_WALLET_ACCOUNT,
