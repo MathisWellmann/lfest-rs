@@ -175,7 +175,7 @@ mod tests {
     use hashbrown::HashMap;
 
     use super::*;
-    use crate::{position::PositionInner, prelude::*};
+    use crate::prelude::*;
 
     #[test]
     #[tracing_test::traced_test]
