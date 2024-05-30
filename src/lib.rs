@@ -18,6 +18,7 @@ mod mock_exchange;
 mod order_filters;
 mod order_margin;
 mod position;
+mod position_inner;
 mod risk_engine;
 #[cfg(test)]
 mod test_helpers;
@@ -44,7 +45,8 @@ pub mod prelude {
         fee, leverage,
         market_state::MarketState,
         order_filters::{PriceFilter, QuantityFilter},
-        position::{Position, PositionInner},
+        position::Position,
+        position_inner::PositionInner,
         quote,
         risk_engine::RiskError,
         types::*,

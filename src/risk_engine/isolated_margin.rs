@@ -210,16 +210,3 @@ where
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn isolated_margin_check_market_buy_order() {
-        todo!()
-    }
-
-    #[test]
-    fn isolated_margin_check_market_sell_order() {
-        todo!()
-    }
-}
