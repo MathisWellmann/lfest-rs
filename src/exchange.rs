@@ -305,7 +305,8 @@ where
 
         let order_id = order.id();
         let user_order_id = order.user_order_id().clone();
-        self.order_margin.update_order(order.clone());
+        self.order_margin
+            .update_order(order.clone(), self.config.contract_spec().fee_maker());
         self.active_limit_orders.insert(order_id, order);
         self.lookup_order_nonce_from_user_order_id
             .insert(user_order_id, order_id);
@@ -455,10 +456,12 @@ where
 
                     ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill();
-                    self.order_margin.remove_order(order);
+                    self.order_margin
+                        .remove_order(order, self.config.contract_spec().fee_maker());
                 } else {
                     order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
-                    self.order_margin.update_order(order.clone());
+                    self.order_margin
+                        .update_order(order.clone(), self.config.contract_spec().fee_maker());
                     // TODO: we could potentially log partial fills as well...
                 }
 

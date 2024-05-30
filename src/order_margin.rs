@@ -5,7 +5,7 @@ use tracing::trace;
 use crate::{
     exchange::ActiveLimitOrders,
     prelude::Position,
-    types::{Currency, LimitOrder, MarginCurrency, Pending, Side},
+    types::{Currency, Fee, LimitOrder, MarginCurrency, Pending, Side},
     utils::max,
 };
 
@@ -29,7 +29,11 @@ where
     Q::PairedCurrency: MarginCurrency,
     UserOrderId: Clone + std::fmt::Debug + std::cmp::PartialEq + Default,
 {
-    pub(crate) fn update_order(&mut self, order: LimitOrder<Q, UserOrderId, Pending<Q>>) {
+    pub(crate) fn update_order(
+        &mut self,
+        order: LimitOrder<Q, UserOrderId, Pending<Q>>,
+        maker_fee: Fee,
+    ) {
         trace!("update_order: order: {order:?}");
         if let Some(active_order) = self.active_limit_orders.get(&order.id()) {
             assert_ne!(active_order, &order);
@@ -45,6 +49,7 @@ where
                 Side::Buy => self.cumulative_buy_value -= notional_delta,
                 Side::Sell => self.cumulative_sell_value -= notional_delta,
             }
+            self.cumulative_order_fees -= notional_delta * maker_fee;
         } else {
             let notional_value = order.remaining_quantity().convert(order.limit_price());
             match order.side() {
@@ -52,11 +57,16 @@ where
                 Side::Sell => self.cumulative_sell_value += notional_value,
             }
             self.active_limit_orders.insert(order.id(), order);
+            self.cumulative_order_fees += notional_value * maker_fee;
         }
     }
 
     /// Remove an order from being tracked for margin purposes.
-    pub(crate) fn remove_order(&mut self, order: &LimitOrder<Q, UserOrderId, Pending<Q>>) {
+    pub(crate) fn remove_order(
+        &mut self,
+        order: &LimitOrder<Q, UserOrderId, Pending<Q>>,
+        maker_fee: Fee,
+    ) {
         let removed_order = self
             .active_limit_orders
             .remove(&order.id())
@@ -75,6 +85,8 @@ where
                 assert!(self.cumulative_sell_value >= Q::PairedCurrency::new_zero());
             }
         }
+        let fee = notional_value * maker_fee;
+        self.cumulative_order_fees -= fee;
     }
 
     /// The margin requirement for all the tracked orders.

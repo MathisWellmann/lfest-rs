@@ -1,3 +1,5 @@
+use tracing::trace;
+
 use super::{risk_engine_trait::RiskError, RiskEngine};
 use crate::{
     contract_specification::ContractSpecification,
@@ -78,6 +80,7 @@ where
 
         let order_fees: M = order_margin_online.cumulative_order_fees();
 
+        trace!("order_margin: {order_margin}, new_order_margin: {new_order_margin}, order_fees: {order_fees}, available_wallet_balance: {available_wallet_balance}");
         if new_order_margin + order_fees > available_wallet_balance + order_margin {
             return Err(RiskError::NotEnoughAvailableBalance);
         }
