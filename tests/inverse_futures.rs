@@ -1,12 +1,13 @@
 //! Test file for the inverse futures mode of the exchange
 
 use fpdec::Decimal;
-use lfest::{mock_exchange_inverse, prelude::*, trade};
+use lfest::{mock_exchange_inverse, prelude::*, trade, MockTransactionAccounting};
 
 #[test]
 #[tracing_test::traced_test]
 fn inv_long_market_win_full() {
     let mut exchange = mock_exchange_inverse(base!(1));
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
         .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
@@ -30,7 +31,7 @@ fn inv_long_market_win_full() {
         Position::Long(PositionInner::new(
             size,
             bid,
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -83,6 +84,7 @@ fn inv_long_market_win_full() {
 #[tracing_test::traced_test]
 fn inv_long_market_loss_full() {
     let mut exchange = mock_exchange_inverse(base!(1));
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = quote!(999);
     let ask = quote!(1000);
@@ -97,7 +99,7 @@ fn inv_long_market_loss_full() {
         Position::Long(PositionInner::new(
             quote!(800),
             quote!(1000),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req
         ))
     );
@@ -151,6 +153,7 @@ fn inv_long_market_loss_full() {
 #[tracing_test::traced_test]
 fn inv_short_market_win_full() {
     let mut exchange = mock_exchange_inverse(base!(1));
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
         .update_state(0, bba!(quote!(1000), quote!(1001)))
@@ -164,7 +167,7 @@ fn inv_short_market_win_full() {
         Position::Short(PositionInner::new(
             quote!(800),
             quote!(1000),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -213,6 +216,7 @@ fn inv_short_market_win_full() {
 #[tracing_test::traced_test]
 fn inv_short_market_loss_full() {
     let mut exchange = mock_exchange_inverse(base!(1));
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
         .update_state(0, bba!(quote!(1000), quote!(1001)))
@@ -235,7 +239,7 @@ fn inv_short_market_loss_full() {
         Position::Short(PositionInner::new(
             size,
             ask,
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req
         ))
     );
@@ -293,6 +297,7 @@ fn inv_short_market_loss_full() {
 #[tracing_test::traced_test]
 fn inv_long_market_win_partial() {
     let mut exchange = mock_exchange_inverse(base!(1));
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let order_updates = exchange
         .update_state(0, bba!(quote!(999.0), quote!(1000.0)))
@@ -317,7 +322,7 @@ fn inv_long_market_win_partial() {
         Position::Long(PositionInner::new(
             size,
             bid,
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req
         ))
     );
@@ -360,7 +365,7 @@ fn inv_long_market_win_partial() {
         Position::Long(PositionInner::new(
             quote!(400),
             quote!(1000),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req
         ))
     );
@@ -379,6 +384,7 @@ fn inv_long_market_win_partial() {
 #[tracing_test::traced_test]
 fn inv_long_market_loss_partial() {
     let mut exchange = mock_exchange_inverse(base!(1));
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = quote!(999);
     let order_updates = exchange.update_state(0, bba!(bid, quote!(1000.0))).unwrap();
@@ -393,7 +399,7 @@ fn inv_long_market_loss_partial() {
         Position::Long(PositionInner::new(
             quote!(800.0),
             bid,
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req
         ))
     );
@@ -430,7 +436,7 @@ fn inv_long_market_loss_partial() {
         Position::Long(PositionInner::new(
             quote!(400.0),
             bid,
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req
         ))
     );
@@ -452,6 +458,7 @@ fn inv_long_market_loss_partial() {
 #[tracing_test::traced_test]
 fn inv_short_market_win_partial() {
     let mut exchange = mock_exchange_inverse(base!(1));
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
         .update_state(0, bba!(quote!(1000.0), quote!(1001.0)))
@@ -469,7 +476,7 @@ fn inv_short_market_win_partial() {
         Position::Short(PositionInner::new(
             quote!(800),
             ask,
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req
         ))
     );
@@ -513,7 +520,7 @@ fn inv_short_market_win_partial() {
         Position::Short(PositionInner::new(
             quote!(400),
             quote!(800),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req
         ))
     );
@@ -535,6 +542,7 @@ fn inv_short_market_win_partial() {
 #[tracing_test::traced_test]
 fn inv_short_market_loss_partial() {
     let mut exchange = mock_exchange_inverse(base!(1));
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let order_updates = exchange
         .update_state(0, bba!(quote!(1000), quote!(1001)))
@@ -559,7 +567,7 @@ fn inv_short_market_loss_partial() {
         Position::Short(PositionInner::new(
             size,
             ask,
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req
         ))
     );
@@ -592,7 +600,7 @@ fn inv_short_market_loss_partial() {
         Position::Short(PositionInner::new(
             quote!(400),
             bid,
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -611,6 +619,7 @@ fn inv_short_market_loss_partial() {
 #[tracing_test::traced_test]
 fn inv_test_market_roundtrip() {
     let mut exchange = mock_exchange_inverse(base!(1));
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
         .update_state(0, bba!(quote!(999), quote!(1000)))
@@ -674,7 +683,7 @@ fn inv_test_market_roundtrip() {
         Position::Short(PositionInner::new(
             quote!(50),
             quote!(1000),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req
         ))
     );
@@ -693,6 +702,7 @@ fn inv_test_market_roundtrip() {
 #[tracing_test::traced_test]
 fn inv_execute_limit() {
     let mut exchange = mock_exchange_inverse(base!(1));
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = quote!(1000);
     let ask = quote!(1001);
@@ -727,7 +737,7 @@ fn inv_execute_limit() {
         Position::Long(PositionInner::new(
             quote!(450),
             quote!(900),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -781,7 +791,7 @@ fn inv_execute_limit() {
         Position::Short(PositionInner::new(
             quote!(600),
             bid,
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req
         ))
     );

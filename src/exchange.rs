@@ -50,7 +50,7 @@ where
     next_order_id: u64,
 
     /// Does the accounting for transactions, moving balances between accounts.
-    pub transaction_accounting: TransactionAccountingT,
+    transaction_accounting: TransactionAccountingT,
 
     /// Get the current position of the user.
     #[getset(get = "pub")]

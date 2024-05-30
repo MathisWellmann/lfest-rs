@@ -1,11 +1,12 @@
 //! Test if a pure limit order strategy works correctly
 
-use lfest::{mock_exchange_linear, prelude::*, trade};
+use lfest::{mock_exchange_linear, prelude::*, trade, MockTransactionAccounting};
 
 #[test]
 #[tracing_test::traced_test]
 fn limit_orders_only() {
     let mut exchange = mock_exchange_linear();
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
 
     let bid = quote!(100);
@@ -38,7 +39,7 @@ fn limit_orders_only() {
         Position::Long(PositionInner::new(
             base!(9.9),
             quote!(100),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );

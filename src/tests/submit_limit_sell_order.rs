@@ -1,9 +1,13 @@
-use crate::{mock_exchange_linear, position::PositionInner, prelude::*, trade};
+use crate::{
+    mock_exchange::MockTransactionAccounting, mock_exchange_linear, position::PositionInner,
+    prelude::*, trade,
+};
 
 #[test]
 #[tracing_test::traced_test]
 fn submit_limit_sell_order_no_position() {
     let mut exchange = mock_exchange_linear();
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
         .update_state(0, bba!(quote!(99), quote!(100)))
@@ -39,7 +43,7 @@ fn submit_limit_sell_order_no_position() {
         Position::Short(PositionInner::new(
             base!(9),
             quote!(100),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );

@@ -1,6 +1,9 @@
 use hashbrown::HashMap;
 
-use crate::{mock_exchange_linear, position::PositionInner, prelude::*, risk_engine::RiskError};
+use crate::{
+    mock_exchange::MockTransactionAccounting, mock_exchange_linear, position::PositionInner,
+    prelude::*, risk_engine::RiskError,
+};
 
 #[test]
 #[tracing_test::traced_test]
@@ -23,6 +26,7 @@ fn submit_market_buy_order_reject() {
 #[tracing_test::traced_test]
 fn submit_market_buy_order_no_position() {
     let mut exchange = mock_exchange_linear();
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
         .update_state(0, bba!(quote!(100), quote!(101)))
@@ -38,7 +42,7 @@ fn submit_market_buy_order_no_position() {
         Position::Long(PositionInner::new(
             base!(5),
             quote!(101),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -56,6 +60,7 @@ fn submit_market_buy_order_no_position() {
 #[tracing_test::traced_test]
 fn submit_market_buy_order_with_long_position() {
     let mut exchange = mock_exchange_linear();
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
@@ -73,7 +78,7 @@ fn submit_market_buy_order_with_long_position() {
         Position::Long(PositionInner::new(
             base!(5),
             quote!(100),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -104,7 +109,7 @@ fn submit_market_buy_order_with_long_position() {
         Position::Long(PositionInner::new(
             base!(9),
             quote!(100),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -115,6 +120,7 @@ fn submit_market_buy_order_with_long_position() {
 #[tracing_test::traced_test]
 fn submit_market_buy_order_with_short_position() {
     let mut exchange = mock_exchange_linear();
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
@@ -140,7 +146,7 @@ fn submit_market_buy_order_with_short_position() {
         Position::Short(PositionInner::new(
             base!(9),
             quote!(100),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -164,6 +170,7 @@ fn submit_market_buy_order_with_short_position() {
 #[tracing_test::traced_test]
 fn submit_market_buy_order_turnaround_short() {
     let mut exchange = mock_exchange_linear();
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
@@ -184,7 +191,7 @@ fn submit_market_buy_order_turnaround_short() {
         Position::Long(PositionInner::new(
             base!(9),
             quote!(100),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );

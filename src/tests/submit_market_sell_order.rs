@@ -1,6 +1,9 @@
 use hashbrown::HashMap;
 
-use crate::{mock_exchange_linear, position::PositionInner, prelude::*, risk_engine::RiskError};
+use crate::{
+    mock_exchange::MockTransactionAccounting, mock_exchange_linear, position::PositionInner,
+    prelude::*, risk_engine::RiskError,
+};
 
 #[test]
 fn submit_market_sell_order_reject() {
@@ -22,6 +25,7 @@ fn submit_market_sell_order_reject() {
 #[test]
 fn submit_market_sell_order() {
     let mut exchange = mock_exchange_linear();
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
@@ -38,7 +42,7 @@ fn submit_market_sell_order() {
         Position::Short(PositionInner::new(
             base!(5),
             quote!(100),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -55,6 +59,7 @@ fn submit_market_sell_order() {
 #[test]
 fn submit_market_sell_order_with_short_position() {
     let mut exchange = mock_exchange_linear();
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
@@ -80,7 +85,7 @@ fn submit_market_sell_order_with_short_position() {
         Position::Short(PositionInner::new(
             base!(5),
             quote!(100),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -103,7 +108,7 @@ fn submit_market_sell_order_with_short_position() {
         Position::Short(PositionInner::new(
             base!(9),
             quote!(100),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -142,6 +147,7 @@ fn submit_market_sell_order_with_long_position() {
 #[test]
 fn submit_market_sell_order_turnaround_long() {
     let mut exchange = mock_exchange_linear();
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
         .update_state(0, bba!(quote!(99), quote!(100)))
@@ -165,7 +171,7 @@ fn submit_market_sell_order_turnaround_long() {
         Position::Long(PositionInner::new(
             base!(9),
             quote!(100),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
@@ -188,7 +194,7 @@ fn submit_market_sell_order_turnaround_long() {
         Position::Short(PositionInner::new(
             base!(9),
             quote!(99),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );

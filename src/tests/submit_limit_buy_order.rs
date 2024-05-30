@@ -1,4 +1,7 @@
-use crate::{mock_exchange_linear, position::PositionInner, prelude::*, trade};
+use crate::{
+    mock_exchange::MockTransactionAccounting, mock_exchange_linear, position::PositionInner,
+    prelude::*, trade,
+};
 
 #[test]
 #[tracing_test::traced_test]
@@ -118,6 +121,7 @@ fn submit_limit_buy_order_no_position_max() {
 #[test]
 fn submit_limit_buy_order_with_long() {
     let mut exchange = mock_exchange_linear();
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
         .update_state(0, bba!(quote!(99), quote!(100)))
@@ -131,7 +135,7 @@ fn submit_limit_buy_order_with_long() {
         Position::Long(PositionInner::new(
             base!(9),
             quote!(100),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         )),
     );
@@ -182,6 +186,7 @@ fn submit_limit_buy_order_with_long() {
 #[test]
 fn submit_limit_buy_order_with_short() {
     let mut exchange = mock_exchange_linear();
+    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
         .update_state(0, bba!(quote!(100), quote!(101)))
@@ -195,7 +200,7 @@ fn submit_limit_buy_order_with_short() {
         Position::Short(PositionInner::new(
             base!(9),
             quote!(100),
-            &mut exchange.transaction_accounting,
+            &mut accounting,
             init_margin_req,
         ))
     );
