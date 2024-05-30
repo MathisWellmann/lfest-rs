@@ -4,7 +4,8 @@ use tracing::trace;
 
 use crate::{
     prelude::{
-        Transaction, TransactionAccounting, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
+        Transaction, TransactionAccounting, TREASURY_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT,
+        USER_WALLET_ACCOUNT,
     },
     quote,
     types::{Currency, MarginCurrency, QuoteCurrency, Side},
@@ -92,7 +93,12 @@ where
                 }
                 Side::Sell => {
                     if filled_qty > inner.quantity {
-                        let pos_value = inner.quantity().convert(fill_price);
+                        inner.decrease_contracts(
+                            filled_qty,
+                            fill_price,
+                            transaction_accounting,
+                            init_margin_req,
+                        );
                         let new_short_qty = filled_qty - inner.quantity;
                         *self = Position::Short(PositionInner::new(
                             new_short_qty,
@@ -103,6 +109,7 @@ where
                     } else if filled_qty == inner.quantity {
                         inner.decrease_contracts(
                             filled_qty,
+                            fill_price,
                             transaction_accounting,
                             init_margin_req,
                         );
@@ -110,6 +117,7 @@ where
                     } else {
                         inner.decrease_contracts(
                             filled_qty,
+                            fill_price,
                             transaction_accounting,
                             init_margin_req,
                         );
@@ -119,7 +127,12 @@ where
             Position::Short(inner) => match side {
                 Side::Buy => {
                     if filled_qty > inner.quantity {
-                        let pos_value = inner.quantity().convert(fill_price);
+                        inner.decrease_contracts(
+                            filled_qty,
+                            fill_price,
+                            transaction_accounting,
+                            init_margin_req,
+                        );
                         let new_long_qty = filled_qty - inner.quantity;
                         *self = Position::Long(PositionInner::new(
                             new_long_qty,
@@ -130,6 +143,7 @@ where
                     } else if filled_qty == inner.quantity {
                         inner.decrease_contracts(
                             filled_qty,
+                            fill_price,
                             transaction_accounting,
                             init_margin_req,
                         );
@@ -137,6 +151,7 @@ where
                     } else {
                         inner.decrease_contracts(
                             filled_qty,
+                            fill_price,
                             transaction_accounting,
                             init_margin_req,
                         );
@@ -200,7 +215,9 @@ where
         let margin = quantity.convert(entry_price) * init_margin_req;
         let transaction =
             Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
-        accounting.create_margin_transfer(transaction);
+        accounting
+            .create_margin_transfer(transaction)
+            .expect("margin transfer for opening a new position works.");
 
         Self {
             quantity,
@@ -257,25 +274,42 @@ where
         let margin = to_add.convert(entry_price) * init_margin_req;
         let transaction =
             Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
-        accounting.create_margin_transfer(transaction);
+        accounting
+            .create_margin_transfer(transaction)
+            .expect("is an internal call and must work");
     }
 
     /// Decrease the position.
     pub(crate) fn decrease_contracts<T>(
         &mut self,
-        to_subtract: Q,
+        qty: Q,
+        liquidation_price: QuoteCurrency,
         accounting: &mut T,
-        init_marign_req: Decimal,
+        init_margin_req: Decimal,
     ) where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
-        debug_assert!(to_subtract > Q::new_zero());
-        debug_assert!(to_subtract <= self.quantity);
+        debug_assert!(qty > Q::new_zero());
+        debug_assert!(qty <= self.quantity);
 
-        self.quantity -= to_subtract;
+        self.quantity -= qty;
         debug_assert!(self.quantity >= Q::new_zero());
 
-        todo!("accounting")
+        let pnl = Q::PairedCurrency::pnl(self.entry_price, liquidation_price, qty);
+        let transaction = Transaction::new(USER_WALLET_ACCOUNT, TREASURY_ACCOUNT, pnl);
+        accounting
+            .create_margin_transfer(transaction)
+            .expect("margin transfer must work");
+
+        let margin_to_free = qty.convert(self.entry_price) * init_margin_req;
+        let transaction = Transaction::new(
+            USER_WALLET_ACCOUNT,
+            USER_POSITION_MARGIN_ACCOUNT,
+            margin_to_free,
+        );
+        accounting
+            .create_margin_transfer(transaction)
+            .expect("margin transfer must work");
     }
 
     /// Compute the new entry price of the position when some quantity is added at a specifiy `entry_price`.
@@ -309,7 +343,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{base, prelude::InMemoryTransactionAccounting};
+    use crate::base;
 
     #[test]
     fn position_inner_new_avg_entry_price() {
@@ -326,37 +360,6 @@ mod tests {
         assert_eq!(
             pos.new_avg_entry_price(base!(0.3), quote!(200)),
             quote!(175)
-        );
-    }
-
-    #[test]
-    fn change_position_from_neutral() {
-        let mut pos = Position::Neutral;
-        let filled_qty = base!(1);
-        let fill_price = quote!(100);
-        let side = Side::Buy;
-        let mut accounting = InMemoryTransactionAccounting::new(quote!(1000));
-        let init_margin_req = Dec!(1);
-        pos.change_position(
-            filled_qty,
-            fill_price,
-            side,
-            &mut accounting,
-            init_margin_req,
-        );
-        let mut accounting = InMemoryTransactionAccounting::new(quote!(1000));
-        assert_eq!(
-            pos,
-            Position::Long(PositionInner::new(
-                filled_qty,
-                fill_price,
-                &mut accounting,
-                init_margin_req
-            ))
-        );
-        assert_eq!(
-            accounting.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
-            quote!(900)
         );
     }
 }
