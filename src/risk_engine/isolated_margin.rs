@@ -128,7 +128,16 @@ where
         assert!(matches!(order.side(), Side::Buy));
 
         match position {
-            Position::Neutral | Position::Long(_) => {}
+            Position::Neutral | Position::Long(_) => {
+                // A long position increases in size.
+                let notional_value = order.quantity().convert(fill_price);
+                let margin_req = notional_value * self.contract_spec.init_margin_req();
+
+                let fee = notional_value * self.contract_spec.fee_taker();
+                if margin_req + fee > available_wallet_balance {
+                    return Err(RiskError::NotEnoughAvailableBalance);
+                }
+            }
             Position::Short(pos_inner) => {
                 if order.quantity() <= pos_inner.quantity() {
                     // The order strictly reduces the position, so no additional margin is required.
@@ -148,14 +157,6 @@ where
                 }
             }
         }
-        // A long position increases in size.
-        let notional_value = order.quantity().convert(fill_price);
-        let margin_req = notional_value * self.contract_spec.init_margin_req();
-
-        let fee = notional_value * self.contract_spec.fee_taker();
-        if margin_req + fee > available_wallet_balance {
-            return Err(RiskError::NotEnoughAvailableBalance);
-        }
 
         Ok(())
     }
@@ -174,7 +175,15 @@ where
         assert!(matches!(order.side(), Side::Sell));
 
         match position {
-            Position::Neutral | Position::Short(_) => {}
+            Position::Neutral | Position::Short(_) => {
+                let notional_value = order.quantity().convert(fill_price);
+                let margin_req = notional_value * self.contract_spec.init_margin_req();
+                let fee = notional_value * self.contract_spec.fee_taker();
+
+                if margin_req + fee > available_wallet_balance {
+                    return Err(RiskError::NotEnoughAvailableBalance);
+                }
+            }
             Position::Long(pos_inner) => {
                 // Else its a long position which needs to be reduced
                 if order.quantity() <= pos_inner.quantity() {
@@ -194,13 +203,6 @@ where
                     return Err(RiskError::NotEnoughAvailableBalance);
                 }
             }
-        }
-        let notional_value = order.quantity().convert(fill_price);
-        let margin_req = notional_value * self.contract_spec.init_margin_req();
-        let fee = notional_value * self.contract_spec.fee_taker();
-
-        if margin_req + fee > available_wallet_balance {
-            return Err(RiskError::NotEnoughAvailableBalance);
         }
         Ok(())
     }

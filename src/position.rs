@@ -98,6 +98,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
+                            Dec!(1),
                         );
                         let new_short_qty = filled_qty - inner.quantity;
                         *self = Position::Short(PositionInner::new(
@@ -112,6 +113,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
+                            Dec!(1),
                         );
                         *self = Position::Neutral;
                     } else {
@@ -120,6 +122,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
+                            Dec!(1),
                         );
                     }
                 }
@@ -132,6 +135,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
+                            Dec!(-1),
                         );
                         let new_long_qty = filled_qty - inner.quantity;
                         *self = Position::Long(PositionInner::new(
@@ -146,6 +150,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
+                            Dec!(-1),
                         );
                         *self = Position::Neutral;
                     } else {
@@ -154,6 +159,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
+                            Dec!(-1),
                         );
                     }
                 }
@@ -265,8 +271,8 @@ where
     ) where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
-        debug_assert!(to_add > Q::new_zero());
-        debug_assert!(entry_price > quote!(0));
+        assert!(to_add > Q::new_zero());
+        assert!(entry_price > quote!(0));
 
         self.quantity += to_add;
         self.entry_price = self.new_avg_entry_price(to_add, entry_price);
@@ -286,16 +292,22 @@ where
         liquidation_price: QuoteCurrency,
         accounting: &mut T,
         init_margin_req: Decimal,
+        direction_multiplier: Decimal,
     ) where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
-        debug_assert!(qty > Q::new_zero());
-        debug_assert!(qty <= self.quantity);
+        assert!(qty > Q::new_zero());
+        assert!(qty <= self.quantity);
+        debug_assert!(direction_multiplier == Dec!(1) || direction_multiplier == Dec!(-1));
 
         self.quantity -= qty;
         debug_assert!(self.quantity >= Q::new_zero());
 
-        let pnl = Q::PairedCurrency::pnl(self.entry_price, liquidation_price, qty);
+        let pnl = Q::PairedCurrency::pnl(
+            self.entry_price,
+            liquidation_price,
+            qty * direction_multiplier,
+        );
         let transaction = Transaction::new(USER_WALLET_ACCOUNT, TREASURY_ACCOUNT, pnl);
         accounting
             .create_margin_transfer(transaction)
