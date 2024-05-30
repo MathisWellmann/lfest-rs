@@ -132,7 +132,34 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::*;
+    use crate::{prelude::*, utils::f64_to_decimal, MockTransactionAccounting};
+
+    #[test_case::test_matrix(
+        [1, 2, 5, 10],
+        [1, 2, 5],
+        [100, 200, 300]
+    )]
+    fn order_margin_online_no_orders(leverage: u32, position_qty: u32, entry_price: u32) {
+        let order_margin = OrderMarginOnline::<_, ()>::default();
+
+        let mut accounting = MockTransactionAccounting::default();
+        let qty = BaseCurrency::new(Decimal::from(position_qty));
+        let entry_price = QuoteCurrency::new(Decimal::from(entry_price));
+        let init_margin_req = f64_to_decimal(leverage as f64, Dec!(0.01));
+        let position = Position::Long(PositionInner::new(
+            qty,
+            entry_price,
+            &mut accounting,
+            init_margin_req,
+        ));
+        let position_margin = qty.convert(entry_price) * init_margin_req;
+
+        assert_eq!(
+            order_margin.order_margin(init_margin_req, &position, position_margin),
+            quote!(0)
+        );
+        assert_eq!(order_margin.cumulative_order_fees(), quote!(0));
+    }
 
     #[test]
     #[tracing_test::traced_test]
