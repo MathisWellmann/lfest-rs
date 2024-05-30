@@ -8,13 +8,16 @@ fn limit_orders_only() {
     let mut exchange = mock_exchange_linear();
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
+    let fee_maker = exchange.config().contract_spec().fee_maker();
 
     let bid = quote!(100);
     let ask = quote!(101);
     let exec_orders = exchange.update_state(0, bba!(bid, ask)).unwrap();
     assert_eq!(exec_orders.len(), 0);
 
-    let o = LimitOrder::new(Side::Buy, quote!(100), base!(9.9)).unwrap();
+    let qty = base!(9.9);
+    let fee0 = qty.convert(bid) * fee_maker;
+    let o = LimitOrder::new(Side::Buy, bid, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(
         exchange.user_balances(),
@@ -43,14 +46,12 @@ fn limit_orders_only() {
             init_margin_req,
         ))
     );
-
     assert_eq!(
         exchange
             .position()
             .unrealized_pnl(exchange.market_state().bid(), exchange.market_state().ask()),
         quote!(-19.8)
     );
-
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
@@ -60,9 +61,18 @@ fn limit_orders_only() {
         }
     );
 
-    let o = LimitOrder::new(Side::Sell, quote!(105), base!(9.9)).unwrap();
+    let sell_price = quote!(105);
+    let fee1 = qty.convert(sell_price) * fee_maker;
+    let o = LimitOrder::new(Side::Sell, sell_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.user_balances().order_margin, quote!(0));
+    assert_eq!(
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(1039.5) - fee0 - fee1,
+            position_margin: quote!(0),
+            order_margin: quote!(0)
+        }
+    );
 
     let order_updates = exchange
         .update_state(2, trade!(quote!(105), base!(10), Side::Buy))
