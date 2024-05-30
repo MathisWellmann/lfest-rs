@@ -1,5 +1,6 @@
 use fpdec::{Dec, Decimal};
 use getset::CopyGetters;
+use tracing::trace;
 
 use crate::{
     exchange::ActiveLimitOrders,
@@ -29,7 +30,9 @@ where
     UserOrderId: Clone + std::fmt::Debug + std::cmp::PartialEq + Default,
 {
     pub(crate) fn update_order(&mut self, order: LimitOrder<Q, UserOrderId, Pending<Q>>) {
+        trace!("update_order: order: {order:?}");
         if let Some(active_order) = self.active_limit_orders.get(&order.id()) {
+            assert_ne!(active_order, &order);
             assert!(order.remaining_quantity() < active_order.remaining_quantity(), "An update to an existing order must mean the new order has less quantity than the tracked order.");
             assert_eq!(order.id(), active_order.id());
 

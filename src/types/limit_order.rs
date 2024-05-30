@@ -142,7 +142,7 @@ where
         );
         debug_assert!(
             filled_quantity > Q::new_zero(),
-            "Filled `quantity` must be greater than zero."
+            "Filled quantity must be greater than zero."
         );
         let price = self.limit_price();
 
@@ -172,12 +172,14 @@ where
             }
         };
 
+        self.remaining_quantity -= filled_quantity;
+
         if fully_filled {
             Some(LimitOrder {
                 user_order_id: self.user_order_id.clone(),
                 state: Filled::new(self.state.meta().clone(), ts_ns, price),
                 limit_price: self.limit_price,
-                remaining_quantity: self.remaining_quantity,
+                remaining_quantity: Q::new_zero(),
                 side: self.side,
             })
         } else {
