@@ -7,7 +7,7 @@ use crate::{
     accounting::TransactionAccounting,
     config::Config,
     market_state::MarketState,
-    order_margin::OrderMarginOnline,
+    order_margin::OrderMargin,
     prelude::{
         Position, Transaction, EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT,
         USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
@@ -65,7 +65,7 @@ where
     // Maps the `user_order_id` to the internal order nonce.
     lookup_order_nonce_from_user_order_id: HashMap<UserOrderId, OrderId>,
 
-    order_margin: OrderMarginOnline<Q, UserOrderId>,
+    order_margin: OrderMargin<Q, UserOrderId>,
 }
 
 impl<A, Q, UserOrderId, TransactionAccountingT> Exchange<A, Q, UserOrderId, TransactionAccountingT>
@@ -94,7 +94,7 @@ where
             position: Position::default(),
             active_limit_orders: HashMap::default(),
             lookup_order_nonce_from_user_order_id: HashMap::default(),
-            order_margin: OrderMarginOnline::default(),
+            order_margin: OrderMargin::default(),
         }
     }
 
@@ -280,15 +280,11 @@ where
                 }
             }
         }
-        let position_margin = self
-            .transaction_accounting
-            .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)?;
         let available_wallet_balance = self
             .transaction_accounting
             .margin_balance_of(USER_WALLET_ACCOUNT)?;
         self.risk_engine.check_limit_order(
             &self.position,
-            position_margin,
             &order,
             available_wallet_balance,
             &self.order_margin,
@@ -306,18 +302,13 @@ where
         let order_id = order.id();
         let user_order_id = order.user_order_id().clone();
         self.order_margin
-            .update(order.clone(), self.config.contract_spec().fee_maker());
+            .update(&order, self.config.contract_spec().fee_maker());
         self.active_limit_orders.insert(order_id, order);
         self.lookup_order_nonce_from_user_order_id
             .insert(user_order_id, order_id);
-        let position_margin = self
-            .transaction_accounting
-            .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
-            .expect("is valid");
         let new_order_margin = self.order_margin.order_margin(
             self.config.contract_spec().init_margin_req(),
             &self.position,
-            position_margin,
         );
         let order_margin = self
             .transaction_accounting
@@ -357,10 +348,6 @@ where
             .active_limit_orders
             .remove(&order_id)
             .ok_or(Error::OrderIdNotFound)?;
-        let position_margin = self
-            .transaction_accounting
-            .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
-            .expect("is valid");
         let order_margin = self
             .transaction_accounting
             .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
@@ -370,13 +357,11 @@ where
             self.order_margin.order_margin(
                 self.config.contract_spec().init_margin_req(),
                 &self.position,
-                position_margin
             )
         );
         let new_order_margin = self.order_margin.order_margin(
             self.config.contract_spec().init_margin_req(),
             &self.position,
-            position_margin,
         );
 
         assert!(new_order_margin <= order_margin, "When cancelling a limit order, the new order margin is smaller or equal the old order margin");
@@ -445,10 +430,6 @@ where
                     .transaction_accounting
                     .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
                     .expect("is valid");
-                let position_margin = self
-                    .transaction_accounting
-                    .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
-                    .expect("is valid");
 
                 if let Some(filled_order) = order.fill(filled_qty, ts_ns) {
                     trace!("fully filled order {}", order.id());
@@ -457,11 +438,13 @@ where
                     ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill();
                     self.order_margin
+                        .update(order, self.config.contract_spec().fee_maker());
+                    self.order_margin
                         .remove_order(order, self.config.contract_spec().fee_maker());
                 } else {
                     order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
                     self.order_margin
-                        .update(order.clone(), self.config.contract_spec().fee_maker());
+                        .update(order, self.config.contract_spec().fee_maker());
                     // TODO: we could potentially log partial fills as well...
                 }
 
@@ -474,7 +457,6 @@ where
                 let new_order_margin = self.order_margin.order_margin(
                     self.config.contract_spec().init_margin_req(),
                     &self.position,
-                    position_margin,
                 );
                 trace!("order_margin: {order_margin}, new_order_margin: {new_order_margin}");
                 assert!(

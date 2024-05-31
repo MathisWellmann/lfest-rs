@@ -1,6 +1,6 @@
 use crate::{
     market_state::MarketState,
-    order_margin::OrderMarginOnline,
+    order_margin::OrderMargin,
     prelude::Position,
     types::{Currency, LimitOrder, MarginCurrency, MarketOrder, Pending, QuoteCurrency},
 };
@@ -48,10 +48,9 @@ where
     fn check_limit_order(
         &self,
         position: &Position<M::PairedCurrency>,
-        position_margin: M,
         order: &LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
         available_wallet_balance: M,
-        order_margin: &OrderMarginOnline<M::PairedCurrency, UserOrderId>,
+        order_margin: &OrderMargin<M::PairedCurrency, UserOrderId>,
     ) -> Result<(), RiskError>;
 
     /// Ensure the account has enough maintenance margin, to keep the position open.
