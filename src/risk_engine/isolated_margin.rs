@@ -4,7 +4,7 @@ use super::{risk_engine_trait::RiskError, RiskEngine};
 use crate::{
     contract_specification::ContractSpecification,
     market_state::MarketState,
-    order_margin::OrderMarginOnline,
+    order_margin::OrderMargin,
     prelude::Position,
     types::{Currency, LimitOrder, MarginCurrency, MarketOrder, Pending, QuoteCurrency, Side},
 };
@@ -61,21 +61,16 @@ where
     fn check_limit_order(
         &self,
         position: &Position<M::PairedCurrency>,
-        position_margin: M,
         order: &LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
         available_wallet_balance: M,
-        order_margin_online: &OrderMarginOnline<M::PairedCurrency, UserOrderId>,
+        order_margin_online: &OrderMargin<M::PairedCurrency, UserOrderId>,
     ) -> Result<(), RiskError> {
-        let order_margin = order_margin_online.order_margin(
-            self.contract_spec.init_margin_req(),
-            position,
-            position_margin,
-        );
+        let order_margin =
+            order_margin_online.order_margin(self.contract_spec.init_margin_req(), position);
         let new_order_margin = order_margin_online.order_margin_with_order(
             order,
             self.contract_spec.init_margin_req(),
             position,
-            position_margin,
         );
 
         let order_fees: M = order_margin_online.cumulative_order_fees();

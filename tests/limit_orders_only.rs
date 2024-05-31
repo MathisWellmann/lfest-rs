@@ -36,7 +36,6 @@ fn limit_orders_only() {
         .update_state(1, bba!(quote!(98), quote!(99)))
         .unwrap();
     assert!(order_updates.is_empty());
-
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
@@ -65,19 +64,19 @@ fn limit_orders_only() {
     let fee1 = qty.convert(sell_price) * fee_maker;
     let o = LimitOrder::new(Side::Sell, sell_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: quote!(1039.5) - fee0 - fee1,
-            position_margin: quote!(0),
-            order_margin: quote!(0)
-        }
-    );
 
     let order_updates = exchange
         .update_state(2, trade!(quote!(105), base!(10), Side::Buy))
         .unwrap();
     assert!(!order_updates.is_empty());
+    assert_eq!(
+        exchange.user_balances(),
+        UserBalances {
+            available_wallet_balance: quote!(1049.5) - fee0 - fee1,
+            position_margin: quote!(0),
+            order_margin: quote!(0)
+        }
+    );
     let order_updates = exchange
         .update_state(2, bba!(quote!(106), quote!(107)))
         .unwrap();
