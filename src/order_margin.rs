@@ -209,9 +209,16 @@ mod tests {
         [1, 2, 5],
         [Side::Buy, Side::Sell],
         [100, 150, 200],
+        [1, 2, 3],
         [1, 2, 3]
     )]
-    fn order_margin_neutral_one_order(leverage: u32, side: Side, limit_price: u32, qty: u32) {
+    fn order_margin_neutral_orders_of_same_side(
+        leverage: u32,
+        side: Side,
+        limit_price: u32,
+        qty: u32,
+        n: usize,
+    ) {
         let mut order_margin = OrderMarginOnline::<_, ()>::default();
 
         let init_margin_req = f64_to_decimal(leverage as f64, Dec!(0.01));
@@ -219,23 +226,26 @@ mod tests {
 
         let qty = BaseCurrency::new(Decimal::from(qty));
         let limit_price = QuoteCurrency::new(Decimal::from(limit_price));
-        let order = LimitOrder::new(side, limit_price, qty).unwrap();
-        let meta = ExchangeOrderMeta::default();
-        let order = order.into_pending(meta);
 
-        order_margin.update(order, fee_maker);
+        for i in 0..n {
+            let order = LimitOrder::new(side, limit_price, qty).unwrap();
+            let meta = ExchangeOrderMeta::new(i as u64, i as i64);
+            let order = order.into_pending(meta);
+            order_margin.update(order, fee_maker);
+        }
 
+        let mult = QuoteCurrency::new(Decimal::from(n as u64));
         assert_eq!(
             order_margin.order_margin(
                 init_margin_req,
                 &Position::<BaseCurrency>::Neutral,
                 quote!(0)
             ),
-            qty.convert(limit_price) * init_margin_req
+            mult * qty.convert(limit_price) * init_margin_req
         );
         assert_eq!(
             order_margin.cumulative_order_fees(),
-            qty.convert(limit_price) * fee_maker
+            mult * qty.convert(limit_price) * fee_maker
         );
     }
 
