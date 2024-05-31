@@ -134,20 +134,22 @@ mod tests {
     use super::*;
     use crate::{prelude::*, utils::f64_to_decimal, MockTransactionAccounting};
 
-    // #[test_case::test_matrix(
-    //     [1, 2, 5]
-    // )]
-    // fn order_margin_online_no_orders_neutral(leverage: u32) {
-    //     let order_margin = OrderMarginOnline::<_, ()>::default();
+    #[test_case::test_matrix(
+        [1, 2, 5]
+    )]
+    fn order_margin_online_no_orders_neutral(leverage: u32) {
+        let order_margin = OrderMarginOnline::<_, ()>::default();
 
-    //     let mut accounting = MockTransactionAccounting::default();
-    //     let init_margin_req = f64_to_decimal(leverage as f64, Dec!(0.01));
+        let init_margin_req = f64_to_decimal(leverage as f64, Dec!(0.01));
 
-    //     let position = Position::Neutral;
-    //     let position_margin = quote!(0);
-    //     assert_eq!(order_margin.order_margin(init_margin_req, &position, position_margin));
-    //     assert_eq!(order_margin.cumulative_order_fees(), quote!(0));
-    // }
+        let position = Position::<BaseCurrency>::Neutral;
+        let position_margin = quote!(0);
+        assert_eq!(
+            order_margin.order_margin(init_margin_req, &position, position_margin),
+            quote!(0)
+        );
+        assert_eq!(order_margin.cumulative_order_fees(), quote!(0));
+    }
 
     #[test_case::test_matrix(
         [1, 2, 5],
@@ -203,19 +205,39 @@ mod tests {
         assert_eq!(order_margin.cumulative_order_fees(), quote!(0));
     }
 
-    // #[test_case::test_matrix(
-    //     [1, 2, 5],
-    //     [1, 2, 5],
-    //     [100, 150, 200]
-    // )]
-    // fn order_margin_one_order(
-    //     leverage: u32,
-    //     position_qty: u32,
-    //     entry_price: u32,
-    //     order: LimitOrder<QuoteCurrency, (), NewOrder>,
-    // ) {
-    //     todo!()
-    // }
+    #[test_case::test_matrix(
+        [1, 2, 5],
+        [Side::Buy, Side::Sell],
+        [100, 150, 200],
+        [1, 2, 3]
+    )]
+    fn order_margin_neutral_one_order(leverage: u32, side: Side, limit_price: u32, qty: u32) {
+        let mut order_margin = OrderMarginOnline::<_, ()>::default();
+
+        let init_margin_req = f64_to_decimal(leverage as f64, Dec!(0.01));
+        let fee_maker = fee!(0.0002);
+
+        let qty = BaseCurrency::new(Decimal::from(qty));
+        let limit_price = QuoteCurrency::new(Decimal::from(limit_price));
+        let order = LimitOrder::new(side, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::default();
+        let order = order.into_pending(meta);
+
+        order_margin.update(order, fee_maker);
+
+        assert_eq!(
+            order_margin.order_margin(
+                init_margin_req,
+                &Position::<BaseCurrency>::Neutral,
+                quote!(0)
+            ),
+            qty.convert(limit_price) * init_margin_req
+        );
+        assert_eq!(
+            order_margin.cumulative_order_fees(),
+            qty.convert(limit_price) * fee_maker
+        );
+    }
 
     #[test]
     #[tracing_test::traced_test]
