@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use fpdec::{Dec, Decimal};
 use getset::{CopyGetters, Getters};
 use tracing::trace;
@@ -121,16 +123,21 @@ where
             liquidation_price,
             qty * direction_multiplier,
         );
-        if pnl > Q::PairedCurrency::new_zero() {
-            let transaction = Transaction::new(USER_WALLET_ACCOUNT, TREASURY_ACCOUNT, pnl);
-            accounting
-                .create_margin_transfer(transaction)
-                .expect("margin transfer must work");
-        } else if pnl < Q::PairedCurrency::new_zero() {
-            let transaction = Transaction::new(TREASURY_ACCOUNT, USER_WALLET_ACCOUNT, pnl.abs());
-            accounting
-                .create_margin_transfer(transaction)
-                .expect("margin transfer must work");
+        match pnl.cmp(&Q::PairedCurrency::new_zero()) {
+            Ordering::Greater => {
+                let transaction = Transaction::new(USER_WALLET_ACCOUNT, TREASURY_ACCOUNT, pnl);
+                accounting
+                    .create_margin_transfer(transaction)
+                    .expect("margin transfer must work");
+            }
+            Ordering::Less => {
+                let transaction =
+                    Transaction::new(TREASURY_ACCOUNT, USER_WALLET_ACCOUNT, pnl.abs());
+                accounting
+                    .create_margin_transfer(transaction)
+                    .expect("margin transfer must work");
+            }
+            Ordering::Equal => {}
         }
         let margin_to_free = qty.convert(self.entry_price) * init_margin_req;
         let transaction = Transaction::new(

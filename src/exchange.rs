@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use getset::Getters;
 use hashbrown::HashMap;
 use tracing::{debug, trace};
@@ -315,20 +317,18 @@ where
             .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
             .expect("Is valid");
 
-        let transaction = if new_order_margin > order_margin {
-            Transaction::new(
+        let transaction = match new_order_margin.cmp(&order_margin) {
+            Ordering::Greater => Transaction::new(
                 USER_ORDER_MARGIN_ACCOUNT,
                 USER_WALLET_ACCOUNT,
                 new_order_margin - order_margin,
-            )
-        } else if new_order_margin == order_margin {
-            return;
-        } else {
-            Transaction::new(
+            ),
+            Ordering::Less => Transaction::new(
                 USER_ORDER_MARGIN_ACCOUNT,
                 USER_WALLET_ACCOUNT,
                 order_margin - new_order_margin,
-            )
+            ),
+            Ordering::Equal => return,
         };
 
         self.transaction_accounting
@@ -419,7 +419,7 @@ where
         let mut order_updates = Vec::new();
         let mut ids_to_remove = Vec::new();
         for order in self.active_limit_orders.values_mut() {
-            if let Some(filled_qty) = market_update.limit_order_filled(&order) {
+            if let Some(filled_qty) = market_update.limit_order_filled(order) {
                 trace!(
                     "filled order {}: {filled_qty}/{}",
                     order.id(),

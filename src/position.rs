@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use fpdec::{Dec, Decimal};
 use tracing::trace;
 
@@ -9,28 +11,19 @@ use crate::{
 };
 
 /// A futures position can be one of three variants.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub enum Position<Q>
 where
     Q: Currency,
     Q::PairedCurrency: MarginCurrency,
 {
     /// No position present.
+    #[default]
     Neutral,
     /// A position in the long direction.
     Long(PositionInner<Q>),
     /// A position in the short direction.
     Short(PositionInner<Q>),
-}
-
-impl<Q> Default for Position<Q>
-where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
-{
-    fn default() -> Self {
-        Position::Neutral
-    }
 }
 
 impl<Q> Position<Q>
@@ -87,8 +80,27 @@ where
                         init_margin_req,
                     );
                 }
-                Side::Sell => {
-                    if filled_qty > inner.quantity() {
+                Side::Sell => match filled_qty.cmp(&inner.quantity()) {
+                    Ordering::Less => {
+                        inner.decrease_contracts(
+                            filled_qty,
+                            fill_price,
+                            transaction_accounting,
+                            init_margin_req,
+                            Dec!(1),
+                        );
+                    }
+                    Ordering::Equal => {
+                        inner.decrease_contracts(
+                            filled_qty,
+                            fill_price,
+                            transaction_accounting,
+                            init_margin_req,
+                            Dec!(1),
+                        );
+                        *self = Position::Neutral;
+                    }
+                    Ordering::Greater => {
                         let new_short_qty = filled_qty - inner.quantity();
                         inner.decrease_contracts(
                             inner.quantity(),
@@ -103,29 +115,31 @@ where
                             transaction_accounting,
                             init_margin_req,
                         ));
-                    } else if filled_qty == inner.quantity() {
-                        inner.decrease_contracts(
-                            filled_qty,
-                            fill_price,
-                            transaction_accounting,
-                            init_margin_req,
-                            Dec!(1),
-                        );
-                        *self = Position::Neutral;
-                    } else {
-                        inner.decrease_contracts(
-                            filled_qty,
-                            fill_price,
-                            transaction_accounting,
-                            init_margin_req,
-                            Dec!(1),
-                        );
                     }
-                }
+                },
             },
             Position::Short(inner) => match side {
-                Side::Buy => {
-                    if filled_qty > inner.quantity() {
+                Side::Buy => match filled_qty.cmp(&inner.quantity()) {
+                    Ordering::Less => {
+                        inner.decrease_contracts(
+                            filled_qty,
+                            fill_price,
+                            transaction_accounting,
+                            init_margin_req,
+                            Dec!(-1),
+                        );
+                    }
+                    Ordering::Equal => {
+                        inner.decrease_contracts(
+                            filled_qty,
+                            fill_price,
+                            transaction_accounting,
+                            init_margin_req,
+                            Dec!(-1),
+                        );
+                        *self = Position::Neutral;
+                    }
+                    Ordering::Greater => {
                         let new_long_qty = filled_qty - inner.quantity();
                         inner.decrease_contracts(
                             inner.quantity(),
@@ -140,25 +154,8 @@ where
                             transaction_accounting,
                             init_margin_req,
                         ));
-                    } else if filled_qty == inner.quantity() {
-                        inner.decrease_contracts(
-                            filled_qty,
-                            fill_price,
-                            transaction_accounting,
-                            init_margin_req,
-                            Dec!(-1),
-                        );
-                        *self = Position::Neutral;
-                    } else {
-                        inner.decrease_contracts(
-                            filled_qty,
-                            fill_price,
-                            transaction_accounting,
-                            init_margin_req,
-                            Dec!(-1),
-                        );
                     }
-                }
+                },
                 Side::Sell => {
                     inner.increase_contracts(
                         filled_qty,
