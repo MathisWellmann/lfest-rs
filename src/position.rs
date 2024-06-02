@@ -40,6 +40,15 @@ where
         }
     }
 
+    /// The quantity of the position, is negative when short.
+    pub fn quantity(&self) -> Q {
+        match self {
+            Position::Neutral => Q::new_zero(),
+            Position::Long(inner) => inner.quantity(),
+            Position::Short(inner) => inner.quantity().into_negative(),
+        }
+    }
+
     /// Change a position while doing proper accounting and balance transfers.
     pub(crate) fn change_position<T>(
         &mut self,

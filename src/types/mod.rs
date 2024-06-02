@@ -32,7 +32,7 @@ pub type OrderId = u64;
 pub type TimestampNs = i64;
 
 /// The user balances.
-#[derive(Debug, Clone, getset::CopyGetters, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct UserBalances<M>
 where
     M: MarginCurrency,

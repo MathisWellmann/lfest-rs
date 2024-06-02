@@ -4,7 +4,7 @@ use crate::types::Currency;
 
 /// A T-Account keeps track of debits and credits.
 #[derive(Debug, Default, Clone, Copy, CopyGetters)]
-pub struct Account<Q>
+pub struct TAccount<Q>
 where
     Q: Currency,
 {
@@ -14,7 +14,7 @@ where
     credits_posted: Q,
 }
 
-impl<Q> Account<Q>
+impl<Q> TAccount<Q>
 where
     Q: Currency,
 {

@@ -1,11 +1,11 @@
-use super::account::Account;
+use super::account::TAccount;
 use crate::types::MarginCurrency;
 
 /// Asserts that the accounting equation holds true.
 ///
 /// # Panics:
 /// If the cumulative debits of all accounts don't equal credits.
-pub(crate) fn assert_accounting_equation<M>(accounts: &[Account<M>])
+pub(crate) fn assert_accounting_equation<M>(accounts: &[TAccount<M>])
 where
     M: MarginCurrency,
 {

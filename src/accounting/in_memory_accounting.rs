@@ -1,7 +1,7 @@
 use tracing::trace;
 
 use super::{
-    account::Account, transaction::Transaction, utils::assert_accounting_equation, AccountId,
+    account::TAccount, transaction::Transaction, utils::assert_accounting_equation, AccountId,
     TransactionAccounting,
 };
 use crate::{
@@ -30,7 +30,7 @@ where
     M: MarginCurrency,
 {
     /// Accounts are allocated at the start as they are known upfront.
-    margin_accounts: [Account<M>; N_ACCOUNTS],
+    margin_accounts: [TAccount<M>; N_ACCOUNTS],
     // TODO: keep track of transaction log or emit `Transactions` to users.
 }
 
@@ -40,7 +40,7 @@ where
 {
     fn new(user_starting_wallet_balance: M) -> Self {
         let mut s = Self {
-            margin_accounts: [Account::default(); N_ACCOUNTS],
+            margin_accounts: [TAccount::default(); N_ACCOUNTS],
         };
         s.margin_accounts[USER_WALLET_ACCOUNT].post_debit(user_starting_wallet_balance);
         s.margin_accounts[TREASURY_ACCOUNT].post_credit(user_starting_wallet_balance);

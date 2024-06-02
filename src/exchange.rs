@@ -24,8 +24,21 @@ use crate::{
     utils::assert_user_wallet_balance,
 };
 
+/// The datatype that holds the active limit orders of a user.
 pub type ActiveLimitOrders<Q, UserOrderId> =
     HashMap<OrderId, LimitOrder<Q, UserOrderId, Pending<Q>>>;
+
+pub struct Account<'a, A, Q, UserOrderId>
+where
+    Q: Currency,
+    Q::PairedCurrency: MarginCurrency,
+    UserOrderId: Clone,
+{
+    pub account_tracker: &'a A,
+    pub active_limit_orders: &'a ActiveLimitOrders<Q, UserOrderId>,
+    pub position: &'a Position<Q>,
+    pub balances: UserBalances<Q::PairedCurrency>,
+}
 
 /// The main leveraged futures exchange for simulated trading
 #[derive(Debug, Clone, Getters)]
@@ -97,6 +110,16 @@ where
             active_limit_orders: HashMap::default(),
             lookup_order_nonce_from_user_order_id: HashMap::default(),
             order_margin: OrderMargin::default(),
+        }
+    }
+
+    /// Get information about the `Account`
+    pub fn account(&self) -> Account<A, Q, UserOrderId> {
+        Account {
+            account_tracker: &self.account_tracker,
+            active_limit_orders: &self.active_limit_orders,
+            position: &self.position,
+            balances: self.user_balances(),
         }
     }
 
