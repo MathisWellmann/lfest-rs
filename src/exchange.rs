@@ -28,15 +28,20 @@ use crate::{
 pub type ActiveLimitOrders<Q, UserOrderId> =
     HashMap<OrderId, LimitOrder<Q, UserOrderId, Pending<Q>>>;
 
+/// Relevant information about the traders account.
 pub struct Account<'a, A, Q, UserOrderId>
 where
     Q: Currency,
     Q::PairedCurrency: MarginCurrency,
     UserOrderId: Clone,
 {
+    /// tracks the performance of the account
     pub account_tracker: &'a A,
+    /// The active limit orders of the account.
     pub active_limit_orders: &'a ActiveLimitOrders<Q, UserOrderId>,
+    /// The current position of the account.
     pub position: &'a Position<Q>,
+    /// The TAccount balances of the account.
     pub balances: UserBalances<Q::PairedCurrency>,
 }
 
