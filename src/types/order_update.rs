@@ -10,5 +10,5 @@ where
     /// The limit order was partially filled.
     PartiallyFilled(LimitOrder<Q, UserOrderId, Pending<Q>>),
     /// The limit order was fully filled.
-    FullyFilled(LimitOrder<Q, UserOrderId, Filled>),
+    FullyFilled(LimitOrder<Q, UserOrderId, Filled<Q>>),
 }

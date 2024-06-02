@@ -177,7 +177,7 @@ where
     pub fn submit_market_order(
         &mut self,
         order: MarketOrder<Q, UserOrderId, NewOrder>,
-    ) -> Result<MarketOrder<Q, UserOrderId, Filled>> {
+    ) -> Result<MarketOrder<Q, UserOrderId, Filled<Q>>> {
         // Basic checks
         self.config
             .contract_spec()
@@ -215,7 +215,7 @@ where
         Ok(filled_order)
     }
 
-    fn settle_filled_market_order(&mut self, order: MarketOrder<Q, UserOrderId, Filled>) {
+    fn settle_filled_market_order(&mut self, order: MarketOrder<Q, UserOrderId, Filled<Q>>) {
         let filled_qty = order.quantity();
         assert!(filled_qty > Q::new_zero());
         let fill_price = order.state().avg_fill_price();

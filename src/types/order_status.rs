@@ -50,7 +50,10 @@ pub enum FilledQuantity<Q> {
 /// The order has been fully filled.
 /// The executed order quantity is stored elsewhere.
 #[derive(Debug, Clone, Eq, PartialEq, Getters, CopyGetters)]
-pub struct Filled {
+pub struct Filled<Q>
+where
+    Q: Currency,
+{
     /// The now filled in order metadata.
     #[getset(get = "pub")]
     meta: ExchangeOrderMeta,
@@ -63,9 +66,16 @@ pub struct Filled {
     /// The average price the order has been filled at.
     #[getset(get_copy = "pub")]
     avg_fill_price: QuoteCurrency,
+
+    /// The total filled quantity.
+    #[getset(get_copy = "pub")]
+    filled_qty: Q,
 }
 
-impl Filled {
+impl<Q> Filled<Q>
+where
+    Q: Currency,
+{
     /// Create a new instance of `Self`.
     pub(crate) fn new(
         meta: ExchangeOrderMeta,
@@ -76,6 +86,7 @@ impl Filled {
             meta,
             ts_ns_executed,
             avg_fill_price,
+            filled_qty: Q::new_zero(),
         }
     }
 }

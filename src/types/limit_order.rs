@@ -135,7 +135,7 @@ where
         &mut self,
         filled_quantity: Q,
         ts_ns: TimestampNs,
-    ) -> Option<LimitOrder<Q, UserOrderId, Filled>> {
+    ) -> Option<LimitOrder<Q, UserOrderId, Filled<Q>>> {
         debug_assert!(
             filled_quantity <= self.remaining_quantity,
             "The filled quantity can not be greater than the limit order quantity"
@@ -201,5 +201,17 @@ where
     /// Get the order id assigned by the exchange.
     pub fn id(&self) -> u64 {
         self.state().meta().id()
+    }
+}
+
+impl<Q, UserOrderId> LimitOrder<Q, UserOrderId, Filled<Q>>
+where
+    Q: Currency,
+    Q::PairedCurrency: MarginCurrency,
+    UserOrderId: Clone,
+{
+    /// Get the total quantity that this order is for.
+    pub fn total_quantity(&self) -> Q {
+        self.state.filled_qty()
     }
 }
