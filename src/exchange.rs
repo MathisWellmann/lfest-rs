@@ -99,7 +99,7 @@ where
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
     pub fn new(account_tracker: A, config: Config<Q::PairedCurrency>) -> Self {
-        let market_state = MarketState::new(config.contract_spec().price_filter().clone());
+        let market_state = MarketState::default();
         let risk_engine =
             IsolatedMarginRiskEngine::<Q::PairedCurrency>::new(config.contract_spec().clone());
 
@@ -145,8 +145,11 @@ where
     where
         U: MarketUpdate<Q, UserOrderId>,
     {
-        self.market_state
-            .update_state(timestamp_ns, &market_update)?;
+        self.market_state.update_state(
+            timestamp_ns,
+            &market_update,
+            self.config.contract_spec().price_filter(),
+        )?;
         self.account_tracker.update(
             timestamp_ns,
             &self.market_state,

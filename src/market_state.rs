@@ -7,12 +7,8 @@ use crate::{
 };
 
 /// Some information regarding the state of the market.
-#[derive(Debug, Clone, Getters, CopyGetters, Setters)]
+#[derive(Debug, Default, Clone, Getters, CopyGetters, Setters)]
 pub struct MarketState {
-    /// Used to validate states
-    // TODO: remove here and pass through were needed
-    price_filter: PriceFilter,
-
     /// The current bid
     #[getset(get_copy = "pub", set = "pub(crate)")]
     bid: QuoteCurrency,
@@ -31,16 +27,6 @@ pub struct MarketState {
 }
 
 impl MarketState {
-    pub(crate) fn new(price_filter: PriceFilter) -> Self {
-        Self {
-            price_filter,
-            bid: quote!(0),
-            ask: quote!(0),
-            current_ts_ns: 0,
-            step: 0,
-        }
-    }
-
     /// Update the exchange state with new information
     ///
     /// ### Parameters:
@@ -52,13 +38,14 @@ impl MarketState {
         &mut self,
         timestamp_ns: TimestampNs,
         market_update: &U,
+        price_filter: &PriceFilter,
     ) -> Result<()>
     where
         U: MarketUpdate<Q, UserOrderId>,
         Q: Currency,
         UserOrderId: Clone,
     {
-        market_update.validate_market_update(&self.price_filter)?;
+        market_update.validate_market_update(price_filter)?;
         market_update.update_market_state(self);
 
         self.current_ts_ns = timestamp_ns;
@@ -81,14 +68,12 @@ impl MarketState {
 
     #[cfg(test)]
     pub fn from_components(
-        price_filter: PriceFilter,
         bid: QuoteCurrency,
         ask: QuoteCurrency,
         current_ts_ns: i64,
         step: u64,
     ) -> Self {
         Self {
-            price_filter,
             bid,
             ask,
             current_ts_ns,

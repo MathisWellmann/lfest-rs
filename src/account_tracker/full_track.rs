@@ -763,7 +763,6 @@ mod tests {
 
     use super::*;
     use crate::{
-        prelude::PriceFilter,
         test_helpers::LN_RETS_H,
         utils::{f64_to_decimal, tests::round},
     };
@@ -773,7 +772,7 @@ mod tests {
     const ACC_RETS_H: [f64; 8] = [0.17, 0.15, 0.23, -0.05, 0.12, 0.09, 0.13, -0.04];
 
     fn mock_market_state_from_mid_price(mid_price: QuoteCurrency) -> MarketState {
-        MarketState::from_components(PriceFilter::default(), mid_price, mid_price, 0, 0)
+        MarketState::from_components(mid_price, mid_price, 0, 0)
     }
 
     #[test]
