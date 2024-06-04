@@ -178,8 +178,6 @@ where
                 cumulative_qty,
                 avg_price,
             } => {
-                assert!(filled_quantity <= (self.remaining_quantity - *cumulative_qty), "The filled quantity can not be greater than the outstanding limit order quantity.");
-
                 let new_qty = *cumulative_qty + filled_quantity;
                 *avg_price = QuoteCurrency::new(
                     ((*cumulative_qty.as_ref() * *avg_price.as_ref())
