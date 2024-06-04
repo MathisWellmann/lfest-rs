@@ -23,7 +23,7 @@ fn partial_limit_order_fill(price: QuoteCurrency, qty: BaseCurrency, side: Side)
     assert_eq!(exec_orders.len(), 1);
 
     let ts = 1;
-    let meta = ExchangeOrderMeta::new(0, ts);
+    let meta = ExchangeOrderMeta::new(0.into(), ts);
     let mut order = order.into_pending(meta);
     assert!(order.fill(qty / base!(2), ts).is_none());
     let expected_order_update = LimitOrderUpdate::PartiallyFilled(order);

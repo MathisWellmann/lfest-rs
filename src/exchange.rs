@@ -67,7 +67,7 @@ where
 
     risk_engine: IsolatedMarginRiskEngine<Q::PairedCurrency>,
 
-    next_order_id: u64,
+    next_order_id: OrderId,
 
     /// Does the accounting for transactions, moving balances between accounts.
     transaction_accounting: TransactionAccountingT,
@@ -109,7 +109,7 @@ where
             market_state,
             risk_engine,
             account_tracker,
-            next_order_id: 0,
+            next_order_id: OrderId::default(),
             transaction_accounting,
             position: Position::default(),
             active_limit_orders: HashMap::default(),
@@ -242,8 +242,9 @@ where
 
     #[inline]
     fn next_order_id(&mut self) -> OrderId {
-        self.next_order_id += 1;
-        self.next_order_id - 1
+        let oid = self.next_order_id;
+        self.next_order_id.incr();
+        oid
     }
 
     /// Cancel an active limit order based on the `user_order_id`.
@@ -263,13 +264,10 @@ where
             "cancel_order_by_user_id: user_order_id: {:?}",
             user_order_id
         );
-        let id: u64 = match self
+        let id = self
             .lookup_order_nonce_from_user_order_id
             .remove(&user_order_id)
-        {
-            None => return Err(Error::UserOrderIdNotFound),
-            Some(id) => id,
-        };
+            .ok_or(Error::UserOrderIdNotFound)?;
         self.cancel_limit_order(id)
     }
 
@@ -455,6 +453,10 @@ where
                     "filled order {}: {filled_qty}/{}",
                     order.id(),
                     order.total_quantity()
+                );
+                assert!(
+                    filled_qty > Q::new_zero(),
+                    "The filled_qty must be greater than zero"
                 );
 
                 let order_margin = self

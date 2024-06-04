@@ -19,7 +19,7 @@ fn submit_limit_sell_order_no_position() {
 
     // Now fill the order
     let ts = 0;
-    let meta = ExchangeOrderMeta::new(0, ts);
+    let meta = ExchangeOrderMeta::new(0.into(), ts);
     let mut order = order.into_pending(meta);
     let limit_price = order.limit_price();
     let filled_order = order
@@ -58,7 +58,7 @@ fn submit_limit_sell_order_no_position() {
     let order = LimitOrder::new(Side::Buy, quote!(100), base!(9)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
-    let meta = ExchangeOrderMeta::new(1, ts);
+    let meta = ExchangeOrderMeta::new(1.into(), ts);
     let mut order = order.into_pending(meta);
     let filled_order = order
         .fill(order.remaining_quantity(), ts)

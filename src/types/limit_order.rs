@@ -2,7 +2,7 @@ use getset::{CopyGetters, Getters};
 
 use super::{
     order_meta::ExchangeOrderMeta, order_status::NewOrder, Filled, FilledQuantity, MarginCurrency,
-    Pending, TimestampNs,
+    OrderId, Pending, TimestampNs,
 };
 use crate::types::{Currency, OrderError, QuoteCurrency, Side};
 
@@ -217,7 +217,7 @@ where
     }
 
     /// Get the order id assigned by the exchange.
-    pub fn id(&self) -> u64 {
+    pub fn id(&self) -> OrderId {
         self.state().meta().id()
     }
 }
@@ -252,7 +252,7 @@ mod tests {
         let limit_price = QuoteCurrency::from(Decimal::from(limit_price));
         let qty = QuoteCurrency::from(Decimal::from(qty));
         let order = LimitOrder::new(side, limit_price, qty).unwrap();
-        let meta = ExchangeOrderMeta::new(0, 0);
+        let meta = ExchangeOrderMeta::new(0.into(), 0);
 
         let mut order = order.into_pending(meta.clone());
         let filled_order = order.fill(qty, 0).unwrap();
@@ -272,7 +272,7 @@ mod tests {
         let limit_price = QuoteCurrency::from(Decimal::from(limit_price));
         let qty = QuoteCurrency::from(Decimal::from(qty));
         let order = LimitOrder::new(side, limit_price, qty).unwrap();
-        let meta = ExchangeOrderMeta::new(0, 0);
+        let meta = ExchangeOrderMeta::new(0.into(), 0);
 
         let qty = QuoteCurrency::from(Decimal::from(qty) / Dec!(2));
         let mut order = order.into_pending(meta.clone());

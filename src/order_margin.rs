@@ -251,7 +251,7 @@ mod tests {
 
         for i in 0..n {
             let order = LimitOrder::new(side, limit_price, qty).unwrap();
-            let meta = ExchangeOrderMeta::new(i as u64, i as i64);
+            let meta = ExchangeOrderMeta::new((i as u64).into(), i as i64);
             let order = order.into_pending(meta);
             order_margin.update(&order, fee_maker);
         }
@@ -291,13 +291,13 @@ mod tests {
 
         for i in 0..n {
             let order = LimitOrder::new(side, limit_price, qty).unwrap();
-            let meta = ExchangeOrderMeta::new(i as u64, i as i64);
+            let meta = ExchangeOrderMeta::new((i as u64).into(), i as i64);
             let order = order.into_pending(meta);
             order_margin.update(&order, fee_maker);
         }
         for i in 0..n {
             let order = LimitOrder::new(side.inverted(), limit_price, qty).unwrap();
-            let meta = ExchangeOrderMeta::new((n + i) as u64, (n + i) as i64);
+            let meta = ExchangeOrderMeta::new(((n + i) as u64).into(), (n + i) as i64);
             let order = order.into_pending(meta);
             order_margin.update(&order, fee_maker);
         }
@@ -337,7 +337,7 @@ mod tests {
         let limit_price = QuoteCurrency::new(Decimal::from(limit_price));
 
         let order = LimitOrder::new(side, limit_price, qty).unwrap();
-        let meta = ExchangeOrderMeta::new(0, 0);
+        let meta = ExchangeOrderMeta::new(0.into(), 0);
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
 
@@ -383,7 +383,7 @@ mod tests {
         );
 
         let order = LimitOrder::new(Side::Buy, quote!(90), base!(1)).unwrap();
-        let meta = ExchangeOrderMeta::new(0, 0);
+        let meta = ExchangeOrderMeta::new(0.into(), 0);
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
         assert_eq!(
@@ -392,7 +392,7 @@ mod tests {
         );
 
         let order = LimitOrder::new(Side::Sell, quote!(100), base!(1)).unwrap();
-        let meta = ExchangeOrderMeta::new(1, 0);
+        let meta = ExchangeOrderMeta::new(1.into(), 0);
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
         assert_eq!(
@@ -401,7 +401,7 @@ mod tests {
         );
 
         let order = LimitOrder::new(Side::Sell, quote!(120), base!(1)).unwrap();
-        let meta = ExchangeOrderMeta::new(2, 0);
+        let meta = ExchangeOrderMeta::new(2.into(), 0);
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
         assert_eq!(
@@ -431,7 +431,7 @@ mod tests {
         );
 
         let order = LimitOrder::new(Side::Buy, quote!(90), base!(1)).unwrap();
-        let meta = ExchangeOrderMeta::new(0, 0);
+        let meta = ExchangeOrderMeta::new(0.into(), 0);
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
         assert_eq!(
@@ -440,7 +440,7 @@ mod tests {
         );
 
         let order = LimitOrder::new(Side::Sell, quote!(100), base!(1)).unwrap();
-        let meta = ExchangeOrderMeta::new(1, 0);
+        let meta = ExchangeOrderMeta::new(1.into(), 0);
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
         assert_eq!(
@@ -449,7 +449,7 @@ mod tests {
         );
 
         let order = LimitOrder::new(Side::Sell, quote!(120), base!(1)).unwrap();
-        let meta = ExchangeOrderMeta::new(2, 0);
+        let meta = ExchangeOrderMeta::new(2.into(), 0);
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
         assert_eq!(
@@ -458,7 +458,7 @@ mod tests {
         );
 
         let order = LimitOrder::new(Side::Buy, quote!(95), base!(1)).unwrap();
-        let meta = ExchangeOrderMeta::new(3, 0);
+        let meta = ExchangeOrderMeta::new(3.into(), 0);
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
         assert_eq!(
@@ -488,7 +488,7 @@ mod tests {
         );
 
         let order = LimitOrder::new(Side::Buy, quote!(90), base!(1)).unwrap();
-        let meta = ExchangeOrderMeta::new(0, 0);
+        let meta = ExchangeOrderMeta::new(0.into(), 0);
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
         assert_eq!(
@@ -497,7 +497,7 @@ mod tests {
         );
 
         let order = LimitOrder::new(Side::Sell, quote!(100), base!(1)).unwrap();
-        let meta = ExchangeOrderMeta::new(1, 0);
+        let meta = ExchangeOrderMeta::new(1.into(), 0);
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
         assert_eq!(
@@ -506,7 +506,7 @@ mod tests {
         );
 
         let order = LimitOrder::new(Side::Sell, quote!(120), base!(1)).unwrap();
-        let meta = ExchangeOrderMeta::new(2, 0);
+        let meta = ExchangeOrderMeta::new(2.into(), 0);
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
         assert_eq!(
@@ -515,7 +515,7 @@ mod tests {
         );
 
         let order = LimitOrder::new(Side::Buy, quote!(95), base!(1)).unwrap();
-        let meta = ExchangeOrderMeta::new(3, 0);
+        let meta = ExchangeOrderMeta::new(3.into(), 0);
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
         assert_eq!(

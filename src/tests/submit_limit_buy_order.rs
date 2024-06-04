@@ -24,7 +24,7 @@ fn submit_limit_buy_order_no_position() {
 
     // Now fill the order
     let ts = 0;
-    let meta = ExchangeOrderMeta::new(0, ts);
+    let meta = ExchangeOrderMeta::new(0.into(), ts);
     let mut order = order.into_pending(meta);
     let filled_order = order
         .fill(order.remaining_quantity(), ts)
@@ -69,7 +69,7 @@ fn submit_limit_buy_order_no_position() {
         .unwrap()
         .is_empty());
 
-    let meta = ExchangeOrderMeta::new(1, 0);
+    let meta = ExchangeOrderMeta::new(1.into(), 0);
     let mut order = order.into_pending(meta);
     let filled_order = order
         .fill(order.remaining_quantity(), ts)
@@ -164,7 +164,7 @@ fn submit_limit_buy_order_with_long() {
     exchange.submit_limit_order(order.clone()).unwrap();
 
     let ts = 0;
-    let meta = ExchangeOrderMeta::new(2, ts);
+    let meta = ExchangeOrderMeta::new(2.into(), ts);
     let mut order = order.into_pending(meta);
     let filled_order = order
         .fill(order.remaining_quantity(), ts)
@@ -222,7 +222,7 @@ fn submit_limit_buy_order_with_short() {
     exchange.submit_limit_order(order.clone()).unwrap();
 
     let ts = 0;
-    let meta = ExchangeOrderMeta::new(2, ts);
+    let meta = ExchangeOrderMeta::new(2.into(), ts);
     let mut order = order.into_pending(meta);
     let filled_order = order
         .fill(order.remaining_quantity(), ts)

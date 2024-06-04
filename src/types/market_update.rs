@@ -85,6 +85,11 @@ where
     UserOrderId: Clone,
 {
     fn limit_order_filled(&self, order: &LimitOrder<Q, UserOrderId, Pending<Q>>) -> Option<Q> {
+        assert!(
+            self.quantity != Q::new_zero(),
+            "The trade quantity must not be zero"
+        );
+
         if match order.side() {
             Side::Buy => self.price <= order.limit_price() && matches!(self.side, Side::Sell),
             Side::Sell => self.price >= order.limit_price() && matches!(self.side, Side::Buy),
