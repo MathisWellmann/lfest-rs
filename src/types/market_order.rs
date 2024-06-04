@@ -116,7 +116,13 @@ where
     ) -> MarketOrder<Q, UserOrderId, Filled<Q>> {
         MarketOrder {
             user_order_id: self.user_order_id,
-            state: Filled::new(self.state.meta().clone(), ts_ns_executed, fill_price),
+            state: Filled::new(
+                self.state.meta().clone(),
+                ts_ns_executed,
+                fill_price,
+                // Market orders are always fully filled currently.
+                self.quantity,
+            ),
             quantity: self.quantity,
             side: self.side,
         }

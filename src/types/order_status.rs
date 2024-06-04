@@ -81,12 +81,13 @@ where
         meta: ExchangeOrderMeta,
         ts_ns_executed: TimestampNs,
         avg_fill_price: QuoteCurrency,
+        filled_qty: Q,
     ) -> Self {
         Self {
             meta,
             ts_ns_executed,
             avg_fill_price,
-            filled_qty: Q::new_zero(),
+            filled_qty,
         }
     }
 }
