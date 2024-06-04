@@ -11,3 +11,5 @@ procs:
     shell: "cargo doc"
   taplo:
     shell: "taplo fmt"
+  semver-checks:
+    shell: "cargo semver-checks"

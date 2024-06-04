@@ -34,6 +34,8 @@
             buildInputs = [
               (lib.hiPrio rust-bin.nightly."2024-04-01".rustfmt)
               rust
+              cargo-semver-checks
+              taplo
             ];
           };
         }
