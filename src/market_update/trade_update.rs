@@ -28,6 +28,7 @@ where
             self.quantity != Q::new_zero(),
             "The trade quantity must not be zero"
         );
+        assert!(order.remaining_quantity() > Q::new_zero());
 
         if match order.side() {
             Side::Buy => self.price <= order.limit_price() && matches!(self.side, Side::Sell),
@@ -60,4 +61,56 @@ macro_rules! trade {
             side: $side,
         }
     }};
+}
+
+#[cfg(test)]
+mod tests {
+    use fpdec::Decimal;
+
+    use super::*;
+    use crate::{
+        base,
+        prelude::{BaseCurrency, ExchangeOrderMeta},
+    };
+
+    #[test_case::test_matrix(
+        [100, 110, 120],
+        [1, 2, 3],
+        [Side::Buy, Side::Sell]
+    )]
+    fn trade_limit_order_filled_some(price: u32, qty: u32, side: Side) {
+        let price = QuoteCurrency::new(Decimal::from(price));
+        let quantity = BaseCurrency::new(Decimal::from(qty));
+        let trade = Trade {
+            price,
+            quantity,
+            side,
+        };
+        let limit_order = LimitOrder::new(side.inverted(), price, quantity).unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0);
+        let limit_order = limit_order.into_pending(meta);
+        assert_eq!(trade.limit_order_filled(&limit_order).unwrap(), quantity);
+    }
+
+    #[test_case::test_matrix(
+        [100, 110, 120],
+        [1, 2, 3],
+        [Side::Buy, Side::Sell]
+    )]
+    fn trade_limit_order_filled_none(price: u32, qty: u32, side: Side) {
+        let price = QuoteCurrency::new(Decimal::from(price));
+        let quantity = BaseCurrency::new(Decimal::from(qty));
+        let trade = Trade {
+            price,
+            quantity,
+            side,
+        };
+        let limit_order = LimitOrder::new(side.inverted(), price, quantity / base!(2)).unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0);
+        let limit_order = limit_order.into_pending(meta);
+        assert_eq!(
+            trade.limit_order_filled(&limit_order).unwrap(),
+            quantity / base!(2)
+        );
+    }
 }
