@@ -172,6 +172,8 @@ where
                         remaining_quantity: Q::new_zero(),
                         side: self.side,
                     });
+                } else {
+                    self.remaining_quantity -= filled_quantity;
                 }
             }
             FilledQuantity::Filled {
@@ -186,8 +188,9 @@ where
                 );
                 *cumulative_qty = new_qty;
 
-                if *cumulative_qty == self.remaining_quantity {
-                    self.remaining_quantity -= filled_quantity;
+                self.remaining_quantity -= filled_quantity;
+
+                if self.remaining_quantity == Q::new_zero() {
                     return Some(LimitOrder {
                         user_order_id: self.user_order_id.clone(),
                         state: Filled::new(meta, ts_ns, price, *cumulative_qty),
@@ -198,7 +201,6 @@ where
                 }
             }
         };
-        self.remaining_quantity -= filled_quantity;
 
         None
     }
