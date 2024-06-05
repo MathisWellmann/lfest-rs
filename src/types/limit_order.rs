@@ -205,6 +205,17 @@ where
         None
     }
 
+    /// Get the total filled quantity for this order.
+    pub fn filled_quantity(&self) -> Q {
+        match self.state.filled_quantity {
+            FilledQuantity::Unfilled => Q::new_zero(),
+            FilledQuantity::Filled {
+                cumulative_qty,
+                avg_price: _,
+            } => cumulative_qty,
+        }
+    }
+
     /// Get the total quantity that this order is for.
     pub fn total_quantity(&self) -> Q {
         let q = match self.state.filled_quantity {
