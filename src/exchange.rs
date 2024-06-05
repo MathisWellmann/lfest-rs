@@ -409,13 +409,19 @@ where
     }
 
     /// Removes an executed limit order from the list of active ones.
+    /// order margin updates are handled separately.
     pub(crate) fn remove_executed_order_from_active(&mut self, order_id: OrderId) {
         let order = self
             .active_limit_orders
             .remove(&order_id)
             .expect("The order must have been active; qed");
-        self.lookup_order_nonce_from_user_order_id
-            .remove(order.user_order_id());
+        debug_assert_eq!(order.id(), order_id);
+        if let Some(order_id) = self
+            .lookup_order_nonce_from_user_order_id
+            .remove(order.user_order_id())
+        {
+            debug_assert_eq!(order_id, order.id());
+        }
     }
 
     /// Remove a fee amount from the wallet balance.
@@ -428,6 +434,7 @@ where
 
         let fee: Q::PairedCurrency = trade_value * fee;
         trace!("detract_fee: {fee}");
+        // TODO: this will fail with negative fees. Handle it here.
         let transaction = Transaction::new(EXCHANGE_FEE_ACCOUNT, USER_WALLET_ACCOUNT, fee);
         transaction_accounting
             .create_margin_transfer(transaction)
@@ -471,10 +478,9 @@ where
                     ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill();
                     self.order_margin
-                        .update(order, self.config.contract_spec().fee_maker());
-                    self.order_margin
-                        .remove_order(order, self.config.contract_spec().fee_maker());
+                        .remove_order(order.id(), self.config.contract_spec().fee_maker());
                 } else {
+                    assert!(order.remaining_quantity() > Q::new_zero());
                     order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
                     self.order_margin
                         .update(order, self.config.contract_spec().fee_maker());

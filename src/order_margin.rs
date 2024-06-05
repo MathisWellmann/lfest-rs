@@ -4,7 +4,7 @@ use tracing::trace;
 
 use crate::{
     exchange::ActiveLimitOrders,
-    prelude::Position,
+    prelude::{OrderId, Position},
     types::{Currency, Fee, LimitOrder, MarginCurrency, Pending, Side},
     utils::{max, min},
 };
@@ -32,6 +32,7 @@ where
         order: &LimitOrder<Q, UserOrderId, Pending<Q>>,
         fee_maker: Fee,
     ) {
+        assert!(order.remaining_quantity() > Q::new_zero());
         trace!("update_order: order: {order:?}");
         if let Some(active_order) = self.active_limit_orders.insert(order.id(), order.clone()) {
             assert_ne!(
@@ -41,21 +42,17 @@ where
             assert!(order.remaining_quantity() < active_order.remaining_quantity(), "An update to an existing order must mean the new order has less quantity than the tracked order.");
             debug_assert_eq!(order.id(), active_order.id());
         }
+        // TODO: wrong when the order qty is reduced
         let notional_value = order.remaining_quantity().convert(order.limit_price());
         self.cumulative_order_fees += notional_value * fee_maker;
     }
 
     /// Remove an order from being tracked for margin purposes.
-    pub(crate) fn remove_order(
-        &mut self,
-        order: &LimitOrder<Q, UserOrderId, Pending<Q>>,
-        fee_maker: Fee,
-    ) {
+    pub(crate) fn remove_order(&mut self, order_id: OrderId, fee_maker: Fee) {
         let removed_order = self
             .active_limit_orders
-            .remove(&order.id())
+            .remove(&order_id)
             .expect("Its an internal method call; it must work");
-        assert_eq!(&removed_order, order);
 
         let notional_value = removed_order
             .remaining_quantity()
