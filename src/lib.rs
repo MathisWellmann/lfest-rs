@@ -14,6 +14,7 @@ mod contract_specification;
 mod cornish_fisher;
 mod exchange;
 mod market_state;
+mod market_update;
 mod mock_exchange;
 mod order_filters;
 mod order_margin;
@@ -44,6 +45,7 @@ pub mod prelude {
         exchange::{Account, ActiveLimitOrders, Exchange},
         fee, leverage,
         market_state::MarketState,
+        market_update::*,
         order_filters::{PriceFilter, QuantityFilter},
         position::Position,
         position_inner::PositionInner,

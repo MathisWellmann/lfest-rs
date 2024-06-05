@@ -1,9 +1,9 @@
 use getset::{CopyGetters, Getters, Setters};
 
 use crate::{
-    prelude::PriceFilter,
+    prelude::{MarketUpdate, PriceFilter},
     quote,
-    types::{Currency, MarketUpdate, QuoteCurrency, Result, TimestampNs},
+    types::{Currency, QuoteCurrency, Result, TimestampNs},
 };
 
 /// Some information regarding the state of the market.

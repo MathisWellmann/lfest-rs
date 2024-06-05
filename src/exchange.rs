@@ -11,15 +11,15 @@ use crate::{
     market_state::MarketState,
     order_margin::OrderMargin,
     prelude::{
-        Position, Transaction, EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT,
+        MarketUpdate, Position, Transaction, EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT,
         USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
     },
     quote,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     types::{
         Currency, Error, ExchangeOrderMeta, Fee, Filled, LimitOrder, LimitOrderUpdate,
-        MarginCurrency, MarketOrder, MarketUpdate, NewOrder, OrderError, OrderId, Pending, Result,
-        Side, TimestampNs, UserBalances,
+        MarginCurrency, MarketOrder, NewOrder, OrderError, OrderId, Pending, Result, Side,
+        TimestampNs, UserBalances,
     },
     utils::assert_user_wallet_balance,
 };
