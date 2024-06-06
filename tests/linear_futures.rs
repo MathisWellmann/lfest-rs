@@ -1,11 +1,11 @@
 //! Test file for the linear futures mode of the exchange
 
-use lfest::{mock_exchange_linear, prelude::*, MockTransactionAccounting};
+use lfest::{mock_exchange_linear_with_account_tracker, prelude::*, MockTransactionAccounting};
 
 #[test]
 #[tracing_test::traced_test]
 fn lin_long_market_win_full() {
-    let mut exchange = mock_exchange_linear();
+    let mut exchange = mock_exchange_linear_with_account_tracker(quote!(1000));
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
@@ -17,6 +17,17 @@ fn lin_long_market_win_full() {
             },
         )
         .unwrap();
+    assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 0);
+    assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
+    assert_eq!(
+        exchange.account_tracker().num_fully_filled_limit_orders(),
+        0
+    );
+    assert_eq!(exchange.account_tracker().num_submitted_market_orders(), 0);
+    assert_eq!(exchange.account_tracker().num_filled_market_orders(), 0);
+    assert_eq!(exchange.account_tracker().buy_volume(), quote!(0));
+    assert_eq!(exchange.account_tracker().sell_volume(), quote!(0));
+    assert_eq!(exchange.account_tracker().cumulative_fees(), quote!(0));
 
     exchange
         .submit_market_order(MarketOrder::new(Side::Buy, base!(5.0)).unwrap())
@@ -25,6 +36,17 @@ fn lin_long_market_win_full() {
     let ask = quote!(101);
     let order_updates = exchange.update_state(0, bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
+    assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 0);
+    assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
+    assert_eq!(
+        exchange.account_tracker().num_fully_filled_limit_orders(),
+        0
+    );
+    assert_eq!(exchange.account_tracker().num_submitted_market_orders(), 1);
+    assert_eq!(exchange.account_tracker().num_filled_market_orders(), 1);
+    assert_eq!(exchange.account_tracker().buy_volume(), quote!(500));
+    assert_eq!(exchange.account_tracker().sell_volume(), quote!(0));
+    assert_eq!(exchange.account_tracker().cumulative_fees(), quote!(0.3));
 
     assert_eq!(
         exchange.position().clone(),
@@ -80,4 +102,15 @@ fn lin_long_market_win_full() {
             order_margin: quote!(0)
         }
     );
+    assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 0);
+    assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
+    assert_eq!(
+        exchange.account_tracker().num_fully_filled_limit_orders(),
+        0
+    );
+    assert_eq!(exchange.account_tracker().num_submitted_market_orders(), 2);
+    assert_eq!(exchange.account_tracker().num_filled_market_orders(), 2);
+    assert_eq!(exchange.account_tracker().buy_volume(), quote!(500));
+    assert_eq!(exchange.account_tracker().sell_volume(), quote!(1000));
+    assert_eq!(exchange.account_tracker().cumulative_fees(), quote!(0.9));
 }

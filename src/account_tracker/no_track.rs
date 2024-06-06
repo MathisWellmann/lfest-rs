@@ -2,8 +2,8 @@ use std::fmt::Display;
 
 use crate::{
     account_tracker::AccountTracker,
-    prelude::MarketState,
-    types::{Currency, MarginCurrency, QuoteCurrency, Side, TimestampNs},
+    prelude::{MarketState, QuoteCurrency, Side, TimestampNs},
+    types::{Currency, MarginCurrency},
 };
 
 /// Performs no tracking of account performance
@@ -14,11 +14,9 @@ impl<M> AccountTracker<M> for NoAccountTracker
 where
     M: Currency + MarginCurrency,
 {
-    fn update(&mut self, _timestamp: TimestampNs, _market_state: &MarketState, _upnl: M) {}
+    fn update(&mut self, _timestamp_ns: TimestampNs, _market_state: &MarketState) {}
 
-    fn log_rpnl(&mut self, _rpnl: M, _ts_ns: i64) {}
-
-    fn log_fee(&mut self, _fee: M) {}
+    fn log_fee(&mut self, _fee_in_margin: M) {}
 
     fn log_limit_order_submission(&mut self) {}
 
@@ -26,9 +24,17 @@ where
 
     fn log_limit_order_fill(&mut self) {}
 
+    fn log_market_order_submission(&mut self) {}
+
     fn log_market_order_fill(&mut self) {}
 
-    fn log_trade(&mut self, _side: Side, _price: QuoteCurrency, _size: M::PairedCurrency) {}
+    fn log_trade(
+        &mut self,
+        _side: Side,
+        _price: QuoteCurrency,
+        _quantity: <M as Currency>::PairedCurrency,
+    ) {
+    }
 }
 
 impl Display for NoAccountTracker {

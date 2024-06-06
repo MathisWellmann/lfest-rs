@@ -1,11 +1,15 @@
 //! Test if a pure limit order strategy works correctly
 
-use lfest::{mock_exchange_linear, prelude::*, trade, MockTransactionAccounting};
+use lfest::{
+    mock_exchange_linear, mock_exchange_linear_with_account_tracker, prelude::*, trade,
+    MockTransactionAccounting,
+};
 
 #[test]
 #[tracing_test::traced_test]
 fn limit_orders_only() {
-    let mut exchange = mock_exchange_linear();
+    let mut exchange = mock_exchange_linear_with_account_tracker(quote!(1000));
+
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let fee_maker = exchange.config().contract_spec().fee_maker();
@@ -27,6 +31,17 @@ fn limit_orders_only() {
             order_margin: quote!(990),
         }
     );
+    assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 1);
+    assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
+    assert_eq!(
+        exchange.account_tracker().num_fully_filled_limit_orders(),
+        0
+    );
+    assert_eq!(exchange.account_tracker().num_submitted_market_orders(), 0);
+    assert_eq!(exchange.account_tracker().num_filled_market_orders(), 0);
+    assert_eq!(exchange.account_tracker().buy_volume(), quote!(0));
+    assert_eq!(exchange.account_tracker().sell_volume(), quote!(0));
+    assert_eq!(exchange.account_tracker().cumulative_fees(), quote!(0));
 
     let order_updates = exchange
         .update_state(1, trade!(quote!(100), base!(10), Side::Sell))
@@ -59,6 +74,17 @@ fn limit_orders_only() {
             order_margin: quote!(0)
         }
     );
+    assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 1);
+    assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
+    assert_eq!(
+        exchange.account_tracker().num_fully_filled_limit_orders(),
+        1
+    );
+    assert_eq!(exchange.account_tracker().num_submitted_market_orders(), 0);
+    assert_eq!(exchange.account_tracker().num_filled_market_orders(), 0);
+    assert_eq!(exchange.account_tracker().buy_volume(), quote!(990));
+    assert_eq!(exchange.account_tracker().sell_volume(), quote!(0));
+    assert_eq!(exchange.account_tracker().cumulative_fees(), quote!(0.198));
 
     let sell_price = quote!(105);
     let fee1 = qty.convert(sell_price) * fee_maker;
@@ -91,6 +117,17 @@ fn limit_orders_only() {
             order_margin: quote!(0)
         }
     );
+    assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 2);
+    assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
+    assert_eq!(
+        exchange.account_tracker().num_fully_filled_limit_orders(),
+        2
+    );
+    assert_eq!(exchange.account_tracker().num_submitted_market_orders(), 0);
+    assert_eq!(exchange.account_tracker().num_filled_market_orders(), 0);
+    assert_eq!(exchange.account_tracker().buy_volume(), quote!(990));
+    assert_eq!(exchange.account_tracker().sell_volume(), quote!(1039.5));
+    assert_eq!(exchange.account_tracker().cumulative_fees(), quote!(0.4059));
 }
 
 #[test]

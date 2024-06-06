@@ -1,6 +1,6 @@
 use crate::{
-    prelude::{Currency, MarketState, QuoteCurrency, Side},
-    types::{MarginCurrency, TimestampNs},
+    prelude::{Currency, MarketState, QuoteCurrency, Side, TimestampNs},
+    types::MarginCurrency,
 };
 
 /// Something that tracks the performance of the Account.
@@ -11,37 +11,27 @@ pub trait AccountTracker<M>: Send
 where
     M: Currency + MarginCurrency,
 {
-    /// Update with each tick, using data provided in update_state method of
-    /// Exchange.
-    ///
-    /// # Arguments:
-    /// `timestamp_ns`: timestamp of latest tick in nanoseconds
-    /// `price`: price of latest tick
-    /// `upnl`: unrealized profit and loss of account in current tick
-    fn update(&mut self, timestamp_ns: TimestampNs, market_state: &MarketState, upnl: M);
+    /// Update with newest market info.
+    fn update(&mut self, timestamp_ns: TimestampNs, market_state: &MarketState);
 
-    /// Log a realized profit and loss event
-    ///
-    /// # Arguments:
-    /// `net_rpnl`: The realized profit and loss, denoted in margin currency.
-    /// `ts_ns`: The timestamp in nanoseconds of this event.
-    fn log_rpnl(&mut self, net_rpnl: M, ts_ns: TimestampNs);
-
-    /// Log a fee, measured in the margin currency
+    /// Log a fee event.
     fn log_fee(&mut self, fee_in_margin: M);
 
-    /// Log a limit order submission event
+    /// Log a `LimitOrder` submission event.
     fn log_limit_order_submission(&mut self);
 
-    /// Log a limit order cancellation event
+    /// Log a `LimitOrder` cancellation event.
     fn log_limit_order_cancellation(&mut self);
 
-    /// Log a limit order fill event.
+    /// Log a `LimitOrder` fill event.
     fn log_limit_order_fill(&mut self);
+
+    /// Log a `MarketOrder` submission event.
+    fn log_market_order_submission(&mut self);
 
     /// Log a market order fill event.
     fn log_market_order_fill(&mut self);
 
-    /// Log a trade event where some order got filled and the position changed
+    /// Log a trade
     fn log_trade(&mut self, side: Side, price: QuoteCurrency, quantity: M::PairedCurrency);
 }

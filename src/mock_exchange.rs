@@ -2,7 +2,10 @@
 
 use fpdec::{Dec, Decimal};
 
-use crate::{account_tracker::NoAccountTracker, prelude::*};
+use crate::{
+    account_tracker::{FullAccountTracker, NoAccountTracker},
+    prelude::*,
+};
 
 /// Constructs a mock exchange (for linear futures) for testing.
 /// The size is denoted in `BaseCurrency`
@@ -24,6 +27,35 @@ pub fn mock_exchange_linear(
     )
     .expect("works");
     let config = Config::new(quote!(1000), 200, contract_spec).unwrap();
+    Exchange::new(acc_tracker, config)
+}
+
+/// Constructs a mock exchange (for linear futures) for testing.
+/// The size is denoted in `BaseCurrency`
+/// and the margin currency is `QuoteCurency`
+pub fn mock_exchange_linear_with_account_tracker(
+    starting_balance: QuoteCurrency,
+) -> Exchange<
+    FullAccountTracker<QuoteCurrency>,
+    BaseCurrency,
+    (),
+    InMemoryTransactionAccounting<QuoteCurrency>,
+> {
+    let acc_tracker = FullAccountTracker::new(starting_balance);
+    let contract_spec = ContractSpecification::new(
+        leverage!(1),
+        Dec!(0.5),
+        PriceFilter::default(),
+        QuantityFilter {
+            min_quantity: base!(0),
+            max_quantity: base!(0),
+            step_size: base!(0.01),
+        },
+        fee!(0.0002),
+        fee!(0.0006),
+    )
+    .expect("works");
+    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
     Exchange::new(acc_tracker, config)
 }
 

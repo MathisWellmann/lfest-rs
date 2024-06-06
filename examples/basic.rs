@@ -5,10 +5,7 @@ mod load_trades;
 
 use std::{convert::TryInto, time::Instant};
 
-use lfest::{
-    account_tracker::{FullAccountTracker, ReturnsSource},
-    prelude::*,
-};
+use lfest::{account_tracker::FullAccountTracker, prelude::*};
 use load_trades::load_prices_from_csv;
 use rand::{thread_rng, Rng};
 use tracing::error;
@@ -76,41 +73,8 @@ fn main() {
         }
     }
     println!(
-        "time to simulate 1 million historical trades and {} orders: {}ms",
-        exchange.account_tracker().num_trades(),
-        t0.elapsed().as_millis()
+        "time to simulate 1 million historical trades: {}micros",
+        t0.elapsed().as_micros()
     );
-    analyze_results(&exchange.account_tracker());
-}
-
-/// analyze the resulting performance metrics of the traded orders
-fn analyze_results<M>(acc_tracker: &FullAccountTracker<M>)
-where
-    M: Currency + MarginCurrency + Send,
-{
-    let win_ratio = acc_tracker.win_ratio();
-    let profit_loss_ratio = acc_tracker.profit_loss_ratio();
-    let rpnl = acc_tracker.total_rpnl();
-    let sharpe = acc_tracker.sharpe(ReturnsSource::Hourly, false);
-    let sortino = acc_tracker.sortino(ReturnsSource::Hourly, false);
-    let max_drawdown = acc_tracker.max_drawdown_wallet_balance();
-    let max_upnl_drawdown = acc_tracker.max_drawdown_total();
-    let num_trades = acc_tracker.num_trades();
-    let turnover = acc_tracker.turnover();
-    let buy_ratio = acc_tracker.buy_ratio();
-
-    println!(
-        "win_ratio: {:.2}, profit_loss_ratio: {:.2}, rpnl: {:.2}, sharpe: {:.2}, sortino: {:.2}, \
-    dd: {:.2}, upnl_dd: {:.2}, #trades: {}, turnover: {}, buy_ratio: {:.2},",
-        win_ratio,
-        profit_loss_ratio,
-        rpnl,
-        sharpe,
-        sortino,
-        max_drawdown,
-        max_upnl_drawdown,
-        num_trades,
-        turnover,
-        buy_ratio,
-    );
+    println!("account_tracker: {}", exchange.account_tracker());
 }

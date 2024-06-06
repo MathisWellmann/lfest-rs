@@ -150,12 +150,9 @@ where
             &market_update,
             self.config.contract_spec().price_filter(),
         )?;
-        self.account_tracker.update(
-            timestamp_ns,
-            &self.market_state,
-            self.position()
-                .unrealized_pnl(self.market_state().bid(), self.market_state().ask()),
-        );
+        self.account_tracker
+            .update(timestamp_ns, &self.market_state);
+
         if let Err(e) = <IsolatedMarginRiskEngine<<Q as Currency>::PairedCurrency> as RiskEngine<
             <Q as Currency>::PairedCurrency,
             UserOrderId,
@@ -181,6 +178,8 @@ where
         &mut self,
         order: MarketOrder<Q, UserOrderId, NewOrder>,
     ) -> Result<MarketOrder<Q, UserOrderId, Filled<Q>>> {
+        self.account_tracker.log_market_order_submission();
+
         // Basic checks
         self.config
             .contract_spec()
@@ -211,7 +210,6 @@ where
             available_wallet_balance,
         )?;
 
-        // From here on, everything is infallible
         let filled_order = order.into_filled(fill_price, self.market_state.current_timestamp_ns());
         self.settle_filled_market_order(filled_order.clone());
 
@@ -227,6 +225,7 @@ where
             &mut self.transaction_accounting,
             filled_qty.convert(fill_price),
             self.config.contract_spec().fee_taker(),
+            &mut self.account_tracker,
         );
 
         self.position.change_position(
@@ -236,6 +235,7 @@ where
             &mut self.transaction_accounting,
             self.config.contract_spec().init_margin_req(),
         );
+        self.account_tracker.log_market_order_fill();
         self.account_tracker
             .log_trade(order.side(), fill_price, filled_qty);
     }
@@ -429,6 +429,7 @@ where
         transaction_accounting: &mut TransactionAccountingT,
         trade_value: Q::PairedCurrency,
         fee: Fee,
+        account_tracker: &mut A,
     ) {
         assert!(trade_value > Q::PairedCurrency::new_zero());
 
@@ -439,6 +440,8 @@ where
         transaction_accounting
             .create_margin_transfer(transaction)
             .expect("margin transfer works");
+
+        account_tracker.log_fee(fee);
 
         assert_user_wallet_balance(transaction_accounting);
     }
@@ -491,6 +494,7 @@ where
                     &mut self.transaction_accounting,
                     filled_qty.convert(order.limit_price()),
                     self.config.contract_spec().fee_maker(),
+                    &mut self.account_tracker,
                 );
 
                 let new_order_margin = self.order_margin.order_margin(
@@ -520,6 +524,8 @@ where
                     &mut self.transaction_accounting,
                     self.config.contract_spec().init_margin_req(),
                 );
+                self.account_tracker
+                    .log_trade(order.side(), order.limit_price(), filled_qty);
             }
         }
         ids_to_remove
