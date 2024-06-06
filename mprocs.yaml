@@ -13,3 +13,5 @@ procs:
     shell: "taplo fmt"
   semver-checks:
     shell: "cargo semver-checks"
+  basic-example:
+    shell: "cargo run --example basic"
