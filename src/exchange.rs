@@ -478,7 +478,7 @@ where
                     ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill();
                     self.order_margin
-                        .remove_order(order.id(), self.config.contract_spec().fee_maker());
+                        .remove(order.id(), self.config.contract_spec().fee_maker());
                 } else {
                     assert!(order.remaining_quantity() > Q::new_zero());
                     order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));

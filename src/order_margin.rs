@@ -41,14 +41,20 @@ where
             );
             assert!(order.remaining_quantity() < active_order.remaining_quantity(), "An update to an existing order must mean the new order has less quantity than the tracked order.");
             debug_assert_eq!(order.id(), active_order.id());
+
+            // when an existing limit order is updated for margin purposes here, its quantity is always reduced.
+            let removed_qty = active_order.remaining_quantity() - order.remaining_quantity();
+            assert!(removed_qty > Q::new_zero());
+            self.cumulative_order_fees -= removed_qty.convert(order.limit_price()) * fee_maker;
+            assert!(self.cumulative_order_fees >= Q::PairedCurrency::new_zero());
+        } else {
+            let notional_value = order.remaining_quantity().convert(order.limit_price());
+            self.cumulative_order_fees += notional_value * fee_maker;
         }
-        // TODO: wrong when the order qty is reduced
-        let notional_value = order.remaining_quantity().convert(order.limit_price());
-        self.cumulative_order_fees += notional_value * fee_maker;
     }
 
     /// Remove an order from being tracked for margin purposes.
-    pub(crate) fn remove_order(&mut self, order_id: OrderId, fee_maker: Fee) {
+    pub(crate) fn remove(&mut self, order_id: OrderId, fee_maker: Fee) {
         let removed_order = self
             .active_limit_orders
             .remove(&order_id)
@@ -246,12 +252,14 @@ mod tests {
         let qty = BaseCurrency::new(Decimal::from(qty));
         let limit_price = QuoteCurrency::new(Decimal::from(limit_price));
 
-        for i in 0..n {
+        let orders = Vec::from_iter((0..n).map(|i| {
             let order = LimitOrder::new(side, limit_price, qty).unwrap();
             let meta = ExchangeOrderMeta::new((i as u64).into(), i as i64);
-            let order = order.into_pending(meta);
-            order_margin.update(&order, fee_maker);
-        }
+            order.into_pending(meta)
+        }));
+        orders
+            .iter()
+            .for_each(|order| order_margin.update(&order, fee_maker));
 
         let mult = QuoteCurrency::new(Decimal::from(n as u64));
         assert_eq!(
@@ -262,6 +270,15 @@ mod tests {
             order_margin.cumulative_order_fees(),
             mult * qty.convert(limit_price) * fee_maker
         );
+
+        orders
+            .iter()
+            .for_each(|order| order_margin.remove(order.id(), fee_maker));
+        assert_eq!(
+            order_margin.order_margin(init_margin_req, &Position::<BaseCurrency>::Neutral),
+            quote!(0)
+        );
+        assert_eq!(order_margin.cumulative_order_fees(), quote!(0));
     }
 
     #[test_case::test_matrix(
@@ -286,18 +303,23 @@ mod tests {
         let qty = BaseCurrency::new(Decimal::from(qty));
         let limit_price = QuoteCurrency::new(Decimal::from(limit_price));
 
-        for i in 0..n {
+        let buy_orders = Vec::from_iter((0..n).map(|i| {
             let order = LimitOrder::new(side, limit_price, qty).unwrap();
             let meta = ExchangeOrderMeta::new((i as u64).into(), i as i64);
-            let order = order.into_pending(meta);
+            order.into_pending(meta)
+        }));
+        buy_orders.iter().for_each(|order| {
             order_margin.update(&order, fee_maker);
-        }
-        for i in 0..n {
+        });
+
+        let sell_orders = Vec::from_iter((0..n).map(|i| {
             let order = LimitOrder::new(side.inverted(), limit_price, qty).unwrap();
             let meta = ExchangeOrderMeta::new(((n + i) as u64).into(), (n + i) as i64);
-            let order = order.into_pending(meta);
+            order.into_pending(meta)
+        }));
+        sell_orders.iter().for_each(|order| {
             order_margin.update(&order, fee_maker);
-        }
+        });
 
         let mult = QuoteCurrency::new(Decimal::from(n as u64));
         assert_eq!(
@@ -308,6 +330,18 @@ mod tests {
             order_margin.cumulative_order_fees(),
             quote!(2) * mult * qty.convert(limit_price) * fee_maker
         );
+
+        buy_orders
+            .iter()
+            .for_each(|order| order_margin.remove(order.id(), fee_maker));
+        sell_orders
+            .iter()
+            .for_each(|order| order_margin.remove(order.id(), fee_maker));
+        assert_eq!(
+            order_margin.order_margin(init_margin_req, &Position::<BaseCurrency>::Neutral),
+            quote!(0)
+        );
+        assert_eq!(order_margin.cumulative_order_fees(), quote!(0));
     }
 
     /// The position always cancels out the orders, so the order margin is zero.
@@ -363,6 +397,48 @@ mod tests {
         assert_eq!(
             order_margin.cumulative_order_fees(),
             qty.convert(limit_price) * fee_maker
+        );
+    }
+
+    #[test_case::test_matrix(
+        [1, 2, 5],
+        [Side::Buy, Side::Sell],
+        [70, 90, 110],
+        [1, 2, 3]
+    )]
+    fn order_margin_neutral_update_partial_fills(
+        leverage: u32,
+        side: Side,
+        limit_price: u32,
+        qty: u32,
+    ) {
+        let mut order_margin = OrderMargin::<_, ()>::default();
+
+        let init_margin_req = f64_to_decimal(1.0 / leverage as f64, Dec!(0.01));
+        let fee_maker = fee!(0.0002);
+
+        let qty = BaseCurrency::new(Decimal::from(qty));
+        let limit_price = QuoteCurrency::new(Decimal::from(limit_price));
+
+        let order = LimitOrder::new(side, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0);
+        let mut order = order.into_pending(meta);
+        order_margin.update(&order, fee_maker);
+
+        // Now partially fill the order
+        let filled_qty = qty / base!(2);
+        assert!(order.fill(filled_qty, 0).is_none());
+        order_margin.update(&order, fee_maker);
+
+        let remaining_qty = order.remaining_quantity();
+        assert_eq!(remaining_qty, filled_qty);
+        assert_eq!(
+            order_margin.order_margin(init_margin_req, &Position::Neutral),
+            remaining_qty.convert(limit_price) * init_margin_req
+        );
+        assert_eq!(
+            order_margin.cumulative_order_fees(),
+            remaining_qty.convert(limit_price) * fee_maker
         );
     }
 
