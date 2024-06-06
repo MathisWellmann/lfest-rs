@@ -21,14 +21,14 @@ This makes it impossible to mistakenly input for example a `USD` denoted value i
 - :chart: Integrated performance tracking.    
 Use the existing [`FullAccountTracker`](https://docs.rs/lfest/latest/lfest/account_tracker/struct.FullAccountTracker.html)  
 or implement your own using the [`AccountTracker`](https://docs.rs/lfest/latest/lfest/account_tracker/trait.AccountTracker.html) trait.
-- :heavy_check_mark: Broad test coverage, to get closer to ensured correctness.
-- :mag: Auditable due to its small and consice codebase. ~ 6k LOC
+- :heavy_check_mark: good test coverage and heavy use of assertions, to get to ensure correctness.
+- :mag: Auditable due to its small and consice codebase.
 - :page_with_curl: Supports both `linear` and `inverse` futures contracts.
 - :no_entry: Order filtering to make sure the price and quantity follow certain rules. See:    
 [`PriceFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.PriceFilter.html)     
 [`QuantityFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuantityFilter.html)    
 - `IsolatedMarginRiskEngine`
-- Double-Entry Bookkeeping is used to ensure correct balance transfers.
+- Double-Entry Bookkeeping is used to ensure the accounting-equation always holds.
 
 ### Order Types
 The supported order types are:
@@ -64,7 +64,7 @@ Some of these metric may behave differently from what you would expect, so make 
 To use this crate in your project, add the following to your Cargo.toml:
 ```ignore
 [dependencies]
-lfest = "0.46"
+lfest = "*" # or lookup newest version on `crates.io`
 ```
 
 Then proceed to use it in your code.
@@ -76,8 +76,7 @@ For an example see [examples](examples/basic.rs)
 - Funding rate (support `settle_funding_period` in `ClearingHouse`)
 - Multiple accounts (low priority)
 - Multiple markets (low priority)
-- Portfolio `RiskEngine` for multiple markets
-- Split out `FullAccountTracker` into smaller and easier to test units (Good first contribution).
+- Portfolio `RiskEngine` for multiple markets akin to `SPAN`
 - Support for updating leverage of a position.
 - Support auto-deleveraging
 - Benchmarking
@@ -89,9 +88,6 @@ Would love to see you use and contribute to this project. Even just adding more 
 
 ### Donations :moneybag: :money_with_wings:
 I you would like to support the development of this crate, feel free to send over a donation:
-
-Or if you're a greedy [Ferengi](https://memory-alpha.fandom.com/wiki/Ferengi) looking for work, 
-get payed to work on this project (Send me an [eMail](wellmannmathis@gmail.com)).
 
 Monero (XMR) address:
 ```plain
