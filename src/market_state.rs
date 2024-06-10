@@ -70,7 +70,7 @@ impl MarketState {
     pub fn from_components(
         bid: QuoteCurrency,
         ask: QuoteCurrency,
-        current_ts_ns: i64,
+        current_ts_ns: TimestampNs,
         step: u64,
     ) -> Self {
         Self {

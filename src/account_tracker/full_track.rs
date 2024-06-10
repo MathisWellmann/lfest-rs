@@ -1,7 +1,11 @@
 use std::fmt::Display;
 
 use getset::CopyGetters;
-use sliding_features::{Drawdown, Echo, LnReturn, View};
+use sliding_features::{
+    pure_functions::Echo,
+    rolling::{Drawdown, LnReturn, WelfordRolling},
+    View,
+};
 
 use crate::{
     account_tracker::AccountTracker,
@@ -14,6 +18,7 @@ use crate::{
 const DAILY_NS: TimestampNs = 86_400_000_000_000;
 
 /// Keep track of Account performance statistics.
+/// Must update in `O(1)` and also compute performance measures in `O(1)`.
 #[derive(Debug, Clone, CopyGetters)]
 pub struct FullAccountTracker<M>
 where
@@ -59,8 +64,13 @@ where
 
     /// Keep track of natural logarithmic returns of users funds.
     user_balances_ln_return: LnReturn<Echo>,
-    drawdown_user_balances: Drawdown<Echo>,
-    drawdown_market: Drawdown<Echo>,
+    drawdown_user_balances: Drawdown<Echo>, // Drawdown of realized user balances.
+    drawdown_market: Drawdown<Echo>,        // Drawdown of the market.
+    user_balances_ln_return_stats: WelfordRolling<Echo>, // Used for `sharpe` and `kelly_leverage`
+    user_balances_pos_ln_return_stats: WelfordRolling<Echo>, // Used for `sortino`
+
+    /// last sum of all user balances.
+    last_balance_sum: M,
 }
 
 /// TODO: create its own `risk` crate out of these implementations for better
@@ -95,9 +105,13 @@ where
             ts_first: 0,
             ts_last: 0,
 
-            user_balances_ln_return: LnReturn::new(Echo::new()),
+            user_balances_ln_return: LnReturn::default(),
             drawdown_user_balances: Drawdown::default(),
             drawdown_market: Drawdown::default(),
+            user_balances_ln_return_stats: WelfordRolling::default(),
+            user_balances_pos_ln_return_stats: WelfordRolling::default(),
+
+            last_balance_sum: M::new_zero(),
         }
     }
 
@@ -148,6 +162,56 @@ where
     pub fn drawdown_market(&self) -> f64 {
         self.drawdown_market.last().unwrap_or(0.0)
     }
+
+    /// The realized profit and loss of the users account.
+    /// Unrealized pnl not included.
+    pub fn rpnl(&self) -> M {
+        self.last_balance_sum - self.wallet_balance_start
+    }
+
+    /// Return the raw sharpe ratio that has been derived from the sampled returns of the users balances.
+    /// This sharpe ratio is not annualized.
+    pub fn sharpe(&self, risk_free_is_buy_and_hold: bool) -> Option<f64> {
+        let std_dev = self.user_balances_ln_return_stats.last()?;
+        let rpnl = decimal_to_f64(*self.rpnl().as_ref());
+
+        let risk_offset = if risk_free_is_buy_and_hold {
+            decimal_to_f64(*self.buy_and_hold_return().as_ref())
+        } else {
+            0.0
+        };
+
+        Some((rpnl - risk_offset) / std_dev)
+    }
+
+    /// Returns the theoretical kelly leverage that would maximize the compounded growth rate,
+    /// assuming the returns are normally distributed. Which they almost never are. So be aware.
+    pub fn kelly_leverage(&self) -> f64 {
+        let mean_return = self.user_balances_ln_return_stats.mean();
+        let return_variance = self.user_balances_ln_return_stats.variance();
+        assert!(return_variance >= 0.0);
+
+        if return_variance == 0.0 {
+            return 0.0;
+        }
+
+        mean_return / return_variance
+    }
+
+    /// Return the raw sortino ratio that has been derived from the sampled returns of the users balances.
+    /// This sortino ratio is not annualized.
+    pub fn sortino(&self, risk_free_is_buy_and_hold: bool) -> Option<f64> {
+        let std_dev = self.user_balances_pos_ln_return_stats.last()?;
+        let rpnl = decimal_to_f64(*self.rpnl().as_ref());
+
+        let risk_offset = if risk_free_is_buy_and_hold {
+            decimal_to_f64(*self.buy_and_hold_return().as_ref())
+        } else {
+            0.0
+        };
+
+        Some((rpnl - risk_offset) / std_dev)
+    }
 }
 
 impl<M> AccountTracker<M> for FullAccountTracker<M>
@@ -170,9 +234,19 @@ where
     }
 
     fn sample_user_balances(&mut self, user_balances: &UserBalances<M>) {
-        let balance_sum = decimal_to_f64(*balance_sum(user_balances).as_ref());
+        let balance_sum = balance_sum(user_balances);
+        self.last_balance_sum = balance_sum;
+
+        let balance_sum = decimal_to_f64(*balance_sum.as_ref());
         self.user_balances_ln_return.update(balance_sum);
         self.drawdown_user_balances.update(balance_sum);
+
+        if let Some(ln_ret) = self.user_balances_ln_return.last() {
+            self.user_balances_ln_return_stats.update(ln_ret);
+            if ln_ret > 0.0 {
+                self.user_balances_pos_ln_return_stats.update(ln_ret);
+            }
+        }
     }
 
     fn log_fee(&mut self, fee_in_margin: M) {
@@ -218,6 +292,10 @@ where
         write!(
             f,
             "
+rpnl: {},
+sharpe: {:?},
+sortino: {:?},
+kelly_leverage: {},
 buy_volume: {},
 sell_volume: {},
 turnover: {},
@@ -227,6 +305,10 @@ num_trading_days: {},
 limit_order_fill_ratio: {},
 limit_order_cancellation_ratio: {},
             ",
+            self.rpnl(),
+            self.sharpe(false),
+            self.sortino(false),
+            self.kelly_leverage(),
             self.buy_volume,
             self.sell_volume,
             self.turnover(),
@@ -241,13 +323,33 @@ limit_order_cancellation_ratio: {},
 
 #[cfg(test)]
 mod tests {
+    use market_state::MarketState;
+
     use super::*;
+    use crate::market_state;
 
     #[test]
-    fn acc_tracker_cumulative_fees() {
+    fn full_track_cumulative_fees() {
         let mut at = FullAccountTracker::new(quote!(100.0));
         at.log_fee(quote!(0.1));
         at.log_fee(quote!(0.2));
         assert_eq!(at.cumulative_fees(), quote!(0.3));
+    }
+
+    #[test]
+    fn full_track_update() {
+        let mut at = FullAccountTracker::new(quote!(1000));
+        let market_state = MarketState::from_components(quote!(100), quote!(101), 1_000_000, 0);
+        at.update(1_000_000, &market_state);
+        assert_eq!(at.num_submitted_limit_orders(), 0);
+        assert_eq!(at.num_cancelled_limit_orders(), 0);
+        assert_eq!(at.num_fully_filled_limit_orders(), 0);
+        assert_eq!(at.num_submitted_market_orders(), 0);
+        assert_eq!(at.num_filled_market_orders(), 0);
+
+        assert_eq!(at.ts_first, 1_000_000);
+        assert_eq!(at.ts_last, 1_000_000);
+        assert_eq!(at.price_first, quote!(100.5));
+        assert_eq!(at.price_last, quote!(100.5));
     }
 }
