@@ -1,5 +1,5 @@
 use crate::{
-    prelude::{Currency, MarketState, QuoteCurrency, Side, TimestampNs, UserBalances},
+    prelude::{Currency, MarketState, QuoteCurrency, Side, UserBalances},
     types::MarginCurrency,
 };
 
@@ -12,7 +12,7 @@ where
     M: Currency + MarginCurrency,
 {
     /// Update with newest market info.
-    fn update(&mut self, timestamp_ns: TimestampNs, market_state: &MarketState);
+    fn update(&mut self, market_state: &MarketState);
 
     /// Process information about the user balances.
     fn sample_user_balances(&mut self, user_balances: &UserBalances<M>);

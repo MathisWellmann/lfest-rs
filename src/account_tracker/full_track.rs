@@ -218,11 +218,11 @@ impl<M> AccountTracker<M> for FullAccountTracker<M>
 where
     M: Currency + MarginCurrency + Send,
 {
-    fn update(&mut self, timestamp_ns: TimestampNs, market_state: &crate::prelude::MarketState) {
+    fn update(&mut self, market_state: &crate::prelude::MarketState) {
         if self.ts_first == 0.into() {
-            self.ts_first = timestamp_ns;
+            self.ts_first = market_state.current_timestamp_ns();
         }
-        self.ts_last = timestamp_ns;
+        self.ts_last = market_state.current_timestamp_ns();
 
         if self.price_first == quote!(0) {
             self.price_first = market_state.mid_price();
@@ -341,7 +341,7 @@ mod tests {
         let mut at = FullAccountTracker::new(quote!(1000));
         let market_state =
             MarketState::from_components(quote!(100), quote!(101), 1_000_000.into(), 0);
-        at.update(1_000_000.into(), &market_state);
+        at.update(&market_state);
         assert_eq!(at.num_submitted_limit_orders(), 0);
         assert_eq!(at.num_cancelled_limit_orders(), 0);
         assert_eq!(at.num_fully_filled_limit_orders(), 0);

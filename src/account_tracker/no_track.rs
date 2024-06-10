@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{
     account_tracker::AccountTracker,
-    prelude::{MarketState, QuoteCurrency, Side, TimestampNs},
+    prelude::{MarketState, QuoteCurrency, Side},
     types::{Currency, MarginCurrency},
 };
 
@@ -14,7 +14,7 @@ impl<M> AccountTracker<M> for NoAccountTracker
 where
     M: Currency + MarginCurrency,
 {
-    fn update(&mut self, _timestamp_ns: TimestampNs, _market_state: &MarketState) {}
+    fn update(&mut self, _market_state: &MarketState) {}
 
     fn sample_user_balances(&mut self, _user_balances: &crate::prelude::UserBalances<M>) {}
 
