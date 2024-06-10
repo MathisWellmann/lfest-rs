@@ -170,18 +170,13 @@ where
     }
 
     /// Return the raw sharpe ratio that has been derived from the sampled returns of the users balances.
-    /// This sharpe ratio is not annualized.
-    pub fn sharpe(&self, risk_free_is_buy_and_hold: bool) -> Option<f64> {
+    /// This sharpe ratio is not annualized and does not include a risk free rate.
+    pub fn sharpe(&self) -> Option<f64> {
         let std_dev = self.user_balances_ln_return_stats.last()?;
-        let rpnl = decimal_to_f64(*self.rpnl().as_ref());
+        let mean_return = self.user_balances_ln_return_stats.mean();
 
-        let risk_offset = if risk_free_is_buy_and_hold {
-            decimal_to_f64(*self.buy_and_hold_return().as_ref())
-        } else {
-            0.0
-        };
-
-        Some((rpnl - risk_offset) / std_dev)
+        // No risk free rate subtracted.
+        Some(mean_return / std_dev)
     }
 
     /// Returns the theoretical kelly leverage that would maximize the compounded growth rate,
@@ -199,18 +194,13 @@ where
     }
 
     /// Return the raw sortino ratio that has been derived from the sampled returns of the users balances.
-    /// This sortino ratio is not annualized.
-    pub fn sortino(&self, risk_free_is_buy_and_hold: bool) -> Option<f64> {
+    /// This sortino ratio is not annualized and does not include a risk free rate.
+    pub fn sortino(&self) -> Option<f64> {
         let std_dev = self.user_balances_pos_ln_return_stats.last()?;
-        let rpnl = decimal_to_f64(*self.rpnl().as_ref());
+        let mean_pos_return = self.user_balances_pos_ln_return_stats.mean();
 
-        let risk_offset = if risk_free_is_buy_and_hold {
-            decimal_to_f64(*self.buy_and_hold_return().as_ref())
-        } else {
-            0.0
-        };
-
-        Some((rpnl - risk_offset) / std_dev)
+        // No risk free rate subtracted.
+        Some(mean_pos_return / std_dev)
     }
 }
 
@@ -306,8 +296,8 @@ limit_order_fill_ratio: {},
 limit_order_cancellation_ratio: {},
             ",
             self.rpnl(),
-            self.sharpe(false),
-            self.sortino(false),
+            self.sharpe(),
+            self.sortino(),
             self.kelly_leverage(),
             self.buy_volume,
             self.sell_volume,
@@ -352,5 +342,6 @@ mod tests {
         assert_eq!(at.ts_last, 1_000_000.into());
         assert_eq!(at.price_first, quote!(100.5));
         assert_eq!(at.price_last, quote!(100.5));
+        assert_eq!(at.drawdown_market(), 0.0);
     }
 }
