@@ -18,13 +18,19 @@ fn main() {
     let contract_spec = ContractSpecification::new(
         leverage!(1),
         Dec!(0.5),
-        PriceFilter::default(),
+        PriceFilter {
+            min_price: quote!(1),
+            max_price: quote!(100000),
+            tick_size: quote!(0.1),
+            multiplier_up: Dec!(2),
+            multiplier_down: Dec!(0),
+        },
         QuantityFilter::default(),
         fee!(0.0002),
         fee!(0.0006),
     )
     .expect("is valid");
-    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
+    let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
     let mut exchange = Exchange::<
         FullAccountTracker<BaseCurrency>,
         QuoteCurrency,

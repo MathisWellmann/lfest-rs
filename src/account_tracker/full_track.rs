@@ -1,12 +1,14 @@
 use std::fmt::Display;
 
 use getset::CopyGetters;
+use sliding_features::{Drawdown, Echo, LnReturn, View};
 
 use crate::{
     account_tracker::AccountTracker,
-    prelude::Side,
+    prelude::{Side, UserBalances},
     quote,
     types::{Currency, MarginCurrency, QuoteCurrency, TimestampNs},
+    utils::{balance_sum, decimal_to_f64},
 };
 
 const DAILY_NS: TimestampNs = 86_400_000_000_000;
@@ -54,6 +56,11 @@ where
     price_last: QuoteCurrency,
     ts_first: TimestampNs,
     ts_last: TimestampNs,
+
+    /// Keep track of natural logarithmic returns of users funds.
+    user_balances_ln_return: LnReturn<Echo>,
+    drawdown_user_balances: Drawdown<Echo>,
+    drawdown_market: Drawdown<Echo>,
 }
 
 /// TODO: create its own `risk` crate out of these implementations for better
@@ -62,7 +69,7 @@ impl<M> FullAccountTracker<M>
 where
     M: Currency + MarginCurrency + Send,
 {
-    /// Create a new AccTracker struct
+    /// Create a new instance of `Self`.
     #[must_use]
     pub fn new(starting_wb: M) -> Self {
         assert!(
@@ -87,16 +94,20 @@ where
             price_last: quote!(0.0),
             ts_first: 0,
             ts_last: 0,
+
+            user_balances_ln_return: LnReturn::new(Echo::new()),
+            drawdown_user_balances: Drawdown::default(),
+            drawdown_market: Drawdown::default(),
         }
     }
 
-    /// Would be return of buy and hold strategy
+    /// Would be the return of buy and hold strategy
     pub fn buy_and_hold_return(&self) -> M {
         let qty = self.wallet_balance_start.convert(self.price_first);
         M::pnl(self.price_first, self.price_last, qty)
     }
 
-    /// Would be return of sell and hold strategy
+    /// Would be the return of sell and hold strategy
     pub fn sell_and_hold_return(&self) -> M {
         self.buy_and_hold_return().into_negative()
     }
@@ -127,6 +138,16 @@ where
     pub fn turnover(&self) -> M {
         self.buy_volume + self.sell_volume
     }
+
+    /// The drawdown of user balances.
+    pub fn drawdown_user_balances(&self) -> f64 {
+        self.drawdown_user_balances.last().unwrap_or(0.0)
+    }
+
+    /// The drawdown the market experienced.
+    pub fn drawdown_market(&self) -> f64 {
+        self.drawdown_market.last().unwrap_or(0.0)
+    }
 }
 
 impl<M> AccountTracker<M> for FullAccountTracker<M>
@@ -143,6 +164,15 @@ where
             self.price_first = market_state.mid_price();
         }
         self.price_last = market_state.mid_price();
+
+        self.drawdown_market
+            .update(decimal_to_f64(*market_state.mid_price().as_ref()));
+    }
+
+    fn sample_user_balances(&mut self, user_balances: &UserBalances<M>) {
+        let balance_sum = decimal_to_f64(*balance_sum(user_balances).as_ref());
+        self.user_balances_ln_return.update(balance_sum);
+        self.drawdown_user_balances.update(balance_sum);
     }
 
     fn log_fee(&mut self, fee_in_margin: M) {
@@ -194,6 +224,8 @@ turnover: {},
 buy_and_hold_returns: {},
 cumulative_fees: {},
 num_trading_days: {},
+limit_order_fill_ratio: {},
+limit_order_cancellation_ratio: {},
             ",
             self.buy_volume,
             self.sell_volume,
@@ -201,6 +233,8 @@ num_trading_days: {},
             self.buy_and_hold_return(),
             self.cumulative_fees(),
             self.num_trading_days(),
+            self.limit_order_fill_ratio(),
+            self.limit_order_cancellation_ratio(),
         )
     }
 }

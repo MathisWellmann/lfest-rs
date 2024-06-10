@@ -1,8 +1,7 @@
-#[cfg(test)]
 use fpdec::Decimal;
 
 use crate::{
-    prelude::{TransactionAccounting, USER_WALLET_ACCOUNT},
+    prelude::{TransactionAccounting, UserBalances, USER_WALLET_ACCOUNT},
     types::MarginCurrency,
 };
 
@@ -48,7 +47,6 @@ pub fn get_num_digits(step_size: Decimal) -> i32 {
 /// Just used when accuracy is not required.
 /// Mainly for `FullTrack` to compute things that are not supported by `Decimal`
 /// such as sqrt.
-#[cfg(test)]
 pub(crate) fn decimal_to_f64(val: Decimal) -> f64 {
     if val.n_frac_digits() == 0 {
         return val.coefficient() as f64;
@@ -86,6 +84,13 @@ where
         .expect("is valid");
     tracing::trace!("wallet_balance: {wallet_balance}");
     assert!(wallet_balance >= M::new_zero());
+}
+
+/// Sum of all balances in users `TAccount`s.
+pub(crate) fn balance_sum<M: MarginCurrency>(user_balances: &UserBalances<M>) -> M {
+    user_balances.available_wallet_balance
+        + user_balances.position_margin
+        + user_balances.order_margin
 }
 
 #[cfg(test)]

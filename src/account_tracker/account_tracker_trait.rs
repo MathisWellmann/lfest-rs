@@ -1,5 +1,5 @@
 use crate::{
-    prelude::{Currency, MarketState, QuoteCurrency, Side, TimestampNs},
+    prelude::{Currency, MarketState, QuoteCurrency, Side, TimestampNs, UserBalances},
     types::MarginCurrency,
 };
 
@@ -13,6 +13,9 @@ where
 {
     /// Update with newest market info.
     fn update(&mut self, timestamp_ns: TimestampNs, market_state: &MarketState);
+
+    /// Process information about the user balances.
+    fn sample_user_balances(&mut self, user_balances: &UserBalances<M>);
 
     /// Log a fee event.
     fn log_fee(&mut self, fee_in_margin: M);

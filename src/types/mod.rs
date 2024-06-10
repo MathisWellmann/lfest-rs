@@ -49,6 +49,7 @@ impl Display for OrderId {
 }
 
 /// The type of a timestamp that is measured in nanoseconds.
+/// TODO: make struct
 pub type TimestampNs = i64;
 
 /// The user balances.

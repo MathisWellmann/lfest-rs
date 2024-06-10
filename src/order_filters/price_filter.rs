@@ -118,7 +118,7 @@ pub(crate) fn enforce_step_size(
     price: QuoteCurrency,
 ) -> Result<(), Error> {
     if (price % step_size) != QuoteCurrency::new_zero() {
-        return Err(Error::MarketUpdatePriceStepSize);
+        return Err(Error::MarketUpdatePriceStepSize { price, step_size });
     }
     Ok(())
 }

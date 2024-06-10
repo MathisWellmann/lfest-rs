@@ -16,6 +16,7 @@ use crate::{
     },
     quote,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
+    sample_returns_trigger::SampleReturnsTrigger,
     types::{
         Currency, Error, ExchangeOrderMeta, Fee, Filled, LimitOrder, LimitOrderUpdate,
         MarginCurrency, MarketOrder, NewOrder, OrderError, OrderId, Pending, Result, Side,
@@ -86,6 +87,8 @@ where
     lookup_order_nonce_from_user_order_id: HashMap<UserOrderId, OrderId>,
 
     order_margin: OrderMargin<Q, UserOrderId>,
+
+    sample_returns_trigger: SampleReturnsTrigger,
 }
 
 impl<A, Q, UserOrderId, TransactionAccountingT> Exchange<A, Q, UserOrderId, TransactionAccountingT>
@@ -104,6 +107,9 @@ where
             IsolatedMarginRiskEngine::<Q::PairedCurrency>::new(config.contract_spec().clone());
 
         let transaction_accounting = TransactionAccountingT::new(config.starting_wallet_balance());
+        let sample_returns_trigger = SampleReturnsTrigger::new(
+            config.sample_returns_every_n_seconds() as i64 * 1_000_000_000,
+        );
         Self {
             config,
             market_state,
@@ -115,6 +121,7 @@ where
             active_limit_orders: HashMap::default(),
             lookup_order_nonce_from_user_order_id: HashMap::default(),
             order_margin: OrderMargin::default(),
+            sample_returns_trigger,
         }
     }
 
@@ -150,8 +157,13 @@ where
             &market_update,
             self.config.contract_spec().price_filter(),
         )?;
+
         self.account_tracker
             .update(timestamp_ns, &self.market_state);
+        if self.sample_returns_trigger.should_trigger(timestamp_ns) {
+            self.account_tracker
+                .sample_user_balances(&self.user_balances());
+        }
 
         if let Err(e) = <IsolatedMarginRiskEngine<<Q as Currency>::PairedCurrency> as RiskEngine<
             <Q as Currency>::PairedCurrency,

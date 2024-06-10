@@ -1,3 +1,4 @@
+use super::QuoteCurrency;
 use crate::risk_engine::RiskError;
 
 /// Defines the possible order errors that can occur when submitting a new order
@@ -91,7 +92,10 @@ pub enum Error {
     MarketUpdatePriceTooHigh,
 
     #[error("Some price in MarketUpdate does not conform to the step size")]
-    MarketUpdatePriceStepSize,
+    MarketUpdatePriceStepSize {
+        price: QuoteCurrency,
+        step_size: QuoteCurrency,
+    },
 
     #[error("The bid ask spread does not exist in this MarketUpdate.")]
     InvalidMarketUpdateBidAskSpread,

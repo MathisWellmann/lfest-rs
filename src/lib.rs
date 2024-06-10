@@ -20,6 +20,7 @@ mod order_margin;
 mod position;
 mod position_inner;
 mod risk_engine;
+mod sample_returns_trigger;
 #[cfg(test)]
 mod tests;
 mod types;

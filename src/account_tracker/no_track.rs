@@ -16,6 +16,8 @@ where
 {
     fn update(&mut self, _timestamp_ns: TimestampNs, _market_state: &MarketState) {}
 
+    fn sample_user_balances(&mut self, _user_balances: &crate::prelude::UserBalances<M>) {}
+
     fn log_fee(&mut self, _fee_in_margin: M) {}
 
     fn log_limit_order_submission(&mut self) {}
