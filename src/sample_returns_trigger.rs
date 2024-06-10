@@ -12,7 +12,7 @@ impl SampleReturnsTrigger {
     pub(crate) fn new(trigger_interval: TimestampNs) -> Self {
         Self {
             trigger_interval,
-            last_trigger: 0,
+            last_trigger: 0.into(),
             init: true,
         }
     }
@@ -39,13 +39,13 @@ mod tests {
 
     #[test]
     fn sample_returns_trigger() {
-        let interval = 100 * 1_000_000_000;
+        let interval: TimestampNs = (100 * 1_000_000_000).into();
         let mut trigger = SampleReturnsTrigger::new(interval);
 
-        assert!(trigger.should_trigger(2 * interval));
+        assert!(trigger.should_trigger(interval * 2_i64.into()));
         assert_eq!(trigger.init, false);
-        assert_eq!(trigger.last_trigger, 2 * interval);
-        assert!(!trigger.should_trigger(250 * 1_000_000_000));
-        assert!(trigger.should_trigger(300 * 1_000_000_000));
+        assert_eq!(trigger.last_trigger, interval * 2_i64.into());
+        assert!(!trigger.should_trigger((250_i64 * 1_000_000_000).into()));
+        assert!(trigger.should_trigger((300_i64 * 1_000_000_000).into()));
     }
 }

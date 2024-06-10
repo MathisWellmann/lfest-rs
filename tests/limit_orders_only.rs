@@ -16,7 +16,7 @@ fn limit_orders_only() {
 
     let bid = quote!(100);
     let ask = quote!(101);
-    let exec_orders = exchange.update_state(0, bba!(bid, ask)).unwrap();
+    let exec_orders = exchange.update_state(0.into(), bba!(bid, ask)).unwrap();
     assert_eq!(exec_orders.len(), 0);
 
     let qty = base!(9.9);
@@ -44,11 +44,11 @@ fn limit_orders_only() {
     assert_eq!(exchange.account_tracker().cumulative_fees(), quote!(0));
 
     let order_updates = exchange
-        .update_state(1, trade!(quote!(100), base!(10), Side::Sell))
+        .update_state(1.into(), trade!(quote!(100), base!(10), Side::Sell))
         .unwrap();
     assert_eq!(order_updates.len(), 1);
     let order_updates = exchange
-        .update_state(1, bba!(quote!(98), quote!(99)))
+        .update_state(1.into(), bba!(quote!(98), quote!(99)))
         .unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
@@ -92,7 +92,7 @@ fn limit_orders_only() {
     exchange.submit_limit_order(o).unwrap();
 
     let order_updates = exchange
-        .update_state(2, trade!(quote!(105), base!(10), Side::Buy))
+        .update_state(2.into(), trade!(quote!(105), base!(10), Side::Buy))
         .unwrap();
     assert!(!order_updates.is_empty());
     assert_eq!(
@@ -104,7 +104,7 @@ fn limit_orders_only() {
         }
     );
     let order_updates = exchange
-        .update_state(2, bba!(quote!(106), quote!(107)))
+        .update_state(2.into(), bba!(quote!(106), quote!(107)))
         .unwrap();
     assert!(order_updates.is_empty());
 
@@ -137,7 +137,7 @@ fn limit_orders_2() {
 
     let exec_orders = exchange
         .update_state(
-            0,
+            0.into(),
             Bba {
                 bid: quote!(100),
                 ask: quote!(101),
@@ -153,10 +153,10 @@ fn limit_orders_2() {
     exchange.submit_limit_order(o).unwrap();
 
     let exec_orders = exchange
-        .update_state(1, trade!(quote!(98), base!(2), Side::Sell))
+        .update_state(1.into(), trade!(quote!(98), base!(2), Side::Sell))
         .unwrap();
     let _ = exchange
-        .update_state(1, bba!(quote!(98), quote!(99)))
+        .update_state(1.into(), bba!(quote!(98), quote!(99)))
         .unwrap();
     assert_eq!(exec_orders.len(), 1);
 }

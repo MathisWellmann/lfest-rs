@@ -265,13 +265,13 @@ mod tests {
         let limit_price = QuoteCurrency::from(Decimal::from(limit_price));
         let qty = QuoteCurrency::from(Decimal::from(qty));
         let order = LimitOrder::new(side, limit_price, qty).unwrap();
-        let meta = ExchangeOrderMeta::new(0.into(), 0);
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
 
         let mut order = order.into_pending(meta.clone());
-        let filled_order = order.fill(qty, 0).unwrap();
+        let filled_order = order.fill(qty, 0.into()).unwrap();
         assert_eq!(
             filled_order.state(),
-            &Filled::new(meta, 0, limit_price, qty)
+            &Filled::new(meta, 0.into(), limit_price, qty)
         );
         assert_eq!(filled_order.total_quantity(), qty);
     }
@@ -285,11 +285,11 @@ mod tests {
         let limit_price = QuoteCurrency::from(Decimal::from(limit_price));
         let qty = QuoteCurrency::from(Decimal::from(qty));
         let order = LimitOrder::new(side, limit_price, qty).unwrap();
-        let meta = ExchangeOrderMeta::new(0.into(), 0);
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
 
         let qty = QuoteCurrency::from(Decimal::from(qty) / Dec!(2));
         let mut order = order.into_pending(meta.clone());
-        assert!(order.fill(qty, 0).is_none());
+        assert!(order.fill(qty, 0.into()).is_none());
         let mut expected_state = Pending::new(meta);
         expected_state.filled_quantity = FilledQuantity::Filled {
             cumulative_qty: qty,

@@ -5,7 +5,7 @@ use crate::{mock_exchange::MockTransactionAccounting, mock_exchange_linear, prel
 fn submit_limit_buy_order_no_position() {
     let mut exchange = mock_exchange_linear();
     assert!(exchange
-        .update_state(0, bba!(quote!(99), quote!(100)))
+        .update_state(0.into(), bba!(quote!(99), quote!(100)))
         .unwrap()
         .is_empty());
 
@@ -24,21 +24,24 @@ fn submit_limit_buy_order_no_position() {
 
     // Now fill the order
     let ts = 0;
-    let meta = ExchangeOrderMeta::new(0.into(), ts);
+    let meta = ExchangeOrderMeta::new(0.into(), ts.into());
     let mut order = order.into_pending(meta);
     let filled_order = order
-        .fill(order.remaining_quantity(), ts)
+        .fill(order.remaining_quantity(), ts.into())
         .expect("Order is fully filled.");
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0, trade!(quote!(98), base!(5), Side::Sell))
+            .update_state(0.into(), trade!(quote!(98), base!(5), Side::Sell))
             .unwrap(),
         vec![expected_order_update]
     );
     let bid = quote!(96);
     let ask = quote!(99);
-    assert!(exchange.update_state(0, bba!(bid, ask)).unwrap().is_empty());
+    assert!(exchange
+        .update_state(0.into(), bba!(bid, ask))
+        .unwrap()
+        .is_empty());
     let mut accounting = InMemoryTransactionAccounting::new(quote!(1000));
     let init_margin_req = Dec!(1);
     assert_eq!(
@@ -65,19 +68,19 @@ fn submit_limit_buy_order_no_position() {
     exchange.submit_limit_order(order.clone()).unwrap();
 
     assert!(exchange
-        .update_state(0, bba!(quote!(96), quote!(97)))
+        .update_state(0.into(), bba!(quote!(96), quote!(97)))
         .unwrap()
         .is_empty());
 
-    let meta = ExchangeOrderMeta::new(1.into(), 0);
+    let meta = ExchangeOrderMeta::new(1.into(), 0.into());
     let mut order = order.into_pending(meta);
     let filled_order = order
-        .fill(order.remaining_quantity(), ts)
+        .fill(order.remaining_quantity(), ts.into())
         .expect("order is filled with this.");
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0, trade!(quote!(99), base!(5), Side::Buy))
+            .update_state(0.into(), trade!(quote!(99), base!(5), Side::Buy))
             .unwrap(),
         vec![expected_order_update]
     );
@@ -90,7 +93,7 @@ fn submit_limit_buy_order_no_position() {
 fn submit_limit_buy_order_no_position_max() {
     let mut exchange = mock_exchange_linear();
     assert!(exchange
-        .update_state(0, bba!(quote!(100), quote!(101)))
+        .update_state(0.into(), bba!(quote!(100), quote!(101)))
         .unwrap()
         .is_empty());
 
@@ -121,7 +124,7 @@ fn submit_limit_buy_order_with_long() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
-        .update_state(0, bba!(quote!(99), quote!(100)))
+        .update_state(0.into(), bba!(quote!(99), quote!(100)))
         .unwrap()
         .is_empty());
     let order = MarketOrder::new(Side::Buy, base!(9)).unwrap();
@@ -147,7 +150,7 @@ fn submit_limit_buy_order_with_long() {
 
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(100), quote!(101)))
+            .update_state(0.into(), bba!(quote!(100), quote!(101)))
             .unwrap(),
         Vec::new()
     );
@@ -164,15 +167,15 @@ fn submit_limit_buy_order_with_long() {
     exchange.submit_limit_order(order.clone()).unwrap();
 
     let ts = 0;
-    let meta = ExchangeOrderMeta::new(2.into(), ts);
+    let meta = ExchangeOrderMeta::new(2.into(), ts.into());
     let mut order = order.into_pending(meta);
     let filled_order = order
-        .fill(order.remaining_quantity(), ts)
+        .fill(order.remaining_quantity(), ts.into())
         .expect("order is fully filled");
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0, trade!(quote!(101), base!(9), Side::Buy))
+            .update_state(0.into(), trade!(quote!(101), base!(9), Side::Buy))
             .unwrap(),
         vec![expected_order_update]
     );
@@ -186,7 +189,7 @@ fn submit_limit_buy_order_with_short() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
-        .update_state(0, bba!(quote!(100), quote!(101)))
+        .update_state(0.into(), bba!(quote!(100), quote!(101)))
         .unwrap()
         .is_empty());
     let order = MarketOrder::new(Side::Sell, base!(9)).unwrap();
@@ -222,15 +225,15 @@ fn submit_limit_buy_order_with_short() {
     exchange.submit_limit_order(order.clone()).unwrap();
 
     let ts = 0;
-    let meta = ExchangeOrderMeta::new(2.into(), ts);
+    let meta = ExchangeOrderMeta::new(2.into(), ts.into());
     let mut order = order.into_pending(meta);
     let filled_order = order
-        .fill(order.remaining_quantity(), ts)
+        .fill(order.remaining_quantity(), ts.into())
         .expect("Order is filled with this.");
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0, trade!(quote!(100), base!(9), Side::Sell))
+            .update_state(0.into(), trade!(quote!(100), base!(9), Side::Sell))
             .unwrap(),
         vec![expected_order_update]
     );
@@ -244,7 +247,7 @@ fn submit_limit_buy_order_above_ask() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(99), quote!(100)))
+            .update_state(0.into(), bba!(quote!(99), quote!(100)))
             .unwrap(),
         Vec::new()
     );

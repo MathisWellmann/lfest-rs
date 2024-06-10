@@ -87,7 +87,7 @@ mod tests {
             side,
         };
         let limit_order = LimitOrder::new(side.inverted(), price, quantity).unwrap();
-        let meta = ExchangeOrderMeta::new(0.into(), 0);
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let limit_order = limit_order.into_pending(meta);
         assert_eq!(trade.limit_order_filled(&limit_order).unwrap(), quantity);
     }
@@ -106,7 +106,7 @@ mod tests {
             side,
         };
         let limit_order = LimitOrder::new(side.inverted(), price, quantity / base!(2)).unwrap();
-        let meta = ExchangeOrderMeta::new(0.into(), 0);
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let limit_order = limit_order.into_pending(meta);
         assert_eq!(
             trade.limit_order_filled(&limit_order).unwrap(),

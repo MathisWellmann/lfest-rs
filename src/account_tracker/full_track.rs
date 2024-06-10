@@ -15,7 +15,7 @@ use crate::{
     utils::{balance_sum, decimal_to_f64},
 };
 
-const DAILY_NS: TimestampNs = 86_400_000_000_000;
+const DAILY_NS: i64 = 86_400_000_000_000;
 
 /// Keep track of Account performance statistics.
 /// Must update in `O(1)` and also compute performance measures in `O(1)`.
@@ -102,8 +102,8 @@ where
             cumulative_fees: M::new_zero(),
             price_first: quote!(0.0),
             price_last: quote!(0.0),
-            ts_first: 0,
-            ts_last: 0,
+            ts_first: TimestampNs::from(0),
+            ts_last: TimestampNs::from(0),
 
             user_balances_ln_return: LnReturn::default(),
             drawdown_user_balances: Drawdown::default(),
@@ -133,7 +133,7 @@ where
             "Last timestamp must be after first."
         );
 
-        (self.ts_last - self.ts_first) / DAILY_NS
+        Into::<i64>::into((self.ts_last - self.ts_first) / TimestampNs::from(DAILY_NS))
     }
 
     /// Return the ratio of filled limit orders vs number of submitted limit
@@ -219,7 +219,7 @@ where
     M: Currency + MarginCurrency + Send,
 {
     fn update(&mut self, timestamp_ns: TimestampNs, market_state: &crate::prelude::MarketState) {
-        if self.ts_first == 0 {
+        if self.ts_first == 0.into() {
             self.ts_first = timestamp_ns;
         }
         self.ts_last = timestamp_ns;
@@ -339,16 +339,17 @@ mod tests {
     #[test]
     fn full_track_update() {
         let mut at = FullAccountTracker::new(quote!(1000));
-        let market_state = MarketState::from_components(quote!(100), quote!(101), 1_000_000, 0);
-        at.update(1_000_000, &market_state);
+        let market_state =
+            MarketState::from_components(quote!(100), quote!(101), 1_000_000.into(), 0);
+        at.update(1_000_000.into(), &market_state);
         assert_eq!(at.num_submitted_limit_orders(), 0);
         assert_eq!(at.num_cancelled_limit_orders(), 0);
         assert_eq!(at.num_fully_filled_limit_orders(), 0);
         assert_eq!(at.num_submitted_market_orders(), 0);
         assert_eq!(at.num_filled_market_orders(), 0);
 
-        assert_eq!(at.ts_first, 1_000_000);
-        assert_eq!(at.ts_last, 1_000_000);
+        assert_eq!(at.ts_first, 1_000_000.into());
+        assert_eq!(at.ts_last, 1_000_000.into());
         assert_eq!(at.price_first, quote!(100.5));
         assert_eq!(at.price_last, quote!(100.5));
     }

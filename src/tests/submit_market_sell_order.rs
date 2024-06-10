@@ -10,7 +10,7 @@ fn submit_market_sell_order_reject() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(100), quote!(101)))
+            .update_state(0.into(), bba!(quote!(100), quote!(101)))
             .unwrap(),
         Vec::new()
     );
@@ -29,7 +29,7 @@ fn submit_market_sell_order() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(100), quote!(101)))
+            .update_state(0.into(), bba!(quote!(100), quote!(101)))
             .unwrap(),
         Vec::new()
     );
@@ -63,7 +63,7 @@ fn submit_market_sell_order_with_short_position() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(100), quote!(101)))
+            .update_state(0.into(), bba!(quote!(100), quote!(101)))
             .unwrap(),
         Vec::new()
     );
@@ -120,7 +120,7 @@ fn submit_market_sell_order_with_long_position() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
-            .update_state(0, bba!(quote!(99), quote!(100)))
+            .update_state(0.into(), bba!(quote!(99), quote!(100)))
             .unwrap(),
         Vec::new()
     );
@@ -150,7 +150,7 @@ fn submit_market_sell_order_turnaround_long() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
-        .update_state(0, bba!(quote!(99), quote!(100)))
+        .update_state(0.into(), bba!(quote!(99), quote!(100)))
         .unwrap()
         .is_empty());
 

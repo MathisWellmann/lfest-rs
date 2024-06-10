@@ -107,9 +107,9 @@ where
             IsolatedMarginRiskEngine::<Q::PairedCurrency>::new(config.contract_spec().clone());
 
         let transaction_accounting = TransactionAccountingT::new(config.starting_wallet_balance());
-        let sample_returns_trigger = SampleReturnsTrigger::new(
+        let sample_returns_trigger = SampleReturnsTrigger::new(Into::<TimestampNs>::into(
             config.sample_returns_every_n_seconds() as i64 * 1_000_000_000,
-        );
+        ));
         Self {
             config,
             market_state,
