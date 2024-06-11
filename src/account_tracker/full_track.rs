@@ -194,6 +194,19 @@ where
         self.last_balance_sum - self.wallet_balance_start
     }
 
+    /// The ratio of executed buy volume vs total.
+    pub fn buy_volume_ratio(&self) -> Option<f64> {
+        assert!(self.buy_volume >= M::new_zero());
+        assert!(self.sell_volume >= M::new_zero());
+
+        let total_volume = self.buy_volume + self.sell_volume;
+        if total_volume == M::new_zero() {
+            return None;
+        }
+
+        Some(decimal_to_f64(*(self.buy_volume / total_volume).as_ref()))
+    }
+
     /// Return the raw sharpe ratio that has been derived from the sampled returns of the users balances.
     /// This sharpe ratio is not annualized and does not include a risk free rate.
     pub fn sharpe(&self) -> Option<f64> {
