@@ -16,7 +16,12 @@ where
 {
     fn update(&mut self, _market_state: &MarketState) {}
 
-    fn sample_user_balances(&mut self, _user_balances: &crate::prelude::UserBalances<M>) {}
+    fn sample_user_balances(
+        &mut self,
+        _user_balances: &crate::prelude::UserBalances<M>,
+        _mid_price: QuoteCurrency,
+    ) {
+    }
 
     fn log_fee(&mut self, _fee_in_margin: M) {}
 

@@ -88,6 +88,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb4b4df9df7eac447b9d7c6d62011245385d2408b31e26ec5f1ad5bc96905312"
 
 [[package]]
+name = "float_extras"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b22b70f8649ea2315955f1a36d964b0e4da482dfaa5f0d04df0d1fb7c338ab7a"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "fpdec"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -160,7 +169,7 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "lfest"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "csv",
  "derive_more",
@@ -169,6 +178,7 @@ dependencies = [
  "getset",
  "hashbrown",
  "num-traits",
+ "quantogram",
  "rand",
  "rand_distr",
  "serde",
@@ -288,6 +298,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22244ce15aa966053a896d1accb3a6e68469b97c7f33f284b99f0d576879fc23"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "quantogram"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77d61f6f89661d840abdcae69a8b2d9c8ce20e9e7dd2c52a78ab4377b435b343"
+dependencies = [
+ "float_extras",
+ "skiplist",
 ]
 
 [[package]]
@@ -431,6 +451,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
 dependencies = [
  "lazy_static",
+]
+
+[[package]]
+name = "skiplist"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa37347a2b4609765d113afe55f16636ccd42dadc1ad0d29030908d1bac4c95b"
+dependencies = [
+ "rand",
 ]
 
 [[package]]

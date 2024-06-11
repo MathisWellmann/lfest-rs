@@ -161,7 +161,7 @@ where
         self.account_tracker.update(&self.market_state);
         if self.sample_returns_trigger.should_trigger(timestamp_ns) {
             self.account_tracker
-                .sample_user_balances(&self.user_balances());
+                .sample_user_balances(&self.user_balances(), self.market_state.mid_price());
         }
 
         if let Err(e) = <IsolatedMarginRiskEngine<<Q as Currency>::PairedCurrency> as RiskEngine<

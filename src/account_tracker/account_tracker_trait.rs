@@ -15,7 +15,7 @@ where
     fn update(&mut self, market_state: &MarketState);
 
     /// Process information about the user balances.
-    fn sample_user_balances(&mut self, user_balances: &UserBalances<M>);
+    fn sample_user_balances(&mut self, user_balances: &UserBalances<M>, mid_price: QuoteCurrency);
 
     /// Log a fee event.
     fn log_fee(&mut self, fee_in_margin: M);

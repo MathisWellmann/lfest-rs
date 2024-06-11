@@ -19,7 +19,7 @@ const DAILY_NS: i64 = 86_400_000_000_000;
 
 /// Keep track of Account performance statistics.
 /// Must update in `O(1)` and also compute performance measures in `O(1)`.
-#[derive(Debug, Clone, CopyGetters)]
+#[derive(Debug, CopyGetters)]
 pub struct FullAccountTracker<M>
 where
     M: MarginCurrency,
@@ -71,6 +71,18 @@ where
 
     /// last sum of all user balances.
     last_balance_sum: M,
+
+    /// Keeps track of ln return distribution of user balances and can compute the quantiles needed for certain risk metrics.
+    #[cfg(feature = "quantiles")]
+    quantogram_user_balances_ln_returns: quantogram::Quantogram,
+
+    /// Keeps track of the markets logarithmic return at the sampling interval.
+    #[cfg(feature = "quantiles")]
+    sampled_market_ln_return: LnReturn<Echo>,
+
+    /// Keeps track of ln return distribution of the market and can compute the quantiles needed for certain risk metrics.
+    #[cfg(feature = "quantiles")]
+    quantogram_market_ln_returns: quantogram::Quantogram,
 }
 
 /// TODO: create its own `risk` crate out of these implementations for better
@@ -112,6 +124,19 @@ where
             user_balances_neg_ln_return_stats: WelfordRolling::default(),
 
             last_balance_sum: M::new_zero(),
+
+            #[cfg(feature = "quantiles")]
+            quantogram_user_balances_ln_returns: quantogram::QuantogramBuilder::new()
+                .with_error(0.001)
+                .build(),
+
+            #[cfg(feature = "quantiles")]
+            sampled_market_ln_return: LnReturn::default(),
+
+            #[cfg(feature = "quantiles")]
+            quantogram_market_ln_returns: quantogram::QuantogramBuilder::new()
+                .with_error(0.001)
+                .build(),
         }
     }
 
@@ -208,6 +233,26 @@ where
         // No risk free rate subtracted.
         Some(mean_return / neg_std_dev)
     }
+
+    /// The discriminant ratio (`d_ratio`) divides the return-to-VaR ratio of the user performance
+    /// by the return-to-VaR ratio of the buy-and-hold strategy.
+    /// If the `d_ratio` is greater than 1, the user outperformed the buy-and-hold strategy.
+    /// from: <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3927058>
+    #[cfg(feature = "quantiles")]
+    pub fn d_ratio(&self, quantile: f64) -> Option<f64> {
+        let market_quantile = self.quantogram_market_ln_returns.quantile(quantile)?;
+        let user_balances_quantile = self
+            .quantogram_user_balances_ln_returns
+            .quantile(quantile)?;
+
+        let market_mean_return = self.quantogram_market_ln_returns.mean()?;
+        let user_balance_mean_return = self.quantogram_user_balances_ln_returns.mean()?;
+
+        let rtv_algo = user_balance_mean_return / user_balances_quantile.abs();
+        let rtv_bnh = market_mean_return / market_quantile.abs();
+
+        Some(1.0 + (rtv_algo - rtv_bnh) / (rtv_bnh).abs())
+    }
 }
 
 impl<M> AccountTracker<M> for FullAccountTracker<M>
@@ -229,18 +274,33 @@ where
             .update(decimal_to_f64(*market_state.mid_price().as_ref()));
     }
 
-    fn sample_user_balances(&mut self, user_balances: &UserBalances<M>) {
+    fn sample_user_balances(
+        &mut self,
+        user_balances: &UserBalances<M>,
+        #[allow(unused)] mid_price: QuoteCurrency,
+    ) {
         let balance_sum = balance_sum(user_balances);
         self.last_balance_sum = balance_sum;
 
         let balance_sum = decimal_to_f64(*balance_sum.as_ref());
-        self.user_balances_ln_return.update(balance_sum);
         self.drawdown_user_balances.update(balance_sum);
 
+        self.user_balances_ln_return.update(balance_sum);
         if let Some(ln_ret) = self.user_balances_ln_return.last() {
             self.user_balances_ln_return_stats.update(ln_ret);
             if ln_ret < 0.0 {
                 self.user_balances_neg_ln_return_stats.update(ln_ret);
+            }
+            #[cfg(feature = "quantiles")]
+            self.quantogram_user_balances_ln_returns.add(ln_ret);
+        }
+
+        #[cfg(feature = "quantiles")]
+        {
+            let mid_price = decimal_to_f64(*mid_price.as_ref());
+            self.sampled_market_ln_return.update(mid_price);
+            if let Some(market_ln_ret) = self.sampled_market_ln_return.last() {
+                self.quantogram_market_ln_returns.add(market_ln_ret);
             }
         }
     }
@@ -359,14 +419,14 @@ mod tests {
             position_margin: quote!(0),
             order_margin: quote!(0),
         };
-        at.sample_user_balances(&balances);
+        at.sample_user_balances(&balances, quote!(100));
 
         let balances = UserBalances {
             available_wallet_balance: quote!(101),
             position_margin: quote!(0),
             order_margin: quote!(0),
         };
-        at.sample_user_balances(&balances);
+        at.sample_user_balances(&balances, quote!(100));
         assert_eq!(
             at.user_balances_ln_return.last().unwrap(),
             0.009950330853168092
@@ -382,7 +442,7 @@ mod tests {
             position_margin: quote!(0),
             order_margin: quote!(0),
         };
-        at.sample_user_balances(&balances);
+        at.sample_user_balances(&balances, quote!(100));
         assert_eq!(
             at.user_balances_ln_return.last().unwrap(),
             0.00985229644301164
@@ -403,5 +463,20 @@ mod tests {
         assert_eq!(at.sharpe().unwrap(), 201.9966995729052);
         assert!(at.sortino().is_none());
         assert_eq!(at.kelly_leverage(), 4120934.6646864437);
+    }
+
+    #[cfg(feature = "quantiles")]
+    #[test]
+    #[tracing_test::traced_test]
+    fn d_ratio() {
+        let mut at = FullAccountTracker::new(quote!(1000));
+        let balances = UserBalances {
+            available_wallet_balance: quote!(100),
+            position_margin: quote!(0),
+            order_margin: quote!(0),
+        };
+        at.sample_user_balances(&balances, quote!(100));
+        assert!(at.d_ratio(0.95).is_none());
+        todo!()
     }
 }

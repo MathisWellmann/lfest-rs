@@ -1,7 +1,11 @@
 procs:
   cargo-check:
     shell: "cargo check"
-  cargo-test:
+  cargo-check-quantiles:
+    shell: "cargo check --features quantiles"
+  cargo-test-quantiles:
+    shell: "cargo test --features quantiles"
+  cargo-test-qua:
     shell: "cargo test"
   cargo-fmt:
     shell: "cargo fmt"
