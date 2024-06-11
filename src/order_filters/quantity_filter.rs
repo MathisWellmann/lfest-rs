@@ -1,27 +1,35 @@
 //! This module contains order filtering related code
 
 use fpdec::{Dec, Decimal};
+use getset::CopyGetters;
 
-use crate::{prelude::OrderError, types::Currency};
+use crate::{
+    prelude::{Error, OrderError},
+    types::Currency,
+    Result,
+};
 
 /// The `SizeFilter` defines the quantity rules that each order needs to follow
 /// The generic currency `S` is always the `PairedCurrency` of the margin
 /// currency
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, CopyGetters)]
 pub struct QuantityFilter<S>
 where
     S: Currency,
 {
-    /// Defines the minimum `quantity` of any order
-    pub min_quantity: Option<S>,
+    /// Defines the optional minimum `quantity` of any order
+    #[getset(get_copy = "pub")]
+    min_quantity: Option<S>,
 
-    /// Defines the maximum `quantity` of any order
-    pub max_quantity: Option<S>,
+    /// Defines the optional maximum `quantity` of any order
+    #[getset(get_copy = "pub")]
+    max_quantity: Option<S>,
 
     /// Defines the intervals that a `quantity` can be increased / decreased by.
     /// For the filter to pass,
     /// (quantity - min_qty) % step_size == 0
-    pub step_size: S,
+    #[getset(get_copy = "pub")]
+    step_size: S,
 }
 
 impl<S> Default for QuantityFilter<S>
@@ -41,7 +49,25 @@ impl<Q> QuantityFilter<Q>
 where
     Q: Currency,
 {
-    pub(crate) fn validate_order_quantity(&self, quantity: Q) -> Result<(), OrderError> {
+    /// Create a new instance of the QuantityFilter.
+    /// Make sure the `min_quantity` is a multiple of `step_size`.
+    pub fn new(min_quantity: Option<Q>, max_quantity: Option<Q>, step_size: Q) -> Result<Self> {
+        if let Some(min_qty) = min_quantity {
+            if (min_qty % step_size) != Q::new_zero() {
+                return Err(Error::InvalidMinQuantity);
+            }
+        }
+        Ok(Self {
+            min_quantity,
+            max_quantity,
+            step_size,
+        })
+    }
+
+    pub(crate) fn validate_order_quantity(
+        &self,
+        quantity: Q,
+    ) -> std::result::Result<(), OrderError> {
         if quantity == Q::new_zero() {
             return Err(OrderError::QuantityTooLow);
         }

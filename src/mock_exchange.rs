@@ -17,11 +17,7 @@ pub fn mock_exchange_linear(
         leverage!(1),
         Dec!(0.5),
         PriceFilter::default(),
-        QuantityFilter {
-            min_quantity: None,
-            max_quantity: None,
-            step_size: base!(0.01),
-        },
+        QuantityFilter::new(None, None, base!(0.01)).unwrap(),
         fee!(0.0002),
         fee!(0.0006),
     )
@@ -46,11 +42,7 @@ pub fn mock_exchange_linear_with_account_tracker(
         leverage!(1),
         Dec!(0.5),
         PriceFilter::default(),
-        QuantityFilter {
-            min_quantity: None,
-            max_quantity: None,
-            step_size: base!(0.01),
-        },
+        QuantityFilter::new(None, None, base!(0.01)).unwrap(),
         fee!(0.0002),
         fee!(0.0006),
     )

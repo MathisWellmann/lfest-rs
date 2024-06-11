@@ -85,6 +85,9 @@ pub enum Error {
     #[error("The provided starting balance must be > 0")]
     InvalidStartingBalance,
 
+    #[error("The chosen `step_size` of the quantity filter does not work with the chosen `min_quantity`. `min_quantity` must be a multiple of `step_size`")]
+    InvalidMinQuantity,
+
     #[error("Some price in MarketUpdate is too low.")]
     MarketUpdatePriceTooLow,
 
