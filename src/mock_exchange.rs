@@ -18,8 +18,8 @@ pub fn mock_exchange_linear(
         Dec!(0.5),
         PriceFilter::default(),
         QuantityFilter {
-            min_quantity: base!(0),
-            max_quantity: base!(0),
+            min_quantity: None,
+            max_quantity: None,
             step_size: base!(0.01),
         },
         fee!(0.0002),
@@ -47,8 +47,8 @@ pub fn mock_exchange_linear_with_account_tracker(
         Dec!(0.5),
         PriceFilter::default(),
         QuantityFilter {
-            min_quantity: base!(0),
-            max_quantity: base!(0),
+            min_quantity: None,
+            max_quantity: None,
             step_size: base!(0.01),
         },
         fee!(0.0002),
