@@ -19,8 +19,8 @@ fn main() {
         leverage!(1),
         Dec!(0.5),
         PriceFilter {
-            min_price: quote!(1),
-            max_price: quote!(100000),
+            min_price: None,
+            max_price: None,
             tick_size: quote!(0.1),
             multiplier_up: Dec!(2),
             multiplier_down: Dec!(0),

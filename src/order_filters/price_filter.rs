@@ -9,13 +9,11 @@ use crate::{
 /// The `PriceFilter` defines the price rules for a symbol
 #[derive(Debug, Clone)]
 pub struct PriceFilter {
-    /// Defines the minimum price allowed.
-    /// Disabled if `min_price` == 0
-    pub min_price: QuoteCurrency,
+    /// Defines the optional minimum price allowed.
+    pub min_price: Option<QuoteCurrency>,
 
-    /// Defines the maximum price allowed.
-    /// Disabled if `max_price` == 0
-    pub max_price: QuoteCurrency,
+    /// Defines the optional maximum price allowed.
+    pub max_price: Option<QuoteCurrency>,
 
     /// Defines the intervals that a price can be increased / decreased by.
     /// For the filter to pass,
@@ -36,9 +34,8 @@ pub struct PriceFilter {
 impl Default for PriceFilter {
     fn default() -> Self {
         Self {
-            min_price: quote!(0),
-            // disabled
-            max_price: quote!(0),
+            min_price: None,
+            max_price: None,
             tick_size: quote!(1),
             multiplier_up: Decimal::TWO,
             multiplier_down: Decimal::ZERO,
@@ -57,13 +54,26 @@ impl PriceFilter {
         Q: Currency,
         UserOrderId: Clone,
     {
-        if order.limit_price() < self.min_price && self.min_price != QuoteCurrency::new_zero() {
+        if order.limit_price() <= quote!(0) {
             return Err(OrderError::LimitPriceBelowMin);
         }
-        if order.limit_price() > self.max_price && self.max_price != QuoteCurrency::new_zero() {
-            return Err(OrderError::LimitPriceAboveMax);
+
+        if let Some(max_price) = self.max_price {
+            if order.limit_price() > max_price {
+                return Err(OrderError::LimitPriceAboveMax);
+            }
         }
-        if ((order.limit_price() - self.min_price) % self.tick_size) != QuoteCurrency::new_zero() {
+
+        let min_price = if let Some(min_price) = self.min_price {
+            if order.limit_price() < min_price {
+                return Err(OrderError::LimitPriceBelowMin);
+            }
+            min_price
+        } else {
+            quote!(0)
+        };
+
+        if ((order.limit_price() - min_price) % self.tick_size) != QuoteCurrency::new_zero() {
             return Err(OrderError::InvalidOrderPriceStepSize);
         }
         if order.limit_price() > mark_price * self.multiplier_up
@@ -91,11 +101,13 @@ pub(crate) fn enforce_bid_ask_spread(bid: QuoteCurrency, ask: QuoteCurrency) -> 
 /// Make sure the price is not too low
 /// Disabled if `min_price` == 0
 pub(crate) fn enforce_min_price(
-    min_price: QuoteCurrency,
+    min_price: Option<QuoteCurrency>,
     price: QuoteCurrency,
 ) -> Result<(), Error> {
-    if price < min_price && min_price != quote!(0) {
-        return Err(Error::MarketUpdatePriceTooLow);
+    if let Some(min_price) = min_price {
+        if price < min_price && min_price != quote!(0) {
+            return Err(Error::MarketUpdatePriceTooLow);
+        }
     }
     Ok(())
 }
@@ -103,11 +115,13 @@ pub(crate) fn enforce_min_price(
 /// Make sure the price is not too high
 /// Disabled if `max_price` == 0
 pub(crate) fn enforce_max_price(
-    max_price: QuoteCurrency,
+    max_price: Option<QuoteCurrency>,
     price: QuoteCurrency,
 ) -> Result<(), Error> {
-    if price > max_price && max_price != quote!(0) {
-        return Err(Error::MarketUpdatePriceTooHigh);
+    if let Some(max_price) = max_price {
+        if price > max_price && max_price != quote!(0) {
+            return Err(Error::MarketUpdatePriceTooHigh);
+        }
     }
     Ok(())
 }
@@ -133,8 +147,8 @@ mod tests {
     #[test]
     fn price_filter() {
         let filter = PriceFilter {
-            min_price: quote!(0.1),
-            max_price: quote!(1000.0),
+            min_price: Some(quote!(0.1)),
+            max_price: Some(quote!(1000.0)),
             tick_size: quote!(0.1),
             multiplier_up: Dec!(1.2),
             multiplier_down: Dec!(0.8),
