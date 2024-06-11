@@ -4,6 +4,11 @@ steps:
     agents: 
       queue: nixos
 
+  - label: ":nixos: :rust: :buildkite: check features quantiles"
+    command: RUSTFLAGS="-D warnings" nix develop --command bash -c "cargo check --features quantiles"
+    agents: 
+      queue: nixos
+
   - label: ":nixos: :rust: :buildkite: clippy"
     command: RUSTFLAGS="-D warnings" nix develop --command bash -c "cargo clippy"
     agents: 
@@ -11,6 +16,11 @@ steps:
 
   - label: ":nixos: :rust: :buildkite: test"
     command: RUSTFLAGS="-D warnings" nix develop --command bash -c "cargo test"
+    agents: 
+      queue: nixos
+
+  - label: ":nixos: :rust: :buildkite: test features quantiles"
+    command: RUSTFLAGS="-D warnings" nix develop --command bash -c "cargo test --features quantiles"
     agents: 
       queue: nixos
 
