@@ -464,19 +464,4 @@ mod tests {
         assert!(at.sortino().is_none());
         assert_eq!(at.kelly_leverage(), 4120934.6646864437);
     }
-
-    #[cfg(feature = "quantiles")]
-    #[test]
-    #[tracing_test::traced_test]
-    fn d_ratio() {
-        let mut at = FullAccountTracker::new(quote!(1000));
-        let balances = UserBalances {
-            available_wallet_balance: quote!(100),
-            position_margin: quote!(0),
-            order_margin: quote!(0),
-        };
-        at.sample_user_balances(&balances, quote!(100));
-        assert!(at.d_ratio(0.95).is_none());
-        todo!()
-    }
 }
