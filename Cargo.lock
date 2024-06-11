@@ -435,9 +435,9 @@ dependencies = [
 
 [[package]]
 name = "sliding_features"
-version = "4.0.1"
+version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bd3245ecee38220607b528e64977e893ad277190d2dfe2892f43464d5a47ad4"
+checksum = "bc35d040ce48b00f052a8cc7b99535165f917d9f436301d21a25f4230a42255b"
 dependencies = [
  "getset",
 ]

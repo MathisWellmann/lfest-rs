@@ -67,7 +67,7 @@ where
     drawdown_user_balances: Drawdown<Echo>, // Drawdown of realized user balances.
     drawdown_market: Drawdown<Echo>,        // Drawdown of the market.
     user_balances_ln_return_stats: WelfordRolling<Echo>, // Used for `sharpe` and `kelly_leverage`
-    user_balances_pos_ln_return_stats: WelfordRolling<Echo>, // Used for `sortino`
+    user_balances_neg_ln_return_stats: WelfordRolling<Echo>, // Used for `sortino`
 
     /// last sum of all user balances.
     last_balance_sum: M,
@@ -109,7 +109,7 @@ where
             drawdown_user_balances: Drawdown::default(),
             drawdown_market: Drawdown::default(),
             user_balances_ln_return_stats: WelfordRolling::default(),
-            user_balances_pos_ln_return_stats: WelfordRolling::default(),
+            user_balances_neg_ln_return_stats: WelfordRolling::default(),
 
             last_balance_sum: M::new_zero(),
         }
@@ -173,6 +173,9 @@ where
     /// This sharpe ratio is not annualized and does not include a risk free rate.
     pub fn sharpe(&self) -> Option<f64> {
         let std_dev = self.user_balances_ln_return_stats.last()?;
+        if std_dev == 0.0 {
+            return None;
+        }
         let mean_return = self.user_balances_ln_return_stats.mean();
 
         // No risk free rate subtracted.
@@ -196,11 +199,14 @@ where
     /// Return the raw sortino ratio that has been derived from the sampled returns of the users balances.
     /// This sortino ratio is not annualized and does not include a risk free rate.
     pub fn sortino(&self) -> Option<f64> {
-        let std_dev = self.user_balances_pos_ln_return_stats.last()?;
-        let mean_pos_return = self.user_balances_pos_ln_return_stats.mean();
+        let neg_std_dev = self.user_balances_neg_ln_return_stats.last()?;
+        if neg_std_dev == 0.0 {
+            return None;
+        }
+        let mean_return = self.user_balances_ln_return_stats.mean();
 
         // No risk free rate subtracted.
-        Some(mean_pos_return / std_dev)
+        Some(mean_return / neg_std_dev)
     }
 }
 
@@ -233,8 +239,8 @@ where
 
         if let Some(ln_ret) = self.user_balances_ln_return.last() {
             self.user_balances_ln_return_stats.update(ln_ret);
-            if ln_ret > 0.0 {
-                self.user_balances_pos_ln_return_stats.update(ln_ret);
+            if ln_ret < 0.0 {
+                self.user_balances_neg_ln_return_stats.update(ln_ret);
             }
         }
     }
@@ -343,5 +349,59 @@ mod tests {
         assert_eq!(at.price_first, quote!(100.5));
         assert_eq!(at.price_last, quote!(100.5));
         assert_eq!(at.drawdown_market(), 0.0);
+    }
+
+    #[test]
+    fn full_track_sharpe() {
+        let mut at = FullAccountTracker::new(quote!(1000));
+        let balances = UserBalances {
+            available_wallet_balance: quote!(100),
+            position_margin: quote!(0),
+            order_margin: quote!(0),
+        };
+        at.sample_user_balances(&balances);
+
+        let balances = UserBalances {
+            available_wallet_balance: quote!(101),
+            position_margin: quote!(0),
+            order_margin: quote!(0),
+        };
+        at.sample_user_balances(&balances);
+        assert_eq!(
+            at.user_balances_ln_return.last().unwrap(),
+            0.009950330853168092
+        );
+        assert_eq!(at.drawdown_user_balances(), 0.0);
+        assert_eq!(at.user_balances_ln_return_stats.last().unwrap(), 0.0);
+        assert!(at.sharpe().is_none());
+        assert!(at.sortino().is_none());
+        assert_eq!(at.kelly_leverage(), 0.0);
+
+        let balances = UserBalances {
+            available_wallet_balance: quote!(102),
+            position_margin: quote!(0),
+            order_margin: quote!(0),
+        };
+        at.sample_user_balances(&balances);
+        assert_eq!(
+            at.user_balances_ln_return.last().unwrap(),
+            0.00985229644301164
+        );
+        assert_eq!(
+            at.user_balances_ln_return_stats.mean(),
+            0.009901313648089865
+        );
+        assert_eq!(
+            at.user_balances_ln_return_stats.variance(),
+            2.402686393680848e-9
+        );
+        assert_eq!(
+            at.user_balances_ln_return_stats.last().unwrap(),
+            4.9017205078225826e-5
+        );
+        assert_eq!(at.drawdown_user_balances(), 0.0);
+        assert_eq!(at.sharpe().unwrap(), 201.9966995729052);
+        assert!(at.sortino().is_none());
+        assert_eq!(at.kelly_leverage(), 4120934.6646864437);
     }
 }
