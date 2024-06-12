@@ -377,6 +377,18 @@ where
             .create_margin_transfer(transaction)
             .expect("margin transfer works");
         assert_user_wallet_balance(&self.transaction_accounting);
+        assert_eq!(
+            self.order_margin.active_limit_orders(),
+            &self.active_limit_orders
+        );
+        assert!(if self.active_limit_orders.is_empty() {
+            self.transaction_accounting
+                .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
+                .expect("is a valid account")
+                .is_zero()
+        } else {
+            true
+        });
     }
 
     /// Cancel an active limit order.
@@ -386,10 +398,6 @@ where
         order_id: OrderId,
     ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
         debug!("cancel_order: {}", order_id);
-        let removed_order = self
-            .active_limit_orders
-            .remove(&order_id)
-            .ok_or(Error::OrderIdNotFound)?;
         let order_margin = self
             .transaction_accounting
             .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
@@ -401,6 +409,12 @@ where
                 &self.position,
             )
         );
+        let removed_order = self
+            .active_limit_orders
+            .remove(&order_id)
+            .ok_or(Error::OrderIdNotFound)?;
+        self.order_margin
+            .remove(order_id, self.config.contract_spec().fee_maker());
         let new_order_margin = self.order_margin.order_margin(
             self.config.contract_spec().init_margin_req(),
             &self.position,
@@ -417,6 +431,19 @@ where
         }
 
         self.account_tracker.log_limit_order_cancellation();
+
+        assert_eq!(
+            self.order_margin.active_limit_orders(),
+            &self.active_limit_orders
+        );
+        assert!(if self.active_limit_orders.is_empty() {
+            self.transaction_accounting
+                .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
+                .expect("is a valid account")
+                .is_zero()
+        } else {
+            true
+        });
 
         Ok(removed_order)
     }
@@ -544,6 +571,19 @@ where
         ids_to_remove
             .into_iter()
             .for_each(|id| self.remove_executed_order_from_active(id));
+
+        assert_eq!(
+            self.order_margin.active_limit_orders(),
+            &self.active_limit_orders
+        );
+        assert!(if self.active_limit_orders.is_empty() {
+            self.transaction_accounting
+                .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
+                .expect("is a valid account")
+                .is_zero()
+        } else {
+            true
+        });
 
         order_updates
     }

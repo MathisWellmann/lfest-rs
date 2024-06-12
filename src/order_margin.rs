@@ -1,5 +1,5 @@
 use fpdec::{Dec, Decimal};
-use getset::CopyGetters;
+use getset::{CopyGetters, Getters};
 use tracing::trace;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// An implementation for computing the order margin online, aka with every change to the active orders.
-#[derive(Debug, Clone, Default, CopyGetters)]
+#[derive(Debug, Clone, Default, CopyGetters, Getters)]
 pub(crate) struct OrderMargin<Q, UserOrderId>
 where
     Q: Currency,
@@ -18,6 +18,7 @@ where
 {
     #[getset(get_copy = "pub(crate)")]
     cumulative_order_fees: Q::PairedCurrency,
+    #[getset(get = "pub(crate)")]
     active_limit_orders: ActiveLimitOrders<Q, UserOrderId>,
 }
 
