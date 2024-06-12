@@ -44,7 +44,7 @@ fn limit_orders_only() {
     assert_eq!(exchange.account_tracker().cumulative_fees(), quote!(0));
 
     let order_updates = exchange
-        .update_state(1.into(), trade!(quote!(100), base!(10), Side::Sell))
+        .update_state(1.into(), trade!(quote!(99), base!(10), Side::Sell))
         .unwrap();
     assert_eq!(order_updates.len(), 1);
     let order_updates = exchange
@@ -92,7 +92,7 @@ fn limit_orders_only() {
     exchange.submit_limit_order(o).unwrap();
 
     let order_updates = exchange
-        .update_state(2.into(), trade!(quote!(105), base!(10), Side::Buy))
+        .update_state(2.into(), trade!(quote!(106), base!(10), Side::Buy))
         .unwrap();
     assert!(!order_updates.is_empty());
     assert_eq!(

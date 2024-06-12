@@ -28,6 +28,8 @@ where
     UserOrderId: Clone,
 {
     fn limit_order_filled(&self, order: &LimitOrder<Q, UserOrderId, Pending<Q>>) -> Option<Q> {
+        assert!(order.remaining_quantity() > Q::new_zero());
+
         // As a simplifying assumption, the order always get executed fully when using candles if the price is right.
         if match order.side() {
             Side::Buy => self.low < order.limit_price(),
@@ -36,7 +38,7 @@ where
             // Order is executed fully with candles.
             Some(match order.side() {
                 Side::Buy => order.remaining_quantity(),
-                Side::Sell => order.remaining_quantity().into_negative(),
+                Side::Sell => order.remaining_quantity(),
             })
         } else {
             None

@@ -21,14 +21,13 @@ fn submit_limit_sell_order_no_position() {
     let ts = 0;
     let meta = ExchangeOrderMeta::new(0.into(), ts.into());
     let mut order = order.into_pending(meta);
-    let limit_price = order.limit_price();
     let filled_order = order
         .fill(order.remaining_quantity(), ts.into())
         .expect("order is fully filled.");
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0.into(), trade!(limit_price, base!(9), Side::Buy))
+            .update_state(0.into(), trade!(quote!(101), base!(9), Side::Buy))
             .unwrap(),
         vec![expected_order_update]
     );
@@ -66,7 +65,7 @@ fn submit_limit_sell_order_no_position() {
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0.into(), trade!(quote!(100), base!(9), Side::Sell))
+            .update_state(0.into(), trade!(quote!(99), base!(9), Side::Sell))
             .unwrap(),
         vec![expected_order_update]
     );

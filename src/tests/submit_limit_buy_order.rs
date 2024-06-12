@@ -32,7 +32,7 @@ fn submit_limit_buy_order_no_position() {
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0.into(), trade!(quote!(98), base!(5), Side::Sell))
+            .update_state(0.into(), trade!(quote!(97), base!(5), Side::Sell))
             .unwrap(),
         vec![expected_order_update]
     );
@@ -175,7 +175,7 @@ fn submit_limit_buy_order_with_long() {
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0.into(), trade!(quote!(101), base!(9), Side::Buy))
+            .update_state(0.into(), trade!(quote!(102), base!(9), Side::Buy))
             .unwrap(),
         vec![expected_order_update]
     );
@@ -233,7 +233,7 @@ fn submit_limit_buy_order_with_short() {
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0.into(), trade!(quote!(100), base!(9), Side::Sell))
+            .update_state(0.into(), trade!(quote!(99), base!(9), Side::Sell))
             .unwrap(),
         vec![expected_order_update]
     );

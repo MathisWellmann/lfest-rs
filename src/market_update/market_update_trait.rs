@@ -4,7 +4,7 @@ use crate::{
 };
 
 /// The interface of what a market update must be able to do.
-pub trait MarketUpdate<Q, UserOrderId>
+pub trait MarketUpdate<Q, UserOrderId>: std::fmt::Debug
 where
     Q: Currency,
     UserOrderId: Clone,

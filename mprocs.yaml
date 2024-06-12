@@ -3,10 +3,10 @@ procs:
     shell: "cargo check"
   cargo-check-quantiles:
     shell: "cargo check --features quantiles"
-  cargo-test-quantiles:
-    shell: "cargo test --features quantiles"
   cargo-test:
     shell: "cargo test"
+  cargo-test-quantiles:
+    shell: "cargo test --features quantiles"
   cargo-fmt:
     shell: "cargo fmt"
   cargo-clippy:

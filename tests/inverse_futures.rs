@@ -699,7 +699,7 @@ fn inv_execute_limit() {
     );
 
     let order_updates = exchange
-        .update_state(1.into(), trade!(quote!(900.0), quote!(450.0), Side::Sell))
+        .update_state(1.into(), trade!(quote!(899), quote!(450), Side::Sell))
         .unwrap();
     assert_eq!(order_updates.len(), 1);
     let bid = quote!(750);
@@ -733,7 +733,7 @@ fn inv_execute_limit() {
     assert_eq!(exchange.active_limit_orders().len(), 1);
 
     let order_updates = exchange
-        .update_state(1.into(), trade!(quote!(1000), quote!(450), Side::Buy))
+        .update_state(1.into(), trade!(quote!(1001), quote!(450), Side::Buy))
         .unwrap();
     assert_eq!(order_updates.len(), 1);
     let bid = quote!(1199);
@@ -757,7 +757,7 @@ fn inv_execute_limit() {
     assert_eq!(exchange.active_limit_orders().len(), 1);
 
     let order_updates = exchange
-        .update_state(2.into(), trade!(quote!(1200), quote!(600), Side::Buy))
+        .update_state(2.into(), trade!(quote!(1201), quote!(600), Side::Buy))
         .unwrap();
     assert_eq!(order_updates.len(), 1);
     let bid = quote!(1201);

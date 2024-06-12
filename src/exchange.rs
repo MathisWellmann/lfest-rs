@@ -152,6 +152,8 @@ where
     where
         U: MarketUpdate<Q, UserOrderId>,
     {
+        trace!("update_state: market_update: {market_update:?}");
+
         self.market_state.update_state(
             timestamp_ns,
             &market_update,

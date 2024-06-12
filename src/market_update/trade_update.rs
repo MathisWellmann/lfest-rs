@@ -25,14 +25,16 @@ where
 {
     fn limit_order_filled(&self, order: &LimitOrder<Q, UserOrderId, Pending<Q>>) -> Option<Q> {
         assert!(
-            self.quantity != Q::new_zero(),
-            "The trade quantity must not be zero"
+            self.quantity > Q::new_zero(),
+            "The trade quantity must be greater than zero."
         );
         assert!(order.remaining_quantity() > Q::new_zero());
 
+        // Notice that the limit order price must be strictly lower or higher than the limit order price,
+        // because we assume the limit order has the worst possible queue position in the book.
         if match order.side() {
-            Side::Buy => self.price <= order.limit_price() && matches!(self.side, Side::Sell),
-            Side::Sell => self.price >= order.limit_price() && matches!(self.side, Side::Buy),
+            Side::Buy => self.price < order.limit_price() && matches!(self.side, Side::Sell),
+            Side::Sell => self.price > order.limit_price() && matches!(self.side, Side::Buy),
         } {
             // Execute up to the quantity of the incoming `Trade`.
             let filled_qty = min(self.quantity, order.remaining_quantity());
@@ -71,6 +73,7 @@ mod tests {
     use crate::{
         base,
         prelude::{BaseCurrency, ExchangeOrderMeta},
+        quote,
     };
 
     #[test_case::test_matrix(
@@ -86,7 +89,12 @@ mod tests {
             quantity,
             side,
         };
-        let limit_order = LimitOrder::new(side.inverted(), price, quantity).unwrap();
+
+        let offset = match side {
+            Side::Buy => quote!(-1),
+            Side::Sell => quote!(1),
+        };
+        let limit_order = LimitOrder::new(side.inverted(), price + offset, quantity).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let limit_order = limit_order.into_pending(meta);
         assert_eq!(trade.limit_order_filled(&limit_order).unwrap(), quantity);
@@ -105,7 +113,12 @@ mod tests {
             quantity,
             side,
         };
-        let limit_order = LimitOrder::new(side.inverted(), price, quantity / base!(2)).unwrap();
+        let offset = match side {
+            Side::Buy => quote!(-1),
+            Side::Sell => quote!(1),
+        };
+        let limit_order =
+            LimitOrder::new(side.inverted(), price + offset, quantity / base!(2)).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let limit_order = limit_order.into_pending(meta);
         assert_eq!(

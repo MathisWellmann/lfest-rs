@@ -3,21 +3,29 @@ use test_case::test_case;
 use crate::{mock_exchange_linear, prelude::*, trade};
 
 #[tracing_test::traced_test]
-#[test_case(quote!(100), base!(2), Side::Buy; "With buy order")]
-#[test_case(quote!(101), base!(2), Side::Sell; "With sell order")]
-fn partial_limit_order_fill(price: QuoteCurrency, qty: BaseCurrency, side: Side) {
+#[test_case(quote!(100), base!(2), Side::Buy, quote!(99); "With buy order")]
+#[test_case(quote!(101), base!(2), Side::Sell, quote!(102); "With sell order")]
+fn partial_limit_order_fill(
+    limit_price: QuoteCurrency,
+    qty: BaseCurrency,
+    side: Side,
+    trade_price: QuoteCurrency,
+) {
     let mut exchange = mock_exchange_linear();
 
     assert!(exchange
         .update_state(1.into(), bba!(quote!(100), quote!(101)))
         .unwrap()
         .is_empty());
-    let order = LimitOrder::new(side, price, qty).unwrap();
+    let order = LimitOrder::new(side, limit_price, qty).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
     assert_eq!(exchange.active_limit_orders().len(), 1);
 
     let exec_orders = exchange
-        .update_state(1.into(), trade!(price, qty / base!(2), side.inverted()))
+        .update_state(
+            1.into(),
+            trade!(trade_price, qty / base!(2), side.inverted()),
+        )
         .unwrap();
     // Half of the limit order should be executed
     assert_eq!(exec_orders.len(), 1);
