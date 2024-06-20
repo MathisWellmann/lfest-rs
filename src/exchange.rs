@@ -544,13 +544,6 @@ where
                     // TODO: we could potentially log partial fills as well...
                 }
 
-                Self::detract_fee(
-                    &mut self.transaction_accounting,
-                    filled_qty.convert(order.limit_price()),
-                    self.config.contract_spec().fee_maker(),
-                    &mut self.account_tracker,
-                );
-
                 self.position.change_position(
                     filled_qty,
                     order.limit_price(),
@@ -579,6 +572,12 @@ where
                         .create_margin_transfer(transaction)
                         .expect("margin transfer works");
                 }
+                Self::detract_fee(
+                    &mut self.transaction_accounting,
+                    filled_qty.convert(order.limit_price()),
+                    self.config.contract_spec().fee_maker(),
+                    &mut self.account_tracker,
+                );
                 assert_user_wallet_balance(&self.transaction_accounting);
             }
         }
