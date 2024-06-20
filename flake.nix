@@ -1,5 +1,5 @@
 {
-  description = "Flake for trade_aggregation-rs";
+  description = "Flake for lfest-rs";
 
   inputs = {
     nixpks.url = "github:NixOS/nixpkgs/nixos-unstable";
