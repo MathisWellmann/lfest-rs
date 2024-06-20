@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use assert2::assert;
 use getset::Getters;
 use hashbrown::HashMap;
 use tracing::{debug, trace};
@@ -495,6 +496,10 @@ where
     where
         U: MarketUpdate<Q, UserOrderId>,
     {
+        assert_eq!(
+            self.order_margin.active_limit_orders(),
+            &self.active_limit_orders
+        );
         let mut order_updates = Vec::new();
         let mut ids_to_remove = Vec::new();
         for order in self.active_limit_orders.values_mut() {
