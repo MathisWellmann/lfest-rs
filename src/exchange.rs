@@ -504,10 +504,12 @@ where
         let mut ids_to_remove = Vec::new();
         for order in self.active_limit_orders.values_mut() {
             if let Some(filled_qty) = market_update.limit_order_filled(order) {
-                trace!(
-                    "filled order {}: {filled_qty}/{}",
+                debug!(
+                    "filled {} order {}: {filled_qty}/{} @ {}",
+                    order.side(),
                     order.id(),
-                    order.total_quantity()
+                    order.remaining_quantity(),
+                    order.limit_price()
                 );
                 assert!(
                     filled_qty > Q::new_zero(),
@@ -518,6 +520,13 @@ where
                     .transaction_accounting
                     .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
                     .expect("is valid");
+                debug_assert_eq!(
+                    order_margin,
+                    self.order_margin.order_margin(
+                        self.config.contract_spec().init_margin_req(),
+                        &self.position
+                    )
+                );
 
                 if let Some(filled_order) = order.fill(filled_qty, ts_ns) {
                     trace!("fully filled order {}", order.id());
@@ -542,11 +551,21 @@ where
                     &mut self.account_tracker,
                 );
 
+                self.position.change_position(
+                    filled_qty,
+                    order.limit_price(),
+                    order.side(),
+                    &mut self.transaction_accounting,
+                    self.config.contract_spec().init_margin_req(),
+                );
+                self.account_tracker
+                    .log_trade(order.side(), order.limit_price(), filled_qty);
+
                 let new_order_margin = self.order_margin.order_margin(
                     self.config.contract_spec().init_margin_req(),
                     &self.position,
                 );
-                trace!("order_margin: {order_margin}, new_order_margin: {new_order_margin}");
+                // TODO: isnt it always smaller?
                 assert!(
                     new_order_margin <= order_margin,
                     "The order margin does not increase with a filled limit order event."
@@ -561,16 +580,6 @@ where
                         .expect("margin transfer works");
                 }
                 assert_user_wallet_balance(&self.transaction_accounting);
-
-                self.position.change_position(
-                    filled_qty,
-                    order.limit_price(),
-                    order.side(),
-                    &mut self.transaction_accounting,
-                    self.config.contract_spec().init_margin_req(),
-                );
-                self.account_tracker
-                    .log_trade(order.side(), order.limit_price(), filled_qty);
             }
         }
         ids_to_remove
@@ -589,6 +598,15 @@ where
         } else {
             true
         });
+        debug_assert_eq!(
+            self.transaction_accounting
+                .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
+                .expect("is valid"),
+            self.order_margin.order_margin(
+                self.config.contract_spec().init_margin_req(),
+                &self.position
+            )
+        );
 
         order_updates
     }

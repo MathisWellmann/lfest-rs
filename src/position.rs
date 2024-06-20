@@ -1,13 +1,12 @@
 use std::cmp::Ordering;
 
 use fpdec::{Dec, Decimal};
-use tracing::trace;
+use tracing::debug;
 
 use crate::{
     position_inner::PositionInner,
     prelude::TransactionAccounting,
     types::{Currency, MarginCurrency, QuoteCurrency, Side},
-    utils::assert_user_wallet_balance,
 };
 
 /// A futures position can be one of three variants.
@@ -60,7 +59,11 @@ where
     ) where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
-        trace!("old position: {}", self);
+        debug_assert!(
+            filled_qty > Q::new_zero(),
+            "The filled_qty must be greater than zero"
+        );
+        debug!("old position: {}", self);
         match self {
             Position::Neutral => match side {
                 Side::Buy => {
@@ -175,8 +178,8 @@ where
                 }
             },
         };
-        assert_user_wallet_balance(transaction_accounting);
-        trace!("new position: {}", self);
+        // crate::utils::assert_user_wallet_balance(transaction_accounting);
+        debug!("new position: {}", self);
     }
 }
 

@@ -64,7 +64,8 @@ where
         let notional_value = removed_order
             .remaining_quantity()
             .convert(removed_order.limit_price());
-        self.cumulative_order_fees -= notional_value * fee_maker
+        self.cumulative_order_fees -= notional_value * fee_maker;
+        assert2::assert!(self.cumulative_order_fees >= Q::PairedCurrency::new_zero());
     }
 
     /// The margin requirement for all the tracked orders.
@@ -83,6 +84,7 @@ where
         position: &Position<Q>,
     ) -> Q::PairedCurrency {
         debug_assert!(init_margin_req <= Dec!(1));
+        trace!("order_margin_internal: position: {position:?}, active_limit_orders: {active_limit_orders:?}");
 
         let mut buy_orders = Vec::from_iter(
             active_limit_orders

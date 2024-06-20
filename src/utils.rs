@@ -1,3 +1,4 @@
+use assert2::assert;
 use fpdec::Decimal;
 
 use crate::{
@@ -82,7 +83,6 @@ where
     let wallet_balance = transaction_accounting
         .margin_balance_of(USER_WALLET_ACCOUNT)
         .expect("is valid");
-    tracing::trace!("wallet_balance: {wallet_balance}");
     assert!(wallet_balance >= M::new_zero());
 }
 
