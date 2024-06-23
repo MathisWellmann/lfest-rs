@@ -7,6 +7,7 @@ use crate::{
 };
 
 /// The `PriceFilter` defines the price rules for a symbol
+/// TODO: make field private with getters and a constructor to validate. Just like `QuantityFilter`
 #[derive(Debug, Clone)]
 pub struct PriceFilter {
     /// Defines the optional minimum price allowed.

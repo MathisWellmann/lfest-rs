@@ -25,6 +25,7 @@ where
     #[getset(get_copy = "pub")]
     max_quantity: Option<S>,
 
+    // TODO: rename to `tick_size`
     /// Defines the intervals that a `quantity` can be increased / decreased by.
     /// For the filter to pass,
     /// (quantity - min_qty) % step_size == 0

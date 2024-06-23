@@ -2,14 +2,15 @@ use getset::{CopyGetters, Getters};
 
 use crate::{
     contract_specification::ContractSpecification,
-    types::{Currency, Error, Result},
+    prelude::MarginCurrency,
+    types::{Error, Result},
 };
 
 #[derive(Debug, Clone, Getters, CopyGetters)]
 /// Define the Exchange configuration
 pub struct Config<M>
 where
-    M: Currency,
+    M: MarginCurrency,
 {
     /// The starting balance of account (denoted in margin currency).
     /// The concrete `Currency` here defines the futures type.
@@ -36,7 +37,7 @@ where
 
 impl<M> Config<M>
 where
-    M: Currency,
+    M: MarginCurrency,
 {
     /// Create a new Config.
     ///
