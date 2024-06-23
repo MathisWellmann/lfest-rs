@@ -72,7 +72,7 @@ impl PriceFilter {
             return Err(Error::InvalidUpMultiplier);
         }
 
-        if multiplier_down <= Dec!(1) {
+        if multiplier_down >= Dec!(1) {
             return Err(Error::InvalidDownMultiplier);
         }
 
