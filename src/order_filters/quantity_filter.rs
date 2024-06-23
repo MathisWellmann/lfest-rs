@@ -25,12 +25,11 @@ where
     #[getset(get_copy = "pub")]
     max_quantity: Option<S>,
 
-    // TODO: rename to `tick_size`
     /// Defines the intervals that a `quantity` can be increased / decreased by.
     /// For the filter to pass,
-    /// (quantity - min_qty) % step_size == 0
+    /// (quantity - min_qty) % tick_size == 0
     #[getset(get_copy = "pub")]
-    step_size: S,
+    tick_size: S,
 }
 
 impl<S> Default for QuantityFilter<S>
@@ -41,7 +40,7 @@ where
         Self {
             min_quantity: None,
             max_quantity: None,
-            step_size: S::new(Dec!(1)),
+            tick_size: S::new(Dec!(1)),
         }
     }
 }
@@ -51,17 +50,21 @@ where
     Q: Currency,
 {
     /// Create a new instance of the QuantityFilter.
-    /// Make sure the `min_quantity` is a multiple of `step_size`.
-    pub fn new(min_quantity: Option<Q>, max_quantity: Option<Q>, step_size: Q) -> Result<Self> {
+    /// Make sure the `min_quantity` is a multiple of `tick_size`.
+    pub fn new(min_quantity: Option<Q>, max_quantity: Option<Q>, tick_size: Q) -> Result<Self> {
         if let Some(min_qty) = min_quantity {
-            if (min_qty % step_size) != Q::new_zero() {
+            if (min_qty % tick_size) != Q::new_zero() {
                 return Err(Error::InvalidMinQuantity);
             }
         }
+        if tick_size == Q::new_zero() {
+            return Err(Error::InvalidTickSize);
+        }
+
         Ok(Self {
             min_quantity,
             max_quantity,
-            step_size,
+            tick_size,
         })
     }
 
@@ -88,7 +91,7 @@ where
             Q::new_zero()
         };
 
-        if ((quantity - min_qty) % self.step_size) != Q::new_zero() {
+        if ((quantity - min_qty) % self.tick_size) != Q::new_zero() {
             return Err(OrderError::InvalidQuantityStepSize);
         }
         Ok(())
@@ -105,7 +108,7 @@ mod tests {
         let filter = QuantityFilter {
             min_quantity: Some(quote!(10)),
             max_quantity: Some(quote!(1000)),
-            step_size: quote!(1),
+            tick_size: quote!(1),
         };
 
         assert_eq!(
@@ -136,7 +139,7 @@ mod tests {
         let filter = QuantityFilter {
             min_quantity: None,
             max_quantity: None,
-            step_size: quote!(1),
+            tick_size: quote!(1),
         };
         assert_eq!(
             filter.validate_order_quantity(quote!(0)),

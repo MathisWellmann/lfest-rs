@@ -45,9 +45,9 @@ where
     }
 
     fn validate_market_update(&self, price_filter: &PriceFilter) -> Result<()> {
-        enforce_min_price(price_filter.min_price, self.price)?;
-        enforce_max_price(price_filter.max_price, self.price)?;
-        enforce_step_size(price_filter.tick_size, self.price)?;
+        enforce_min_price(price_filter.min_price(), self.price)?;
+        enforce_max_price(price_filter.max_price(), self.price)?;
+        enforce_step_size(price_filter.tick_size(), self.price)?;
         Ok(())
     }
 

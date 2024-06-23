@@ -18,13 +18,7 @@ fn main() {
     let contract_spec = ContractSpecification::new(
         leverage!(1),
         Dec!(0.5),
-        PriceFilter {
-            min_price: None,
-            max_price: None,
-            tick_size: quote!(0.1),
-            multiplier_up: Dec!(2),
-            multiplier_down: Dec!(0),
-        },
+        PriceFilter::new(None, None, quote!(0.1), Dec!(2), Dec!(0)).expect("is valid price filter"),
         QuantityFilter::default(),
         fee!(0.0002),
         fee!(0.0006),

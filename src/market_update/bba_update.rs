@@ -31,12 +31,12 @@ where
     }
 
     fn validate_market_update(&self, price_filter: &PriceFilter) -> Result<()> {
-        enforce_min_price(price_filter.min_price, self.bid)?;
-        enforce_min_price(price_filter.min_price, self.ask)?;
-        enforce_max_price(price_filter.max_price, self.bid)?;
-        enforce_max_price(price_filter.max_price, self.ask)?;
-        enforce_step_size(price_filter.tick_size, self.bid)?;
-        enforce_step_size(price_filter.tick_size, self.ask)?;
+        enforce_min_price(price_filter.min_price(), self.bid)?;
+        enforce_min_price(price_filter.min_price(), self.ask)?;
+        enforce_max_price(price_filter.max_price(), self.bid)?;
+        enforce_max_price(price_filter.max_price(), self.ask)?;
+        enforce_step_size(price_filter.tick_size(), self.bid)?;
+        enforce_step_size(price_filter.tick_size(), self.ask)?;
         enforce_bid_ask_spread(self.bid, self.ask)?;
         Ok(())
     }

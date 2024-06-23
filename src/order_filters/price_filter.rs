@@ -1,4 +1,5 @@
-use fpdec::Decimal;
+use fpdec::{Dec, Decimal};
+use getset::CopyGetters;
 
 use crate::{
     prelude::{Error, OrderError},
@@ -7,29 +8,33 @@ use crate::{
 };
 
 /// The `PriceFilter` defines the price rules for a symbol
-/// TODO: make field private with getters and a constructor to validate. Just like `QuantityFilter`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, CopyGetters)]
 pub struct PriceFilter {
     /// Defines the optional minimum price allowed.
-    pub min_price: Option<QuoteCurrency>,
+    #[getset(get_copy = "pub")]
+    min_price: Option<QuoteCurrency>,
 
     /// Defines the optional maximum price allowed.
-    pub max_price: Option<QuoteCurrency>,
+    #[getset(get_copy = "pub")]
+    max_price: Option<QuoteCurrency>,
 
     /// Defines the intervals that a price can be increased / decreased by.
     /// For the filter to pass,
     /// (order.limit_price - min_price) % tick_size == 0
-    pub tick_size: QuoteCurrency,
+    #[getset(get_copy = "pub")]
+    tick_size: QuoteCurrency,
 
     /// Defines valid ranges for the order price relative to the mark price
     /// To pass this filter,
     /// order.limit_price <= mark_price * multiplier_up
-    pub multiplier_up: Decimal,
+    #[getset(get_copy = "pub")]
+    multiplier_up: Decimal,
 
     /// Defines valid ranges for the order price relative to the mark price
     /// To pass this filter,
     /// order.limit_price >= mark_price * multiplier_down
-    pub multiplier_down: Decimal,
+    #[getset(get_copy = "pub")]
+    multiplier_down: Decimal,
 }
 
 impl Default for PriceFilter {
@@ -45,6 +50,41 @@ impl Default for PriceFilter {
 }
 
 impl PriceFilter {
+    /// Create a new `PriceFilter`.
+    pub fn new(
+        min_price: Option<QuoteCurrency>,
+        max_price: Option<QuoteCurrency>,
+        tick_size: QuoteCurrency,
+        multiplier_up: Decimal,
+        multiplier_down: Decimal,
+    ) -> crate::Result<Self> {
+        if let Some(min_qty) = min_price {
+            if (min_qty % tick_size) != quote!(0) {
+                return Err(Error::InvalidMinPrice);
+            }
+        }
+
+        if tick_size == quote!(0) {
+            return Err(Error::InvalidTickSize);
+        }
+
+        if multiplier_up <= Dec!(1) {
+            return Err(Error::InvalidUpMultiplier);
+        }
+
+        if multiplier_down <= Dec!(1) {
+            return Err(Error::InvalidDownMultiplier);
+        }
+
+        Ok(Self {
+            min_price,
+            max_price,
+            tick_size,
+            multiplier_up,
+            multiplier_down,
+        })
+    }
+
     /// check if an `Order` is valid
     pub(crate) fn validate_limit_order<Q, UserOrderId>(
         &self,
