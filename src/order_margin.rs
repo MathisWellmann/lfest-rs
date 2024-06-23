@@ -163,7 +163,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{prelude::*, utils::f64_to_decimal, MockTransactionAccounting};
+    use crate::{prelude::*, MockTransactionAccounting};
 
     #[test_case::test_matrix(
         [1, 2, 5]
@@ -171,7 +171,7 @@ mod tests {
     fn order_margin_neutral_no_orders(leverage: u32) {
         let order_margin = OrderMargin::<_, ()>::default();
 
-        let init_margin_req = f64_to_decimal(1.0 / leverage as f64, Dec!(0.01));
+        let init_margin_req = Dec!(1.0) / Decimal::from(leverage);
 
         let position = Position::<BaseCurrency>::Neutral;
         assert_eq!(
@@ -192,7 +192,7 @@ mod tests {
         let mut accounting = MockTransactionAccounting::default();
         let qty = BaseCurrency::new(Decimal::from(position_qty));
         let entry_price = QuoteCurrency::new(Decimal::from(entry_price));
-        let init_margin_req = f64_to_decimal(1.0 / leverage as f64, Dec!(0.01));
+        let init_margin_req = Dec!(1.0) / Decimal::from(leverage);
         let position = Position::Long(PositionInner::new(
             qty,
             entry_price,
@@ -218,7 +218,7 @@ mod tests {
         let mut accounting = MockTransactionAccounting::default();
         let qty = BaseCurrency::new(Decimal::from(position_qty));
         let entry_price = QuoteCurrency::new(Decimal::from(entry_price));
-        let init_margin_req = f64_to_decimal(1.0 / leverage as f64, Dec!(0.01));
+        let init_margin_req = Dec!(1.0) / Decimal::from(leverage);
         let position = Position::Short(PositionInner::new(
             qty,
             entry_price,
@@ -249,7 +249,7 @@ mod tests {
     ) {
         let mut order_margin = OrderMargin::<_, ()>::default();
 
-        let init_margin_req = f64_to_decimal(1.0 / leverage as f64, Dec!(0.01));
+        let init_margin_req = Dec!(1.0) / Decimal::from(leverage);
         let fee_maker = fee!(0.0002);
 
         let qty = BaseCurrency::new(Decimal::from(qty));
@@ -301,7 +301,7 @@ mod tests {
     ) {
         let mut order_margin = OrderMargin::<_, ()>::default();
 
-        let init_margin_req = f64_to_decimal(1.0 / leverage as f64, Dec!(0.01));
+        let init_margin_req = Dec!(1.0) / Decimal::from(leverage);
         let fee_maker = fee!(0.0002);
 
         let qty = BaseCurrency::new(Decimal::from(qty));
@@ -365,7 +365,7 @@ mod tests {
     ) {
         let mut order_margin = OrderMargin::<_, ()>::default();
 
-        let init_margin_req = f64_to_decimal(1.0 / leverage as f64, Dec!(0.01));
+        let init_margin_req = Dec!(1.0) / Decimal::from(leverage);
         let fee_maker = fee!(0.0002);
 
         let qty = BaseCurrency::new(Decimal::from(qty));
@@ -418,7 +418,7 @@ mod tests {
     ) {
         let mut order_margin = OrderMargin::<_, ()>::default();
 
-        let init_margin_req = f64_to_decimal(1.0 / leverage as f64, Dec!(0.01));
+        let init_margin_req = Dec!(1.0) / Decimal::from(leverage);
         let fee_maker = fee!(0.0002);
 
         let qty = BaseCurrency::new(Decimal::from(qty));

@@ -12,7 +12,7 @@ use crate::{
     prelude::{Side, UserBalances},
     quote,
     types::{Currency, MarginCurrency, QuoteCurrency, TimestampNs},
-    utils::{balance_sum, decimal_to_f64},
+    utils::balance_sum,
 };
 
 const DAILY_NS: i64 = 86_400_000_000_000;
@@ -204,7 +204,7 @@ where
             return None;
         }
 
-        Some(decimal_to_f64(*(self.buy_volume / total_volume).as_ref()))
+        Some((*(self.buy_volume / total_volume).as_ref()).into())
     }
 
     /// Return the raw sharpe ratio that has been derived from the sampled returns of the users balances.
@@ -284,7 +284,7 @@ where
         self.price_last = market_state.mid_price();
 
         self.drawdown_market
-            .update(decimal_to_f64(*market_state.mid_price().as_ref()));
+            .update((*market_state.mid_price().as_ref()).into());
     }
 
     fn sample_user_balances(
@@ -295,7 +295,7 @@ where
         let balance_sum = balance_sum(user_balances);
         self.last_balance_sum = balance_sum;
 
-        let balance_sum = decimal_to_f64(*balance_sum.as_ref());
+        let balance_sum: f64 = (*balance_sum.as_ref()).into();
         self.drawdown_user_balances.update(balance_sum);
 
         self.user_balances_ln_return.update(balance_sum);
@@ -310,7 +310,7 @@ where
 
         #[cfg(feature = "quantiles")]
         {
-            let mid_price = decimal_to_f64(*mid_price.as_ref());
+            let mid_price: f64 = (*mid_price.as_ref()).into();
             self.sampled_market_ln_return.update(mid_price);
             if let Some(market_ln_ret) = self.sampled_market_ln_return.last() {
                 self.quantogram_market_ln_returns.add(market_ln_ret);
