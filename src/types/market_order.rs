@@ -32,10 +32,11 @@ where
     state: OrderStatus,
 }
 
-impl<Q> MarketOrder<Q, (), NewOrder>
+impl<Q, UserOrderId> MarketOrder<Q, UserOrderId, NewOrder>
 where
     Q: Currency,
     Q::PairedCurrency: MarginCurrency,
+    UserOrderId: Default,
 {
     /// Create a new market order without a `user_order_id`.
     ///
@@ -50,19 +51,13 @@ where
             return Err(OrderError::OrderSizeLTEZero);
         }
         Ok(MarketOrder {
-            user_order_id: (),
+            user_order_id: UserOrderId::default(),
             state: NewOrder,
             side,
             quantity,
         })
     }
-}
 
-impl<Q, UserOrderId> MarketOrder<Q, UserOrderId, NewOrder>
-where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
-{
     /// Create a new limit order
     ///
     /// # Arguments:

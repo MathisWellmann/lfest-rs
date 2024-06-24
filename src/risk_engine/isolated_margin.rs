@@ -1,3 +1,4 @@
+use fpdec::{Dec, Decimal};
 use tracing::trace;
 
 use super::{risk_engine_trait::RiskError, RiskEngine};
@@ -88,23 +89,21 @@ where
         market_state: &MarketState,
         position: &Position<M::PairedCurrency>,
     ) -> Result<(), RiskError> {
-        let pos_inner = match position {
+        let maint_margin_req = self.contract_spec.maintenance_margin();
+        match position {
             Position::Neutral => return Ok(()),
-            Position::Long(inner) => inner,
-            Position::Short(inner) => inner,
-        };
-        if pos_inner.quantity() == M::PairedCurrency::new_zero() {
-            return Ok(());
-        }
-        let mtm_price = market_state.mid_price();
-        let pos_value = pos_inner.quantity().convert(mtm_price);
-        let maint_margin = pos_inner.quantity().convert(pos_inner.entry_price())
-            * self.contract_spec.maintenance_margin();
-        let upnl = pos_inner.unrealized_pnl(mtm_price);
-
-        trace!("check_maintenance_margin: pos_value: {pos_value}, main_margin: {maint_margin}, upnl: {upnl}");
-        if pos_value + upnl < maint_margin {
-            return Err(RiskError::Liquidate);
+            Position::Long(inner) => {
+                let liquidation_price = inner.entry_price().as_ref() * (Dec!(1) - maint_margin_req);
+                if market_state.bid().as_ref() < &liquidation_price {
+                    return Err(RiskError::Liquidate);
+                }
+            }
+            Position::Short(inner) => {
+                let liquidation_price = inner.entry_price().as_ref() * (Dec!(1) + maint_margin_req);
+                if market_state.ask().as_ref() > &liquidation_price {
+                    return Err(RiskError::Liquidate);
+                }
+            }
         }
 
         Ok(())
@@ -207,5 +206,108 @@ where
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fpdec::{Dec, Decimal};
+
+    use super::*;
+    use crate::{
+        base, fee,
+        prelude::{BaseCurrency, Leverage, PositionInner, PriceFilter, QuantityFilter},
+        quote, MockTransactionAccounting,
+    };
+
+    #[test_case::test_case(2, 75)]
+    #[test_case::test_case(3, 84)]
+    #[test_case::test_case(5, 90)]
+    fn isolated_margin_check_maintenance_margin_long(leverage: u32, expected_liq_price: u32) {
+        let contract_spec = ContractSpecification::<BaseCurrency>::new(
+            Leverage::new(Decimal::from(leverage)).unwrap(),
+            Dec!(0.5),
+            PriceFilter::default(),
+            QuantityFilter::default(),
+            fee!(0.0002),
+            fee!(0.0006),
+        )
+        .unwrap();
+        let init_margin_req = contract_spec.init_margin_req();
+        let re = IsolatedMarginRiskEngine::<QuoteCurrency>::new(contract_spec);
+        let market_state = MarketState::from_components(quote!(100), quote!(101), 0.into(), 0);
+        let mut accounting = MockTransactionAccounting::default();
+
+        let position = Position::Neutral;
+
+        RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
+
+        let position = Position::Long(PositionInner::new(
+            base!(1),
+            quote!(100),
+            &mut accounting,
+            init_margin_req,
+        ));
+        RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
+
+        let position = Position::Long(PositionInner::new(
+            base!(1),
+            quote!(100),
+            &mut accounting,
+            init_margin_req,
+        ));
+        let market_state = MarketState::from_components(quote!(200), quote!(201), 0.into(), 0);
+        RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
+
+        let ask = QuoteCurrency::new(Decimal::from(expected_liq_price));
+        let bid = ask - quote!(1);
+        let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
+        assert_eq!(
+            RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position),
+            Err(RiskError::Liquidate)
+        );
+        let ask = QuoteCurrency::new(Decimal::from(expected_liq_price)) + quote!(1);
+        let bid = ask - quote!(1);
+        let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
+        RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
+    }
+
+    #[test_case::test_case(2, 126)]
+    #[test_case::test_case(3, 117)]
+    #[test_case::test_case(5, 111)]
+    fn isolated_margin_check_maintenance_margin_short(leverage: u32, expected_liq_price: u32) {
+        let contract_spec = ContractSpecification::<BaseCurrency>::new(
+            Leverage::new(Decimal::from(leverage)).unwrap(),
+            Dec!(0.5),
+            PriceFilter::default(),
+            QuantityFilter::default(),
+            fee!(0.0002),
+            fee!(0.0006),
+        )
+        .unwrap();
+        let init_margin_req = contract_spec.init_margin_req();
+        let re = IsolatedMarginRiskEngine::<QuoteCurrency>::new(contract_spec);
+        let market_state = MarketState::from_components(quote!(100), quote!(101), 0.into(), 0);
+        let mut accounting = MockTransactionAccounting::default();
+
+        let position = Position::Short(PositionInner::new(
+            base!(1),
+            quote!(100),
+            &mut accounting,
+            init_margin_req,
+        ));
+        RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
+
+        let ask = QuoteCurrency::new(Decimal::from(expected_liq_price));
+        let bid = ask - quote!(1);
+        let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
+        assert_eq!(
+            RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position),
+            Err(RiskError::Liquidate)
+        );
+        let ask = QuoteCurrency::new(Decimal::from(expected_liq_price)) - quote!(1);
+        let bid = ask - quote!(1);
+        let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
+        RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
     }
 }

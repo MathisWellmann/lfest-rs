@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use assert2::assert;
 use getset::Getters;
 use hashbrown::HashMap;
-use tracing::{debug, trace};
+use tracing::{debug, info, trace, warn};
 
 use crate::{
     account_tracker::AccountTracker,
@@ -173,11 +173,28 @@ where
         >>::check_maintenance_margin(
             &self.risk_engine, &self.market_state, &self.position
         ) {
-            // TODO: liquidate position properly
+            self.liquidate();
             return Err(e.into());
         };
 
         Ok(self.check_active_orders(market_update, timestamp_ns))
+    }
+
+    // Liquidate the position by closing it with a market order.
+    fn liquidate(&mut self) {
+        warn!("liquidating position {}", self.position);
+        let order = match &self.position {
+            Position::Long(pos) => {
+                MarketOrder::new(Side::Sell, pos.quantity()).expect("Can create market order.")
+            }
+            Position::Short(pos) => {
+                MarketOrder::new(Side::Buy, pos.quantity()).expect("Can create market order.")
+            }
+            Position::Neutral => panic!("A neutral position can not be liquidated"),
+        };
+        self.submit_market_order(order)
+            .expect("Must be able to submit liquidation order");
+        info!("balances after liquidation: {:?}", self.user_balances());
     }
 
     /// Submit a new `MarketOrder` to the exchange.
