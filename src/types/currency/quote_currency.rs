@@ -1,7 +1,7 @@
 use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use derive_more::{Add, AddAssign, Div, From, Into, Mul, Sub, SubAssign};
-use fpdec::Decimal;
+use fpdec::{Decimal, Quantize};
 
 use super::MarginCurrency;
 use crate::{
@@ -73,6 +73,10 @@ impl Currency for QuoteCurrency {
     #[inline(always)]
     fn into_negative(self) -> Self {
         Self(-self.0)
+    }
+
+    fn quantize(self, val: Self) -> Self {
+        Self(self.0.quantize(*val.as_ref()))
     }
 }
 

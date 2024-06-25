@@ -62,6 +62,9 @@ pub trait Currency:
     /// Convert the Currency to a negative value
     /// TODO: rename for greater clarity
     fn into_negative(self) -> Self;
+
+    /// Quantize the currency value.
+    fn quantize(self, val: Self) -> Self;
 }
 
 #[cfg(test)]
