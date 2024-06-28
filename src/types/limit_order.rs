@@ -112,10 +112,7 @@ where
     }
 
     /// Take in the order metadata provided by the exchange and coverts the order to the `Pending` state.
-    pub(crate) fn into_pending(
-        self,
-        meta: ExchangeOrderMeta,
-    ) -> LimitOrder<Q, UserOrderId, Pending<Q>> {
+    pub fn into_pending(self, meta: ExchangeOrderMeta) -> LimitOrder<Q, UserOrderId, Pending<Q>> {
         LimitOrder {
             user_order_id: self.user_order_id,
             side: self.side,
