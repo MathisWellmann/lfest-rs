@@ -17,7 +17,7 @@ pub struct ExchangeOrderMeta {
 
 impl ExchangeOrderMeta {
     /// Create a new instance of `Self`.
-    pub(crate) fn new(id: OrderId, ts_ns_exchange_received: TimestampNs) -> Self {
+    pub fn new(id: OrderId, ts_ns_exchange_received: TimestampNs) -> Self {
         Self {
             id,
             ts_ns_exchange_received,
