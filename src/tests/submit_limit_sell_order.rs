@@ -124,7 +124,10 @@ fn submit_limit_sell_order_below_bid() {
     let order = LimitOrder::new(Side::Sell, quote!(99), base!(9)).unwrap();
     assert_eq!(
         exchange.submit_limit_order(order),
-        Err(Error::OrderError(OrderError::LimitPriceBelowBid))
+        Err(Error::OrderError(OrderError::LimitPriceLteBid {
+            limit_price: quote!(99),
+            best_bid: quote!(99)
+        }))
     );
 }
 

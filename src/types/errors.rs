@@ -2,7 +2,7 @@ use super::QuoteCurrency;
 use crate::risk_engine::RiskError;
 
 /// Defines the possible order errors that can occur when submitting a new order
-#[derive(thiserror::Error, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum OrderError {
     #[error("Maximum number of active orders reached")]
@@ -23,11 +23,17 @@ pub enum OrderError {
     #[error("The limit price is above the maximum price.")]
     LimitPriceAboveMax,
 
-    #[error("The limit price is larger than the current ask")]
-    LimitPriceAboveAsk,
+    #[error("The limit price {limit_price} is greater or equal the current best ask {best_ask}")]
+    LimitPriceGteAsk {
+        limit_price: QuoteCurrency,
+        best_ask: QuoteCurrency,
+    },
 
-    #[error("The limit price is lower than the current bid")]
-    LimitPriceBelowBid,
+    #[error("The limit price {limit_price} is lower or equal the current best bid {best_bid}")]
+    LimitPriceLteBid {
+        limit_price: QuoteCurrency,
+        best_bid: QuoteCurrency,
+    },
 
     #[error("The order price does not conform to the step size.")]
     InvalidOrderPriceStepSize,

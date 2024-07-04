@@ -254,7 +254,10 @@ fn submit_limit_buy_order_above_ask() {
     let order = LimitOrder::new(Side::Buy, quote!(100), base!(9)).unwrap();
     assert_eq!(
         exchange.submit_limit_order(order),
-        Err(Error::OrderError(OrderError::LimitPriceAboveAsk))
+        Err(Error::OrderError(OrderError::LimitPriceGteAsk {
+            limit_price: quote!(100),
+            best_ask: quote!(100)
+        }))
     );
 }
 

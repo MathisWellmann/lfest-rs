@@ -333,12 +333,18 @@ where
         match order.side() {
             Side::Buy => {
                 if order.limit_price() >= self.market_state.ask() {
-                    return Err(Error::OrderError(OrderError::LimitPriceAboveAsk));
+                    return Err(Error::OrderError(OrderError::LimitPriceGteAsk {
+                        limit_price: order.limit_price(),
+                        best_ask: self.market_state.ask(),
+                    }));
                 }
             }
             Side::Sell => {
                 if order.limit_price() <= self.market_state.bid() {
-                    return Err(Error::OrderError(OrderError::LimitPriceBelowBid));
+                    return Err(Error::OrderError(OrderError::LimitPriceLteBid {
+                        limit_price: order.limit_price(),
+                        best_bid: self.market_state.bid(),
+                    }));
                 }
             }
         }
