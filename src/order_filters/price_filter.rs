@@ -2,7 +2,7 @@ use fpdec::{Dec, Decimal};
 use getset::CopyGetters;
 
 use crate::{
-    prelude::{Error, OrderError},
+    prelude::{ConfigError, FilterError, OrderError},
     quote,
     types::{Currency, LimitOrder, NewOrder, QuoteCurrency},
 };
@@ -57,23 +57,23 @@ impl PriceFilter {
         tick_size: QuoteCurrency,
         multiplier_up: Decimal,
         multiplier_down: Decimal,
-    ) -> crate::Result<Self> {
+    ) -> Result<Self, ConfigError> {
         if let Some(min_qty) = min_price {
             if (min_qty % tick_size) != quote!(0) {
-                return Err(Error::InvalidMinPrice);
+                return Err(ConfigError::InvalidMinPrice);
             }
         }
 
         if tick_size == quote!(0) {
-            return Err(Error::InvalidTickSize);
+            return Err(ConfigError::InvalidTickSize);
         }
 
         if multiplier_up <= Dec!(1) {
-            return Err(Error::InvalidUpMultiplier);
+            return Err(ConfigError::InvalidUpMultiplier);
         }
 
         if multiplier_down >= Dec!(1) {
-            return Err(Error::InvalidDownMultiplier);
+            return Err(ConfigError::InvalidDownMultiplier);
         }
 
         Ok(Self {
@@ -132,9 +132,12 @@ impl PriceFilter {
 }
 
 /// Errors if there is no bid-ask spread
-pub(crate) fn enforce_bid_ask_spread(bid: QuoteCurrency, ask: QuoteCurrency) -> Result<(), Error> {
+pub(crate) fn enforce_bid_ask_spread(
+    bid: QuoteCurrency,
+    ask: QuoteCurrency,
+) -> Result<(), FilterError> {
     if bid >= ask {
-        return Err(Error::InvalidMarketUpdateBidAskSpread);
+        return Err(FilterError::InvalidMarketUpdateBidAskSpread);
     }
     Ok(())
 }
@@ -144,10 +147,10 @@ pub(crate) fn enforce_bid_ask_spread(bid: QuoteCurrency, ask: QuoteCurrency) -> 
 pub(crate) fn enforce_min_price(
     min_price: Option<QuoteCurrency>,
     price: QuoteCurrency,
-) -> Result<(), Error> {
+) -> Result<(), FilterError> {
     if let Some(min_price) = min_price {
         if price < min_price && min_price != quote!(0) {
-            return Err(Error::MarketUpdatePriceTooLow);
+            return Err(FilterError::MarketUpdatePriceTooLow);
         }
     }
     Ok(())
@@ -158,10 +161,10 @@ pub(crate) fn enforce_min_price(
 pub(crate) fn enforce_max_price(
     max_price: Option<QuoteCurrency>,
     price: QuoteCurrency,
-) -> Result<(), Error> {
+) -> Result<(), FilterError> {
     if let Some(max_price) = max_price {
         if price > max_price && max_price != quote!(0) {
-            return Err(Error::MarketUpdatePriceTooHigh);
+            return Err(FilterError::MarketUpdatePriceTooHigh);
         }
     }
     Ok(())
@@ -171,9 +174,9 @@ pub(crate) fn enforce_max_price(
 pub(crate) fn enforce_step_size(
     step_size: QuoteCurrency,
     price: QuoteCurrency,
-) -> Result<(), Error> {
+) -> Result<(), FilterError> {
     if (price % step_size) != QuoteCurrency::new_zero() {
-        return Err(Error::MarketUpdatePriceStepSize { price, step_size });
+        return Err(FilterError::MarketUpdatePriceStepSize { price, step_size });
     }
     Ok(())
 }

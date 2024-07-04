@@ -1,7 +1,7 @@
 use derive_more::Display;
 use fpdec::{Dec, Decimal};
 
-use crate::types::errors::{Error, Result};
+use super::ConfigError;
 
 /// Allows the quick construction of `Leverage`
 ///
@@ -22,9 +22,9 @@ pub struct Leverage(Decimal);
 
 impl Leverage {
     /// Create a new instance from a `Decimal` value
-    pub fn new(val: Decimal) -> Result<Self> {
+    pub fn new(val: Decimal) -> Result<Self, ConfigError> {
         if val < Dec!(1) {
-            Err(Error::InvalidLeverage)?
+            Err(ConfigError::InvalidLeverage)?
         }
         Ok(Self(val))
     }

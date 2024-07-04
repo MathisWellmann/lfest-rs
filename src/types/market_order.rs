@@ -48,7 +48,7 @@ where
     /// Either a successfully created instance or an [`OrderError`]
     pub fn new(side: Side, quantity: Q) -> Result<Self, OrderError> {
         if quantity <= Q::new_zero() {
-            return Err(OrderError::OrderSizeLTEZero);
+            return Err(OrderError::OrderQuantityLTEZero);
         }
         Ok(MarketOrder {
             user_order_id: UserOrderId::default(),
@@ -73,7 +73,7 @@ where
         user_order_id: UserOrderId,
     ) -> Result<Self, OrderError> {
         if quantity <= Q::new_zero() {
-            return Err(OrderError::OrderSizeLTEZero);
+            return Err(OrderError::OrderQuantityLTEZero);
         }
         Ok(Self {
             user_order_id,

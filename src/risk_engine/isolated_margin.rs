@@ -1,12 +1,12 @@
 use fpdec::{Dec, Decimal};
 use tracing::trace;
 
-use super::{risk_engine_trait::RiskError, RiskEngine};
+use super::RiskEngine;
 use crate::{
     contract_specification::ContractSpecification,
     market_state::MarketState,
     order_margin::OrderMargin,
-    prelude::Position,
+    prelude::{Position, RiskError},
     types::{Currency, LimitOrder, MarginCurrency, MarketOrder, Pending, QuoteCurrency, Side},
 };
 

@@ -57,7 +57,7 @@ where
             return Err(OrderError::LimitPriceLTEZero);
         }
         if quantity <= Q::new_zero() {
-            return Err(OrderError::OrderSizeLTEZero);
+            return Err(OrderError::OrderQuantityLTEZero);
         }
         Ok(Self {
             user_order_id: (),
@@ -95,7 +95,7 @@ where
             return Err(OrderError::LimitPriceLTEZero);
         }
         if quantity <= Q::new_zero() {
-            return Err(OrderError::OrderSizeLTEZero);
+            return Err(OrderError::OrderQuantityLTEZero);
         }
         Ok(Self {
             user_order_id,

@@ -48,7 +48,6 @@ pub mod prelude {
         position::Position,
         position_inner::PositionInner,
         quote,
-        risk_engine::RiskError,
         types::*,
     };
 }

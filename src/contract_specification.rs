@@ -3,9 +3,8 @@ use getset::{CopyGetters, Getters, Setters};
 
 use crate::{
     fee, leverage,
-    prelude::{Currency, PriceFilter, QuantityFilter},
-    types::{Error, Fee, Leverage},
-    Result,
+    prelude::{ConfigError, Currency, PriceFilter, QuantityFilter},
+    types::{Fee, Leverage},
 };
 
 /// Specifies the details of the futures contract
@@ -74,9 +73,9 @@ where
         quantity_filter: QuantityFilter<Q>,
         fee_maker: Fee,
         fee_taker: Fee,
-    ) -> Result<Self> {
+    ) -> Result<Self, ConfigError> {
         if maintenance_margin_fraction > Dec!(1) || maintenance_margin_fraction <= Dec!(0) {
-            return Err(Error::InvalidMaintenanceMarginFraction);
+            return Err(ConfigError::InvalidMaintenanceMarginFraction);
         }
 
         let initial_margin = Dec!(1) / *leverage.as_ref();

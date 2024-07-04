@@ -2,8 +2,7 @@ use getset::{CopyGetters, Getters};
 
 use crate::{
     contract_specification::ContractSpecification,
-    prelude::MarginCurrency,
-    types::{Error, Result},
+    prelude::{ConfigError, MarginCurrency},
 };
 
 #[derive(Debug, Clone, Getters, CopyGetters)]
@@ -57,12 +56,12 @@ where
         max_num_open_orders: usize,
         contract_specification: ContractSpecification<M::PairedCurrency>,
         sample_returns_every_n_seconds: u64,
-    ) -> Result<Self> {
+    ) -> Result<Self, ConfigError> {
         if max_num_open_orders == 0 {
-            return Err(Error::InvalidMaxNumOpenOrders);
+            return Err(ConfigError::InvalidMaxNumOpenOrders);
         }
         if starting_balance <= M::new_zero() {
-            return Err(Error::InvalidStartingBalance);
+            return Err(ConfigError::InvalidStartingBalance);
         }
 
         Ok(Config {

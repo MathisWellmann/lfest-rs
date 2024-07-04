@@ -1,20 +1,9 @@
 use crate::{
     market_state::MarketState,
     order_margin::OrderMargin,
-    prelude::Position,
+    prelude::{Position, RiskError},
     types::{Currency, LimitOrder, MarginCurrency, MarketOrder, Pending, QuoteCurrency},
 };
-
-/// The error that the `RiskEngine` outputs, if any.
-#[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
-#[allow(missing_docs)]
-pub enum RiskError {
-    #[error("The `Trader` does not have enough balance.")]
-    NotEnoughAvailableBalance,
-
-    #[error("The position will be liquidated!")]
-    Liquidate,
-}
 
 pub(crate) trait RiskEngine<M, UserOrderId>
 where

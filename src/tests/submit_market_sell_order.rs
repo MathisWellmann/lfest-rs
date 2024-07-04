@@ -1,9 +1,6 @@
 use hashbrown::HashMap;
 
-use crate::{
-    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*,
-    risk_engine::RiskError,
-};
+use crate::{mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*};
 
 #[test]
 fn submit_market_sell_order_reject() {

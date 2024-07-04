@@ -4,9 +4,8 @@ use fpdec::{Dec, Decimal};
 use getset::CopyGetters;
 
 use crate::{
-    prelude::{Error, OrderError},
+    prelude::{ConfigError, OrderError},
     types::Currency,
-    Result,
 };
 
 /// The `SizeFilter` defines the quantity rules that each order needs to follow
@@ -51,14 +50,18 @@ where
 {
     /// Create a new instance of the QuantityFilter.
     /// Make sure the `min_quantity` is a multiple of `tick_size`.
-    pub fn new(min_quantity: Option<Q>, max_quantity: Option<Q>, tick_size: Q) -> Result<Self> {
+    pub fn new(
+        min_quantity: Option<Q>,
+        max_quantity: Option<Q>,
+        tick_size: Q,
+    ) -> Result<Self, ConfigError> {
         if let Some(min_qty) = min_quantity {
             if (min_qty % tick_size) != Q::new_zero() {
-                return Err(Error::InvalidMinQuantity);
+                return Err(ConfigError::InvalidMinQuantity);
             }
         }
         if tick_size == Q::new_zero() {
-            return Err(Error::InvalidTickSize);
+            return Err(ConfigError::InvalidTickSize);
         }
 
         Ok(Self {
