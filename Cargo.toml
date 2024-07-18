@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.69.1"
+version = "0.69.2"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2021"
 license-file = "LICENSE"
@@ -18,7 +18,7 @@ serde = { version = "1", features = ["derive"] }
 thiserror = "1"
 hashbrown = "0.14"
 derive_more = { version = "0.99", features = ["add", "mul"] }
-fpdec = "0.10"
+fpdec = { version = "0.10", features = ["serde-as-str"] }
 distrs = "0.2"
 num-traits = "0.2"
 getset = "0.1.2"
@@ -32,6 +32,7 @@ rand = "0.8"
 rand_distr = "0.4"
 test-case = "3"
 tracing-test = "0.2"
+ron = "0.8"
 
 [features]
 # Functionality that requires estimation of ln return quantiles, e.g `var` or `d_ratio`.

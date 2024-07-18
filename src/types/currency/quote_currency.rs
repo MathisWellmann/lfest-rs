@@ -37,6 +37,8 @@ macro_rules! quote {
     Into,
     From,
     Hash,
+    Serialize,
+    Deserialize,
 )]
 #[mul(forward)]
 #[div(forward)]

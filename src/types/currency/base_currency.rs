@@ -37,6 +37,8 @@ macro_rules! base {
     Into,
     From,
     Hash,
+    Serialize,
+    Deserialize,
 )]
 #[mul(forward)]
 #[div(forward)]
@@ -194,5 +196,15 @@ mod tests {
             BaseCurrency::pnl(quote!(100.0), quote!(80.0), quote!(-1000.0)),
             base!(2.5)
         );
+    }
+
+    #[test]
+    fn parse_base_currency() {
+        let v = base!(0.1);
+        let ser = ron::ser::to_string_pretty(&v, ron::ser::PrettyConfig::new().struct_names(true))
+            .unwrap();
+        let s = r#"BaseCurrency("0.1")"#;
+        assert_eq!(ser, s);
+        assert_eq!(ron::from_str::<BaseCurrency>(s).unwrap(), v);
     }
 }

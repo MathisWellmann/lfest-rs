@@ -34,6 +34,8 @@ pub trait Currency:
     + PartialEq
     + PartialOrd
     + AsRef<Decimal>
+    + serde::Serialize
+    + for<'a> serde::Deserialize<'a>
 {
     /// The paired currency.
     /// e.g.: for the BTCUSD market the BTC currency is paired with USD, so the
