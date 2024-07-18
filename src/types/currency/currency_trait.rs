@@ -12,6 +12,8 @@ pub trait Currency:
     + Send
     + Sized
     + Ord
+    + Send
+    + Sync
     + std::fmt::Debug
     + std::fmt::Display
     // Require to do arithmetic with `Self` on the right hand side
