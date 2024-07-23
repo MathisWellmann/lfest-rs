@@ -363,6 +363,17 @@ where
         Ok(order)
     }
 
+    /// Amend an existing limit order.
+    pub fn amend_limit_order(
+        &mut self,
+        existing_order_id: OrderId,
+        new_order: LimitOrder<Q, UserOrderId, NewOrder>,
+    ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
+        // TODO: when only decreasing the quantity, the queue position would not change of the order, but at the LOB is not yet implemented, the queue position does not matter.
+        self.cancel_limit_order(existing_order_id)?;
+        self.submit_limit_order(new_order)
+    }
+
     /// Append a new limit order as active order
     fn append_limit_order(&mut self, order: LimitOrder<Q, UserOrderId, Pending<Q>>) {
         debug!("append_limit_order: order: {:?}", order);
