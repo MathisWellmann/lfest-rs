@@ -27,4 +27,7 @@ pub enum Error {
 
     #[error("Failed to lookup account.")]
     AccountLookupFailure,
+
+    #[error("The amended order quantity has already been filled in the original order. Remaining order was cancelled.")]
+    AmendQtyAlreadyFilled,
 }

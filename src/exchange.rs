@@ -369,7 +369,16 @@ where
         existing_order_id: OrderId,
         new_order: LimitOrder<Q, UserOrderId, NewOrder>,
     ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
-        // TODO: when only decreasing the quantity, the queue position would not change of the order, but at the LOB is not yet implemented, the queue position does not matter.
+        let existing_order = self
+            .active_limit_orders
+            .get(&existing_order_id)
+            .ok_or(Error::OrderIdNotFound)?;
+        // When the order is in partially filled status and the new quantity <= `filled_quantity`, as per `binance` docs.
+        if new_order.remaining_quantity() <= existing_order.filled_quantity() {
+            self.cancel_limit_order(existing_order_id)
+                .expect("Can cancel this order");
+            return Err(Error::AmendQtyAlreadyFilled);
+        }
         self.cancel_limit_order(existing_order_id)?;
         self.submit_limit_order(new_order)
     }
