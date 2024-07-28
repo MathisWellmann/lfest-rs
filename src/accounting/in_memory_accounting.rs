@@ -25,6 +25,7 @@ pub const BROKER_MARGIN_ACCOUNT: usize = 4;
 pub const TREASURY_ACCOUNT: usize = 5;
 
 /// Keeps track of transaction in memory.
+#[derive(Debug)]
 pub struct InMemoryTransactionAccounting<M>
 where
     M: MarginCurrency,

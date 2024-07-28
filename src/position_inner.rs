@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use fpdec::{Dec, Decimal};
 use getset::{CopyGetters, Getters};
-use tracing::trace;
+use tracing::{debug, trace};
 
 use crate::{
     prelude::{
@@ -84,12 +84,15 @@ where
     ) where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
-        trace!("increase_contracts: qty: {qty} @ {entry_price}");
+        debug!(
+            "increase_contracts: qty: {qty} @ {entry_price}; self: {:?}",
+            self
+        );
         assert!(qty > Q::new_zero());
         assert!(entry_price > quote!(0));
 
-        self.quantity += qty;
         self.entry_price = self.new_avg_entry_price(qty, entry_price);
+        self.quantity += qty;
 
         let margin = qty.convert(entry_price) * init_margin_req;
         let transaction =
@@ -110,7 +113,10 @@ where
     ) where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
-        trace!("decrease_contracts: qty: {qty} @ {liquidation_price}");
+        debug!(
+            "decrease_contracts: qty: {qty} @ {liquidation_price}; self: {:?}",
+            self
+        );
         assert!(qty > Q::new_zero());
         assert!(qty <= self.quantity);
         debug_assert!(direction_multiplier == Dec!(1) || direction_multiplier == Dec!(-1));
@@ -167,7 +173,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::base;
+    use crate::{base, prelude::InMemoryTransactionAccounting};
 
     #[test]
     fn position_inner_new_avg_entry_price() {
@@ -184,6 +190,74 @@ mod tests {
         assert_eq!(
             pos.new_avg_entry_price(base!(0.3), quote!(200)),
             quote!(175)
+        );
+    }
+
+    #[test_case::test_matrix([1, 2, 5])]
+    fn position_inner_new(leverage: u32) {
+        let mut ta = InMemoryTransactionAccounting::new(quote!(1000));
+        let init_margin_req = Dec!(1) / Decimal::from(leverage);
+        let pos = PositionInner::new(base!(0.5), quote!(100), &mut ta, init_margin_req);
+        assert_eq!(
+            pos,
+            PositionInner {
+                quantity: base!(0.5),
+                entry_price: quote!(100)
+            }
+        );
+        assert_eq!(
+            ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
+            quote!(50) * init_margin_req
+        );
+        assert_eq!(
+            ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
+            quote!(1000) - quote!(50) * init_margin_req
+        );
+    }
+
+    #[test_case::test_matrix([1, 2, 5])]
+    fn position_inner_increase_contracts(leverage: u32) {
+        let mut ta = InMemoryTransactionAccounting::new(quote!(1000));
+        let init_margin_req = Dec!(1) / Decimal::from(leverage);
+        let mut pos = PositionInner::new(base!(0.5), quote!(100), &mut ta, init_margin_req);
+        pos.increase_contracts(base!(0.5), quote!(150), &mut ta, init_margin_req);
+        assert_eq!(
+            pos,
+            PositionInner {
+                quantity: base!(1),
+                entry_price: quote!(125),
+            }
+        );
+        assert_eq!(
+            ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
+            quote!(125) * init_margin_req
+        );
+        assert_eq!(
+            ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
+            quote!(1000) - quote!(125) * init_margin_req
+        );
+    }
+
+    #[test_case::test_matrix([1, 2, 5])]
+    fn position_inner_decrease_contracts(leverage: u32) {
+        let mut ta = InMemoryTransactionAccounting::new(quote!(1000));
+        let init_margin_req = Dec!(1) / Decimal::from(leverage);
+        let mut pos = PositionInner::new(base!(0.5), quote!(100), &mut ta, init_margin_req);
+        pos.decrease_contracts(base!(0.5), quote!(100), &mut ta, init_margin_req, Dec!(1));
+        assert_eq!(
+            pos,
+            PositionInner {
+                quantity: base!(0),
+                entry_price: quote!(100),
+            }
+        );
+        assert_eq!(
+            ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
+            quote!(0)
+        );
+        assert_eq!(
+            ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
+            quote!(1000)
         );
     }
 }

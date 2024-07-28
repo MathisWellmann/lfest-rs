@@ -5,7 +5,7 @@ use tracing::debug;
 
 use crate::{
     position_inner::PositionInner,
-    prelude::TransactionAccounting,
+    prelude::{TransactionAccounting, USER_POSITION_MARGIN_ACCOUNT},
     types::{Currency, MarginCurrency, QuoteCurrency, Side},
 };
 
@@ -65,24 +65,32 @@ where
         );
         debug!("old position: {}", self);
         match self {
-            Position::Neutral => match side {
-                Side::Buy => {
-                    *self = Position::Long(PositionInner::new(
-                        filled_qty,
-                        fill_price,
-                        transaction_accounting,
-                        init_margin_req,
-                    ))
+            Position::Neutral => {
+                assert_eq!(
+                    transaction_accounting
+                        .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
+                        .expect("Is valid account"),
+                    Q::PairedCurrency::new_zero()
+                );
+                match side {
+                    Side::Buy => {
+                        *self = Position::Long(PositionInner::new(
+                            filled_qty,
+                            fill_price,
+                            transaction_accounting,
+                            init_margin_req,
+                        ))
+                    }
+                    Side::Sell => {
+                        *self = Position::Short(PositionInner::new(
+                            filled_qty,
+                            fill_price,
+                            transaction_accounting,
+                            init_margin_req,
+                        ))
+                    }
                 }
-                Side::Sell => {
-                    *self = Position::Short(PositionInner::new(
-                        filled_qty,
-                        fill_price,
-                        transaction_accounting,
-                        init_margin_req,
-                    ))
-                }
-            },
+            }
             Position::Long(inner) => match side {
                 Side::Buy => {
                     inner.increase_contracts(
@@ -111,6 +119,12 @@ where
                             Dec!(1),
                         );
                         *self = Position::Neutral;
+                        assert_eq!(
+                            transaction_accounting
+                                .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
+                                .expect("Is valid account"),
+                            Q::PairedCurrency::new_zero()
+                        );
                     }
                     Ordering::Greater => {
                         let new_short_qty = filled_qty - inner.quantity();
@@ -150,6 +164,12 @@ where
                             Dec!(-1),
                         );
                         *self = Position::Neutral;
+                        assert_eq!(
+                            transaction_accounting
+                                .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
+                                .expect("Is valid account"),
+                            Q::PairedCurrency::new_zero()
+                        );
                     }
                     Ordering::Greater => {
                         let new_long_qty = filled_qty - inner.quantity();

@@ -94,11 +94,11 @@ where
 
 impl<A, Q, UserOrderId, TransactionAccountingT> Exchange<A, Q, UserOrderId, TransactionAccountingT>
 where
-    A: AccountTracker<Q::PairedCurrency>,
+    A: AccountTracker<Q::PairedCurrency> + std::fmt::Debug,
     Q: Currency,
     Q::PairedCurrency: MarginCurrency,
     UserOrderId: Clone + Eq + PartialEq + std::hash::Hash + std::fmt::Debug + Default,
-    TransactionAccountingT: TransactionAccounting<Q::PairedCurrency>,
+    TransactionAccountingT: TransactionAccounting<Q::PairedCurrency> + std::fmt::Debug,
 {
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
@@ -459,6 +459,9 @@ where
             .ok_or(Error::OrderIdNotFound)?;
         self.order_margin
             .remove(order_id, self.config.contract_spec().fee_maker());
+        self.lookup_order_nonce_from_user_order_id
+            .remove(removed_order.user_order_id())
+            .expect("Can be removed");
         let new_order_margin = self.order_margin.order_margin(
             self.config.contract_spec().init_margin_req(),
             &self.position,
@@ -545,6 +548,7 @@ where
         );
         let mut order_updates = Vec::new();
         let mut ids_to_remove = Vec::new();
+
         for order in self.active_limit_orders.values_mut() {
             if let Some(filled_qty) = market_update.limit_order_filled(order) {
                 debug!(
@@ -572,13 +576,16 @@ where
                 );
 
                 if let Some(filled_order) = order.fill(filled_qty, ts_ns) {
-                    trace!("fully filled order {}", order.id());
-                    order_updates.push(LimitOrderUpdate::FullyFilled(filled_order));
+                    debug!("fully filled order {}", order.id());
 
                     ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill();
                     self.order_margin
                         .remove(order.id(), self.config.contract_spec().fee_maker());
+                    self.lookup_order_nonce_from_user_order_id
+                        .remove(filled_order.user_order_id())
+                        .expect("Can be removed");
+                    order_updates.push(LimitOrderUpdate::FullyFilled(filled_order));
                 } else {
                     assert!(order.remaining_quantity() > Q::new_zero());
                     order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
