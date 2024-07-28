@@ -41,6 +41,13 @@ fn load_trades_from_csv(filename: &str) -> Vec<Trade<QuoteCurrency>> {
     out
 }
 
+fn generate_quotes_from_trades(trades: &[Trade<QuoteCurrency>]) -> Vec<Bba> {
+    Vec::from_iter(trades.iter().map(|v| Bba {
+        bid: v.price - quote!(1),
+        ask: v.price + quote!(1),
+    }))
+}
+
 fn update_state<Q, U>(
     exchange: &mut Exchange<
         NoAccountTracker,
@@ -48,7 +55,7 @@ fn update_state<Q, U>(
         (),
         InMemoryTransactionAccounting<Q::PairedCurrency>,
     >,
-    trades: &[Trade<Q>],
+    trades: &[U],
 ) where
     Q: Currency,
     Q::PairedCurrency: MarginCurrency,
@@ -90,6 +97,10 @@ fn criterion_benchmark(c: &mut Criterion) {
                 black_box(&trades),
             )
         })
+    });
+    let bbas = generate_quotes_from_trades(&trades);
+    group.bench_function("quotes_1_million", |b| {
+        b.iter(|| update_state::<QuoteCurrency, Bba>(black_box(&mut exchange), black_box(&bbas)))
     });
 }
 
