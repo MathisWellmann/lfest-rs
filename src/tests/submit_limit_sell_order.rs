@@ -7,7 +7,7 @@ fn submit_limit_sell_order_no_position() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
-        .update_state(0.into(), bba!(quote!(99), quote!(100)))
+        .update_state(0.into(), &bba!(quote!(99), quote!(100)))
         .unwrap()
         .is_empty());
 
@@ -27,12 +27,12 @@ fn submit_limit_sell_order_no_position() {
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0.into(), trade!(quote!(101), base!(9), Side::Buy))
+            .update_state(0.into(), &trade!(quote!(101), base!(9), Side::Buy))
             .unwrap(),
         vec![expected_order_update]
     );
     exchange
-        .update_state(0.into(), bba!(quote!(101), quote!(102)))
+        .update_state(0.into(), &bba!(quote!(101), quote!(102)))
         .unwrap();
     assert_eq!(
         exchange.position().clone(),
@@ -65,7 +65,7 @@ fn submit_limit_sell_order_no_position() {
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0.into(), trade!(quote!(99), base!(9), Side::Sell))
+            .update_state(0.into(), &trade!(quote!(99), base!(9), Side::Sell))
             .unwrap(),
         vec![expected_order_update]
     );
@@ -86,7 +86,7 @@ fn submit_limit_sell_order_no_position() {
 fn submit_limit_sell_order_no_position_max() {
     let mut exchange = mock_exchange_linear();
     assert!(exchange
-        .update_state(0.into(), bba!(quote!(99), quote!(100)))
+        .update_state(0.into(), &bba!(quote!(99), quote!(100)))
         .unwrap()
         .is_empty());
 
@@ -117,7 +117,7 @@ fn submit_limit_sell_order_below_bid() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
-            .update_state(0.into(), bba!(quote!(99), quote!(100)))
+            .update_state(0.into(), &bba!(quote!(99), quote!(100)))
             .unwrap(),
         Vec::new()
     );

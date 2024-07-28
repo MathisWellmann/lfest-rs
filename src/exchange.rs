@@ -148,7 +148,7 @@ where
     pub fn update_state<U>(
         &mut self,
         timestamp_ns: TimestampNs,
-        market_update: U,
+        market_update: &U,
     ) -> Result<Vec<LimitOrderUpdate<Q, UserOrderId>>>
     where
         U: MarketUpdate<Q, UserOrderId>,
@@ -157,7 +157,7 @@ where
 
         self.market_state.update_state(
             timestamp_ns,
-            &market_update,
+            market_update,
             self.config.contract_spec().price_filter(),
         )?;
 
@@ -536,7 +536,7 @@ where
     /// Checks for the execution of active limit orders in the account.
     fn check_active_orders<U>(
         &mut self,
-        market_update: U,
+        market_update: &U,
         ts_ns: TimestampNs,
     ) -> Vec<LimitOrderUpdate<Q, UserOrderId>>
     where

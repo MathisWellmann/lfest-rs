@@ -44,7 +44,7 @@ fn main() {
         let exec_orders = exchange
             .update_state(
                 (i as i64).into(),
-                bba!(
+                &bba!(
                     QuoteCurrency::new(price_decimal),
                     QuoteCurrency::new(price_decimal + spread)
                 ),

@@ -7,6 +7,8 @@ procs:
     shell: "cargo test"
   cargo-test-quantiles:
     shell: "cargo test --features quantiles"
+  cargo-bench:
+    shell: "cargo bench"
   cargo-fmt:
     shell: "cargo fmt"
   cargo-clippy:

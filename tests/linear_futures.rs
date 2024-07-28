@@ -12,7 +12,7 @@ fn lin_long_market_win_full() {
     let _ = exchange
         .update_state(
             0.into(),
-            Bba {
+            &Bba {
                 bid: quote!(99.0),
                 ask: quote!(100.0),
             },
@@ -35,7 +35,7 @@ fn lin_long_market_win_full() {
         .unwrap();
     let bid = quote!(100);
     let ask = quote!(101);
-    let order_updates = exchange.update_state(0.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(0.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 0);
     assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
@@ -70,7 +70,7 @@ fn lin_long_market_win_full() {
 
     let bid = quote!(200);
     let ask = quote!(201);
-    let order_updates = exchange.update_state(0.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(0.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange.position().unrealized_pnl(quote!(200), quote!(201)),

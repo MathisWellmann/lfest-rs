@@ -22,8 +22,6 @@ where
     Q::PairedCurrency: MarginCurrency,
 {
     /// The number of futures contracts making up the position.
-    /// Denoted in the currency in which the size is valued.
-    /// e.g.: XBTUSD has a contract size of 1 USD, so `M::PairedCurrency` is USD.
     #[getset(get_copy = "pub")]
     quantity: Q,
 

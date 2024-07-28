@@ -14,7 +14,7 @@ fn partial_limit_order_fill(
     let mut exchange = mock_exchange_linear();
 
     assert!(exchange
-        .update_state(1.into(), bba!(quote!(100), quote!(101)))
+        .update_state(1.into(), &bba!(quote!(100), quote!(101)))
         .unwrap()
         .is_empty());
     let order = LimitOrder::new(side, limit_price, qty).unwrap();
@@ -24,7 +24,7 @@ fn partial_limit_order_fill(
     let exec_orders = exchange
         .update_state(
             1.into(),
-            trade!(trade_price, qty / base!(2), side.inverted()),
+            &trade!(trade_price, qty / base!(2), side.inverted()),
         )
         .unwrap();
     // Half of the limit order should be executed

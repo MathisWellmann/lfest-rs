@@ -10,7 +10,7 @@ fn inv_long_market_win_full() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
-        .update_state(0.into(), bba!(quote!(999.0), quote!(1000.0)))
+        .update_state(0.into(), &bba!(quote!(999.0), quote!(1000.0)))
         .unwrap();
 
     let value: BaseCurrency = exchange.user_balances().available_wallet_balance * base!(0.8);
@@ -20,7 +20,7 @@ fn inv_long_market_win_full() {
 
     let bid = quote!(1000);
     let ask = quote!(1001);
-    let order_updates = exchange.update_state(1.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
     let fee_quote: QuoteCurrency = size * exchange.config().contract_spec().fee_taker();
@@ -47,7 +47,7 @@ fn inv_long_market_win_full() {
 
     let bid = quote!(2000);
     let ask = quote!(2001);
-    let order_updates = exchange.update_state(1.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange
@@ -88,7 +88,7 @@ fn inv_long_market_loss_full() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = quote!(999);
     let ask = quote!(1000);
-    let order_updates = exchange.update_state(0.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(0.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
     let o = MarketOrder::new(Side::Buy, quote!(800.0)).unwrap();
@@ -118,7 +118,7 @@ fn inv_long_market_loss_full() {
 
     let bid = quote!(800);
     let ask = quote!(801);
-    let order_updates = exchange.update_state(2.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(2.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange.position().unrealized_pnl(quote!(800), quote!(801)),
@@ -158,7 +158,7 @@ fn inv_short_market_win_full() {
     let fee_taker = exchange.config().contract_spec().fee_taker();
     let bid = quote!(1000);
     assert!(exchange
-        .update_state(0.into(), bba!(bid, quote!(1001)))
+        .update_state(0.into(), &bba!(bid, quote!(1001)))
         .unwrap()
         .is_empty());
 
@@ -186,7 +186,7 @@ fn inv_short_market_win_full() {
     );
 
     assert!(exchange
-        .update_state(1.into(), bba!(quote!(799), quote!(800)))
+        .update_state(1.into(), &bba!(quote!(799), quote!(800)))
         .unwrap()
         .is_empty());
     assert_eq!(
@@ -203,7 +203,7 @@ fn inv_short_market_win_full() {
 
     let bid = quote!(799);
     let ask = quote!(800);
-    let order_updates = exchange.update_state(2.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(2.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
     let fee_quote0 = size * exchange.config().contract_spec().fee_taker();
@@ -233,7 +233,7 @@ fn inv_short_market_loss_full() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
-        .update_state(0.into(), bba!(quote!(1000), quote!(1001)))
+        .update_state(0.into(), &bba!(quote!(1000), quote!(1001)))
         .unwrap()
         .is_empty());
 
@@ -245,7 +245,7 @@ fn inv_short_market_loss_full() {
     let bid = quote!(999);
     let ask = quote!(1000);
     assert!(exchange
-        .update_state(1.into(), bba!(bid, ask))
+        .update_state(1.into(), &bba!(bid, ask))
         .unwrap()
         .is_empty());
 
@@ -274,7 +274,7 @@ fn inv_short_market_loss_full() {
     );
 
     assert_eq!(
-        exchange.update_state(2.into(), bba!(quote!(1999), quote!(2000))),
+        exchange.update_state(2.into(), &bba!(quote!(1999), quote!(2000))),
         Err(Error::RiskError(RiskError::Liquidate))
     );
 
@@ -296,7 +296,7 @@ fn inv_long_market_win_partial() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let order_updates = exchange
-        .update_state(0.into(), bba!(quote!(999.0), quote!(1000.0)))
+        .update_state(0.into(), &bba!(quote!(999.0), quote!(1000.0)))
         .unwrap();
     assert!(order_updates.is_empty());
 
@@ -307,7 +307,7 @@ fn inv_long_market_win_partial() {
 
     let bid = quote!(1000);
     let ask = quote!(1001);
-    let order_updates = exchange.update_state(1.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
     let fee_quote = size * exchange.config().contract_spec().fee_taker();
@@ -333,7 +333,7 @@ fn inv_long_market_win_partial() {
     );
 
     assert!(exchange
-        .update_state(1.into(), bba!(quote!(2000), quote!(2001)))
+        .update_state(1.into(), &bba!(quote!(2000), quote!(2001)))
         .unwrap()
         .is_empty());
 
@@ -353,7 +353,7 @@ fn inv_long_market_win_partial() {
 
     let bid = quote!(2000);
     let ask = quote!(2001);
-    let order_updates = exchange.update_state(2.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(2.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
     assert_eq!(
@@ -384,14 +384,14 @@ fn inv_long_market_loss_partial() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = quote!(999);
     let order_updates = exchange
-        .update_state(0.into(), bba!(bid, quote!(1000.0)))
+        .update_state(0.into(), &bba!(bid, quote!(1000.0)))
         .unwrap();
     assert!(order_updates.is_empty());
 
     let o = MarketOrder::new(Side::Buy, quote!(800.0)).unwrap();
     exchange.submit_market_order(o).unwrap();
     assert!(exchange
-        .update_state(1.into(), bba!(bid, quote!(1000)))
+        .update_state(1.into(), &bba!(bid, quote!(1000)))
         .unwrap()
         .is_empty());
 
@@ -406,7 +406,7 @@ fn inv_long_market_loss_partial() {
     );
 
     let order_updates = exchange
-        .update_state(1.into(), bba!(quote!(800.0), quote!(801.0)))
+        .update_state(1.into(), &bba!(quote!(800.0), quote!(801.0)))
         .unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
@@ -421,7 +421,7 @@ fn inv_long_market_loss_partial() {
 
     let bid = quote!(800);
     let ask = quote!(801);
-    let order_updates = exchange.update_state(1.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
     let fee_quote0 = quote!(800) * exchange.config().contract_spec().fee_taker();
@@ -462,14 +462,14 @@ fn inv_short_market_win_partial() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
-        .update_state(0.into(), bba!(quote!(1000.0), quote!(1001.0)))
+        .update_state(0.into(), &bba!(quote!(1000.0), quote!(1001.0)))
         .unwrap();
 
     let o = MarketOrder::new(Side::Sell, quote!(800.0)).unwrap();
     exchange.submit_market_order(o).unwrap();
     let bid = quote!(999);
     let ask = quote!(1000);
-    let order_updates = exchange.update_state(1.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
     assert_eq!(
@@ -492,7 +492,7 @@ fn inv_short_market_win_partial() {
     );
 
     let order_updates = exchange
-        .update_state(2.into(), bba!(quote!(799), quote!(800)))
+        .update_state(2.into(), &bba!(quote!(799), quote!(800)))
         .unwrap();
     assert!(order_updates.is_empty());
 
@@ -505,7 +505,7 @@ fn inv_short_market_win_partial() {
     exchange.submit_market_order(o).unwrap();
     let bid = quote!(799);
     let ask = quote!(800);
-    let order_updates = exchange.update_state(3.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(3.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
     let fee_quote0 = quote!(800) * exchange.config().contract_spec().fee_taker();
@@ -546,7 +546,7 @@ fn inv_short_market_loss_partial() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let order_updates = exchange
-        .update_state(0.into(), bba!(quote!(1000), quote!(1001)))
+        .update_state(0.into(), &bba!(quote!(1000), quote!(1001)))
         .unwrap();
     assert!(order_updates.is_empty());
 
@@ -557,7 +557,7 @@ fn inv_short_market_loss_partial() {
 
     let bid = quote!(999);
     let ask = quote!(1000);
-    let order_updates = exchange.update_state(1.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
     let fee_quote1 = size * exchange.config().contract_spec().fee_taker();
@@ -585,7 +585,7 @@ fn inv_short_market_loss_partial() {
     let bid = quote!(1999);
     let ask = quote!(2000);
     assert_eq!(
-        exchange.update_state(1.into(), bba!(bid, ask)),
+        exchange.update_state(1.into(), &bba!(bid, ask)),
         Err(Error::RiskError(RiskError::Liquidate))
     );
     assert_eq!(exchange.position(), &Position::Neutral);
@@ -606,7 +606,7 @@ fn inv_test_market_roundtrip() {
     let fee_taker = exchange.config().contract_spec().fee_taker();
     let ask = quote!(1000);
     assert!(exchange
-        .update_state(0.into(), bba!(quote!(999), ask))
+        .update_state(0.into(), &bba!(quote!(999), ask))
         .unwrap()
         .is_empty());
 
@@ -617,7 +617,7 @@ fn inv_test_market_roundtrip() {
     let bid = quote!(1000);
     let ask = quote!(1001);
     assert!(exchange
-        .update_state(1.into(), bba!(bid, ask))
+        .update_state(1.into(), &bba!(bid, ask))
         .unwrap()
         .is_empty());
 
@@ -644,7 +644,7 @@ fn inv_execute_limit() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = quote!(1000);
     let ask = quote!(1001);
-    let _ = exchange.update_state(0.into(), bba!(bid, ask)).unwrap();
+    let _ = exchange.update_state(0.into(), &bba!(bid, ask)).unwrap();
 
     let o = LimitOrder::new(Side::Buy, quote!(900.0), quote!(450.0)).unwrap();
     exchange.submit_limit_order(o).unwrap();
@@ -659,12 +659,12 @@ fn inv_execute_limit() {
     );
 
     let order_updates = exchange
-        .update_state(1.into(), trade!(quote!(899), quote!(450), Side::Sell))
+        .update_state(1.into(), &trade!(quote!(899), quote!(450), Side::Sell))
         .unwrap();
     assert_eq!(order_updates.len(), 1);
     let bid = quote!(750);
     let ask = quote!(751);
-    let order_updates = exchange.update_state(1.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
     assert_eq!(exchange.market_state().bid(), quote!(750));
@@ -693,12 +693,12 @@ fn inv_execute_limit() {
     assert_eq!(exchange.active_limit_orders().len(), 1);
 
     let order_updates = exchange
-        .update_state(1.into(), trade!(quote!(1001), quote!(450), Side::Buy))
+        .update_state(1.into(), &trade!(quote!(1001), quote!(450), Side::Buy))
         .unwrap();
     assert_eq!(order_updates.len(), 1);
     let bid = quote!(1199);
     let ask = quote!(1200);
-    let order_updates = exchange.update_state(1.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
     assert_eq!(exchange.active_limit_orders().len(), 0);
@@ -717,12 +717,12 @@ fn inv_execute_limit() {
     assert_eq!(exchange.active_limit_orders().len(), 1);
 
     let order_updates = exchange
-        .update_state(2.into(), trade!(quote!(1201), quote!(600), Side::Buy))
+        .update_state(2.into(), &trade!(quote!(1201), quote!(600), Side::Buy))
         .unwrap();
     assert_eq!(order_updates.len(), 1);
     let bid = quote!(1201);
     let ask = quote!(1202);
-    let order_updates = exchange.update_state(2.into(), bba!(bid, ask)).unwrap();
+    let order_updates = exchange.update_state(2.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange.position().clone(),

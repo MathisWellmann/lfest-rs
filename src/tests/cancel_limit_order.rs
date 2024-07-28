@@ -8,7 +8,7 @@ use crate::{
 fn cancel_limit_order() {
     let mut exchange = mock_exchange_linear();
     exchange
-        .update_state(0.into(), bba!(quote!(100), quote!(101)))
+        .update_state(0.into(), &bba!(quote!(100), quote!(101)))
         .unwrap();
 
     let order = LimitOrder::new(Side::Buy, quote!(100), base!(1)).unwrap();

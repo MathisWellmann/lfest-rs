@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.69.5"
+version = "0.69.6"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2021"
 license-file = "LICENSE"
@@ -33,7 +33,12 @@ rand_distr = "0.4"
 test-case = "3"
 tracing-test = "0.2"
 ron = "0.8"
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [features]
 # Functionality that requires estimation of ln return quantiles, e.g `var` or `d_ratio`.
 quantiles = ["dep:quantogram"]
+
+[[bench]]
+name = "market_update_trade"
+harness = false
