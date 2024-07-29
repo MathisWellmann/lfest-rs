@@ -46,3 +46,7 @@ harness = false
 [[bench]]
 name = "submit_market_order"
 harness = false
+
+[[bench]]
+name = "submit_limit_order"
+harness = false

@@ -324,12 +324,6 @@ where
             .price_filter()
             .validate_limit_order(&order, self.market_state.mid_price())?;
 
-        let meta = ExchangeOrderMeta::new(
-            self.next_order_id(),
-            self.market_state.current_timestamp_ns(),
-        );
-        let order = order.into_pending(meta);
-
         match order.side() {
             Side::Buy => {
                 if order.limit_price() >= self.market_state.ask() {
@@ -348,6 +342,13 @@ where
                 }
             }
         }
+
+        let meta = ExchangeOrderMeta::new(
+            self.next_order_id(),
+            self.market_state.current_timestamp_ns(),
+        );
+        let order = order.into_pending(meta);
+
         let available_wallet_balance = self
             .transaction_accounting
             .margin_balance_of(USER_WALLET_ACCOUNT)?;
