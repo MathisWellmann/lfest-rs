@@ -40,7 +40,7 @@ where
     /// # Panics:
     /// if `quantity` or `entry_price` are invalid.
     pub fn new<T>(
-        qty: Q,
+        quantity: Q,
         entry_price: QuoteCurrency,
         accounting: &mut T,
         init_margin_req: Decimal,
@@ -48,11 +48,11 @@ where
     where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
-        trace!("new position: qty {qty} @ {entry_price}");
-        assert!(qty > Q::new_zero());
+        trace!("new position: qty {quantity} @ {entry_price}");
+        assert!(quantity > Q::new_zero());
         assert!(entry_price > quote!(0));
 
-        let margin = qty.convert(entry_price) * init_margin_req;
+        let margin = quantity.convert(entry_price) * init_margin_req;
         let transaction =
             Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
         accounting
@@ -60,7 +60,7 @@ where
             .expect("margin transfer for opening a new position works.");
 
         Self {
-            quantity: qty,
+            quantity,
             entry_price,
         }
     }
@@ -165,6 +165,14 @@ where
                 + (*added_qty.as_ref() * *entry_price.as_ref()))
                 / *new_qty.as_ref(),
         )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_parts(quantity: Q, entry_price: QuoteCurrency) -> Self {
+        Self {
+            quantity,
+            entry_price,
+        }
     }
 }
 

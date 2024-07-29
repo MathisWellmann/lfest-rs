@@ -38,6 +38,30 @@ where
     state: OrderStatus,
 }
 
+impl<Q, UserOrderId, OrderStatus> LimitOrder<Q, UserOrderId, OrderStatus>
+where
+    Q: Currency,
+    UserOrderId: Clone,
+    OrderStatus: Clone,
+{
+    #[cfg(test)]
+    pub(crate) fn from_parts(
+        user_order_id: UserOrderId,
+        side: Side,
+        limit_price: QuoteCurrency,
+        remaining_quantity: Q,
+        state: OrderStatus,
+    ) -> Self {
+        Self {
+            user_order_id,
+            side,
+            limit_price,
+            remaining_quantity,
+            state,
+        }
+    }
+}
+
 impl<Q> LimitOrder<Q, (), NewOrder>
 where
     Q: Currency,

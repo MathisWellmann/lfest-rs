@@ -395,7 +395,7 @@ where
         self.active_limit_orders.insert(order_id, order);
         self.lookup_order_nonce_from_user_order_id
             .insert(user_order_id, order_id);
-        let new_order_margin = self.order_margin.order_margin(
+        let new_order_margin = self.order_margin.order_margin_with_fees(
             self.config.contract_spec().init_margin_req(),
             &self.position,
         );
@@ -449,7 +449,7 @@ where
             .expect("is valid");
         assert_eq!(
             order_margin,
-            self.order_margin.order_margin(
+            self.order_margin.order_margin_with_fees(
                 self.config.contract_spec().init_margin_req(),
                 &self.position,
             )
@@ -463,7 +463,7 @@ where
         self.lookup_order_nonce_from_user_order_id
             .remove(removed_order.user_order_id())
             .expect("Can be removed");
-        let new_order_margin = self.order_margin.order_margin(
+        let new_order_margin = self.order_margin.order_margin_with_fees(
             self.config.contract_spec().init_margin_req(),
             &self.position,
         );
@@ -550,10 +550,13 @@ where
         let mut order_updates = Vec::new();
         let mut ids_to_remove = Vec::new();
 
+        // TODO: remove, its for debugging
+        let alo = self.active_limit_orders.clone();
+
         for order in self.active_limit_orders.values_mut() {
             if let Some(filled_qty) = market_update.limit_order_filled(order) {
                 debug!(
-                    "filled {} order {}: {filled_qty}/{} @ {}",
+                    "filled limit {} order {}: {filled_qty}/{} @ {}",
                     order.side(),
                     order.id(),
                     order.remaining_quantity(),
@@ -564,13 +567,21 @@ where
                     "The filled_qty must be greater than zero"
                 );
 
+                info!(
+                    "market_update: {market_update:?}, active_limit_orders: {alo:?}, cumulative_order_fees: {}, market_state: {:?}, transaction_accounting: {:?}, position: {:?}",
+                    self.order_margin.cumulative_order_fees(),
+                    self.market_state,
+                    self.transaction_accounting,
+                    self.position,
+                );
+
                 let order_margin = self
                     .transaction_accounting
                     .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
                     .expect("is valid");
-                debug_assert_eq!(
+                assert_eq!(
                     order_margin,
-                    self.order_margin.order_margin(
+                    self.order_margin.order_margin_with_fees(
                         self.config.contract_spec().init_margin_req(),
                         &self.position
                     )
@@ -605,11 +616,11 @@ where
                 self.account_tracker
                     .log_trade(order.side(), order.limit_price(), filled_qty);
 
-                let new_order_margin = self.order_margin.order_margin(
+                let new_order_margin = self.order_margin.order_margin_with_fees(
                     self.config.contract_spec().init_margin_req(),
                     &self.position,
                 );
-                // TODO: isnt it always smaller?
+                debug!("order_margin: {order_margin}, new_order_margin: {new_order_margin}");
                 assert!(
                     new_order_margin <= order_margin,
                     "The order margin does not increase with a filled limit order event."
@@ -629,7 +640,6 @@ where
                     self.config.contract_spec().fee_maker(),
                     &mut self.account_tracker,
                 );
-                assert_user_wallet_balance(&self.transaction_accounting);
             }
         }
         ids_to_remove
@@ -648,15 +658,16 @@ where
         } else {
             true
         });
-        debug_assert_eq!(
+        assert_eq!(
             self.transaction_accounting
                 .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
                 .expect("is valid"),
-            self.order_margin.order_margin(
+            self.order_margin.order_margin_with_fees(
                 self.config.contract_spec().init_margin_req(),
                 &self.position
             )
         );
+        assert_user_wallet_balance(&self.transaction_accounting);
 
         order_updates
     }
@@ -677,5 +688,89 @@ where
                 .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
                 .expect("is a valid account"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fpdec::Dec;
+
+    use super::*;
+    use crate::{
+        base,
+        contract_specification::ContractSpecification,
+        fee, leverage,
+        prelude::{
+            BaseCurrency, Decimal, FilledQuantity, InMemoryTransactionAccounting, NoAccountTracker,
+            PositionInner, PriceFilter, QuantityFilter, QuoteCurrency, TAccount, Trade,
+        },
+    };
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn some_debugging() {
+        let contract_spec = ContractSpecification::new(
+            leverage!(1),
+            Dec!(0.5),
+            PriceFilter::new(None, None, quote!(0.1), Dec!(2), Dec!(0.5)).unwrap(),
+            QuantityFilter::new(None, None, base!(0.001)).unwrap(),
+            fee!(0.0002),
+            fee!(0.0006),
+        )
+        .unwrap();
+        let config = Config::new(quote!(10000), 100, contract_spec.clone(), 3600).unwrap();
+        let transaction_accounting = InMemoryTransactionAccounting::from_accounts([
+            TAccount::from_parts(
+                quote!(103473101.929093160000000000),
+                quote!(103473101.201668800000000000),
+            ),
+            TAccount::from_parts(quote!(96205857.958312340), quote!(96205054.201693160)),
+            TAccount::from_parts(quote!(7227008.62800), quote!(7217875.074600000000000000)),
+            TAccount::from_parts(quote!(2889.542256460), quote!(0)),
+            TAccount::from_parts(quote!(0), quote!(0)),
+            TAccount::from_parts(quote!(37345.073100000000000000), quote!(50172.65280)),
+        ]);
+
+        let order_id: OrderId = 16835.into();
+        let mut active_limit_orders =
+            HashMap::<OrderId, LimitOrder<BaseCurrency, u64, Pending<BaseCurrency>>>::new();
+        let meta = ExchangeOrderMeta::new(order_id, 1656633071479000000.into());
+        let mut status = Pending::new(meta);
+        status.filled_quantity = FilledQuantity::Filled {
+            cumulative_qty: base!(0.466),
+            avg_price: quote!(19599.9),
+        };
+        let pending_order =
+            LimitOrder::from_parts(17503, Side::Buy, quote!(19599.9), base!(0.041), status);
+        let mut lookup_order_nonce_from_user_order_id = HashMap::<u64, OrderId>::new();
+        lookup_order_nonce_from_user_order_id
+            .insert(*pending_order.user_order_id(), pending_order.id());
+        active_limit_orders.insert(order_id, pending_order);
+
+        let mut exchange =
+            Exchange::<_, BaseCurrency, u64, InMemoryTransactionAccounting<QuoteCurrency>> {
+                config,
+                market_state: MarketState::from_components(
+                    quote!(19599.0),
+                    quote!(19600.7),
+                    1656648245348000000.into(),
+                    963211121,
+                ),
+                account_tracker: NoAccountTracker,
+                risk_engine: IsolatedMarginRiskEngine::new(contract_spec),
+                next_order_id: 16836.into(),
+                transaction_accounting,
+                position: Position::Long(PositionInner::from_parts(base!(0.466), quote!(19599.9))),
+                active_limit_orders: active_limit_orders.clone(),
+                lookup_order_nonce_from_user_order_id,
+                order_margin: OrderMargin::from_parts(quote!(0.160719180), active_limit_orders),
+                sample_returns_trigger: SampleReturnsTrigger::new(3600_000_000_000.into()),
+            };
+        let market_update = Trade {
+            price: quote!(19598.7),
+            quantity: base!(1.181),
+            side: Side::Sell,
+        };
+        exchange.check_active_orders(&market_update, 0.into());
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
     base, bba, mock_exchange_linear,
-    prelude::{ExchangeOrderMeta, LimitOrder, OrderId, Side, UserBalances},
-    quote,
+    prelude::{Currency, ExchangeOrderMeta, LimitOrder, OrderId, Side, UserBalances},
+    quote, TEST_FEE_MAKER,
 };
 
 #[test]
@@ -11,7 +11,9 @@ fn cancel_limit_order() {
         .update_state(0.into(), &bba!(quote!(100), quote!(101)))
         .unwrap();
 
-    let order = LimitOrder::new(Side::Buy, quote!(100), base!(1)).unwrap();
+    let limit_price = quote!(100);
+    let qty = base!(1);
+    let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
 
     exchange.submit_limit_order(order.clone()).unwrap();
 
@@ -24,12 +26,13 @@ fn cancel_limit_order() {
         exchange.active_limit_orders().get(&order_id).unwrap(),
         &expected_order
     );
+    let fee = qty.convert(limit_price) * TEST_FEE_MAKER;
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(900),
+            available_wallet_balance: quote!(900) - fee,
             position_margin: quote!(0),
-            order_margin: quote!(100)
+            order_margin: quote!(100) + fee
         }
     );
 

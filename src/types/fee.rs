@@ -21,7 +21,7 @@ pub struct Fee(Decimal);
 impl Fee {
     /// Create a new instance from a `Decimal` value
     #[inline(always)]
-    pub fn new(val: Decimal) -> Self {
+    pub const fn new(val: Decimal) -> Self {
         Self(val)
     }
 }

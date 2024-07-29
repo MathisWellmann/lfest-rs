@@ -1,4 +1,7 @@
-use crate::{mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, trade};
+use crate::{
+    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, trade,
+    TEST_FEE_MAKER,
+};
 
 #[test]
 #[tracing_test::traced_test]
@@ -10,15 +13,17 @@ fn submit_limit_buy_order_no_position() {
         .is_empty());
 
     let limit_price = quote!(98);
-    let order = LimitOrder::new(Side::Buy, limit_price, base!(5)).unwrap();
+    let qty = base!(5);
+    let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
     assert_eq!(exchange.position(), &Position::Neutral);
+    let fee = qty.convert(limit_price) * TEST_FEE_MAKER;
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(510),
+            available_wallet_balance: quote!(510) - fee,
             position_margin: quote!(0),
-            order_margin: quote!(490)
+            order_margin: quote!(490) + fee
         }
     );
 

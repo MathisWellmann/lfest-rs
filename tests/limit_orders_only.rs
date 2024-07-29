@@ -26,9 +26,9 @@ fn limit_orders_only() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(10),
+            available_wallet_balance: quote!(10) - fee0,
             position_margin: quote!(0),
-            order_margin: quote!(990),
+            order_margin: quote!(990) + fee0,
         }
     );
     assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 1);

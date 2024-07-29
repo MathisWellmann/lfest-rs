@@ -7,6 +7,11 @@ use crate::{
     prelude::*,
 };
 
+/// The maker fee used in tests.
+pub const TEST_FEE_MAKER: Fee = fee!(0.0002);
+/// The taker fee used in tests.
+pub const TEST_FEE_TAKER: Fee = fee!(0.0006);
+
 /// Constructs a mock exchange (for linear futures) for testing.
 /// The size is denoted in `BaseCurrency`
 /// and the margin currency is `QuoteCurency`
@@ -18,8 +23,8 @@ pub fn mock_exchange_linear(
         Dec!(0.5),
         PriceFilter::default(),
         QuantityFilter::new(None, None, base!(0.01)).unwrap(),
-        fee!(0.0002),
-        fee!(0.0006),
+        TEST_FEE_MAKER,
+        TEST_FEE_TAKER,
     )
     .expect("works");
     let config = Config::new(quote!(1000), 200, contract_spec, 3600).unwrap();
@@ -43,8 +48,8 @@ pub fn mock_exchange_linear_with_account_tracker(
         Dec!(0.5),
         PriceFilter::default(),
         QuantityFilter::new(None, None, base!(0.01)).unwrap(),
-        fee!(0.0002),
-        fee!(0.0006),
+        TEST_FEE_MAKER,
+        TEST_FEE_TAKER,
     )
     .expect("works");
     let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
@@ -61,8 +66,8 @@ pub fn mock_exchange_inverse(
         Dec!(0.5),
         PriceFilter::default(),
         QuantityFilter::default(),
-        fee!(0.0002),
-        fee!(0.0006),
+        TEST_FEE_MAKER,
+        TEST_FEE_TAKER,
     )
     .expect("works");
     let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();

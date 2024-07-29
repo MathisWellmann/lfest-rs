@@ -69,12 +69,13 @@ where
     }
 
     /// The margin requirement for all the tracked orders.
-    pub(crate) fn order_margin(
+    pub(crate) fn order_margin_with_fees(
         &self,
         init_margin_req: Decimal,
         position: &Position<Q>,
     ) -> Q::PairedCurrency {
-        Self::order_margin_internal(&self.active_limit_orders, init_margin_req, position)
+        let om = Self::order_margin_internal(&self.active_limit_orders, init_margin_req, position);
+        om + self.cumulative_order_fees
     }
 
     /// The margin requirement for all the tracked orders.
@@ -148,7 +149,7 @@ where
     }
 
     /// Get the order margin if a new order were to be added.
-    pub(crate) fn order_margin_with_order(
+    pub(crate) fn order_margin_and_fees_with_order(
         &self,
         order: &LimitOrder<Q, UserOrderId, Pending<Q>>,
         init_margin_req: Decimal,
@@ -156,7 +157,19 @@ where
     ) -> Q::PairedCurrency {
         let mut active_orders = self.active_limit_orders.clone();
         assert!(active_orders.insert(order.id(), order.clone()).is_none());
-        Self::order_margin_internal(&active_orders, init_margin_req, position)
+        let om = Self::order_margin_internal(&active_orders, init_margin_req, position);
+        om + self.cumulative_order_fees
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_parts(
+        cumulative_order_fees: Q::PairedCurrency,
+        active_limit_orders: ActiveLimitOrders<Q, UserOrderId>,
+    ) -> Self {
+        Self {
+            cumulative_order_fees,
+            active_limit_orders,
+        }
     }
 }
 
@@ -175,7 +188,7 @@ mod tests {
 
         let position = Position::<BaseCurrency>::Neutral;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
+            order_margin.order_margin_with_fees(init_margin_req, &position),
             quote!(0)
         );
         assert_eq!(order_margin.cumulative_order_fees(), quote!(0));
@@ -201,7 +214,7 @@ mod tests {
         ));
 
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
+            order_margin.order_margin_with_fees(init_margin_req, &position),
             quote!(0)
         );
         assert_eq!(order_margin.cumulative_order_fees(), quote!(0));
@@ -227,7 +240,7 @@ mod tests {
         ));
 
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
+            order_margin.order_margin_with_fees(init_margin_req, &position),
             quote!(0)
         );
         assert_eq!(order_margin.cumulative_order_fees(), quote!(0));
@@ -266,9 +279,11 @@ mod tests {
             .for_each(|order| order_margin.update(&order, fee_maker));
 
         let mult = QuoteCurrency::new(Decimal::from(n as u64));
+        let fees = (qty.convert(limit_price) * fee_maker) * mult;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &Position::<BaseCurrency>::Neutral,),
-            mult * qty.convert(limit_price) * init_margin_req
+            order_margin
+                .order_margin_with_fees(init_margin_req, &Position::<BaseCurrency>::Neutral,),
+            mult * qty.convert(limit_price) * init_margin_req + fees
         );
         assert_eq!(
             order_margin.cumulative_order_fees(),
@@ -279,7 +294,8 @@ mod tests {
             .iter()
             .for_each(|order| order_margin.remove(order.id(), fee_maker));
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &Position::<BaseCurrency>::Neutral),
+            order_margin
+                .order_margin_with_fees(init_margin_req, &Position::<BaseCurrency>::Neutral),
             quote!(0)
         );
         assert_eq!(order_margin.cumulative_order_fees(), quote!(0));
@@ -326,9 +342,11 @@ mod tests {
         });
 
         let mult = QuoteCurrency::new(Decimal::from(n as u64));
+        let fees = (qty.convert(limit_price) * fee_maker) * mult * Dec!(2);
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &Position::<BaseCurrency>::Neutral,),
-            mult * qty.convert(limit_price) * init_margin_req
+            order_margin
+                .order_margin_with_fees(init_margin_req, &Position::<BaseCurrency>::Neutral,),
+            mult * qty.convert(limit_price) * init_margin_req + fees
         );
         assert_eq!(
             order_margin.cumulative_order_fees(),
@@ -342,7 +360,8 @@ mod tests {
             .iter()
             .for_each(|order| order_margin.remove(order.id(), fee_maker));
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &Position::<BaseCurrency>::Neutral),
+            order_margin
+                .order_margin_with_fees(init_margin_req, &Position::<BaseCurrency>::Neutral),
             quote!(0)
         );
         assert_eq!(order_margin.cumulative_order_fees(), quote!(0));
@@ -393,10 +412,11 @@ mod tests {
             )),
         };
 
+        let fees = qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            quote!(0),
-            "The position quantity always cancels out the limit orders. So margin requirement is 0"
+            order_margin.order_margin_with_fees(init_margin_req, &position),
+            fees,
+            "The position quantity always cancels out the limit orders. So margin requirement is 0, but with fees."
         );
         assert_eq!(
             order_margin.cumulative_order_fees(),
@@ -436,9 +456,10 @@ mod tests {
 
         let remaining_qty = order.remaining_quantity();
         assert_eq!(remaining_qty, filled_qty);
+        let fees = remaining_qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &Position::Neutral),
-            remaining_qty.convert(limit_price) * init_margin_req
+            order_margin.order_margin_with_fees(init_margin_req, &Position::Neutral),
+            remaining_qty.convert(limit_price) * init_margin_req + fees
         );
         assert_eq!(
             order_margin.cumulative_order_fees(),
@@ -455,35 +476,43 @@ mod tests {
         let mut order_margin = OrderMargin::default();
 
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
+            order_margin.order_margin_with_fees(init_margin_req, &position),
             quote!(0)
         );
 
-        let order = LimitOrder::new(Side::Buy, quote!(90), base!(1)).unwrap();
+        let qty = base!(1);
+        let limit_price = quote!(90);
+        let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
+        let fee_0 = qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            quote!(90)
+            order_margin.order_margin_with_fees(init_margin_req, &position),
+            quote!(90) + fee_0
         );
 
-        let order = LimitOrder::new(Side::Sell, quote!(100), base!(1)).unwrap();
+        let limit_price = quote!(100);
+        let order = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(1.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
+        let fee_1 = qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            quote!(100)
+            order_margin.order_margin_with_fees(init_margin_req, &position),
+            quote!(100) + fee_0 + fee_1
         );
 
-        let order = LimitOrder::new(Side::Sell, quote!(120), base!(1)).unwrap();
+        let limit_price = quote!(120);
+        let qty = base!(1);
+        let order = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(2.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
+        let fee_2 = qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            quote!(220)
+            order_margin.order_margin_with_fees(init_margin_req, &position),
+            quote!(220) + fee_0 + fee_1 + fee_2
         );
     }
 
@@ -503,44 +532,53 @@ mod tests {
         let init_margin_req = Dec!(1);
 
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
+            order_margin.order_margin_with_fees(init_margin_req, &position),
             quote!(0)
         );
 
-        let order = LimitOrder::new(Side::Buy, quote!(90), base!(1)).unwrap();
+        let limit_price = quote!(90);
+        let qty = base!(1);
+        let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
+        let fee_0 = qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            quote!(90)
+            order_margin.order_margin_with_fees(init_margin_req, &position),
+            quote!(90) + fee_0
         );
 
-        let order = LimitOrder::new(Side::Sell, quote!(100), base!(1)).unwrap();
+        let limit_price = quote!(100);
+        let order = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(1.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
+        let fee_1 = qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            quote!(90)
+            order_margin.order_margin_with_fees(init_margin_req, &position),
+            quote!(90) + fee_0 + fee_1
         );
 
-        let order = LimitOrder::new(Side::Sell, quote!(120), base!(1)).unwrap();
+        let limit_price = quote!(120);
+        let order = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(2.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
+        let fee_2 = qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            quote!(120)
+            order_margin.order_margin_with_fees(init_margin_req, &position),
+            quote!(120) + fee_0 + fee_1 + fee_2
         );
 
-        let order = LimitOrder::new(Side::Buy, quote!(95), base!(1)).unwrap();
+        let limit_price = quote!(95);
+        let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(3.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
+        let fee_3 = qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            quote!(185)
+            order_margin.order_margin_with_fees(init_margin_req, &position),
+            quote!(185) + fee_0 + fee_1 + fee_2 + fee_3
         );
     }
 
@@ -560,44 +598,53 @@ mod tests {
         let init_margin_req = Dec!(1);
 
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
+            order_margin.order_margin_with_fees(init_margin_req, &position),
             quote!(0)
         );
 
-        let order = LimitOrder::new(Side::Buy, quote!(90), base!(1)).unwrap();
+        let limit_price = quote!(90);
+        let qty = base!(1);
+        let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
+        let fee_0 = qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            quote!(0)
+            order_margin.order_margin_with_fees(init_margin_req, &position),
+            quote!(0) + fee_0
         );
 
-        let order = LimitOrder::new(Side::Sell, quote!(100), base!(1)).unwrap();
+        let limit_price = quote!(100);
+        let order = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(1.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
+        let fee_1 = qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            quote!(100)
+            order_margin.order_margin_with_fees(init_margin_req, &position),
+            quote!(100) + fee_0 + fee_1
         );
 
-        let order = LimitOrder::new(Side::Sell, quote!(120), base!(1)).unwrap();
+        let limit_price = quote!(120);
+        let order = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(2.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
+        let fee_2 = qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            quote!(220)
+            order_margin.order_margin_with_fees(init_margin_req, &position),
+            quote!(220) + fee_0 + fee_1 + fee_2
         );
 
-        let order = LimitOrder::new(Side::Buy, quote!(95), base!(1)).unwrap();
+        let limit_price = quote!(95);
+        let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(3.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.update(&order, fee_maker);
+        let fee_3 = qty.convert(limit_price) * fee_maker;
         assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            quote!(220)
+            order_margin.order_margin_with_fees(init_margin_req, &position),
+            quote!(220) + fee_0 + fee_1 + fee_2 + fee_3
         );
     }
 }

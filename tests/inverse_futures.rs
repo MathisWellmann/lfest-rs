@@ -1,7 +1,7 @@
 //! Test file for the inverse futures mode of the exchange
 
 use fpdec::Decimal;
-use lfest::{mock_exchange_inverse, prelude::*, trade, MockTransactionAccounting};
+use lfest::{mock_exchange_inverse, prelude::*, trade, MockTransactionAccounting, TEST_FEE_MAKER};
 
 #[test]
 #[tracing_test::traced_test]
@@ -646,15 +646,18 @@ fn inv_execute_limit() {
     let ask = quote!(1001);
     let _ = exchange.update_state(0.into(), &bba!(bid, ask)).unwrap();
 
-    let o = LimitOrder::new(Side::Buy, quote!(900.0), quote!(450.0)).unwrap();
+    let limit_price = quote!(900);
+    let qty = quote!(450);
+    let o = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.active_limit_orders().len(), 1);
+    let fee = qty.convert(limit_price) * TEST_FEE_MAKER;
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: base!(0.5),
+            available_wallet_balance: base!(0.5) - fee,
             position_margin: base!(0),
-            order_margin: base!(0.5)
+            order_margin: base!(0.5) + fee
         }
     );
 

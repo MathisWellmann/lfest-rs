@@ -135,6 +135,13 @@ where
                             init_margin_req,
                             Dec!(1),
                         );
+                        assert_eq!(inner.quantity(), Q::new_zero());
+                        assert_eq!(
+                            transaction_accounting
+                                .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
+                                .expect("Is valid account"),
+                            Q::PairedCurrency::new_zero()
+                        );
                         *self = Position::Short(PositionInner::new(
                             new_short_qty,
                             fill_price,
@@ -179,6 +186,13 @@ where
                             transaction_accounting,
                             init_margin_req,
                             Dec!(-1),
+                        );
+                        assert_eq!(inner.quantity(), Q::new_zero());
+                        assert_eq!(
+                            transaction_accounting
+                                .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
+                                .expect("Is valid account"),
+                            Q::PairedCurrency::new_zero()
                         );
                         *self = Position::Long(PositionInner::new(
                             new_long_qty,

@@ -66,18 +66,16 @@ where
         available_wallet_balance: M,
         order_margin_online: &OrderMargin<M::PairedCurrency, UserOrderId>,
     ) -> Result<(), RiskError> {
-        let order_margin =
-            order_margin_online.order_margin(self.contract_spec.init_margin_req(), position);
-        let new_order_margin = order_margin_online.order_margin_with_order(
+        let order_margin = order_margin_online
+            .order_margin_with_fees(self.contract_spec.init_margin_req(), position);
+        let new_order_margin = order_margin_online.order_margin_and_fees_with_order(
             order,
             self.contract_spec.init_margin_req(),
             position,
         );
 
-        let order_fees: M = order_margin_online.cumulative_order_fees();
-
-        trace!("order_margin: {order_margin}, new_order_margin: {new_order_margin}, order_fees: {order_fees}, available_wallet_balance: {available_wallet_balance}");
-        if new_order_margin + order_fees > available_wallet_balance + order_margin {
+        trace!("order_margin: {order_margin}, new_order_margin: {new_order_margin}, available_wallet_balance: {available_wallet_balance}");
+        if new_order_margin > available_wallet_balance + order_margin {
             return Err(RiskError::NotEnoughAvailableBalance);
         }
 
