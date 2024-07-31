@@ -6,8 +6,8 @@ use tracing::{debug, trace};
 
 use crate::{
     prelude::{
-        Transaction, TransactionAccounting, TREASURY_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT,
-        USER_WALLET_ACCOUNT,
+        Transaction, TransactionAccounting, EXCHANGE_FEE_ACCOUNT, TREASURY_ACCOUNT,
+        USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
     },
     quote,
     types::{Currency, MarginCurrency, QuoteCurrency},
@@ -28,6 +28,10 @@ where
     /// The entry price of the position.
     #[getset(get_copy = "pub")]
     entry_price: QuoteCurrency,
+
+    /// The outstanding fees of the position that will be payed when reducing the position.
+    #[getset(get_copy = "pub")]
+    outstanding_fees: Q::PairedCurrency,
 }
 
 impl<Q> PositionInner<Q>
@@ -44,6 +48,7 @@ where
         entry_price: QuoteCurrency,
         accounting: &mut T,
         init_margin_req: Decimal,
+        fees: Q::PairedCurrency,
     ) -> Self
     where
         T: TransactionAccounting<Q::PairedCurrency>,
@@ -62,6 +67,7 @@ where
         Self {
             quantity,
             entry_price,
+            outstanding_fees: fees,
         }
     }
 
@@ -79,6 +85,7 @@ where
         entry_price: QuoteCurrency,
         accounting: &mut T,
         init_margin_req: Decimal,
+        fees: Q::PairedCurrency,
     ) where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
@@ -91,6 +98,7 @@ where
 
         self.entry_price = self.new_avg_entry_price(qty, entry_price);
         self.quantity += qty;
+        self.outstanding_fees += fees;
 
         let margin = qty.convert(entry_price) * init_margin_req;
         let transaction =
@@ -108,6 +116,7 @@ where
         accounting: &mut T,
         init_margin_req: Decimal,
         direction_multiplier: Decimal,
+        fees: Q::PairedCurrency,
     ) where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
@@ -121,6 +130,8 @@ where
 
         self.quantity -= qty;
         debug_assert!(self.quantity >= Q::new_zero());
+
+        self.outstanding_fees += fees;
 
         let pnl = Q::PairedCurrency::pnl(
             self.entry_price,
@@ -152,6 +163,16 @@ where
         accounting
             .create_margin_transfer(transaction)
             .expect("margin transfer must work");
+
+        let transaction = Transaction::new(
+            EXCHANGE_FEE_ACCOUNT,
+            USER_WALLET_ACCOUNT,
+            self.outstanding_fees,
+        );
+        accounting
+            .create_margin_transfer(transaction)
+            .expect("margin transfer must work");
+        self.outstanding_fees = Q::PairedCurrency::new_zero();
     }
 
     /// Compute the new entry price of the position when some quantity is added at a specifiy `entry_price`.
@@ -166,26 +187,22 @@ where
                 / *new_qty.as_ref(),
         )
     }
-
-    #[cfg(test)]
-    pub(crate) fn from_parts(quantity: Q, entry_price: QuoteCurrency) -> Self {
-        Self {
-            quantity,
-            entry_price,
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{base, prelude::InMemoryTransactionAccounting};
+    use crate::{base, prelude::InMemoryTransactionAccounting, TEST_FEE_MAKER};
 
     #[test]
     fn position_inner_new_avg_entry_price() {
+        let quantity = base!(0.1);
+        let entry_price = quote!(100);
+        let outstanding_fees = quantity.convert(entry_price) * TEST_FEE_MAKER;
         let pos = PositionInner {
-            quantity: base!(0.1),
-            entry_price: quote!(100),
+            quantity,
+            entry_price,
+            outstanding_fees,
         };
         assert_eq!(pos.new_avg_entry_price(base!(0.1), quote!(50)), quote!(75));
         assert_eq!(pos.new_avg_entry_price(base!(0.1), quote!(90)), quote!(95));
@@ -203,12 +220,16 @@ mod tests {
     fn position_inner_new(leverage: u32) {
         let mut ta = InMemoryTransactionAccounting::new(quote!(1000));
         let init_margin_req = Dec!(1) / Decimal::from(leverage);
-        let pos = PositionInner::new(base!(0.5), quote!(100), &mut ta, init_margin_req);
+        let qty = base!(0.5);
+        let entry_price = quote!(100);
+        let fees = qty.convert(entry_price) * TEST_FEE_MAKER;
+        let pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fees);
         assert_eq!(
             pos,
             PositionInner {
-                quantity: base!(0.5),
-                entry_price: quote!(100)
+                quantity: qty,
+                entry_price,
+                outstanding_fees: fees,
             }
         );
         assert_eq!(
@@ -225,13 +246,20 @@ mod tests {
     fn position_inner_increase_contracts(leverage: u32) {
         let mut ta = InMemoryTransactionAccounting::new(quote!(1000));
         let init_margin_req = Dec!(1) / Decimal::from(leverage);
-        let mut pos = PositionInner::new(base!(0.5), quote!(100), &mut ta, init_margin_req);
-        pos.increase_contracts(base!(0.5), quote!(150), &mut ta, init_margin_req);
+        let qty = base!(0.5);
+        let entry_price = quote!(100);
+        let fee_0 = qty.convert(entry_price) * TEST_FEE_MAKER;
+        let mut pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fee_0);
+
+        let entry_price = quote!(150);
+        let fee_1 = qty.convert(entry_price) * TEST_FEE_MAKER;
+        pos.increase_contracts(qty, entry_price, &mut ta, init_margin_req, fee_1);
         assert_eq!(
             pos,
             PositionInner {
                 quantity: base!(1),
                 entry_price: quote!(125),
+                outstanding_fees: fee_0 + fee_1
             }
         );
         assert_eq!(
@@ -248,13 +276,17 @@ mod tests {
     fn position_inner_decrease_contracts(leverage: u32) {
         let mut ta = InMemoryTransactionAccounting::new(quote!(1000));
         let init_margin_req = Dec!(1) / Decimal::from(leverage);
-        let mut pos = PositionInner::new(base!(0.5), quote!(100), &mut ta, init_margin_req);
-        pos.decrease_contracts(base!(0.5), quote!(100), &mut ta, init_margin_req, Dec!(1));
+        let qty = base!(0.5);
+        let entry_price = quote!(100);
+        let fees = qty.convert(entry_price) * TEST_FEE_MAKER;
+        let mut pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fees);
+        pos.decrease_contracts(qty, entry_price, &mut ta, init_margin_req, Dec!(1), fees);
         assert_eq!(
             pos,
             PositionInner {
                 quantity: base!(0),
                 entry_price: quote!(100),
+                outstanding_fees: quote!(0),
             }
         );
         assert_eq!(
@@ -263,7 +295,7 @@ mod tests {
         );
         assert_eq!(
             ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
-            quote!(1000)
+            quote!(1000) - fees * Dec!(2)
         );
     }
 }

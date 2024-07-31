@@ -26,11 +26,12 @@ fn limit_orders_only() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(10) - fee0,
+            available_wallet_balance: quote!(10),
             position_margin: quote!(0),
-            order_margin: quote!(990) + fee0,
+            order_margin: quote!(990),
         }
     );
+    assert_eq!(exchange.position().outstanding_fees(), quote!(0));
     assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 1);
     assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
     assert_eq!(
@@ -41,7 +42,7 @@ fn limit_orders_only() {
     assert_eq!(exchange.account_tracker().num_filled_market_orders(), 0);
     assert_eq!(exchange.account_tracker().buy_volume(), quote!(0));
     assert_eq!(exchange.account_tracker().sell_volume(), quote!(0));
-    assert_eq!(exchange.account_tracker().cumulative_fees(), quote!(0));
+    assert_eq!(exchange.fees_paid(), quote!(0));
 
     let order_updates = exchange
         .update_state(1.into(), &trade!(quote!(99), base!(10), Side::Sell))
@@ -54,10 +55,11 @@ fn limit_orders_only() {
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
-            base!(9.9),
+            qty,
             quote!(100),
             &mut accounting,
             init_margin_req,
+            fee0
         ))
     );
     assert_eq!(
@@ -69,11 +71,12 @@ fn limit_orders_only() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(9.802),
+            available_wallet_balance: quote!(10),
             position_margin: quote!(990),
             order_margin: quote!(0)
         }
     );
+    assert_eq!(exchange.position().outstanding_fees(), fee0);
     assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 1);
     assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
     assert_eq!(
@@ -84,7 +87,6 @@ fn limit_orders_only() {
     assert_eq!(exchange.account_tracker().num_filled_market_orders(), 0);
     assert_eq!(exchange.account_tracker().buy_volume(), quote!(990));
     assert_eq!(exchange.account_tracker().sell_volume(), quote!(0));
-    assert_eq!(exchange.account_tracker().cumulative_fees(), quote!(0.198));
 
     let sell_price = quote!(105);
     let fee1 = qty.convert(sell_price) * fee_maker;
@@ -127,7 +129,7 @@ fn limit_orders_only() {
     assert_eq!(exchange.account_tracker().num_filled_market_orders(), 0);
     assert_eq!(exchange.account_tracker().buy_volume(), quote!(990));
     assert_eq!(exchange.account_tracker().sell_volume(), quote!(1039.5));
-    assert_eq!(exchange.account_tracker().cumulative_fees(), quote!(0.4059));
+    assert_eq!(exchange.fees_paid(), quote!(0.4059));
 }
 
 #[test]

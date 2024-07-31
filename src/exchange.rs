@@ -19,9 +19,9 @@ use crate::{
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     sample_returns_trigger::SampleReturnsTrigger,
     types::{
-        Currency, Error, ExchangeOrderMeta, Fee, Filled, LimitOrder, LimitOrderUpdate,
-        MarginCurrency, MarketOrder, NewOrder, OrderError, OrderId, Pending, Result, Side,
-        TimestampNs, UserBalances,
+        Currency, Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderUpdate, MarginCurrency,
+        MarketOrder, NewOrder, OrderError, OrderId, Pending, Result, Side, TimestampNs,
+        UserBalances,
     },
     utils::assert_user_wallet_balance,
 };
@@ -134,6 +134,13 @@ where
             position: &self.position,
             balances: self.user_balances(),
         }
+    }
+
+    /// Get the total amount of fees paid to the exchange.
+    pub fn fees_paid(&self) -> Q::PairedCurrency {
+        self.transaction_accounting
+            .margin_balance_of(EXCHANGE_FEE_ACCOUNT)
+            .expect("is valid account")
     }
 
     /// Update the exchange state with new information
@@ -252,12 +259,8 @@ where
         assert!(filled_qty > Q::new_zero());
         let fill_price = order.state().avg_fill_price();
         assert!(fill_price > quote!(0));
-        Self::detract_fee(
-            &mut self.transaction_accounting,
-            filled_qty.convert(fill_price),
-            self.config.contract_spec().fee_taker(),
-            &mut self.account_tracker,
-        );
+
+        let fees = filled_qty.convert(fill_price) * self.config.contract_spec().fee_taker();
 
         self.position.change_position(
             filled_qty,
@@ -265,6 +268,7 @@ where
             order.side(),
             &mut self.transaction_accounting,
             self.config.contract_spec().init_margin_req(),
+            fees,
         );
         self.account_tracker.log_market_order_fill();
         self.account_tracker
@@ -387,15 +391,21 @@ where
     /// Append a new limit order as active order
     fn append_limit_order(&mut self, order: LimitOrder<Q, UserOrderId, Pending<Q>>) {
         debug!("append_limit_order: order: {:?}", order);
+        debug!(
+            "active_limit_orders: {:?}, market_state: {:?}, transaction_accounting: {:?}, position: {:?}",
+            self.active_limit_orders,
+            self.market_state,
+            self.transaction_accounting,
+            self.position,
+        );
 
         let order_id = order.id();
         let user_order_id = order.user_order_id().clone();
-        self.order_margin
-            .update(&order, self.config.contract_spec().fee_maker());
+        self.order_margin.update(&order);
         self.active_limit_orders.insert(order_id, order);
         self.lookup_order_nonce_from_user_order_id
             .insert(user_order_id, order_id);
-        let new_order_margin = self.order_margin.order_margin_with_fees(
+        let new_order_margin = self.order_margin.order_margin(
             self.config.contract_spec().init_margin_req(),
             &self.position,
         );
@@ -417,11 +427,10 @@ where
             ),
             Ordering::Equal => return,
         };
-
         self.transaction_accounting
             .create_margin_transfer(transaction)
             .expect("margin transfer works");
-        assert_user_wallet_balance(&self.transaction_accounting);
+
         assert_eq!(
             self.order_margin.active_limit_orders(),
             &self.active_limit_orders
@@ -434,6 +443,7 @@ where
         } else {
             true
         });
+        assert_user_wallet_balance(&self.transaction_accounting);
     }
 
     /// Cancel an active limit order.
@@ -449,7 +459,7 @@ where
             .expect("is valid");
         assert_eq!(
             order_margin,
-            self.order_margin.order_margin_with_fees(
+            self.order_margin.order_margin(
                 self.config.contract_spec().init_margin_req(),
                 &self.position,
             )
@@ -458,12 +468,11 @@ where
             .active_limit_orders
             .remove(&order_id)
             .ok_or(Error::OrderIdNotFound)?;
-        self.order_margin
-            .remove(order_id, self.config.contract_spec().fee_maker());
+        self.order_margin.remove(order_id);
         self.lookup_order_nonce_from_user_order_id
             .remove(removed_order.user_order_id())
             .expect("Can be removed");
-        let new_order_margin = self.order_margin.order_margin_with_fees(
+        let new_order_margin = self.order_margin.order_margin(
             self.config.contract_spec().init_margin_req(),
             &self.position,
         );
@@ -512,28 +521,6 @@ where
         }
     }
 
-    /// Remove a fee amount from the wallet balance.
-    fn detract_fee(
-        transaction_accounting: &mut TransactionAccountingT,
-        trade_value: Q::PairedCurrency,
-        fee: Fee,
-        account_tracker: &mut A,
-    ) {
-        assert!(trade_value > Q::PairedCurrency::new_zero());
-
-        let fee: Q::PairedCurrency = trade_value * fee;
-        trace!("detract_fee: {fee}");
-        // TODO: this will fail with negative fees. Handle it here.
-        let transaction = Transaction::new(EXCHANGE_FEE_ACCOUNT, USER_WALLET_ACCOUNT, fee);
-        transaction_accounting
-            .create_margin_transfer(transaction)
-            .expect("margin transfer works");
-
-        account_tracker.log_fee(fee);
-
-        assert_user_wallet_balance(transaction_accounting);
-    }
-
     /// Checks for the execution of active limit orders in the account.
     fn check_active_orders<U>(
         &mut self,
@@ -567,9 +554,8 @@ where
                     "The filled_qty must be greater than zero"
                 );
 
-                info!(
-                    "market_update: {market_update:?}, active_limit_orders: {alo:?}, cumulative_order_fees: {}, market_state: {:?}, transaction_accounting: {:?}, position: {:?}",
-                    self.order_margin.cumulative_order_fees(),
+                debug!(
+                    "market_update: {market_update:?}, active_limit_orders: {alo:?}, market_state: {:?}, transaction_accounting: {:?}, position: {:?}",
                     self.market_state,
                     self.transaction_accounting,
                     self.position,
@@ -581,7 +567,7 @@ where
                     .expect("is valid");
                 assert_eq!(
                     order_margin,
-                    self.order_margin.order_margin_with_fees(
+                    self.order_margin.order_margin(
                         self.config.contract_spec().init_margin_req(),
                         &self.position
                     )
@@ -592,8 +578,7 @@ where
 
                     ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill();
-                    self.order_margin
-                        .remove(order.id(), self.config.contract_spec().fee_maker());
+                    self.order_margin.remove(order.id());
                     self.lookup_order_nonce_from_user_order_id
                         .remove(filled_order.user_order_id())
                         .expect("Can be removed");
@@ -601,22 +586,24 @@ where
                 } else {
                     assert!(order.remaining_quantity() > Q::new_zero());
                     order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
-                    self.order_margin
-                        .update(order, self.config.contract_spec().fee_maker());
+                    self.order_margin.update(order);
                     // TODO: we could potentially log partial fills as well...
                 }
 
+                let fees = filled_qty.convert(order.limit_price())
+                    * self.config.contract_spec().fee_maker();
                 self.position.change_position(
                     filled_qty,
                     order.limit_price(),
                     order.side(),
                     &mut self.transaction_accounting,
                     self.config.contract_spec().init_margin_req(),
+                    fees,
                 );
                 self.account_tracker
                     .log_trade(order.side(), order.limit_price(), filled_qty);
 
-                let new_order_margin = self.order_margin.order_margin_with_fees(
+                let new_order_margin = self.order_margin.order_margin(
                     self.config.contract_spec().init_margin_req(),
                     &self.position,
                 );
@@ -634,12 +621,6 @@ where
                         .create_margin_transfer(transaction)
                         .expect("margin transfer works");
                 }
-                Self::detract_fee(
-                    &mut self.transaction_accounting,
-                    filled_qty.convert(order.limit_price()),
-                    self.config.contract_spec().fee_maker(),
-                    &mut self.account_tracker,
-                );
             }
         }
         ids_to_remove
@@ -662,7 +643,7 @@ where
             self.transaction_accounting
                 .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
                 .expect("is valid"),
-            self.order_margin.order_margin_with_fees(
+            self.order_margin.order_margin(
                 self.config.contract_spec().init_margin_req(),
                 &self.position
             )
@@ -693,84 +674,141 @@ where
 
 #[cfg(test)]
 mod tests {
-    use fpdec::Dec;
+    // use fpdec::Dec;
 
-    use super::*;
-    use crate::{
-        base,
-        contract_specification::ContractSpecification,
-        fee, leverage,
-        prelude::{
-            BaseCurrency, Decimal, FilledQuantity, InMemoryTransactionAccounting, NoAccountTracker,
-            PositionInner, PriceFilter, QuantityFilter, QuoteCurrency, TAccount, Trade,
-        },
-    };
+    // use super::*;
+    // use crate::{
+    //     base,
+    //     contract_specification::ContractSpecification,
+    //     fee, leverage,
+    //     prelude::{
+    //         BaseCurrency, Decimal, InMemoryTransactionAccounting, NoAccountTracker, PositionInner,
+    //         PriceFilter, QuantityFilter, QuoteCurrency, TAccount,
+    //     },
+    // };
 
-    #[test]
-    #[tracing_test::traced_test]
-    fn some_debugging() {
-        let contract_spec = ContractSpecification::new(
-            leverage!(1),
-            Dec!(0.5),
-            PriceFilter::new(None, None, quote!(0.1), Dec!(2), Dec!(0.5)).unwrap(),
-            QuantityFilter::new(None, None, base!(0.001)).unwrap(),
-            fee!(0.0002),
-            fee!(0.0006),
-        )
-        .unwrap();
-        let config = Config::new(quote!(10000), 100, contract_spec.clone(), 3600).unwrap();
-        let transaction_accounting = InMemoryTransactionAccounting::from_accounts([
-            TAccount::from_parts(
-                quote!(103473101.929093160000000000),
-                quote!(103473101.201668800000000000),
-            ),
-            TAccount::from_parts(quote!(96205857.958312340), quote!(96205054.201693160)),
-            TAccount::from_parts(quote!(7227008.62800), quote!(7217875.074600000000000000)),
-            TAccount::from_parts(quote!(2889.542256460), quote!(0)),
-            TAccount::from_parts(quote!(0), quote!(0)),
-            TAccount::from_parts(quote!(37345.073100000000000000), quote!(50172.65280)),
-        ]);
+    // #[test]
+    // #[tracing_test::traced_test]
+    // fn some_debugging() {
+    //     let contract_spec = ContractSpecification::new(
+    //         leverage!(1),
+    //         Dec!(0.5),
+    //         PriceFilter::new(None, None, quote!(0.1), Dec!(2), Dec!(0.5)).unwrap(),
+    //         QuantityFilter::new(None, None, base!(0.001)).unwrap(),
+    //         fee!(0.0002),
+    //         fee!(0.0006),
+    //     )
+    //     .unwrap();
+    //     let config = Config::new(quote!(10000), 100, contract_spec.clone(), 3600).unwrap();
+    //     let transaction_accounting = InMemoryTransactionAccounting::from_accounts([
+    //         TAccount::from_parts(
+    //             quote!(103473101.929093160000000000),
+    //             quote!(103473101.201668800000000000),
+    //         ),
+    //         TAccount::from_parts(quote!(96205857.958312340), quote!(96205054.201693160)),
+    //         TAccount::from_parts(quote!(7227008.62800), quote!(7217875.074600000000000000)),
+    //         TAccount::from_parts(quote!(2889.542256460), quote!(0)),
+    //         TAccount::from_parts(quote!(0), quote!(0)),
+    //         TAccount::from_parts(quote!(37345.073100000000000000), quote!(50172.65280)),
+    //     ]);
 
-        let order_id: OrderId = 16835.into();
-        let mut active_limit_orders =
-            HashMap::<OrderId, LimitOrder<BaseCurrency, u64, Pending<BaseCurrency>>>::new();
-        let meta = ExchangeOrderMeta::new(order_id, 1656633071479000000.into());
-        let mut status = Pending::new(meta);
-        status.filled_quantity = FilledQuantity::Filled {
-            cumulative_qty: base!(0.466),
-            avg_price: quote!(19599.9),
-        };
-        let pending_order =
-            LimitOrder::from_parts(17503, Side::Buy, quote!(19599.9), base!(0.041), status);
-        let mut lookup_order_nonce_from_user_order_id = HashMap::<u64, OrderId>::new();
-        lookup_order_nonce_from_user_order_id
-            .insert(*pending_order.user_order_id(), pending_order.id());
-        active_limit_orders.insert(order_id, pending_order);
+    //     let order_id: OrderId = 16835.into();
+    //     let mut active_limit_orders =
+    //         HashMap::<OrderId, LimitOrder<BaseCurrency, u64, Pending<BaseCurrency>>>::new();
+    //     let meta = ExchangeOrderMeta::new(order_id, 1656633071479000000.into());
+    //     let mut status = Pending::new(meta);
+    //     status.filled_quantity = FilledQuantity::Filled {
+    //         cumulative_qty: base!(0.466),
+    //         avg_price: quote!(19599.9),
+    //     };
+    //     let pending_order =
+    //         LimitOrder::from_parts(17503, Side::Buy, quote!(19599.9), base!(0.041), status);
+    //     let mut lookup_order_nonce_from_user_order_id = HashMap::<u64, OrderId>::new();
+    //     lookup_order_nonce_from_user_order_id
+    //         .insert(*pending_order.user_order_id(), pending_order.id());
+    //     active_limit_orders.insert(order_id, pending_order);
 
-        let mut exchange =
-            Exchange::<_, BaseCurrency, u64, InMemoryTransactionAccounting<QuoteCurrency>> {
-                config,
-                market_state: MarketState::from_components(
-                    quote!(19599.0),
-                    quote!(19600.7),
-                    1656648245348000000.into(),
-                    963211121,
-                ),
-                account_tracker: NoAccountTracker,
-                risk_engine: IsolatedMarginRiskEngine::new(contract_spec),
-                next_order_id: 16836.into(),
-                transaction_accounting,
-                position: Position::Long(PositionInner::from_parts(base!(0.466), quote!(19599.9))),
-                active_limit_orders: active_limit_orders.clone(),
-                lookup_order_nonce_from_user_order_id,
-                order_margin: OrderMargin::from_parts(quote!(0.160719180), active_limit_orders),
-                sample_returns_trigger: SampleReturnsTrigger::new(3600_000_000_000.into()),
-            };
-        let market_update = Trade {
-            price: quote!(19598.7),
-            quantity: base!(1.181),
-            side: Side::Sell,
-        };
-        exchange.check_active_orders(&market_update, 0.into());
-    }
+    //     let mut exchange =
+    //         Exchange::<_, BaseCurrency, u64, InMemoryTransactionAccounting<QuoteCurrency>> {
+    //             config,
+    //             market_state: MarketState::from_components(
+    //                 quote!(19599.0),
+    //                 quote!(19600.7),
+    //                 1656648245348000000.into(),
+    //                 963211121,
+    //             ),
+    //             account_tracker: NoAccountTracker,
+    //             risk_engine: IsolatedMarginRiskEngine::new(contract_spec),
+    //             next_order_id: 16836.into(),
+    //             transaction_accounting,
+    //             position: Position::Long(PositionInner::from_parts(base!(0.466), quote!(19599.9))),
+    //             active_limit_orders: active_limit_orders.clone(),
+    //             lookup_order_nonce_from_user_order_id,
+    //             order_margin: OrderMargin::from_parts(quote!(0.160719180), active_limit_orders),
+    //             sample_returns_trigger: SampleReturnsTrigger::new(3600_000_000_000.into()),
+    //         };
+    //     let market_update = Trade {
+    //         price: quote!(19598.7),
+    //         quantity: base!(1.181),
+    //         side: Side::Sell,
+    //     };
+    //     exchange.check_active_orders(&market_update, 0.into());
+    // }
+
+    // #[test]
+    // #[tracing_test::traced_test]
+    // fn some_more_debugging() {
+    //     let contract_spec = ContractSpecification::new(
+    //         leverage!(1),
+    //         Dec!(0.5),
+    //         PriceFilter::new(None, None, quote!(0.1), Dec!(2), Dec!(0.5)).unwrap(),
+    //         QuantityFilter::new(None, None, base!(0.001)).unwrap(),
+    //         fee!(0.0002),
+    //         fee!(0.0006),
+    //     )
+    //     .unwrap();
+    //     let config = Config::new(quote!(10000), 100, contract_spec.clone(), 3600).unwrap();
+    //     let transaction_accounting = InMemoryTransactionAccounting::from_accounts([
+    //         TAccount::from_parts(
+    //             quote!(103473905.685712340000000000),
+    //             quote!(103473904.958287980000000000),
+    //         ),
+    //         TAccount::from_parts(quote!(96205857.958312340), quote!(96205857.958312340)),
+    //         TAccount::from_parts(quote!(7227812.22390), quote!(7217875.074600000000000000)),
+    //         TAccount::from_parts(quote!(2889.702975640), quote!(0)),
+    //         TAccount::from_parts(quote!(0), quote!(0)),
+    //         TAccount::from_parts(quote!(37345.073100000000000000), quote!(50172.65280)),
+    //     ]);
+
+    //     let active_limit_orders =
+    //         HashMap::<OrderId, LimitOrder<BaseCurrency, u64, Pending<BaseCurrency>>>::new();
+    //     let lookup_order_nonce_from_user_order_id = HashMap::<u64, OrderId>::new();
+
+    //     let mut exchange =
+    //         Exchange::<_, BaseCurrency, u64, InMemoryTransactionAccounting<QuoteCurrency>> {
+    //             config,
+    //             market_state: MarketState::from_components(
+    //                 quote!(19551.6),
+    //                 quote!(19551.9),
+    //                 1656648418696000000.into(),
+    //                 963240098,
+    //             ),
+    //             account_tracker: NoAccountTracker,
+    //             risk_engine: IsolatedMarginRiskEngine::new(contract_spec),
+    //             next_order_id: 16836.into(),
+    //             transaction_accounting,
+    //             position: Position::Long(PositionInner::from_parts(base!(0.507), quote!(19599.9))),
+    //             active_limit_orders: active_limit_orders.clone(),
+    //             lookup_order_nonce_from_user_order_id,
+    //             order_margin: OrderMargin::from_parts(quote!(0), active_limit_orders),
+    //             sample_returns_trigger: SampleReturnsTrigger::new(3600_000_000_000.into()),
+    //         };
+    //     let new_order =
+    //         LimitOrder::new_with_user_order_id(Side::Sell, quote!(19869.9), base!(0.507), 17504)
+    //             .unwrap();
+    //     let meta = ExchangeOrderMeta::new(16836.into(), 1656648418696000000.into());
+    //     let pending_order = new_order.into_pending(meta);
+
+    //     exchange.append_limit_order(pending_order);
+    // }
 }

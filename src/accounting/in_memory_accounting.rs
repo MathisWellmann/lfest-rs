@@ -35,16 +35,6 @@ where
     // TODO: keep track of transaction log or emit `Transactions` to users.
 }
 
-impl<M> InMemoryTransactionAccounting<M>
-where
-    M: MarginCurrency,
-{
-    #[cfg(test)]
-    pub(crate) fn from_accounts(margin_accounts: [TAccount<M>; N_ACCOUNTS]) -> Self {
-        Self { margin_accounts }
-    }
-}
-
 impl<M> TransactionAccounting<M> for InMemoryTransactionAccounting<M>
 where
     M: MarginCurrency,

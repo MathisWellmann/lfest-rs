@@ -29,12 +29,4 @@ where
     pub(crate) fn net_balance(&self) -> Q {
         self.debits_posted - self.credits_posted
     }
-
-    #[cfg(test)]
-    pub(crate) fn from_parts(debits_posted: Q, credits_posted: Q) -> Self {
-        Self {
-            debits_posted,
-            credits_posted,
-        }
-    }
 }

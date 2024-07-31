@@ -23,8 +23,6 @@ where
     ) {
     }
 
-    fn log_fee(&mut self, _fee_in_margin: M) {}
-
     fn log_limit_order_submission(&mut self) {}
 
     fn log_limit_order_cancellation(&mut self) {}

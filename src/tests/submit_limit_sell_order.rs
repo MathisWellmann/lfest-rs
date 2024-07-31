@@ -1,4 +1,7 @@
-use crate::{mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, trade};
+use crate::{
+    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, trade,
+    TEST_FEE_MAKER,
+};
 
 #[test]
 #[tracing_test::traced_test]
@@ -34,24 +37,28 @@ fn submit_limit_sell_order_no_position() {
     exchange
         .update_state(0.into(), &bba!(quote!(101), quote!(102)))
         .unwrap();
+    let qty = base!(9);
+    let entry_price = quote!(100);
+    let fee = qty.convert(entry_price) * TEST_FEE_MAKER;
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(
-            base!(9),
-            quote!(100),
+            qty,
+            entry_price,
             &mut accounting,
             init_margin_req,
+            fee,
         ))
     );
-    let fee = quote!(0.18);
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(100) - fee,
+            available_wallet_balance: quote!(100),
             position_margin: quote!(900),
             order_margin: quote!(0)
         }
     );
+    assert_eq!(exchange.position().outstanding_fees(), quote!(0.18));
 
     // close the position again
     let order = LimitOrder::new(Side::Buy, quote!(100), base!(9)).unwrap();
@@ -95,10 +102,7 @@ fn submit_limit_sell_order_no_position_max() {
     let order = LimitOrder::new(Side::Sell, quote!(100), base!(4)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
     let order = LimitOrder::new(Side::Sell, quote!(100), base!(1)).unwrap();
-    assert_eq!(
-        exchange.submit_limit_order(order.clone()),
-        Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
-    );
+    exchange.submit_limit_order(order.clone()).unwrap();
 
     let order = LimitOrder::new(Side::Buy, quote!(99), base!(5)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();

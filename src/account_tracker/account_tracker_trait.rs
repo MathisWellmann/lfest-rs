@@ -17,9 +17,6 @@ where
     /// Process information about the user balances.
     fn sample_user_balances(&mut self, user_balances: &UserBalances<M>, mid_price: QuoteCurrency);
 
-    /// Log a fee event.
-    fn log_fee(&mut self, fee_in_margin: M);
-
     /// Log a `LimitOrder` submission event.
     fn log_limit_order_submission(&mut self);
 

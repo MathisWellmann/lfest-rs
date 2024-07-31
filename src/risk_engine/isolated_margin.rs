@@ -66,9 +66,9 @@ where
         available_wallet_balance: M,
         order_margin_online: &OrderMargin<M::PairedCurrency, UserOrderId>,
     ) -> Result<(), RiskError> {
-        let order_margin = order_margin_online
-            .order_margin_with_fees(self.contract_spec.init_margin_req(), position);
-        let new_order_margin = order_margin_online.order_margin_and_fees_with_order(
+        let order_margin =
+            order_margin_online.order_margin(self.contract_spec.init_margin_req(), position);
+        let new_order_margin = order_margin_online.order_margin_with_order(
             order,
             self.contract_spec.init_margin_req(),
             position,
@@ -213,9 +213,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        base, fee,
+        base,
         prelude::{BaseCurrency, Leverage, PositionInner, PriceFilter, QuantityFilter},
-        quote, MockTransactionAccounting,
+        quote, MockTransactionAccounting, TEST_FEE_MAKER, TEST_FEE_TAKER,
     };
 
     #[test_case::test_case(2, 75)]
@@ -227,8 +227,8 @@ mod tests {
             Dec!(0.5),
             PriceFilter::default(),
             QuantityFilter::default(),
-            fee!(0.0002),
-            fee!(0.0006),
+            TEST_FEE_MAKER,
+            TEST_FEE_TAKER,
         )
         .unwrap();
         let init_margin_req = contract_spec.init_margin_req();
@@ -240,19 +240,24 @@ mod tests {
 
         RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
 
+        let qty = base!(1);
+        let entry_price = quote!(100);
+        let fees = qty.convert(entry_price) * TEST_FEE_MAKER;
         let position = Position::Long(PositionInner::new(
-            base!(1),
-            quote!(100),
+            qty,
+            entry_price,
             &mut accounting,
             init_margin_req,
+            fees,
         ));
         RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
 
         let position = Position::Long(PositionInner::new(
-            base!(1),
-            quote!(100),
+            qty,
+            entry_price,
             &mut accounting,
             init_margin_req,
+            fees,
         ));
         let market_state = MarketState::from_components(quote!(200), quote!(201), 0.into(), 0);
         RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
@@ -279,8 +284,8 @@ mod tests {
             Dec!(0.5),
             PriceFilter::default(),
             QuantityFilter::default(),
-            fee!(0.0002),
-            fee!(0.0006),
+            TEST_FEE_MAKER,
+            TEST_FEE_TAKER,
         )
         .unwrap();
         let init_margin_req = contract_spec.init_margin_req();
@@ -288,11 +293,15 @@ mod tests {
         let market_state = MarketState::from_components(quote!(100), quote!(101), 0.into(), 0);
         let mut accounting = MockTransactionAccounting::default();
 
+        let qty = base!(1);
+        let entry_price = quote!(100);
+        let fees = qty.convert(entry_price) * TEST_FEE_MAKER;
         let position = Position::Short(PositionInner::new(
             base!(1),
             quote!(100),
             &mut accounting,
             init_margin_req,
+            fees,
         ));
         RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
 

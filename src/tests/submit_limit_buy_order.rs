@@ -1,6 +1,6 @@
 use crate::{
     mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, trade,
-    TEST_FEE_MAKER,
+    TEST_FEE_MAKER, TEST_FEE_TAKER,
 };
 
 #[test]
@@ -21,9 +21,9 @@ fn submit_limit_buy_order_no_position() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(510) - fee,
+            available_wallet_balance: quote!(510),
             position_margin: quote!(0),
-            order_margin: quote!(490) + fee
+            order_margin: quote!(490)
         }
     );
 
@@ -52,21 +52,22 @@ fn submit_limit_buy_order_no_position() {
     assert_eq!(
         exchange.position(),
         &Position::Long(PositionInner::new(
-            base!(5),
-            quote!(98),
+            qty,
+            limit_price,
             &mut accounting,
-            init_margin_req
+            init_margin_req,
+            fee,
         ))
     );
-    let fee = quote!(0.098);
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(510) - fee,
+            available_wallet_balance: quote!(510),
             position_margin: quote!(490),
             order_margin: quote!(0),
         }
     );
+    assert_eq!(exchange.position().outstanding_fees(), quote!(0.098));
 
     // close the position again with a limit order.
     let order = LimitOrder::new(Side::Sell, quote!(98), base!(5)).unwrap();
@@ -107,10 +108,7 @@ fn submit_limit_buy_order_no_position_max() {
     let order = LimitOrder::new(Side::Buy, quote!(100), base!(4)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
     let order = LimitOrder::new(Side::Buy, quote!(100), base!(1)).unwrap();
-    assert_eq!(
-        exchange.submit_limit_order(order.clone()),
-        Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
-    );
+    exchange.submit_limit_order(order.clone()).unwrap();
 
     let order = LimitOrder::new(Side::Sell, quote!(101), base!(5)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
@@ -128,13 +126,17 @@ fn submit_limit_buy_order_with_long() {
     let mut exchange = mock_exchange_linear();
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
+    let bid = quote!(99);
+    let ask = quote!(100);
     assert!(exchange
-        .update_state(0.into(), &bba!(quote!(99), quote!(100)))
+        .update_state(0.into(), &bba!(bid, ask))
         .unwrap()
         .is_empty());
-    let order = MarketOrder::new(Side::Buy, base!(9)).unwrap();
+    let qty = base!(9);
+    let order = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
 
+    let fee = qty.convert(ask) * TEST_FEE_TAKER;
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
@@ -142,16 +144,18 @@ fn submit_limit_buy_order_with_long() {
             quote!(100),
             &mut accounting,
             init_margin_req,
+            fee,
         )),
     );
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(100) - quote!(0.54),
+            available_wallet_balance: quote!(100),
             position_margin: quote!(900),
             order_margin: quote!(0)
         }
     );
+    assert_eq!(exchange.position().outstanding_fees(), quote!(0.54));
 
     assert_eq!(
         exchange
@@ -161,7 +165,7 @@ fn submit_limit_buy_order_with_long() {
     );
 
     // Another buy limit order should not work
-    let order = LimitOrder::new(Side::Buy, quote!(100), base!(1)).unwrap();
+    let order = LimitOrder::new(Side::Buy, quote!(100), base!(1.1)).unwrap();
     assert_eq!(
         exchange.submit_limit_order(order),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
@@ -200,23 +204,28 @@ fn submit_limit_buy_order_with_short() {
     let order = MarketOrder::new(Side::Sell, base!(9)).unwrap();
     exchange.submit_market_order(order).unwrap();
 
+    let qty = base!(9);
+    let entry_price = quote!(100);
+    let fee = qty.convert(entry_price) * TEST_FEE_TAKER;
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(
-            base!(9),
-            quote!(100),
+            qty,
+            entry_price,
             &mut accounting,
             init_margin_req,
+            fee
         ))
     );
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(100) - quote!(0.54),
+            available_wallet_balance: quote!(100),
             position_margin: quote!(900),
             order_margin: quote!(0)
         }
     );
+    assert_eq!(exchange.position().outstanding_fees(), quote!(0.54));
 
     // Another sell limit order should not work
     let order = LimitOrder::new(Side::Sell, quote!(101), base!(1)).unwrap();

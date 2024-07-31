@@ -48,6 +48,15 @@ where
         }
     }
 
+    /// Get the outstanding fees of the position that will be payed when reducing the position.
+    pub fn outstanding_fees(&self) -> Q::PairedCurrency {
+        match self {
+            Position::Neutral => Q::PairedCurrency::new_zero(),
+            Position::Long(inner) => inner.outstanding_fees(),
+            Position::Short(inner) => inner.outstanding_fees(),
+        }
+    }
+
     /// Change a position while doing proper accounting and balance transfers.
     pub(crate) fn change_position<T>(
         &mut self,
@@ -56,6 +65,7 @@ where
         side: Side,
         transaction_accounting: &mut T,
         init_margin_req: Decimal,
+        fees: Q::PairedCurrency,
     ) where
         T: TransactionAccounting<Q::PairedCurrency>,
     {
@@ -79,6 +89,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
+                            fees,
                         ))
                     }
                     Side::Sell => {
@@ -87,6 +98,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
+                            fees,
                         ))
                     }
                 }
@@ -98,6 +110,7 @@ where
                         fill_price,
                         transaction_accounting,
                         init_margin_req,
+                        fees,
                     );
                 }
                 Side::Sell => match filled_qty.cmp(&inner.quantity()) {
@@ -108,6 +121,7 @@ where
                             transaction_accounting,
                             init_margin_req,
                             Dec!(1),
+                            fees,
                         );
                     }
                     Ordering::Equal => {
@@ -117,6 +131,7 @@ where
                             transaction_accounting,
                             init_margin_req,
                             Dec!(1),
+                            fees,
                         );
                         *self = Position::Neutral;
                         assert_eq!(
@@ -134,6 +149,7 @@ where
                             transaction_accounting,
                             init_margin_req,
                             Dec!(1),
+                            fees,
                         );
                         assert_eq!(inner.quantity(), Q::new_zero());
                         assert_eq!(
@@ -147,6 +163,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
+                            Q::PairedCurrency::new_zero(),
                         ));
                     }
                 },
@@ -160,6 +177,7 @@ where
                             transaction_accounting,
                             init_margin_req,
                             Dec!(-1),
+                            fees,
                         );
                     }
                     Ordering::Equal => {
@@ -169,6 +187,7 @@ where
                             transaction_accounting,
                             init_margin_req,
                             Dec!(-1),
+                            fees,
                         );
                         *self = Position::Neutral;
                         assert_eq!(
@@ -186,6 +205,7 @@ where
                             transaction_accounting,
                             init_margin_req,
                             Dec!(-1),
+                            fees,
                         );
                         assert_eq!(inner.quantity(), Q::new_zero());
                         assert_eq!(
@@ -199,6 +219,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
+                            Q::PairedCurrency::new_zero(),
                         ));
                     }
                 },
@@ -208,6 +229,7 @@ where
                         fill_price,
                         transaction_accounting,
                         init_margin_req,
+                        fees,
                     );
                 }
             },

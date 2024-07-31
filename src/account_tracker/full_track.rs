@@ -53,10 +53,6 @@ where
     #[getset(get_copy = "pub")]
     sell_volume: M,
 
-    /// The cumulative fees paid.
-    #[getset(get_copy = "pub")]
-    cumulative_fees: M,
-
     price_first: QuoteCurrency,
     price_last: QuoteCurrency,
     ts_first: TimestampNs,
@@ -111,7 +107,6 @@ where
             buy_volume: M::new_zero(),
             sell_volume: M::new_zero(),
 
-            cumulative_fees: M::new_zero(),
             price_first: quote!(0.0),
             price_last: quote!(0.0),
             ts_first: TimestampNs::from(0),
@@ -318,10 +313,6 @@ where
         }
     }
 
-    fn log_fee(&mut self, fee_in_margin: M) {
-        self.cumulative_fees += fee_in_margin
-    }
-
     fn log_limit_order_submission(&mut self) {
         self.num_submitted_limit_orders += 1;
     }
@@ -369,7 +360,6 @@ buy_volume: {},
 sell_volume: {},
 turnover: {},
 buy_and_hold_returns: {},
-cumulative_fees: {},
 num_trading_days: {},
 limit_order_fill_ratio: {},
 limit_order_cancellation_ratio: {},
@@ -382,7 +372,6 @@ limit_order_cancellation_ratio: {},
             self.sell_volume,
             self.turnover(),
             self.buy_and_hold_return(),
-            self.cumulative_fees(),
             self.num_trading_days(),
             self.limit_order_fill_ratio(),
             self.limit_order_cancellation_ratio(),
@@ -396,14 +385,6 @@ mod tests {
 
     use super::*;
     use crate::market_state;
-
-    #[test]
-    fn full_track_cumulative_fees() {
-        let mut at = FullAccountTracker::new(quote!(100.0));
-        at.log_fee(quote!(0.1));
-        at.log_fee(quote!(0.2));
-        assert_eq!(at.cumulative_fees(), quote!(0.3));
-    }
 
     #[test]
     fn full_track_update() {
