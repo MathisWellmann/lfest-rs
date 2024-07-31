@@ -111,6 +111,11 @@ where
         self.user_order_id = user_order_id;
     }
 
+    /// Get the total quantity that this order is for.
+    pub fn total_quantity(&self) -> Q {
+        self.remaining_quantity
+    }
+
     /// Take in the order metadata provided by the exchange and coverts the order to the `Pending` state.
     pub fn into_pending(self, meta: ExchangeOrderMeta) -> LimitOrder<Q, UserOrderId, Pending<Q>> {
         LimitOrder {
