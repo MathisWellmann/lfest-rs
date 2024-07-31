@@ -1,8 +1,8 @@
 use tracing::trace;
 
 use super::{
-    account::TAccount, transaction::Transaction, utils::assert_accounting_equation, AccountId,
-    TransactionAccounting,
+    account::TAccount, transaction::Transaction, utils::debug_assert_accounting_equation,
+    AccountId, TransactionAccounting,
 };
 use crate::{
     types::{Error, MarginCurrency},
@@ -45,7 +45,7 @@ where
         };
         s.margin_accounts[USER_WALLET_ACCOUNT].post_debit(user_starting_wallet_balance);
         s.margin_accounts[TREASURY_ACCOUNT].post_credit(user_starting_wallet_balance);
-        assert_accounting_equation(&s.margin_accounts);
+        debug_assert_accounting_equation(&s.margin_accounts);
 
         s
     }
@@ -68,7 +68,7 @@ where
 
         self.margin_accounts[transaction.debit_account_id()] = debit_account;
 
-        assert_accounting_equation(&self.margin_accounts);
+        debug_assert_accounting_equation(&self.margin_accounts);
 
         Ok(())
     }
