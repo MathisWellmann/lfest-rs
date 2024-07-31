@@ -464,10 +464,13 @@ where
                 &self.position,
             )
         );
-        let removed_order = self
-            .active_limit_orders
-            .remove(&order_id)
-            .ok_or(Error::OrderIdNotFound)?;
+        let removed_order = self.active_limit_orders.remove(&order_id).ok_or_else(|| {
+            if order_id < self.next_order_id {
+                Error::OrderNoLongerActive
+            } else {
+                Error::OrderIdNotFound
+            }
+        })?;
         self.order_margin.remove(order_id);
         self.lookup_order_nonce_from_user_order_id
             .remove(removed_order.user_order_id())

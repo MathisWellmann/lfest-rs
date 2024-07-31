@@ -22,6 +22,9 @@ pub enum Error {
     #[error("internal order id not found")]
     OrderIdNotFound,
 
+    #[error("The order is no longer active")]
+    OrderNoLongerActive,
+
     #[error(transparent)]
     Decimal(#[from] fpdec::DecimalError),
 
