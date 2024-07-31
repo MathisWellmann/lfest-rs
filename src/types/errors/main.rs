@@ -1,4 +1,5 @@
 use super::{ConfigError, FilterError, OrderError, RiskError};
+use crate::prelude::OrderId;
 
 /// Describes possible Errors that may occur when calling methods in this crate
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
@@ -20,7 +21,10 @@ pub enum Error {
     UserOrderIdNotFound,
 
     #[error("internal order id not found")]
-    OrderIdNotFound,
+    OrderIdNotFound {
+        /// The `OrderId` that was not found.
+        order_id: OrderId,
+    },
 
     #[error("The order is no longer active")]
     OrderNoLongerActive,

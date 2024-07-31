@@ -374,10 +374,12 @@ where
         existing_order_id: OrderId,
         new_order: LimitOrder<Q, UserOrderId, NewOrder>,
     ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
-        let existing_order = self
-            .active_limit_orders
-            .get(&existing_order_id)
-            .ok_or(Error::OrderIdNotFound)?;
+        let existing_order =
+            self.active_limit_orders
+                .get(&existing_order_id)
+                .ok_or(Error::OrderIdNotFound {
+                    order_id: existing_order_id,
+                })?;
         // When the order is in partially filled status and the new quantity <= `filled_quantity`, as per `binance` docs.
         if new_order.remaining_quantity() <= existing_order.filled_quantity() {
             self.cancel_limit_order(existing_order_id)
@@ -468,7 +470,7 @@ where
             if order_id < self.next_order_id {
                 Error::OrderNoLongerActive
             } else {
-                Error::OrderIdNotFound
+                Error::OrderIdNotFound { order_id }
             }
         })?;
         self.order_margin.remove(order_id);
