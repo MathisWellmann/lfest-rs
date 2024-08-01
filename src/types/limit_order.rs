@@ -126,6 +126,13 @@ where
             state: Pending::new(meta),
         }
     }
+
+    /// Modify the `remaining_quantity`.
+    /// The `new_qty` must be GT than zero.
+    pub(crate) fn set_remaining_quantity(&mut self, new_qty: Q) {
+        assert!(new_qty > Q::new_zero());
+        self.remaining_quantity = new_qty;
+    }
 }
 
 impl<Q, UserOrderId> LimitOrder<Q, UserOrderId, Pending<Q>>

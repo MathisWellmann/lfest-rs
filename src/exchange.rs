@@ -369,10 +369,15 @@ where
     }
 
     /// Amend an existing limit order.
+    ///
+    /// The amend message will only be accepted if the original order can be successfully removed.
+    /// Requests which cannot be processed will be rejected with an error.
+    ///
+    /// The new order get a new `OrderId` as well.
     pub fn amend_limit_order(
         &mut self,
         existing_order_id: OrderId,
-        new_order: LimitOrder<Q, UserOrderId, NewOrder>,
+        mut new_order: LimitOrder<Q, UserOrderId, NewOrder>,
     ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
         let existing_order = self
             .active_limit_orders
@@ -387,11 +392,24 @@ where
                 }
             })?;
         // When the order is in partially filled status and the new quantity <= `filled_quantity`, as per `binance` docs.
-        if new_order.remaining_quantity() <= existing_order.filled_quantity() {
+        //
+        // As per cboe: "Changes in OrderQty result in an adjustment of the current order’s OrderQty. The new OrderQty does
+        // not directly replace the current order’s LeavesQty. Rather, a delta is computed from the current
+        // OrderQty and the replacement OrderQty. This delta is then applied to the current LeavesQty. If the
+        // resulting LeavesQty is less than or equal to zero, the order is cancelled. This results in safer behavior
+        // when the modification request overlaps partial fills for the current order, leaving the Member in total
+        // control of the share exposure of the order"
+        let qty_delta = new_order.total_quantity() - existing_order.total_quantity();
+        trace!("qty_delta: {qty_delta}");
+        let new_leaves_qty = existing_order.remaining_quantity() + qty_delta;
+        if new_leaves_qty <= Q::new_zero() {
             self.cancel_limit_order(existing_order_id)
                 .expect("Can cancel this order");
             return Err(Error::AmendQtyAlreadyFilled);
         }
+
+        new_order.set_remaining_quantity(new_leaves_qty);
+
         self.cancel_limit_order(existing_order_id)?;
         self.submit_limit_order(new_order)
     }
