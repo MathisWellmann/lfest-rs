@@ -6,6 +6,7 @@ use tracing::debug;
 use crate::{
     position_inner::PositionInner,
     prelude::{TransactionAccounting, USER_POSITION_MARGIN_ACCOUNT},
+    quote,
     types::{Currency, MarginCurrency, QuoteCurrency, Side},
 };
 
@@ -54,6 +55,24 @@ where
             Position::Neutral => Q::PairedCurrency::new_zero(),
             Position::Long(inner) => inner.outstanding_fees(),
             Position::Short(inner) => inner.outstanding_fees(),
+        }
+    }
+
+    /// The entry price of the position which is the total cost of the position relative to its quantity.
+    pub fn entry_price(&self) -> QuoteCurrency {
+        match self {
+            Position::Neutral => quote!(0),
+            Position::Long(inner) => inner.entry_price(),
+            Position::Short(inner) => inner.entry_price(),
+        }
+    }
+
+    /// The total value of the position which is composed of quantity and avg. entry price.
+    pub fn total_cost(&self) -> Q::PairedCurrency {
+        match self {
+            Position::Neutral => Q::PairedCurrency::new_zero(),
+            Position::Long(inner) => inner.total_cost(),
+            Position::Short(inner) => inner.total_cost(),
         }
     }
 

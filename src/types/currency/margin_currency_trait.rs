@@ -16,11 +16,12 @@ pub trait MarginCurrency: Currency {
     /// # Arguments:
     /// Returns the profit and loss measured in the `PairedCurrency` of the size
     /// currency.
-    fn pnl<S>(
+    fn pnl<S: Currency>(
         entry_price: QuoteCurrency,
         exit_price: QuoteCurrency,
         quantity: S,
-    ) -> S::PairedCurrency
-    where
-        S: Currency;
+    ) -> S::PairedCurrency;
+
+    /// Compute the price paid for `self` (total_cost) for `quantity` number of contracts.
+    fn price_paid_for_qty(&self, quantity: <Self as Currency>::PairedCurrency) -> QuoteCurrency;
 }

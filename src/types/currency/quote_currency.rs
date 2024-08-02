@@ -1,7 +1,7 @@
 use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use derive_more::{Add, AddAssign, Div, From, Into, Mul, Sub, SubAssign};
-use fpdec::{Decimal, Quantize};
+use fpdec::{Dec, Decimal, Quantize};
 
 use super::MarginCurrency;
 use crate::{
@@ -96,6 +96,14 @@ impl MarginCurrency for QuoteCurrency {
             return S::PairedCurrency::new_zero();
         }
         quantity.convert(exit_price) - quantity.convert(entry_price)
+    }
+
+    /// linear futures
+    fn price_paid_for_qty(&self, quantity: <Self as Currency>::PairedCurrency) -> QuoteCurrency {
+        if *quantity.as_ref() == Dec!(0) {
+            return quote!(0);
+        }
+        QuoteCurrency(self.0 / quantity.as_ref())
     }
 }
 

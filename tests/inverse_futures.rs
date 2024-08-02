@@ -373,16 +373,9 @@ fn inv_long_market_win_partial() {
     let order_updates = exchange.update_state(2.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    assert_eq!(
-        exchange.position().clone(),
-        Position::Long(PositionInner::new(
-            quote!(400),
-            quote!(1000),
-            &mut accounting,
-            init_margin_req,
-            base!(0),
-        ))
-    );
+    assert_eq!(exchange.position().quantity(), quote!(400));
+    assert_eq!(exchange.position().entry_price(), quote!(1000));
+    assert_eq!(exchange.position().total_cost(), base!(0.4));
     assert_eq!(exchange.position().unrealized_pnl(bid, ask), base!(0.2));
     assert_eq!(
         exchange.user_balances(),
@@ -401,12 +394,12 @@ fn inv_long_market_loss_partial() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = quote!(999);
-    let order_updates = exchange
-        .update_state(0.into(), &bba!(bid, quote!(1000.0)))
-        .unwrap();
+    let ask = quote!(1000);
+    let order_updates = exchange.update_state(0.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
     let qty = quote!(800);
+    let fee_0 = qty.convert(ask) * TEST_FEE_TAKER;
     let o = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(o).unwrap();
     assert!(exchange
@@ -426,8 +419,9 @@ fn inv_long_market_loss_partial() {
         ))
     );
 
+    let bid = quote!(800);
     let order_updates = exchange
-        .update_state(1.into(), &bba!(quote!(800.0), quote!(801.0)))
+        .update_state(1.into(), &bba!(bid, quote!(801.0)))
         .unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
@@ -437,7 +431,9 @@ fn inv_long_market_loss_partial() {
         base!(-0.2)
     );
 
-    let o = MarketOrder::new(Side::Sell, quote!(400.0)).unwrap();
+    let qty = quote!(400);
+    let fee_1 = qty.convert(bid) * TEST_FEE_TAKER;
+    let o = MarketOrder::new(Side::Sell, qty).unwrap();
     exchange.submit_market_order(o).unwrap();
 
     let bid = quote!(800);
@@ -445,24 +441,10 @@ fn inv_long_market_loss_partial() {
     let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_quote0 = quote!(800) * exchange.config().contract_spec().fee_taker();
-    let fee_base0: BaseCurrency = fee_quote0.convert(quote!(1000));
-
-    let fee_quote1 = quote!(400) * exchange.config().contract_spec().fee_taker();
-    let fee_base1: BaseCurrency = fee_quote1.convert(quote!(800));
-
-    let fee_combined: BaseCurrency = fee_base0 + fee_base1;
-
-    assert_eq!(
-        exchange.position().clone(),
-        Position::Long(PositionInner::new(
-            quote!(400),
-            quote!(1000),
-            &mut accounting,
-            init_margin_req,
-            base!(0),
-        ))
-    );
+    assert_eq!(exchange.position().quantity(), quote!(400));
+    assert_eq!(exchange.position().entry_price(), quote!(1000));
+    assert_eq!(exchange.position().total_cost(), base!(0.4));
+    assert_eq!(exchange.position().outstanding_fees(), base!(0));
     assert_eq!(
         exchange.position().unrealized_pnl(quote!(800), quote!(801)),
         base!(-0.1)
@@ -470,7 +452,7 @@ fn inv_long_market_loss_partial() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: base!(0.5) - fee_combined,
+            available_wallet_balance: base!(0.5) - fee_0 - fee_1,
             position_margin: base!(0.4),
             order_margin: base!(0)
         }

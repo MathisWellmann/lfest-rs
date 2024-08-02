@@ -1,11 +1,12 @@
 use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use derive_more::{Add, AddAssign, Div, From, Into, Mul, Sub, SubAssign};
-use fpdec::{Decimal, Quantize};
+use fpdec::{Dec, Decimal, Quantize};
 
 use super::MarginCurrency;
 use crate::{
     prelude::Leverage,
+    quote,
     types::{Currency, Fee, QuoteCurrency},
 };
 
@@ -84,18 +85,23 @@ impl Currency for BaseCurrency {
 
 impl MarginCurrency for BaseCurrency {
     /// This represents the pnl calculation for inverse futures contracts
-    fn pnl<S>(
+    fn pnl<S: Currency>(
         entry_price: QuoteCurrency,
         exit_price: QuoteCurrency,
         quantity: S,
-    ) -> S::PairedCurrency
-    where
-        S: Currency,
-    {
+    ) -> S::PairedCurrency {
         if quantity.is_zero() {
             return S::PairedCurrency::new_zero();
         }
         quantity.convert(entry_price) - quantity.convert(exit_price)
+    }
+
+    // inverse futures.
+    fn price_paid_for_qty(&self, quantity: <Self as Currency>::PairedCurrency) -> QuoteCurrency {
+        if self.0 == Dec!(0) {
+            return quote!(0);
+        }
+        QuoteCurrency::from(quantity.as_ref() / self.0)
     }
 }
 
