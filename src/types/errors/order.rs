@@ -19,16 +19,10 @@ pub enum OrderError {
     #[error("The limit price is above the maximum price.")]
     LimitPriceAboveMax,
 
-    #[error("The limit price {limit_price} is greater or equal the current best ask {best_ask}")]
-    LimitPriceGteAsk {
+    #[error("The limit order `RePricing` was `GoodTillCrossing` leading to its rejection as the limit_price {limit_price} locks or crosses the away market quotation price {away_market_quotation_price}")]
+    GoodTillCrossingRejectedOrder {
         limit_price: QuoteCurrency,
-        best_ask: QuoteCurrency,
-    },
-
-    #[error("The limit price {limit_price} is lower or equal the current best bid {best_bid}")]
-    LimitPriceLteBid {
-        limit_price: QuoteCurrency,
-        best_bid: QuoteCurrency,
+        away_market_quotation_price: QuoteCurrency,
     },
 
     #[error("The order price does not conform to the step size.")]

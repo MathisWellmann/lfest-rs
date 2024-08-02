@@ -12,16 +12,15 @@ use crate::{
     market_state::MarketState,
     order_margin::OrderMargin,
     prelude::{
-        MarketUpdate, Position, Transaction, EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT,
-        USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
+        MarketUpdate, OrderError, Position, RePricing, Transaction, EXCHANGE_FEE_ACCOUNT,
+        USER_ORDER_MARGIN_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
     },
     quote,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     sample_returns_trigger::SampleReturnsTrigger,
     types::{
         Currency, Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderUpdate, MarginCurrency,
-        MarketOrder, NewOrder, OrderError, OrderId, Pending, Result, Side, TimestampNs,
-        UserBalances,
+        MarketOrder, NewOrder, OrderId, Pending, Result, Side, TimestampNs, UserBalances,
     },
     utils::assert_user_wallet_balance,
 };
@@ -328,25 +327,6 @@ where
             .price_filter()
             .validate_limit_order(&order, self.market_state.mid_price())?;
 
-        match order.side() {
-            Side::Buy => {
-                if order.limit_price() >= self.market_state.ask() {
-                    return Err(Error::OrderError(OrderError::LimitPriceGteAsk {
-                        limit_price: order.limit_price(),
-                        best_ask: self.market_state.ask(),
-                    }));
-                }
-            }
-            Side::Sell => {
-                if order.limit_price() <= self.market_state.bid() {
-                    return Err(Error::OrderError(OrderError::LimitPriceLteBid {
-                        limit_price: order.limit_price(),
-                        best_bid: self.market_state.bid(),
-                    }));
-                }
-            }
-        }
-
         let meta = ExchangeOrderMeta::new(
             self.next_order_id(),
             self.market_state.current_timestamp_ns(),
@@ -362,7 +342,29 @@ where
             available_wallet_balance,
             &self.order_margin,
         )?;
-        self.append_limit_order(order.clone());
+
+        // If a limit order is marketable, it will take liquidity from the book at the `limit_price` price level and pay the taker fee,
+        let marketable = match order.side() {
+            Side::Buy => order.limit_price() >= self.market_state.ask(),
+            Side::Sell => order.limit_price() <= self.market_state.bid(),
+        };
+        match order.re_pricing() {
+            RePricing::GoodTilCrossing => {
+                if marketable {
+                    return Err(Error::OrderError(
+                        OrderError::GoodTillCrossingRejectedOrder {
+                            limit_price: order.limit_price(),
+                            away_market_quotation_price: match order.side() {
+                                Side::Buy => self.market_state.ask(),
+                                Side::Sell => self.market_state.bid(),
+                            },
+                        },
+                    ));
+                }
+            }
+        }
+
+        self.append_limit_order(order.clone(), marketable);
         self.account_tracker.log_limit_order_submission();
 
         Ok(order)
@@ -414,9 +416,16 @@ where
         self.submit_limit_order(new_order)
     }
 
-    /// Append a new limit order as active order
-    fn append_limit_order(&mut self, order: LimitOrder<Q, UserOrderId, Pending<Q>>) {
-        debug!("append_limit_order: order: {:?}", order);
+    /// Append a new limit order as active order.
+    /// If limit order is `marketable`, the order will take liquidity from the book at the `limit_price` price level.
+    /// Then it pays the taker fee for the quantity that was taken from the book, the rest of the quantity (if any)
+    /// will be placed into the book as a passive order.
+    fn append_limit_order(
+        &mut self,
+        order: LimitOrder<Q, UserOrderId, Pending<Q>>,
+        marketable: bool,
+    ) {
+        debug!("append_limit_order: order: {order:?}, marketable: {marketable}");
         debug!(
             "active_limit_orders: {:?}, market_state: {:?}, transaction_accounting: {:?}, position: {:?}",
             self.active_limit_orders,

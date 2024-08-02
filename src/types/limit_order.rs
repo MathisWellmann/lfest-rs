@@ -1,8 +1,8 @@
-use getset::{CopyGetters, Getters};
+use getset::{CopyGetters, Getters, Setters};
 
 use super::{
     order_meta::ExchangeOrderMeta, order_status::NewOrder, Filled, FilledQuantity, MarginCurrency,
-    OrderId, Pending, TimestampNs,
+    OrderId, Pending, RePricing, TimestampNs,
 };
 use crate::types::{Currency, OrderError, QuoteCurrency, Side};
 
@@ -10,7 +10,7 @@ use crate::types::{Currency, OrderError, QuoteCurrency, Side};
 /// Is generic over:
 /// `S`: The order size aka quantity which is denoted in either base or quote currency.
 /// `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
-#[derive(Debug, Clone, PartialEq, Eq, Getters, CopyGetters)]
+#[derive(Debug, Clone, PartialEq, Eq, Getters, CopyGetters, Setters)]
 pub struct LimitOrder<Q, UserOrderId, OrderStatus>
 where
     Q: Currency,
@@ -32,6 +32,10 @@ where
     /// The remaining amount of Currency `S` the order is for.
     #[getset(get_copy = "pub")]
     remaining_quantity: Q,
+
+    /// Determines the behaviour for when the limit price locks or crosses an away market quotation.
+    #[getset(get_copy = "pub", set = "pub")]
+    re_pricing: RePricing,
 
     /// Depending on the status, different information is available.
     #[getset(get = "pub")]
@@ -65,6 +69,7 @@ where
             limit_price,
             remaining_quantity: quantity,
             side,
+            re_pricing: RePricing::default(),
         })
     }
 }
@@ -103,6 +108,7 @@ where
             limit_price,
             remaining_quantity: quantity,
             side,
+            re_pricing: RePricing::default(),
         })
     }
 
@@ -124,6 +130,7 @@ where
             limit_price: self.limit_price,
             remaining_quantity: self.remaining_quantity,
             state: Pending::new(meta),
+            re_pricing: RePricing::default(),
         }
     }
 
@@ -180,6 +187,7 @@ where
                         limit_price: self.limit_price,
                         remaining_quantity: Q::new_zero(),
                         side: self.side,
+                        re_pricing: self.re_pricing,
                     });
                 } else {
                     self.remaining_quantity -= filled_quantity;
@@ -206,6 +214,7 @@ where
                         limit_price: self.limit_price,
                         remaining_quantity: Q::new_zero(),
                         side: self.side,
+                        re_pricing: self.re_pricing,
                     });
                 }
             }

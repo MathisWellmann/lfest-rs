@@ -8,6 +8,7 @@ mod order_id;
 mod order_meta;
 mod order_status;
 mod order_update;
+mod re_pricing;
 mod side;
 mod timestamp_ns;
 
@@ -21,6 +22,7 @@ pub use order_id::OrderId;
 pub use order_meta::ExchangeOrderMeta;
 pub use order_status::{Filled, FilledQuantity, NewOrder, Pending};
 pub use order_update::LimitOrderUpdate;
+pub use re_pricing::RePricing;
 pub use side::Side;
 pub use timestamp_ns::TimestampNs;
 
