@@ -27,3 +27,9 @@ impl Display for TimestampNs {
         write!(f, "{}", self.0)
     }
 }
+
+impl AsRef<i64> for TimestampNs {
+    fn as_ref(&self) -> &i64 {
+        &self.0
+    }
+}
