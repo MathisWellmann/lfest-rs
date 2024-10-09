@@ -59,11 +59,11 @@ where
     ts_last: TimestampNs,
 
     /// Keep track of natural logarithmic returns of users funds.
-    user_balances_ln_return: LnReturn<Echo>,
-    drawdown_user_balances: Drawdown<Echo>, // Drawdown of realized user balances.
-    drawdown_market: Drawdown<Echo>,        // Drawdown of the market.
-    user_balances_ln_return_stats: WelfordRolling<Echo>, // Used for `sharpe` and `kelly_leverage`
-    user_balances_neg_ln_return_stats: WelfordRolling<Echo>, // Used for `sortino`
+    user_balances_ln_return: LnReturn<f32, Echo<f32>>,
+    drawdown_user_balances: Drawdown<f32, Echo<f32>>, // Drawdown of realized user balances.
+    drawdown_market: Drawdown<f32, Echo<f32>>,        // Drawdown of the market.
+    user_balances_ln_return_stats: WelfordRolling<f32, Echo<f32>>, // Used for `sharpe` and `kelly_leverage`
+    user_balances_neg_ln_return_stats: WelfordRolling<f32, Echo<f32>>, // Used for `sortino`
 
     /// last sum of all user balances.
     last_balance_sum: M,
@@ -74,7 +74,7 @@ where
 
     /// Keeps track of the markets logarithmic return at the sampling interval.
     #[cfg(feature = "quantiles")]
-    sampled_market_ln_return: LnReturn<Echo>,
+    sampled_market_ln_return: LnReturn<f32, Echo<f32>>,
 
     /// Keeps track of ln return distribution of the market and can compute the quantiles needed for certain risk metrics.
     #[cfg(feature = "quantiles")]
@@ -147,25 +147,25 @@ where
     }
 
     /// Return the number of trading days
-    pub fn num_trading_days(&self) -> i64 {
+    pub fn num_trading_days(&self) -> u32 {
         assert!(
             self.ts_last >= self.ts_first,
             "Last timestamp must be after first."
         );
 
-        Into::<i64>::into((self.ts_last - self.ts_first) / TimestampNs::from(DAILY_NS))
+        Into::<i64>::into((self.ts_last - self.ts_first) / TimestampNs::from(DAILY_NS)) as u32
     }
 
     /// Return the ratio of filled limit orders vs number of submitted limit
     /// orders
-    pub fn limit_order_fill_ratio(&self) -> f64 {
-        self.num_fully_filled_limit_orders as f64 / self.num_submitted_limit_orders as f64
+    pub fn limit_order_fill_ratio(&self) -> f32 {
+        self.num_fully_filled_limit_orders as f32 / self.num_submitted_limit_orders as f32
     }
 
     /// Return the ratio of limit order cancellations vs number of submitted
     /// limit orders
-    pub fn limit_order_cancellation_ratio(&self) -> f64 {
-        self.num_cancelled_limit_orders as f64 / self.num_submitted_limit_orders as f64
+    pub fn limit_order_cancellation_ratio(&self) -> f32 {
+        self.num_cancelled_limit_orders as f32 / self.num_submitted_limit_orders as f32
     }
 
     /// The total volume traded.
@@ -174,12 +174,12 @@ where
     }
 
     /// The drawdown of user balances.
-    pub fn drawdown_user_balances(&self) -> f64 {
+    pub fn drawdown_user_balances(&self) -> f32 {
         self.drawdown_user_balances.last().unwrap_or(0.0)
     }
 
     /// The drawdown the market experienced.
-    pub fn drawdown_market(&self) -> f64 {
+    pub fn drawdown_market(&self) -> f32 {
         self.drawdown_market.last().unwrap_or(0.0)
     }
 
@@ -190,7 +190,7 @@ where
     }
 
     /// The ratio of executed buy volume vs total.
-    pub fn buy_volume_ratio(&self) -> Option<f64> {
+    pub fn buy_volume_ratio(&self) -> Option<f32> {
         assert!(self.buy_volume >= M::new_zero());
         assert!(self.sell_volume >= M::new_zero());
 
@@ -204,7 +204,7 @@ where
 
     /// Return the raw sharpe ratio that has been derived from the sampled returns of the users balances.
     /// This sharpe ratio is not annualized and does not include a risk free rate.
-    pub fn sharpe(&self) -> Option<f64> {
+    pub fn sharpe(&self) -> Option<f32> {
         let std_dev = self.user_balances_ln_return_stats.last()?;
         if std_dev == 0.0 {
             return None;
@@ -217,7 +217,7 @@ where
 
     /// Returns the theoretical kelly leverage that would maximize the compounded growth rate,
     /// assuming the returns are normally distributed. Which they almost never are. So be aware.
-    pub fn kelly_leverage(&self) -> f64 {
+    pub fn kelly_leverage(&self) -> f32 {
         let mean_return = self.user_balances_ln_return_stats.mean();
         let return_variance = self.user_balances_ln_return_stats.variance();
         assert!(return_variance >= 0.0);
@@ -231,7 +231,7 @@ where
 
     /// Return the raw sortino ratio that has been derived from the sampled returns of the users balances.
     /// This sortino ratio is not annualized and does not include a risk free rate.
-    pub fn sortino(&self) -> Option<f64> {
+    pub fn sortino(&self) -> Option<f32> {
         let neg_std_dev = self.user_balances_neg_ln_return_stats.last()?;
         if neg_std_dev == 0.0 {
             return None;
@@ -290,7 +290,7 @@ where
         let balance_sum = balance_sum(user_balances);
         self.last_balance_sum = balance_sum;
 
-        let balance_sum: f64 = (*balance_sum.as_ref()).into();
+        let balance_sum: f32 = (*balance_sum.as_ref()).into();
         self.drawdown_user_balances.update(balance_sum);
 
         self.user_balances_ln_return.update(balance_sum);
@@ -300,15 +300,15 @@ where
                 self.user_balances_neg_ln_return_stats.update(ln_ret);
             }
             #[cfg(feature = "quantiles")]
-            self.quantogram_user_balances_ln_returns.add(ln_ret);
+            self.quantogram_user_balances_ln_returns.add(ln_ret as f64);
         }
 
         #[cfg(feature = "quantiles")]
         {
-            let mid_price: f64 = (*mid_price.as_ref()).into();
+            let mid_price: f32 = (*mid_price.as_ref()).into();
             self.sampled_market_ln_return.update(mid_price);
             if let Some(market_ln_ret) = self.sampled_market_ln_return.last() {
-                self.quantogram_market_ln_returns.add(market_ln_ret);
+                self.quantogram_market_ln_returns.add(market_ln_ret as f64);
             }
         }
     }
@@ -421,10 +421,7 @@ mod tests {
             order_margin: quote!(0),
         };
         at.sample_user_balances(&balances, quote!(100));
-        assert_eq!(
-            at.user_balances_ln_return.last().unwrap(),
-            0.009950330853168092
-        );
+        assert_eq!(at.user_balances_ln_return.last().unwrap(), 0.009950321);
         assert_eq!(at.drawdown_user_balances(), 0.0);
         assert_eq!(at.user_balances_ln_return_stats.last().unwrap(), 0.0);
         assert!(at.sharpe().is_none());
@@ -437,25 +434,16 @@ mod tests {
             order_margin: quote!(0),
         };
         at.sample_user_balances(&balances, quote!(100));
-        assert_eq!(
-            at.user_balances_ln_return.last().unwrap(),
-            0.00985229644301164
-        );
-        assert_eq!(
-            at.user_balances_ln_return_stats.mean(),
-            0.009901313648089865
-        );
-        assert_eq!(
-            at.user_balances_ln_return_stats.variance(),
-            2.402686393680848e-9
-        );
+        assert_eq!(at.user_balances_ln_return.last().unwrap(), 0.009852353);
+        assert_eq!(at.user_balances_ln_return_stats.mean(), 0.009901337);
+        assert_eq!(at.user_balances_ln_return_stats.variance(), 2.3994853e-9);
         assert_eq!(
             at.user_balances_ln_return_stats.last().unwrap(),
-            4.9017205078225826e-5
+            4.898454e-5
         );
         assert_eq!(at.drawdown_user_balances(), 0.0);
-        assert_eq!(at.sharpe().unwrap(), 201.9966995729052);
+        assert_eq!(at.sharpe().unwrap(), 202.13188);
         assert!(at.sortino().is_none());
-        assert_eq!(at.kelly_leverage(), 4120934.6646864437);
+        assert_eq!(at.kelly_leverage(), 4126442.3);
     }
 }

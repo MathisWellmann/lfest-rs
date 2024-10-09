@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.73.3"
+version = "0.74.0"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2021"
 license-file = "LICENSE"
@@ -22,7 +22,7 @@ fpdec = { version = "0.10", features = ["serde-as-str"] }
 distrs = "0.2"
 num-traits = "0.2"
 getset = "0.1.2"
-sliding_features = "4"
+sliding_features = "5"
 quantogram = { version = "0.4", optional = true }
 assert2 = "0.3"
 
