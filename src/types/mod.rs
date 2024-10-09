@@ -10,6 +10,7 @@ mod order_status;
 mod order_update;
 mod re_pricing;
 mod side;
+mod smol_currency;
 mod timestamp_ns;
 
 pub use currency::{BaseCurrency, Currency, MarginCurrency, QuoteCurrency};
