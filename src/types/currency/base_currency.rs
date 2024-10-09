@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Mul, Rem, Sub};
+use std::ops::Rem;
 
 use derive_more::{Add, AddAssign, Div, From, Into, Mul, Sub, SubAssign};
 use fpdec::{Dec, Decimal, Quantize};

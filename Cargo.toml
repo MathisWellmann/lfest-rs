@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.73.2"
+version = "0.73.3"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2021"
 license-file = "LICENSE"
@@ -16,8 +16,8 @@ tracing = { version = "0.1", features = ["release_max_level_info"] }
 tracing-subscriber = "0.3"
 serde = { version = "1", features = ["derive"] }
 thiserror = "1"
-hashbrown = "0.14"
-derive_more = { version = "0.99", features = ["add", "mul"] }
+hashbrown = "0.15"
+derive_more = { version = "1", features = ["full"] }
 fpdec = { version = "0.10", features = ["serde-as-str"] }
 distrs = "0.2"
 num-traits = "0.2"
