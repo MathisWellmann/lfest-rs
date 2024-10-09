@@ -205,4 +205,9 @@ mod tests {
             quote!(100.0)
         );
     }
+
+    #[test]
+    fn size_of_quote_currency() {
+        assert_eq!(std::mem::size_of::<QuoteCurrency>(), 32);
+    }
 }

@@ -15,6 +15,7 @@ pub struct Trade<Q> {
     /// Generic denotation, e.g either Quote or Base currency denoted.
     pub quantity: Q,
     /// Either a buy or sell order.
+    // TODO: remove field and derive from sign of `quantity` to save size of struct.
     pub side: Side,
 }
 
@@ -125,5 +126,10 @@ mod tests {
             trade.limit_order_filled(&limit_order).unwrap(),
             quantity / base!(2)
         );
+    }
+
+    #[test]
+    fn size_of_trade() {
+        assert_eq!(std::mem::size_of::<Trade<BaseCurrency>>(), 80);
     }
 }
