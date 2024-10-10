@@ -41,7 +41,7 @@ pub mod prelude {
         config::Config,
         contract_specification::*,
         exchange::{Account, ActiveLimitOrders, Exchange},
-        fee, leverage,
+        leverage,
         market_state::MarketState,
         market_update::*,
         order_filters::{PriceFilter, QuantityFilter},

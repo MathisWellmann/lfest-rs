@@ -2,7 +2,7 @@ use fpdec::{Dec, Decimal};
 use getset::{CopyGetters, Getters, Setters};
 
 use crate::{
-    fee, leverage,
+    leverage,
     prelude::{ConfigError, Currency, PriceFilter, QuantityFilter},
     types::{Fee, Leverage},
 };
@@ -103,8 +103,8 @@ where
             Dec!(0.5),
             PriceFilter::default(),
             QuantityFilter::default(),
-            fee!(0.0002),
-            fee!(0.0006),
+            Fee::from_basis_points(2),
+            Fee::from_basis_points(6),
         )
         .expect("Is valid")
     }

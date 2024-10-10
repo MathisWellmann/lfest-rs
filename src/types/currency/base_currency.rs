@@ -6,7 +6,7 @@ use fpdec::{Dec, Decimal, Quantize};
 use super::MarginCurrency;
 use crate::{
     quote,
-    types::{Currency, Fee, QuoteCurrency},
+    types::{Currency, QuoteCurrency},
 };
 
 /// Allows the quick construction of `BaseCurrency`
@@ -148,14 +148,6 @@ impl Rem for BaseCurrency {
 
     fn rem(self, rhs: Self) -> Self::Output {
         Self(self.0 % rhs.0)
-    }
-}
-
-impl Mul<Fee> for BaseCurrency {
-    type Output = Self;
-
-    fn mul(self, rhs: Fee) -> Self::Output {
-        Self(self.0 * rhs.as_ref())
     }
 }
 

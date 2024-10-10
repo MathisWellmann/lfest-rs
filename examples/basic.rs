@@ -20,8 +20,8 @@ fn main() {
         Dec!(0.5),
         PriceFilter::new(None, None, quote!(0.1), Dec!(2), Dec!(0)).expect("is valid price filter"),
         QuantityFilter::default(),
-        fee!(0.0002),
-        fee!(0.0006),
+        Fee::from_basis_points(2),
+        Fee::from_basis_points(6),
     )
     .expect("is valid");
     let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();

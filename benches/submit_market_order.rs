@@ -31,8 +31,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         Dec!(0.5),
         PriceFilter::new(None, None, quote!(0.5), Dec!(2), Dec!(0.5)).expect("is valid filter"),
         QuantityFilter::new(None, None, quote!(0.1)).expect("is valid filter"),
-        fee!(0.0002),
-        fee!(0.0006),
+        Fee::from_basis_points(2),
+        Fee::from_basis_points(6),
     )
     .expect("works");
     let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();

@@ -1,28 +1,33 @@
 use std::ops::Mul;
 
 use derive_more::Display;
-use fpdec::Decimal;
+use fpdec::{Dec, Decimal};
 
-use super::{Currency, QuoteCurrency};
+use super::{BaseCurrency, Currency, QuoteCurrency};
 
-/// Allows the quick construction of `Fee`
-#[macro_export]
-macro_rules! fee {
-    ( $a:literal) => {{
-        use $crate::prelude::fpdec::Decimal;
-        $crate::prelude::Fee::new($crate::prelude::fpdec::Dec!($a))
-    }};
+/// Fee as a part per one hundred thousand.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Display)]
+pub struct Fee {
+    /// A per cent mill or pcm is one one-thousandth of a percent.
+    /// 2.5 basis points would be 25 pcm.
+    per_cent_mille: i32,
 }
 
-/// Fee as a fraction
-#[derive(Default, Debug, Clone, Copy, PartialEq, Display)]
-pub struct Fee(Decimal);
-
 impl Fee {
-    /// Create a new instance from a `Decimal` value
+    /// Create a new instance from a value denoted as a basis point (1 / 10_000)
     #[inline(always)]
-    pub const fn new(val: Decimal) -> Self {
-        Self(val)
+    pub const fn from_basis_points(basis_points: i32) -> Self {
+        Self {
+            per_cent_mille: basis_points * 10,
+        }
+    }
+
+    /// Create a new instance from a value denoted as (1 / 100_000)
+    #[inline(always)]
+    pub const fn from_per_cent_mille(pcm: i32) -> Self {
+        Self {
+            per_cent_mille: pcm,
+        }
     }
 }
 
@@ -33,13 +38,23 @@ where
     type Output = QuoteCurrency;
 
     fn mul(self, rhs: C) -> Self::Output {
-        QuoteCurrency::new(self.0 * rhs.as_ref())
+        QuoteCurrency::new(self.per_cent_mille * rhs.as_ref() / Dec!(100000))
     }
 }
 
-impl AsRef<Decimal> for Fee {
-    fn as_ref(&self) -> &Decimal {
-        &self.0
+impl Mul<Fee> for BaseCurrency {
+    type Output = Self;
+
+    fn mul(self, rhs: Fee) -> Self::Output {
+        BaseCurrency::new(self.as_ref() * Decimal::from(rhs.per_cent_mille) / Dec!(100000))
+    }
+}
+
+impl Mul<Fee> for QuoteCurrency {
+    type Output = Self;
+
+    fn mul(self, rhs: Fee) -> Self::Output {
+        QuoteCurrency::new(self.as_ref() * Decimal::from(rhs.per_cent_mille) / Dec!(100000))
     }
 }
 
@@ -50,4 +65,14 @@ pub enum FeeType {
     Maker(Fee),
     /// The fee market orders pay.
     Taker(Fee),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn size_of_fee() {
+        assert_eq!(std::mem::size_of::<Fee>(), 4);
+    }
 }
