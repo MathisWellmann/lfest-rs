@@ -8,9 +8,9 @@ use crate::{
 };
 
 /// The maker fee used in tests.
-pub const TEST_FEE_MAKER: Fee = Fee::from_basis_points(2);
+pub const TEST_FEE_MAKER: Fee<Maker> = Fee::from_basis_points(2);
 /// The taker fee used in tests.
-pub const TEST_FEE_TAKER: Fee = Fee::from_basis_points(6);
+pub const TEST_FEE_TAKER: Fee<Taker> = Fee::from_basis_points(6);
 
 /// Constructs a mock exchange (for linear futures) for testing.
 /// The size is denoted in `BaseCurrency`

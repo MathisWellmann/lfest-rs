@@ -3,7 +3,7 @@ use getset::{CopyGetters, Getters, Setters};
 
 use crate::{
     leverage,
-    prelude::{ConfigError, Currency, PriceFilter, QuantityFilter},
+    prelude::{ConfigError, Currency, Maker, PriceFilter, QuantityFilter, Taker},
     types::{Fee, Leverage},
 };
 
@@ -42,13 +42,13 @@ where
     #[getset(get = "pub")]
     quantity_filter: QuantityFilter<Q>,
 
-    /// The maker fee as a fraction. e.g.: 2.5 basis points rebate -> -0.00025
+    /// The maker fee as parts per 100_000
     #[getset(get_copy = "pub")]
-    fee_maker: Fee,
+    fee_maker: Fee<Maker>,
 
-    /// The taker fee as a fraction. e.g.: 10 basis points -> 0.0010
+    /// The taker fee as parts per 100_000
     #[getset(get_copy = "pub")]
-    fee_taker: Fee,
+    fee_taker: Fee<Taker>,
 }
 
 impl<Q> ContractSpecification<Q>
@@ -71,8 +71,8 @@ where
         maintenance_margin_fraction: Decimal,
         price_filter: PriceFilter,
         quantity_filter: QuantityFilter<Q>,
-        fee_maker: Fee,
-        fee_taker: Fee,
+        fee_maker: Fee<Maker>,
+        fee_taker: Fee<Taker>,
     ) -> Result<Self, ConfigError> {
         if maintenance_margin_fraction > Dec!(1) || maintenance_margin_fraction <= Dec!(0) {
             return Err(ConfigError::InvalidMaintenanceMarginFraction);

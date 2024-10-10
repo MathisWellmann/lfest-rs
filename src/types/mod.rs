@@ -15,7 +15,7 @@ mod timestamp_ns;
 
 pub use currency::{BaseCurrency, Currency, MarginCurrency, QuoteCurrency};
 pub use errors::*;
-pub use fee::{Fee, FeeType};
+pub use fee::{Fee, Maker, Taker};
 pub use leverage::Leverage;
 pub use limit_order::LimitOrder;
 pub use market_order::MarketOrder;

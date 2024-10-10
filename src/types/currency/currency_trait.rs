@@ -1,7 +1,7 @@
 use fpdec::Decimal;
 
 use crate::{
-    prelude::Leverage,
+    prelude::{Leverage, Maker, Taker},
     types::{Fee, QuoteCurrency},
 };
 
@@ -28,7 +28,8 @@ pub trait Currency:
     + std::ops::Mul<Decimal, Output = Self>
     + std::ops::Div<Decimal, Output = Self>
     + std::ops::Div<Leverage, Output = Self>
-    + std::ops::Mul<Fee, Output = Self>
+    + std::ops::Mul<Fee<Maker>, Output = Self>
+    + std::ops::Mul<Fee<Taker>, Output = Self>
     + std::ops::AddAssign
     + std::ops::SubAssign
     + PartialEq
