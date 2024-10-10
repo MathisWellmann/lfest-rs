@@ -221,9 +221,9 @@ mod tests {
     #[test_case::test_case(2, 75)]
     #[test_case::test_case(3, 84)]
     #[test_case::test_case(5, 90)]
-    fn isolated_margin_check_maintenance_margin_long(leverage: u32, expected_liq_price: u32) {
+    fn isolated_margin_check_maintenance_margin_long(leverage: u8, expected_liq_price: u32) {
         let contract_spec = ContractSpecification::<BaseCurrency>::new(
-            Leverage::new(Decimal::from(leverage)).unwrap(),
+            Leverage::new(leverage).unwrap(),
             Dec!(0.5),
             PriceFilter::default(),
             QuantityFilter::default(),
@@ -278,9 +278,9 @@ mod tests {
     #[test_case::test_case(2, 126)]
     #[test_case::test_case(3, 117)]
     #[test_case::test_case(5, 111)]
-    fn isolated_margin_check_maintenance_margin_short(leverage: u32, expected_liq_price: u32) {
+    fn isolated_margin_check_maintenance_margin_short(leverage: u8, expected_liq_price: u32) {
         let contract_spec = ContractSpecification::<BaseCurrency>::new(
-            Leverage::new(Decimal::from(leverage)).unwrap(),
+            Leverage::new(leverage).unwrap(),
             Dec!(0.5),
             PriceFilter::default(),
             QuantityFilter::default(),

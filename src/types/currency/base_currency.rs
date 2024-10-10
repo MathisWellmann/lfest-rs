@@ -5,7 +5,6 @@ use fpdec::{Dec, Decimal, Quantize};
 
 use super::MarginCurrency;
 use crate::{
-    prelude::Leverage,
     quote,
     types::{Currency, Fee, QuoteCurrency},
 };
@@ -149,14 +148,6 @@ impl Rem for BaseCurrency {
 
     fn rem(self, rhs: Self) -> Self::Output {
         Self(self.0 % rhs.0)
-    }
-}
-
-impl Div<Leverage> for BaseCurrency {
-    type Output = Self;
-
-    fn div(self, rhs: Leverage) -> Self::Output {
-        Self(self.0 / *rhs.as_ref())
     }
 }
 

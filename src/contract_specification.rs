@@ -78,7 +78,7 @@ where
             return Err(ConfigError::InvalidMaintenanceMarginFraction);
         }
 
-        let initial_margin = Dec!(1) / *leverage.as_ref();
+        let initial_margin = Dec!(1) / leverage;
 
         Ok(Self {
             ticker: String::new(),
