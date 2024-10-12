@@ -1,18 +1,18 @@
 use super::{ConfigError, FilterError, OrderError, RiskError};
-use crate::prelude::OrderId;
+use crate::prelude::{Mon, OrderId};
 
 /// Describes possible Errors that may occur when calling methods in this crate
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
 #[allow(missing_docs)]
-pub enum Error {
+pub enum Error<T: Mon> {
     #[error(transparent)]
-    FilterError(#[from] FilterError),
+    FilterError(#[from] FilterError<T>),
 
     #[error(transparent)]
     ConfigError(#[from] ConfigError),
 
     #[error(transparent)]
-    OrderError(#[from] OrderError),
+    OrderError(#[from] OrderError<T>),
 
     #[error(transparent)]
     RiskError(#[from] RiskError),

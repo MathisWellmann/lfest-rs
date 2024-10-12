@@ -1,6 +1,7 @@
 //! Convenince function used in tests.
 
 use fpdec::{Dec, Decimal};
+use num_traits::Zero;
 
 use crate::{
     account_tracker::{FullAccountTracker, NoAccountTracker},
@@ -16,18 +17,18 @@ pub const TEST_FEE_TAKER: Fee<Taker> = Fee::from_basis_points(6);
 /// The size is denoted in `BaseCurrency`
 /// and the margin currency is `QuoteCurency`
 pub fn mock_exchange_linear(
-) -> Exchange<NoAccountTracker, BaseCurrency, (), InMemoryTransactionAccounting<QuoteCurrency>> {
+) -> Exchange<NoAccountTracker, Decimal, Base, (), InMemoryTransactionAccounting<Decimal, Quote>> {
     let acc_tracker = NoAccountTracker;
     let contract_spec = ContractSpecification::new(
         leverage!(1),
         Dec!(0.5),
         PriceFilter::default(),
-        QuantityFilter::new(None, None, base!(0.01)).unwrap(),
+        QuantityFilter::new(None, None, Monies::new(Dec!(0.01))).unwrap(),
         TEST_FEE_MAKER,
         TEST_FEE_TAKER,
     )
     .expect("works");
-    let config = Config::new(quote!(1000), 200, contract_spec, 3600).unwrap();
+    let config = Config::new(Monies::new(Dec!(1000)), 200, contract_spec, 3600).unwrap();
     Exchange::new(acc_tracker, config)
 }
 
@@ -35,19 +36,20 @@ pub fn mock_exchange_linear(
 /// The size is denoted in `BaseCurrency`
 /// and the margin currency is `QuoteCurency`
 pub fn mock_exchange_linear_with_account_tracker(
-    starting_balance: QuoteCurrency,
+    starting_balance: Monies<Decimal, Quote>,
 ) -> Exchange<
-    FullAccountTracker<QuoteCurrency>,
-    BaseCurrency,
+    FullAccountTracker<Decimal, Quote>,
+    Decimal,
+    Base,
     (),
-    InMemoryTransactionAccounting<QuoteCurrency>,
+    InMemoryTransactionAccounting<Decimal, Quote>,
 > {
     let acc_tracker = FullAccountTracker::new(starting_balance);
     let contract_spec = ContractSpecification::new(
         leverage!(1),
         Dec!(0.5),
         PriceFilter::default(),
-        QuantityFilter::new(None, None, base!(0.01)).unwrap(),
+        QuantityFilter::new(None, None, Monies::new(Dec!(0.01))).unwrap(),
         TEST_FEE_MAKER,
         TEST_FEE_TAKER,
     )
@@ -58,8 +60,8 @@ pub fn mock_exchange_linear_with_account_tracker(
 
 /// Constructs a mock exchange (for inverse futures) for testing.
 pub fn mock_exchange_inverse(
-    starting_balance: BaseCurrency,
-) -> Exchange<NoAccountTracker, QuoteCurrency, (), InMemoryTransactionAccounting<BaseCurrency>> {
+    starting_balance: Monies<Decimal, Base>,
+) -> Exchange<NoAccountTracker, Decimal, Quote, (), InMemoryTransactionAccounting<Decimal, Base>> {
     let acc_tracker = NoAccountTracker;
     let contract_spec = ContractSpecification::new(
         leverage!(1),
@@ -78,19 +80,23 @@ pub fn mock_exchange_inverse(
 #[derive(Default, Clone)]
 pub struct MockTransactionAccounting;
 
-impl<M> TransactionAccounting<M> for MockTransactionAccounting
+impl<T, BaseOrQuote> TransactionAccounting<T, BaseOrQuote> for MockTransactionAccounting
 where
-    M: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: MarginCurrencyMarker<T>,
 {
-    fn new(_user_starting_wallet_balance: M) -> Self {
+    fn new(_user_starting_wallet_balance: Monies<T, BaseOrQuote>) -> Self {
         Self {}
     }
 
-    fn create_margin_transfer(&mut self, _transaction: Transaction<M>) -> Result<()> {
+    fn create_margin_transfer(
+        &mut self,
+        _transaction: Transaction<T, BaseOrQuote>,
+    ) -> Result<(), T> {
         Ok(())
     }
 
-    fn margin_balance_of(&self, _account: AccountId) -> Result<M> {
-        Ok(M::new_zero())
+    fn margin_balance_of(&self, _account: AccountId) -> Result<Monies<T, BaseOrQuote>, T> {
+        Ok(Monies::zero())
     }
 }

@@ -3,7 +3,7 @@ use std::ops::Div;
 use derive_more::Display;
 use fpdec::{Dec, Decimal};
 
-use super::{BaseCurrency, ConfigError, Currency, QuoteCurrency};
+use super::{ConfigError, Mon};
 
 /// Allows the quick construction of `Leverage`
 ///
@@ -29,6 +29,14 @@ impl Leverage {
         }
         Ok(Self(val))
     }
+
+    /// Compute the initial margin requirement from leverage.
+    pub fn init_margin_req<T>(&self) -> T
+    where
+        T: Mon,
+    {
+        T::one() / T::from(self.0)
+    }
 }
 
 impl Div<Leverage> for Decimal {
@@ -36,22 +44,6 @@ impl Div<Leverage> for Decimal {
 
     fn div(self, rhs: Leverage) -> Self::Output {
         self / Decimal::from(rhs.0)
-    }
-}
-
-impl Div<Leverage> for BaseCurrency {
-    type Output = Self;
-
-    fn div(self, rhs: Leverage) -> Self::Output {
-        BaseCurrency::new(self.as_ref() / Decimal::from(rhs.0))
-    }
-}
-
-impl Div<Leverage> for QuoteCurrency {
-    type Output = Self;
-
-    fn div(self, rhs: Leverage) -> Self::Output {
-        QuoteCurrency::new(self.as_ref() / Decimal::from(rhs.0))
     }
 }
 

@@ -1,66 +1,66 @@
 //! This module contains order filtering related code
 
-use fpdec::{Dec, Decimal};
 use getset::CopyGetters;
+use num_traits::{One, Zero};
 
-use crate::{
-    prelude::{ConfigError, OrderError},
-    types::Currency,
-};
+use crate::prelude::{ConfigError, CurrencyMarker, Mon, Monies, OrderError};
 
 /// The `SizeFilter` defines the quantity rules that each order needs to follow
 /// The generic currency `S` is always the `PairedCurrency` of the margin
 /// currency
 #[derive(Debug, Clone, CopyGetters)]
-pub struct QuantityFilter<S>
+pub struct QuantityFilter<T, BaseOrQuote>
 where
-    S: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
     /// Defines the optional minimum `quantity` of any order
     #[getset(get_copy = "pub")]
-    min_quantity: Option<S>,
+    min_quantity: Option<Monies<T, BaseOrQuote>>,
 
     /// Defines the optional maximum `quantity` of any order
     #[getset(get_copy = "pub")]
-    max_quantity: Option<S>,
+    max_quantity: Option<Monies<T, BaseOrQuote>>,
 
     /// Defines the intervals that a `quantity` can be increased / decreased by.
     /// For the filter to pass,
     /// (quantity - min_qty) % tick_size == 0
     #[getset(get_copy = "pub")]
-    tick_size: S,
+    tick_size: Monies<T, BaseOrQuote>,
 }
 
-impl<S> Default for QuantityFilter<S>
+impl<T, BaseOrQuote> Default for QuantityFilter<T, BaseOrQuote>
 where
-    S: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
     fn default() -> Self {
         Self {
             min_quantity: None,
             max_quantity: None,
-            tick_size: S::new(Dec!(1)),
+            tick_size: Monies::one(),
         }
     }
 }
 
-impl<Q> QuantityFilter<Q>
+impl<T, BaseOrQuote> QuantityFilter<T, BaseOrQuote>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
     /// Create a new instance of the QuantityFilter.
     /// Make sure the `min_quantity` is a multiple of `tick_size`.
     pub fn new(
-        min_quantity: Option<Q>,
-        max_quantity: Option<Q>,
-        tick_size: Q,
+        min_quantity: Option<Monies<T, BaseOrQuote>>,
+        max_quantity: Option<Monies<T, BaseOrQuote>>,
+        tick_size: Monies<T, BaseOrQuote>,
     ) -> Result<Self, ConfigError> {
         if let Some(min_qty) = min_quantity {
-            if (min_qty % tick_size) != Q::new_zero() {
+            if (min_qty % tick_size) != Monies::zero() {
                 return Err(ConfigError::InvalidMinQuantity);
             }
         }
-        if tick_size == Q::new_zero() {
+        if tick_size == Monies::zero() {
             return Err(ConfigError::InvalidTickSize);
         }
 
@@ -73,9 +73,9 @@ where
 
     pub(crate) fn validate_order_quantity(
         &self,
-        quantity: Q,
-    ) -> std::result::Result<(), OrderError> {
-        if quantity == Q::new_zero() {
+        quantity: Monies<T, BaseOrQuote>,
+    ) -> std::result::Result<(), OrderError<T>> {
+        if quantity == Monies::zero() {
             return Err(OrderError::QuantityTooLow);
         }
 
@@ -91,10 +91,10 @@ where
             }
             min_qty
         } else {
-            Q::new_zero()
+            Monies::zero()
         };
 
-        if ((quantity - min_qty) % self.tick_size) != Q::new_zero() {
+        if ((quantity - min_qty) % self.tick_size) != Monies::zero() {
             return Err(OrderError::InvalidQuantityStepSize);
         }
         Ok(())

@@ -2,24 +2,25 @@ use std::fmt::Display;
 
 use crate::{
     account_tracker::AccountTracker,
-    prelude::{MarketState, QuoteCurrency, Side},
-    types::{Currency, MarginCurrency},
+    prelude::{MarketState, Mon, Monies, Quote, Side},
+    types::MarginCurrencyMarker,
 };
 
 /// Performs no tracking of account performance
 #[derive(Default, Debug, Clone)]
 pub struct NoAccountTracker;
 
-impl<M> AccountTracker<M> for NoAccountTracker
+impl<T, BaseOrQuote> AccountTracker<T, BaseOrQuote> for NoAccountTracker
 where
-    M: Currency + MarginCurrency,
+    T: Mon,
+    BaseOrQuote: MarginCurrencyMarker<T>,
 {
-    fn update(&mut self, _market_state: &MarketState) {}
+    fn update(&mut self, _market_state: &MarketState<T>) {}
 
     fn sample_user_balances(
         &mut self,
-        _user_balances: &crate::prelude::UserBalances<M>,
-        _mid_price: QuoteCurrency,
+        _user_balances: &crate::prelude::UserBalances<T, BaseOrQuote>,
+        _mid_price: Monies<T, Quote>,
     ) {
     }
 
@@ -36,8 +37,8 @@ where
     fn log_trade(
         &mut self,
         _side: Side,
-        _price: QuoteCurrency,
-        _quantity: <M as Currency>::PairedCurrency,
+        _price: Monies<T, Quote>,
+        _quantity: Monies<T, BaseOrQuote::PairedCurrency>,
     ) {
     }
 }

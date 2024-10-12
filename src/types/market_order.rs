@@ -1,8 +1,9 @@
 use getset::{CopyGetters, Getters};
+use num_traits::Zero;
 
 use super::{
-    order_status::NewOrder, Currency, ExchangeOrderMeta, Filled, MarginCurrency, OrderError,
-    Pending, QuoteCurrency, Side, TimestampNs,
+    order_status::NewOrder, CurrencyMarker, ExchangeOrderMeta, Filled, Mon, Monies, OrderError,
+    Pending, Quote, Side, TimestampNs,
 };
 
 /// Defines an market order aka taker order.
@@ -10,9 +11,10 @@ use super::{
 /// `S`: The order size aka quantity which is denoted in either base or quote currency.
 /// `UserOrderId`: The type of user order id to use.
 #[derive(Debug, Clone, PartialEq, Eq, Getters, CopyGetters)]
-pub struct MarketOrder<Q, UserOrderId, OrderStatus>
+pub struct MarketOrder<T, BaseOrQuote, UserOrderId, OrderStatus>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
     OrderStatus: Clone,
 {
     /// Order Id provided by the user, can be any type really.
@@ -25,17 +27,17 @@ where
 
     /// The amount of currency `S` the order is for and fill information.
     #[getset(get_copy = "pub")]
-    quantity: Q,
+    quantity: Monies<T, BaseOrQuote>,
 
     /// Depending on the status, different information is available.
     #[getset(get = "pub")]
     state: OrderStatus,
 }
 
-impl<Q, UserOrderId> MarketOrder<Q, UserOrderId, NewOrder>
+impl<T, BaseOrQuote, UserOrderId> MarketOrder<T, BaseOrQuote, UserOrderId, NewOrder>
 where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
     UserOrderId: Default,
 {
     /// Create a new market order without a `user_order_id`.
@@ -46,8 +48,8 @@ where
     ///
     /// # Returns:
     /// Either a successfully created instance or an [`OrderError`]
-    pub fn new(side: Side, quantity: Q) -> Result<Self, OrderError> {
-        if quantity <= Q::new_zero() {
+    pub fn new(side: Side, quantity: Monies<T, BaseOrQuote>) -> Result<Self, OrderError<T>> {
+        if quantity <= Monies::zero() {
             return Err(OrderError::OrderQuantityLTEZero);
         }
         Ok(MarketOrder {
@@ -69,10 +71,10 @@ where
     /// Either a successfully created order or an [`OrderError`]
     pub fn new_with_user_order_id(
         side: Side,
-        quantity: Q,
+        quantity: Monies<T, BaseOrQuote>,
         user_order_id: UserOrderId,
-    ) -> Result<Self, OrderError> {
-        if quantity <= Q::new_zero() {
+    ) -> Result<Self, OrderError<T>> {
+        if quantity <= Monies::zero() {
             return Err(OrderError::OrderQuantityLTEZero);
         }
         Ok(Self {
@@ -84,7 +86,10 @@ where
     }
 
     /// Take in the order metadata provided by the exchange and coverts the order to the `Pending` state.
-    pub fn into_pending(self, meta: ExchangeOrderMeta) -> MarketOrder<Q, UserOrderId, Pending<Q>> {
+    pub fn into_pending(
+        self,
+        meta: ExchangeOrderMeta,
+    ) -> MarketOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>> {
         MarketOrder {
             user_order_id: self.user_order_id,
             side: self.side,
@@ -94,18 +99,18 @@ where
     }
 }
 
-impl<Q, UserOrderId> MarketOrder<Q, UserOrderId, Pending<Q>>
+impl<T, BaseOrQuote, UserOrderId> MarketOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>
 where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
     UserOrderId: Clone,
 {
     /// Mark the order as filled, by modifying its state.
     pub(crate) fn into_filled(
         self,
-        fill_price: QuoteCurrency,
+        fill_price: Monies<T, Quote>,
         ts_ns_executed: TimestampNs,
-    ) -> MarketOrder<Q, UserOrderId, Filled<Q>> {
+    ) -> MarketOrder<T, BaseOrQuote, UserOrderId, Filled<T, BaseOrQuote>> {
         MarketOrder {
             user_order_id: self.user_order_id,
             state: Filled::new(

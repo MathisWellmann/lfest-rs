@@ -311,25 +311,20 @@ checksum = "f81ec6369c545a7d40e4589b5597581fa1c441fe1cce96dd1de43159910a36a2"
 [[package]]
 name = "fpdec"
 version = "0.10.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03b7013b21970d6dd4660617bc5a821e2eaad0e06dfd5be13d48faabdfd350fc"
 dependencies = [
  "fpdec-core",
  "fpdec-macros",
+ "num-traits",
  "serde",
 ]
 
 [[package]]
 name = "fpdec-core"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64c81a0af753d9c6e1d5f83f956699e66fe578c8002e233c831facaad1becc9f"
 
 [[package]]
 name = "fpdec-macros"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45cd2d5a6b768a966a951d753151922da390c185fcce1ee5f529dab994d8480c"
 dependencies = [
  "fpdec-core",
  "quote",
@@ -428,7 +423,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lfest"
-version = "0.77.0"
+version = "0.78.0"
 dependencies = [
  "assert2",
  "criterion",

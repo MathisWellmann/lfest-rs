@@ -1,19 +1,21 @@
 use getset::{CopyGetters, Getters, Setters};
+use num_traits::Zero;
 
 use super::{
-    order_meta::ExchangeOrderMeta, order_status::NewOrder, Filled, FilledQuantity, MarginCurrency,
-    OrderId, Pending, RePricing, TimestampNs,
+    order_meta::ExchangeOrderMeta, order_status::NewOrder, CurrencyMarker, Filled, FilledQuantity,
+    MarginCurrencyMarker, Mon, Monies, OrderId, Pending, Quote, RePricing, TimestampNs,
 };
-use crate::types::{Currency, OrderError, QuoteCurrency, Side};
+use crate::types::{OrderError, Side};
 
 /// Defines a limit order.
 /// Is generic over:
 /// `S`: The order size aka quantity which is denoted in either base or quote currency.
 /// `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
 #[derive(Debug, Clone, PartialEq, Eq, Getters, CopyGetters, Setters)]
-pub struct LimitOrder<Q, UserOrderId, OrderStatus>
+pub struct LimitOrder<T, BaseOrQuote, UserOrderId, OrderStatus>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
     UserOrderId: Clone,
     OrderStatus: Clone,
 {
@@ -27,11 +29,11 @@ where
 
     /// The limit order price, where it will sit in the orderbook.
     #[getset(get_copy = "pub")]
-    limit_price: QuoteCurrency,
+    limit_price: Monies<T, Quote>,
 
     /// The remaining amount of Currency `S` the order is for.
     #[getset(get_copy = "pub")]
-    remaining_quantity: Q,
+    remaining_quantity: Monies<T, BaseOrQuote>,
 
     /// Determines the behaviour for when the limit price locks or crosses an away market quotation.
     #[getset(get_copy = "pub", set = "pub")]
@@ -42,10 +44,11 @@ where
     state: OrderStatus,
 }
 
-impl<Q> LimitOrder<Q, (), NewOrder>
+impl<T, BaseOrQuote> LimitOrder<T, BaseOrQuote, (), NewOrder>
 where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
 {
     /// Create a new limit order without a user_order_id.
     ///
@@ -56,11 +59,15 @@ where
     ///
     /// # Returns:
     /// Either a successfully created order or an [`OrderError`]
-    pub fn new(side: Side, limit_price: QuoteCurrency, quantity: Q) -> Result<Self, OrderError> {
-        if limit_price <= QuoteCurrency::new_zero() {
+    pub fn new(
+        side: Side,
+        limit_price: Monies<T, Quote>,
+        quantity: Monies<T, BaseOrQuote>,
+    ) -> Result<Self, OrderError<T>> {
+        if limit_price <= Monies::zero() {
             return Err(OrderError::LimitPriceLTEZero);
         }
-        if quantity <= Q::new_zero() {
+        if quantity <= Monies::zero() {
             return Err(OrderError::OrderQuantityLTEZero);
         }
         Ok(Self {
@@ -74,10 +81,11 @@ where
     }
 }
 
-impl<Q, UserOrderId> LimitOrder<Q, UserOrderId, NewOrder>
+impl<T, BaseOrQuote, UserOrderId> LimitOrder<T, BaseOrQuote, UserOrderId, NewOrder>
 where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
     UserOrderId: Clone + Default,
 {
     /// Create a new limit order
@@ -92,14 +100,14 @@ where
     /// Either a successfully created order or an [`OrderError`]
     pub fn new_with_user_order_id(
         side: Side,
-        limit_price: QuoteCurrency,
-        quantity: Q,
+        limit_price: Monies<T, Quote>,
+        quantity: Monies<T, BaseOrQuote>,
         user_order_id: UserOrderId,
-    ) -> Result<Self, OrderError> {
-        if limit_price <= QuoteCurrency::new_zero() {
+    ) -> Result<Self, OrderError<T>> {
+        if limit_price <= Monies::zero() {
             return Err(OrderError::LimitPriceLTEZero);
         }
-        if quantity <= Q::new_zero() {
+        if quantity <= Monies::zero() {
             return Err(OrderError::OrderQuantityLTEZero);
         }
         Ok(Self {
@@ -118,12 +126,15 @@ where
     }
 
     /// Get the total quantity that this order is for.
-    pub fn total_quantity(&self) -> Q {
+    pub fn total_quantity(&self) -> Monies<T, BaseOrQuote> {
         self.remaining_quantity
     }
 
     /// Take in the order metadata provided by the exchange and coverts the order to the `Pending` state.
-    pub fn into_pending(self, meta: ExchangeOrderMeta) -> LimitOrder<Q, UserOrderId, Pending<Q>> {
+    pub fn into_pending(
+        self,
+        meta: ExchangeOrderMeta,
+    ) -> LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>> {
         LimitOrder {
             user_order_id: self.user_order_id,
             side: self.side,
@@ -136,16 +147,17 @@ where
 
     /// Modify the `remaining_quantity`.
     /// The `new_qty` must be GT than zero.
-    pub(crate) fn set_remaining_quantity(&mut self, new_qty: Q) {
-        assert!(new_qty > Q::new_zero());
+    pub(crate) fn set_remaining_quantity(&mut self, new_qty: Monies<T, BaseOrQuote>) {
+        assert!(new_qty > Monies::zero());
         self.remaining_quantity = new_qty;
     }
 }
 
-impl<Q, UserOrderId> LimitOrder<Q, UserOrderId, Pending<Q>>
+impl<T, BaseOrQuote, UserOrderId> LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>
 where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
     UserOrderId: Clone,
 {
     /// Used when an order gets some `quantity` filled at a `price`.
@@ -154,15 +166,15 @@ where
     /// Some(filled_order), if the order is fully filled.
     pub(crate) fn fill(
         &mut self,
-        filled_quantity: Q,
+        filled_quantity: Monies<T, BaseOrQuote>,
         ts_ns: TimestampNs,
-    ) -> Option<LimitOrder<Q, UserOrderId, Filled<Q>>> {
+    ) -> Option<LimitOrder<T, BaseOrQuote, UserOrderId, Filled<T, BaseOrQuote>>> {
         assert!(
             filled_quantity <= self.remaining_quantity,
             "The filled quantity can not be greater than the limit order quantity"
         );
         assert!(
-            filled_quantity > Q::new_zero(),
+            filled_quantity > Monies::zero(),
             "Filled quantity must be greater than zero."
         );
         let price = self.limit_price();
@@ -185,7 +197,7 @@ where
                             filled_quantity,
                         ),
                         limit_price: self.limit_price,
-                        remaining_quantity: Q::new_zero(),
+                        remaining_quantity: Monies::zero(),
                         side: self.side,
                         re_pricing: self.re_pricing,
                     });
@@ -198,7 +210,7 @@ where
                 avg_price,
             } => {
                 let new_qty = *cumulative_qty + filled_quantity;
-                *avg_price = QuoteCurrency::new(
+                *avg_price = Monies::new(
                     ((*cumulative_qty.as_ref() * *avg_price.as_ref())
                         + (*price.as_ref() * *filled_quantity.as_ref()))
                         / *new_qty.as_ref(),
@@ -207,12 +219,12 @@ where
 
                 self.remaining_quantity -= filled_quantity;
 
-                if self.remaining_quantity == Q::new_zero() {
+                if self.remaining_quantity.is_zero() {
                     return Some(LimitOrder {
                         user_order_id: self.user_order_id.clone(),
                         state: Filled::new(meta, ts_ns, price, *cumulative_qty),
                         limit_price: self.limit_price,
-                        remaining_quantity: Q::new_zero(),
+                        remaining_quantity: Monies::zero(),
                         side: self.side,
                         re_pricing: self.re_pricing,
                     });
@@ -224,9 +236,9 @@ where
     }
 
     /// Get the total filled quantity for this order.
-    pub fn filled_quantity(&self) -> Q {
+    pub fn filled_quantity(&self) -> Monies<T, BaseOrQuote> {
         match self.state.filled_quantity {
-            FilledQuantity::Unfilled => Q::new_zero(),
+            FilledQuantity::Unfilled => Monies::zero(),
             FilledQuantity::Filled {
                 cumulative_qty,
                 avg_price: _,
@@ -235,7 +247,7 @@ where
     }
 
     /// Get the total quantity that this order is for.
-    pub fn total_quantity(&self) -> Q {
+    pub fn total_quantity(&self) -> Monies<T, BaseOrQuote> {
         let q = match self.state.filled_quantity {
             FilledQuantity::Unfilled => self.remaining_quantity,
             FilledQuantity::Filled {
@@ -243,7 +255,7 @@ where
                 avg_price: _,
             } => self.remaining_quantity + cumulative_qty,
         };
-        assert!(q > Q::new_zero(), "total quantity must always be > zero");
+        assert!(q > Monies::zero(), "total quantity must always be > zero");
         q
     }
 
@@ -253,16 +265,17 @@ where
     }
 }
 
-impl<Q, UserOrderId> LimitOrder<Q, UserOrderId, Filled<Q>>
+impl<T, BaseOrQuote, UserOrderId> LimitOrder<T, BaseOrQuote, UserOrderId, Filled<T, BaseOrQuote>>
 where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
     UserOrderId: Clone,
 {
     /// Get the total quantity that this order is for.
-    pub fn total_quantity(&self) -> Q {
+    pub fn total_quantity(&self) -> Monies<T, BaseOrQuote> {
         let q = self.state.filled_qty();
-        assert!(q > Q::new_zero(), "total quantity must always be > zero");
+        assert!(q > Monies::zero(), "total quantity must always be > zero");
         q
     }
 }

@@ -1,8 +1,4 @@
-use std::ops::Mul;
-
-use fpdec::{Dec, Decimal};
-
-use super::{BaseCurrency, Currency, QuoteCurrency};
+use super::{CurrencyMarker, Mon, Monies};
 
 /// Fee as a part per one hundred thousand.
 /// The generic `MarkerTaker` marker indicates to the type system if its a maker or taker fee.
@@ -32,32 +28,14 @@ impl<MakerTaker> Fee<MakerTaker> {
             _fee_type: std::marker::PhantomData,
         }
     }
-}
 
-impl<C, MakerTaker> Mul<C> for Fee<MakerTaker>
-where
-    C: Currency,
-{
-    type Output = QuoteCurrency;
-
-    fn mul(self, rhs: C) -> Self::Output {
-        QuoteCurrency::new(self.per_cent_mille * rhs.as_ref() / Dec!(100000))
-    }
-}
-
-impl<MakerTaker> Mul<Fee<MakerTaker>> for BaseCurrency {
-    type Output = Self;
-
-    fn mul(self, rhs: Fee<MakerTaker>) -> Self::Output {
-        BaseCurrency::new(self.as_ref() * Decimal::from(rhs.per_cent_mille) / Dec!(100000))
-    }
-}
-
-impl<MakerTaker> Mul<Fee<MakerTaker>> for QuoteCurrency {
-    type Output = Self;
-
-    fn mul(self, rhs: Fee<MakerTaker>) -> Self::Output {
-        QuoteCurrency::new(self.as_ref() * Decimal::from(rhs.per_cent_mille) / Dec!(100000))
+    /// Compute the fraction of the `value` that is the fee.
+    pub fn for_value<T, BaseOrQuote>(&self, value: Monies<T, BaseOrQuote>) -> Monies<T, BaseOrQuote>
+    where
+        T: Mon,
+        BaseOrQuote: CurrencyMarker<T>,
+    {
+        Monies::new(*value.as_ref() * T::from(self.per_cent_mille) / T::from(100000))
     }
 }
 

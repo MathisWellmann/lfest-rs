@@ -1,14 +1,15 @@
-use super::{Currency, Filled, LimitOrder, Pending};
+use super::{CurrencyMarker, Filled, LimitOrder, Mon, Pending};
 
 /// Contains the possible updates to limit orders.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum LimitOrderUpdate<Q, UserOrderId>
+pub enum LimitOrderUpdate<T, BaseOrQuote, UserOrderId>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
     UserOrderId: Clone,
 {
     /// The limit order was partially filled.
-    PartiallyFilled(LimitOrder<Q, UserOrderId, Pending<Q>>),
+    PartiallyFilled(LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>),
     /// The limit order was fully filled.
-    FullyFilled(LimitOrder<Q, UserOrderId, Filled<Q>>),
+    FullyFilled(LimitOrder<T, BaseOrQuote, UserOrderId, Filled<T, BaseOrQuote>>),
 }

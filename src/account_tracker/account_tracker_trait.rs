@@ -1,21 +1,26 @@
 use crate::{
-    prelude::{Currency, MarketState, QuoteCurrency, Side, UserBalances},
-    types::MarginCurrency,
+    prelude::{MarketState, Mon, Monies, Quote, Side, UserBalances},
+    types::MarginCurrencyMarker,
 };
 
 /// Something that tracks the performance of the Account.
 /// This allows for greated flexibility over using the FullAccountTracker
 /// which can easily use more than 10GB of RAM due to storage of tick-by-tick
 /// returns
-pub trait AccountTracker<M>: Send
+pub trait AccountTracker<T, BaseOrQuote>
 where
-    M: Currency + MarginCurrency,
+    T: Mon,
+    BaseOrQuote: MarginCurrencyMarker<T>,
 {
     /// Update with newest market info.
-    fn update(&mut self, market_state: &MarketState);
+    fn update(&mut self, market_state: &MarketState<T>);
 
     /// Process information about the user balances.
-    fn sample_user_balances(&mut self, user_balances: &UserBalances<M>, mid_price: QuoteCurrency);
+    fn sample_user_balances(
+        &mut self,
+        user_balances: &UserBalances<T, BaseOrQuote>,
+        mid_price: Monies<T, Quote>,
+    );
 
     /// Log a `LimitOrder` submission event.
     fn log_limit_order_submission(&mut self);
@@ -33,5 +38,10 @@ where
     fn log_market_order_fill(&mut self);
 
     /// Log a trade
-    fn log_trade(&mut self, side: Side, price: QuoteCurrency, quantity: M::PairedCurrency);
+    fn log_trade(
+        &mut self,
+        side: Side,
+        price: Monies<T, Quote>,
+        quantity: Monies<T, BaseOrQuote::PairedCurrency>,
+    );
 }

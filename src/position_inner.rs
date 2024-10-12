@@ -1,64 +1,64 @@
 use std::cmp::Ordering;
 
-use fpdec::{Dec, Decimal};
 use getset::{CopyGetters, Getters};
+use num_traits::{Signed, Zero};
 use tracing::{debug, trace};
 
 use crate::{
     prelude::{
-        Transaction, TransactionAccounting, EXCHANGE_FEE_ACCOUNT, TREASURY_ACCOUNT,
-        USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
+        CurrencyMarker, Mon, Monies, Quote, Transaction, TransactionAccounting,
+        EXCHANGE_FEE_ACCOUNT, TREASURY_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
     },
-    quote,
-    types::{Currency, MarginCurrency, QuoteCurrency},
+    types::MarginCurrencyMarker,
 };
 
 /// Describes the position information of the account.
 /// It assumes isolated margining mechanism, because the margin is directly associated with the position.
-// TODO: change generic to `M`.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Getters, CopyGetters)]
-pub struct PositionInner<Q>
+pub struct PositionInner<T, BaseOrQuote>
 where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
     /// The number of futures contracts making up the position.
     #[getset(get_copy = "pub")]
-    quantity: Q,
+    quantity: Monies<T, BaseOrQuote>,
 
     /// The total cost paid for the position (not margin though).
     #[getset(get_copy = "pub")]
-    total_cost: Q::PairedCurrency,
+    total_cost: Monies<T, BaseOrQuote::PairedCurrency>,
 
     /// The outstanding fees of the position that will be payed when reducing the position.
     #[getset(get_copy = "pub")]
-    outstanding_fees: Q::PairedCurrency,
+    outstanding_fees: Monies<T, BaseOrQuote::PairedCurrency>,
 }
 
-impl<Q> PositionInner<Q>
+impl<T, BaseOrQuote> PositionInner<T, BaseOrQuote>
 where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
 {
     /// Create a new instance.
     ///
     /// # Panics:
     /// if `quantity` or `entry_price` are invalid.
-    pub fn new<T>(
-        quantity: Q,
-        entry_price: QuoteCurrency,
-        accounting: &mut T,
-        init_margin_req: Decimal,
-        fees: Q::PairedCurrency,
+    pub fn new<Acc>(
+        quantity: Monies<T, BaseOrQuote>,
+        entry_price: Monies<T, Quote>,
+        accounting: &mut Acc,
+        init_margin_req: T,
+        fees: Monies<T, BaseOrQuote::PairedCurrency>,
     ) -> Self
     where
-        T: TransactionAccounting<Q::PairedCurrency>,
+        Acc: TransactionAccounting<T, BaseOrQuote::PairedCurrency>,
     {
         trace!("new position: qty {quantity} @ {entry_price}");
-        assert!(quantity > Q::new_zero());
-        assert!(entry_price > quote!(0));
+        assert!(quantity > Monies::zero());
+        assert!(entry_price > Monies::zero());
 
-        let margin = quantity.convert(entry_price) * init_margin_req;
+        let margin =
+            BaseOrQuote::PairedCurrency::convert_from(quantity, entry_price) * init_margin_req;
         let transaction =
             Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
         accounting
@@ -67,42 +67,45 @@ where
 
         Self {
             quantity,
-            total_cost: quantity.convert(entry_price),
+            total_cost: BaseOrQuote::PairedCurrency::convert_from(quantity, entry_price),
             outstanding_fees: fees,
         }
     }
 
     /// The average price at which this position was entered into.
-    pub fn entry_price(&self) -> QuoteCurrency {
-        self.total_cost.price_paid_for_qty(self.quantity)
+    pub fn entry_price(&self) -> Monies<T, Quote> {
+        BaseOrQuote::PairedCurrency::price_paid_for_qty(self.total_cost, self.quantity)
     }
 
     /// Return the positions unrealized profit and loss
     /// denoted in QUOTE when using linear futures,
     /// denoted in BASE when using inverse futures
-    pub fn unrealized_pnl(&self, mark_to_market_price: QuoteCurrency) -> Q::PairedCurrency {
-        Q::PairedCurrency::pnl(self.entry_price(), mark_to_market_price, self.quantity)
+    pub fn unrealized_pnl(
+        &self,
+        mark_to_market_price: Monies<T, Quote>,
+    ) -> Monies<T, BaseOrQuote::PairedCurrency> {
+        BaseOrQuote::PairedCurrency::pnl(self.entry_price(), mark_to_market_price, self.quantity)
     }
 
     /// Add contracts to the position.
-    pub(crate) fn increase_contracts<T>(
+    pub(crate) fn increase_contracts<Acc>(
         &mut self,
-        qty: Q,
-        entry_price: QuoteCurrency,
-        accounting: &mut T,
-        init_margin_req: Decimal,
-        fees: Q::PairedCurrency,
+        qty: Monies<T, BaseOrQuote>,
+        entry_price: Monies<T, Quote>,
+        accounting: &mut Acc,
+        init_margin_req: T,
+        fees: Monies<T, BaseOrQuote::PairedCurrency>,
     ) where
-        T: TransactionAccounting<Q::PairedCurrency>,
+        Acc: TransactionAccounting<T, BaseOrQuote::PairedCurrency>,
     {
         debug!(
             "increase_contracts: qty: {qty} @ {entry_price}; self: {:?}",
             self
         );
-        assert!(qty > Q::new_zero());
-        assert!(entry_price > quote!(0));
+        assert!(qty > Monies::zero());
+        assert!(entry_price > Monies::zero());
 
-        let value = qty.convert(entry_price);
+        let value = BaseOrQuote::PairedCurrency::convert_from(qty, entry_price);
 
         self.quantity += qty;
         self.outstanding_fees += fees;
@@ -117,39 +120,42 @@ where
     }
 
     /// Decrease the position.
-    pub(crate) fn decrease_contracts<T>(
+    pub(crate) fn decrease_contracts<Acc>(
         &mut self,
-        qty: Q,
-        liquidation_price: QuoteCurrency,
-        accounting: &mut T,
-        init_margin_req: Decimal,
-        direction_multiplier: Decimal,
-        fees: Q::PairedCurrency,
+        qty: Monies<T, BaseOrQuote>,
+        liquidation_price: Monies<T, Quote>,
+        accounting: &mut Acc,
+        init_margin_req: T,
+        direction_multiplier: T,
+        fees: Monies<T, BaseOrQuote::PairedCurrency>,
     ) where
-        T: TransactionAccounting<Q::PairedCurrency>,
+        Acc: TransactionAccounting<T, BaseOrQuote::PairedCurrency>,
     {
         debug!(
             "decrease_contracts: qty: {qty} @ {liquidation_price}; self: {:?}",
             self
         );
-        assert!(qty > Q::new_zero());
+        assert!(qty > Monies::zero());
         assert!(qty <= self.quantity);
-        debug_assert!(direction_multiplier == Dec!(1) || direction_multiplier == Dec!(-1));
+        debug_assert!(direction_multiplier == T::one() || direction_multiplier == T::from(-1));
 
         let entry_price = self.entry_price();
 
         self.quantity -= qty;
         self.outstanding_fees += fees;
-        self.total_cost -= qty.convert(entry_price);
+        self.total_cost -= BaseOrQuote::PairedCurrency::convert_from(qty, entry_price);
 
-        debug_assert!(self.quantity >= Q::new_zero());
-        if *self.quantity.as_ref() == Dec!(0) {
-            assert_eq!(*self.total_cost.as_ref(), Dec!(0));
+        debug_assert!(self.quantity >= Monies::zero());
+        if self.quantity.is_zero() {
+            assert_eq!(*self.total_cost.as_ref(), T::zero());
         }
 
-        let pnl =
-            Q::PairedCurrency::pnl(entry_price, liquidation_price, qty * direction_multiplier);
-        match pnl.cmp(&Q::PairedCurrency::new_zero()) {
+        let pnl = BaseOrQuote::PairedCurrency::pnl(
+            entry_price,
+            liquidation_price,
+            qty * direction_multiplier,
+        );
+        match pnl.cmp(&Monies::zero()) {
             Ordering::Greater => {
                 let transaction = Transaction::new(USER_WALLET_ACCOUNT, TREASURY_ACCOUNT, pnl);
                 accounting
@@ -165,7 +171,8 @@ where
             }
             Ordering::Equal => {}
         }
-        let margin_to_free = qty.convert(entry_price) * init_margin_req;
+        let margin_to_free =
+            BaseOrQuote::PairedCurrency::convert_from(qty, entry_price) * init_margin_req;
         let transaction = Transaction::new(
             USER_WALLET_ACCOUNT,
             USER_POSITION_MARGIN_ACCOUNT,
@@ -183,7 +190,7 @@ where
         accounting
             .create_margin_transfer(transaction)
             .expect("margin transfer must work");
-        self.outstanding_fees = Q::PairedCurrency::new_zero();
+        self.outstanding_fees = Monies::zero();
     }
 }
 
@@ -191,8 +198,7 @@ where
 mod tests {
     use super::*;
     use crate::{
-        base,
-        prelude::{BaseCurrency, InMemoryTransactionAccounting, Side},
+        prelude::{InMemoryTransactionAccounting, Side},
         TEST_FEE_MAKER,
     };
 

@@ -5,7 +5,8 @@ use super::{
     AccountId, TransactionAccounting,
 };
 use crate::{
-    types::{Error, MarginCurrency},
+    prelude::{Mon, Monies},
+    types::{Error, MarginCurrencyMarker},
     Result,
 };
 
@@ -26,20 +27,23 @@ pub const TREASURY_ACCOUNT: usize = 5;
 
 /// Keeps track of transaction in memory.
 #[derive(Debug)]
-pub struct InMemoryTransactionAccounting<M>
+pub struct InMemoryTransactionAccounting<T, BaseOrQuote>
 where
-    M: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: MarginCurrencyMarker<T>,
 {
     /// Accounts are allocated at the start as they are known upfront.
-    margin_accounts: [TAccount<M>; N_ACCOUNTS],
+    margin_accounts: [TAccount<T, BaseOrQuote>; N_ACCOUNTS],
     // TODO: keep track of transaction log or emit `Transactions` to users.
 }
 
-impl<M> TransactionAccounting<M> for InMemoryTransactionAccounting<M>
+impl<T, BaseOrQuote> TransactionAccounting<T, BaseOrQuote>
+    for InMemoryTransactionAccounting<T, BaseOrQuote>
 where
-    M: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: MarginCurrencyMarker<T>,
 {
-    fn new(user_starting_wallet_balance: M) -> Self {
+    fn new(user_starting_wallet_balance: Monies<T, BaseOrQuote>) -> Self {
         let mut s = Self {
             margin_accounts: [TAccount::default(); N_ACCOUNTS],
         };
@@ -50,7 +54,10 @@ where
         s
     }
 
-    fn create_margin_transfer(&mut self, transaction: Transaction<M>) -> Result<()> {
+    fn create_margin_transfer(
+        &mut self,
+        transaction: Transaction<T, BaseOrQuote>,
+    ) -> Result<(), T> {
         trace!("create_margin_transfer: {transaction:?}");
         let mut debit_account = self
             .margin_accounts
@@ -73,7 +80,7 @@ where
         Ok(())
     }
 
-    fn margin_balance_of(&self, account: AccountId) -> Result<M> {
+    fn margin_balance_of(&self, account: AccountId) -> Result<Monies<T, BaseOrQuote>, T> {
         self.margin_accounts
             .get(account)
             .ok_or(Error::AccountLookupFailure)

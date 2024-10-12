@@ -3,7 +3,7 @@ use crate::{
     order_filters::{
         enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
     },
-    prelude::{Currency, LimitOrder, MarketState, Pending, PriceFilter, QuoteCurrency},
+    prelude::{CurrencyMarker, LimitOrder, MarketState, Mon, Monies, Pending, PriceFilter, Quote},
     Result,
 };
 
@@ -11,26 +11,30 @@ use crate::{
 /// For now we don't handle the quantity a these price levels.
 /// This will change in future versions.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct Bba {
+pub struct Bba<T>
+where
+    T: Mon,
+{
     /// The new best bid
-    pub bid: QuoteCurrency,
+    pub bid: Monies<T, Quote>,
     /// The new best ask
-    pub ask: QuoteCurrency,
+    pub ask: Monies<T, Quote>,
 }
 
-impl<Q, UserOrderId> MarketUpdate<Q, UserOrderId> for Bba
+impl<T, BaseOrQuote, UserOrderId> MarketUpdate<T, BaseOrQuote, UserOrderId> for Bba<T>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
     UserOrderId: Clone,
 {
     fn limit_order_filled(
         &self,
-        _limit_order: &LimitOrder<Q, UserOrderId, Pending<Q>>,
-    ) -> Option<Q> {
+        _limit_order: &LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>,
+    ) -> Option<Monies<T, BaseOrQuote>> {
         None
     }
 
-    fn validate_market_update(&self, price_filter: &PriceFilter) -> Result<()> {
+    fn validate_market_update(&self, price_filter: &PriceFilter<T>) -> Result<(), T> {
         enforce_min_price(price_filter.min_price(), self.bid)?;
         enforce_min_price(price_filter.min_price(), self.ask)?;
         enforce_max_price(price_filter.max_price(), self.bid)?;
@@ -41,7 +45,7 @@ where
         Ok(())
     }
 
-    fn update_market_state(&self, market_state: &mut MarketState) {
+    fn update_market_state(&self, market_state: &mut MarketState<T>) {
         market_state.set_bid(self.bid);
         market_state.set_ask(self.ask);
     }

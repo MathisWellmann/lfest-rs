@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use assert2::assert;
 use getset::Getters;
 use hashbrown::HashMap;
+use num_traits::Zero;
 use tracing::{debug, info, trace, warn};
 
 use crate::{
@@ -12,61 +13,63 @@ use crate::{
     market_state::MarketState,
     order_margin::OrderMargin,
     prelude::{
-        MarketUpdate, OrderError, Position, RePricing, Transaction, EXCHANGE_FEE_ACCOUNT,
-        USER_ORDER_MARGIN_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
+        CurrencyMarker, MarketUpdate, Mon, Monies, OrderError, Position, RePricing, Transaction,
+        EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT,
+        USER_WALLET_ACCOUNT,
     },
-    quote,
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     sample_returns_trigger::SampleReturnsTrigger,
     types::{
-        Currency, Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderUpdate, MarginCurrency,
+        Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderUpdate, MarginCurrencyMarker,
         MarketOrder, NewOrder, OrderId, Pending, Result, Side, TimestampNs, UserBalances,
     },
     utils::assert_user_wallet_balance,
 };
 
 /// The datatype that holds the active limit orders of a user.
-pub type ActiveLimitOrders<Q, UserOrderId> =
-    HashMap<OrderId, LimitOrder<Q, UserOrderId, Pending<Q>>>;
+pub type ActiveLimitOrders<T, BaseOrQuote, UserOrderId> =
+    HashMap<OrderId, LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>>;
 
 /// Relevant information about the traders account.
-pub struct Account<'a, A, Q, UserOrderId>
+pub struct Account<'a, A, T, BaseOrQuote, UserOrderId>
 where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
     UserOrderId: Clone,
 {
     /// tracks the performance of the account
     pub account_tracker: &'a A,
     /// The active limit orders of the account.
-    pub active_limit_orders: &'a ActiveLimitOrders<Q, UserOrderId>,
+    pub active_limit_orders: &'a ActiveLimitOrders<T, BaseOrQuote, UserOrderId>,
     /// The current position of the account.
-    pub position: &'a Position<Q>,
+    pub position: &'a Position<T, BaseOrQuote>,
     /// The TAccount balances of the account.
-    pub balances: UserBalances<Q::PairedCurrency>,
+    pub balances: UserBalances<T, BaseOrQuote::PairedCurrency>,
 }
 
 /// The main leveraged futures exchange for simulated trading
 #[derive(Debug, Clone, Getters)]
-pub struct Exchange<A, Q, UserOrderId, TransactionAccountingT>
+pub struct Exchange<A, T, BaseOrQuote, UserOrderId, TransactionAccountingT>
 where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default,
 {
     /// The exchange configuration.
     #[getset(get = "pub")]
-    config: Config<Q::PairedCurrency>,
+    config: Config<T, BaseOrQuote::PairedCurrency>,
 
     /// The current state of the simulated market.
     #[getset(get = "pub")]
-    market_state: MarketState,
+    market_state: MarketState<T>,
 
     /// A performance tracker for the user account.
     #[getset(get = "pub")]
     account_tracker: A,
 
-    risk_engine: IsolatedMarginRiskEngine<Q::PairedCurrency>,
+    risk_engine: IsolatedMarginRiskEngine<T, BaseOrQuote>,
 
     next_order_id: OrderId,
 
@@ -76,35 +79,36 @@ where
     /// Get the current position of the user.
     #[getset(get = "pub")]
     #[cfg_attr(test, getset(get_mut = "pub(crate)"))]
-    position: Position<Q>,
+    position: Position<T, BaseOrQuote>,
 
     /// Active limit orders of the user.
     /// Maps the order `id` to the actual `Order`.
     #[getset(get = "pub")]
-    active_limit_orders: ActiveLimitOrders<Q, UserOrderId>,
+    active_limit_orders: ActiveLimitOrders<T, BaseOrQuote, UserOrderId>,
 
     // Maps the `user_order_id` to the internal order nonce.
     lookup_order_nonce_from_user_order_id: HashMap<UserOrderId, OrderId>,
 
-    order_margin: OrderMargin<Q, UserOrderId>,
+    order_margin: OrderMargin<T, BaseOrQuote, UserOrderId>,
 
     sample_returns_trigger: SampleReturnsTrigger,
 }
 
-impl<A, Q, UserOrderId, TransactionAccountingT> Exchange<A, Q, UserOrderId, TransactionAccountingT>
+impl<A, T, BaseOrQuote, UserOrderId, TransactionAccountingT>
+    Exchange<A, T, BaseOrQuote, UserOrderId, TransactionAccountingT>
 where
-    A: AccountTracker<Q::PairedCurrency> + std::fmt::Debug,
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
+    A: AccountTracker<T, BaseOrQuote::PairedCurrency> + std::fmt::Debug,
     UserOrderId: Clone + Eq + PartialEq + std::hash::Hash + std::fmt::Debug + Default,
-    TransactionAccountingT: TransactionAccounting<Q::PairedCurrency> + std::fmt::Debug,
+    TransactionAccountingT: TransactionAccounting<T, BaseOrQuote::PairedCurrency> + std::fmt::Debug,
 {
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
-    pub fn new(account_tracker: A, config: Config<Q::PairedCurrency>) -> Self {
+    pub fn new(account_tracker: A, config: Config<T, BaseOrQuote::PairedCurrency>) -> Self {
         let market_state = MarketState::default();
-        let risk_engine =
-            IsolatedMarginRiskEngine::<Q::PairedCurrency>::new(config.contract_spec().clone());
+        let risk_engine = IsolatedMarginRiskEngine::new(config.contract_spec().clone());
 
         let transaction_accounting = TransactionAccountingT::new(config.starting_wallet_balance());
         let sample_returns_trigger = SampleReturnsTrigger::new(Into::<TimestampNs>::into(
@@ -126,7 +130,7 @@ where
     }
 
     /// Get information about the `Account`
-    pub fn account(&self) -> Account<A, Q, UserOrderId> {
+    pub fn account(&self) -> Account<A, T, BaseOrQuote, UserOrderId> {
         Account {
             account_tracker: &self.account_tracker,
             active_limit_orders: &self.active_limit_orders,
@@ -136,7 +140,7 @@ where
     }
 
     /// Get the total amount of fees paid to the exchange.
-    pub fn fees_paid(&self) -> Q::PairedCurrency {
+    pub fn fees_paid(&self) -> Monies<T, BaseOrQuote::PairedCurrency> {
         self.transaction_accounting
             .margin_balance_of(EXCHANGE_FEE_ACCOUNT)
             .expect("is valid account")
@@ -155,9 +159,9 @@ where
         &mut self,
         timestamp_ns: TimestampNs,
         market_update: &U,
-    ) -> Result<Vec<LimitOrderUpdate<Q, UserOrderId>>>
+    ) -> Result<Vec<LimitOrderUpdate<T, BaseOrQuote, UserOrderId>>, T>
     where
-        U: MarketUpdate<Q, UserOrderId>,
+        U: MarketUpdate<T, BaseOrQuote, UserOrderId>,
     {
         trace!("update_state: market_update: {market_update:?}");
 
@@ -173,8 +177,9 @@ where
                 .sample_user_balances(&self.user_balances(), self.market_state.mid_price());
         }
 
-        if let Err(e) = <IsolatedMarginRiskEngine<<Q as Currency>::PairedCurrency> as RiskEngine<
-            <Q as Currency>::PairedCurrency,
+        if let Err(e) = <IsolatedMarginRiskEngine<T, BaseOrQuote> as RiskEngine<
+            T,
+            BaseOrQuote,
             UserOrderId,
         >>::check_maintenance_margin(
             &self.risk_engine, &self.market_state, &self.position
@@ -213,8 +218,8 @@ where
     /// Else its an error.
     pub fn submit_market_order(
         &mut self,
-        order: MarketOrder<Q, UserOrderId, NewOrder>,
-    ) -> Result<MarketOrder<Q, UserOrderId, Filled<Q>>> {
+        order: MarketOrder<T, BaseOrQuote, UserOrderId, NewOrder>,
+    ) -> Result<MarketOrder<T, BaseOrQuote, UserOrderId, Filled<T, BaseOrQuote>>, T> {
         self.account_tracker.log_market_order_submission();
 
         // Basic checks
@@ -253,13 +258,17 @@ where
         Ok(filled_order)
     }
 
-    fn settle_filled_market_order(&mut self, order: MarketOrder<Q, UserOrderId, Filled<Q>>) {
+    fn settle_filled_market_order(
+        &mut self,
+        order: MarketOrder<T, BaseOrQuote, UserOrderId, Filled<T, BaseOrQuote>>,
+    ) {
         let filled_qty = order.quantity();
-        assert!(filled_qty > Q::new_zero());
+        assert!(filled_qty > Monies::zero());
         let fill_price = order.state().avg_fill_price();
-        assert!(fill_price > quote!(0));
+        assert!(fill_price > Monies::zero());
 
-        let fees = filled_qty.convert(fill_price) * self.config.contract_spec().fee_taker();
+        let value = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price);
+        let fees = self.config.contract_spec().fee_taker().for_value(value);
 
         self.position.change_position(
             filled_qty,
@@ -293,7 +302,7 @@ where
     pub fn cancel_order_by_user_id(
         &mut self,
         user_order_id: UserOrderId,
-    ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
+    ) -> Result<LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>, T> {
         debug!(
             "cancel_order_by_user_id: user_order_id: {:?}",
             user_order_id
@@ -313,8 +322,8 @@ where
     /// Else its an error.
     pub fn submit_limit_order(
         &mut self,
-        order: LimitOrder<Q, UserOrderId, NewOrder>,
-    ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
+        order: LimitOrder<T, BaseOrQuote, UserOrderId, NewOrder>,
+    ) -> Result<LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>, T> {
         trace!("submit_order: {:?}", order);
 
         // Basic checks
@@ -379,8 +388,8 @@ where
     pub fn amend_limit_order(
         &mut self,
         existing_order_id: OrderId,
-        mut new_order: LimitOrder<Q, UserOrderId, NewOrder>,
-    ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
+        mut new_order: LimitOrder<T, BaseOrQuote, UserOrderId, NewOrder>,
+    ) -> Result<LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>, T> {
         let existing_order = self
             .active_limit_orders
             .get(&existing_order_id)
@@ -404,7 +413,7 @@ where
         let qty_delta = new_order.total_quantity() - existing_order.total_quantity();
         trace!("qty_delta: {qty_delta}");
         let new_leaves_qty = existing_order.remaining_quantity() + qty_delta;
-        if new_leaves_qty <= Q::new_zero() {
+        if new_leaves_qty <= Monies::zero() {
             self.cancel_limit_order(existing_order_id)
                 .expect("Can cancel this order");
             return Err(Error::AmendQtyAlreadyFilled);
@@ -422,7 +431,7 @@ where
     /// will be placed into the book as a passive order.
     fn append_limit_order(
         &mut self,
-        order: LimitOrder<Q, UserOrderId, Pending<Q>>,
+        order: LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>,
         marketable: bool,
     ) {
         debug!("append_limit_order: order: {order:?}, marketable: {marketable}");
@@ -486,7 +495,7 @@ where
     pub fn cancel_limit_order(
         &mut self,
         order_id: OrderId,
-    ) -> Result<LimitOrder<Q, UserOrderId, Pending<Q>>> {
+    ) -> Result<LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>, T> {
         debug!("cancel_order: {}", order_id);
         let order_margin = self
             .transaction_accounting
@@ -564,9 +573,9 @@ where
         &mut self,
         market_update: &U,
         ts_ns: TimestampNs,
-    ) -> Vec<LimitOrderUpdate<Q, UserOrderId>>
+    ) -> Vec<LimitOrderUpdate<T, BaseOrQuote, UserOrderId>>
     where
-        U: MarketUpdate<Q, UserOrderId>,
+        U: MarketUpdate<T, BaseOrQuote, UserOrderId>,
     {
         assert_eq!(
             self.order_margin.active_limit_orders(),
@@ -588,7 +597,7 @@ where
                     order.limit_price()
                 );
                 assert!(
-                    filled_qty > Q::new_zero(),
+                    filled_qty > Monies::zero(),
                     "The filled_qty must be greater than zero"
                 );
 
@@ -622,14 +631,15 @@ where
                         .expect("Can be removed");
                     order_updates.push(LimitOrderUpdate::FullyFilled(filled_order));
                 } else {
-                    assert!(order.remaining_quantity() > Q::new_zero());
+                    assert!(order.remaining_quantity() > Monies::zero());
                     order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
                     self.order_margin.update(order);
                     // TODO: we could potentially log partial fills as well...
                 }
 
-                let fees = filled_qty.convert(order.limit_price())
-                    * self.config.contract_spec().fee_maker();
+                let value =
+                    BaseOrQuote::PairedCurrency::convert_from(filled_qty, order.limit_price());
+                let fees = self.config.contract_spec().fee_maker().for_value(value);
                 self.position.change_position(
                     filled_qty,
                     order.limit_price(),
@@ -692,7 +702,7 @@ where
     }
 
     /// Get the balances of the user account.
-    pub fn user_balances(&self) -> UserBalances<Q::PairedCurrency> {
+    pub fn user_balances(&self) -> UserBalances<T, BaseOrQuote::PairedCurrency> {
         UserBalances {
             available_wallet_balance: self
                 .transaction_accounting

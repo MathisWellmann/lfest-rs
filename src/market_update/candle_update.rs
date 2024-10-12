@@ -1,9 +1,13 @@
+use num_traits::Zero;
+
 use super::MarketUpdate;
 use crate::{
     order_filters::{
         enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
     },
-    prelude::{Currency, LimitOrder, MarketState, Pending, PriceFilter, QuoteCurrency, Side},
+    prelude::{
+        CurrencyMarker, LimitOrder, MarketState, Mon, Monies, Pending, PriceFilter, Quote, Side,
+    },
     Result,
 };
 
@@ -11,24 +15,31 @@ use crate::{
 /// Here we can use the `high` and `low` prices to see if our simulated resting orders
 /// have been executed over the last period as a proxy in absence of actual `Trade` flow.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct Candle {
+pub struct Candle<T>
+where
+    T: Mon,
+{
     /// The best bid at the time of candle creation
-    pub bid: QuoteCurrency,
+    pub bid: Monies<T, Quote>,
     /// The best ask at the time of candle creation
-    pub ask: QuoteCurrency,
+    pub ask: Monies<T, Quote>,
     /// The low price of the candle
-    pub low: QuoteCurrency,
+    pub low: Monies<T, Quote>,
     /// The high price of the candle
-    pub high: QuoteCurrency,
+    pub high: Monies<T, Quote>,
 }
 
-impl<Q, UserOrderId> MarketUpdate<Q, UserOrderId> for Candle
+impl<T, BaseOrQuote, UserOrderId> MarketUpdate<T, BaseOrQuote, UserOrderId> for Candle<T>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
     UserOrderId: Clone,
 {
-    fn limit_order_filled(&self, order: &LimitOrder<Q, UserOrderId, Pending<Q>>) -> Option<Q> {
-        assert!(order.remaining_quantity() > Q::new_zero());
+    fn limit_order_filled(
+        &self,
+        order: &LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>,
+    ) -> Option<Monies<T, BaseOrQuote>> {
+        assert!(order.remaining_quantity() > Monies::zero());
 
         // As a simplifying assumption, the order always get executed fully when using candles if the price is right.
         if match order.side() {
@@ -45,7 +56,7 @@ where
         }
     }
 
-    fn validate_market_update(&self, price_filter: &PriceFilter) -> Result<()> {
+    fn validate_market_update(&self, price_filter: &PriceFilter<T>) -> Result<(), T> {
         enforce_min_price(price_filter.min_price(), self.bid)?;
         enforce_min_price(price_filter.min_price(), self.ask)?;
         enforce_min_price(price_filter.min_price(), self.low)?;
@@ -63,7 +74,7 @@ where
         Ok(())
     }
 
-    fn update_market_state(&self, market_state: &mut MarketState) {
+    fn update_market_state(&self, market_state: &mut MarketState<T>) {
         market_state.set_bid(self.bid);
         market_state.set_ask(self.ask);
     }

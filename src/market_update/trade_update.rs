@@ -1,35 +1,48 @@
+use num_traits::Zero;
+
 use super::MarketUpdate;
 use crate::{
     order_filters::{enforce_max_price, enforce_min_price, enforce_step_size},
-    prelude::{Currency, LimitOrder, MarketState, Pending, PriceFilter, QuoteCurrency, Side},
+    prelude::{
+        CurrencyMarker, LimitOrder, MarketState, Mon, Monies, Pending, PriceFilter, Quote, Side,
+    },
     utils::min,
     Result,
 };
 
 /// A taker trade that consumes liquidity in the book.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct Trade<Q> {
+pub struct Trade<T, BaseOrQuote>
+where
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+{
     /// The price at which the trade executed at.
-    pub price: QuoteCurrency,
+    pub price: Monies<T, Quote>,
     /// The executed quantity.
     /// Generic denotation, e.g either Quote or Base currency denoted.
-    pub quantity: Q,
+    pub quantity: Monies<T, BaseOrQuote>,
     /// Either a buy or sell order.
     // TODO: remove field and derive from sign of `quantity` to save size of struct.
     pub side: Side,
 }
 
-impl<Q, UserOrderId> MarketUpdate<Q, UserOrderId> for Trade<Q>
+impl<T, BaseOrQuote, UserOrderId> MarketUpdate<T, BaseOrQuote, UserOrderId>
+    for Trade<T, BaseOrQuote>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
     UserOrderId: Clone,
 {
-    fn limit_order_filled(&self, order: &LimitOrder<Q, UserOrderId, Pending<Q>>) -> Option<Q> {
+    fn limit_order_filled(
+        &self,
+        order: &LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>,
+    ) -> Option<Monies<T, BaseOrQuote>> {
         assert!(
-            self.quantity > Q::new_zero(),
+            self.quantity > Monies::zero(),
             "The trade quantity must be greater than zero."
         );
-        assert!(order.remaining_quantity() > Q::new_zero());
+        assert!(order.remaining_quantity() > Monies::zero());
 
         // Notice that the limit order price must be strictly lower or higher than the limit order price,
         // because we assume the limit order has the worst possible queue position in the book.
@@ -45,14 +58,14 @@ where
         }
     }
 
-    fn validate_market_update(&self, price_filter: &PriceFilter) -> Result<()> {
+    fn validate_market_update(&self, price_filter: &PriceFilter<T>) -> Result<(), T> {
         enforce_min_price(price_filter.min_price(), self.price)?;
         enforce_max_price(price_filter.max_price(), self.price)?;
         enforce_step_size(price_filter.tick_size(), self.price)?;
         Ok(())
     }
 
-    fn update_market_state(&self, _market_state: &mut MarketState) {}
+    fn update_market_state(&self, _market_state: &mut MarketState<T>) {}
 }
 /// Creates the `Trade` struct used as a `MarketUpdate`.
 #[macro_export]

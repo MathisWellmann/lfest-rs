@@ -1,4 +1,3 @@
-use fpdec::{Dec, Decimal};
 use tracing::trace;
 
 use super::RiskEngine;
@@ -6,40 +5,44 @@ use crate::{
     contract_specification::ContractSpecification,
     market_state::MarketState,
     order_margin::OrderMargin,
-    prelude::{Position, RiskError},
-    types::{Currency, LimitOrder, MarginCurrency, MarketOrder, Pending, QuoteCurrency, Side},
+    prelude::{CurrencyMarker, Mon, Monies, Position, Quote, RiskError},
+    types::{LimitOrder, MarginCurrencyMarker, MarketOrder, Pending, Side},
 };
 
-/// TODO: change M to Q
 #[derive(Debug, Clone)]
-pub(crate) struct IsolatedMarginRiskEngine<M>
+pub(crate) struct IsolatedMarginRiskEngine<T, BaseOrQuote>
 where
-    M: Currency + MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
-    contract_spec: ContractSpecification<M::PairedCurrency>,
+    contract_spec: ContractSpecification<T, BaseOrQuote>,
 }
 
-impl<M> IsolatedMarginRiskEngine<M>
+impl<T, BaseOrQuote> IsolatedMarginRiskEngine<T, BaseOrQuote>
 where
-    M: Currency + MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
-    pub(crate) fn new(contract_spec: ContractSpecification<M::PairedCurrency>) -> Self {
+    pub(crate) fn new(contract_spec: ContractSpecification<T, BaseOrQuote>) -> Self {
         Self { contract_spec }
     }
 }
 
-impl<M, UserOrderId> RiskEngine<M, UserOrderId> for IsolatedMarginRiskEngine<M>
+impl<T, BaseOrQuote, UserOrderId> RiskEngine<T, BaseOrQuote, UserOrderId>
+    for IsolatedMarginRiskEngine<T, BaseOrQuote>
 where
-    M: Currency + MarginCurrency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default,
 {
     fn check_market_order(
         &self,
-        position: &Position<M::PairedCurrency>,
-        position_margin: M,
-        order: &MarketOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
-        fill_price: QuoteCurrency,
-        available_wallet_balance: M,
+        position: &Position<T, BaseOrQuote>,
+        position_margin: Monies<T, BaseOrQuote::PairedCurrency>,
+        order: &MarketOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>,
+        fill_price: Monies<T, Quote>,
+        available_wallet_balance: Monies<T, BaseOrQuote::PairedCurrency>,
     ) -> Result<(), RiskError> {
         match order.side() {
             Side::Buy => self.check_market_buy_order(
@@ -61,10 +64,10 @@ where
 
     fn check_limit_order(
         &self,
-        position: &Position<M::PairedCurrency>,
-        order: &LimitOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
-        available_wallet_balance: M,
-        order_margin_online: &OrderMargin<M::PairedCurrency, UserOrderId>,
+        position: &Position<T, BaseOrQuote>,
+        order: &LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>,
+        available_wallet_balance: Monies<T, BaseOrQuote::PairedCurrency>,
+        order_margin_online: &OrderMargin<T, BaseOrQuote, UserOrderId>,
     ) -> Result<(), RiskError> {
         let order_margin =
             order_margin_online.order_margin(self.contract_spec.init_margin_req(), position);
@@ -74,7 +77,7 @@ where
             position,
         );
 
-        trace!("order_margin: {order_margin}, new_order_margin: {new_order_margin}, available_wallet_balance: {available_wallet_balance}");
+        trace!("order_margin: {order_margin:?}, new_order_margin: {new_order_margin:?}, available_wallet_balance: {available_wallet_balance:?}");
         if new_order_margin > available_wallet_balance + order_margin {
             return Err(RiskError::NotEnoughAvailableBalance);
         }
@@ -84,21 +87,21 @@ where
 
     fn check_maintenance_margin(
         &self,
-        market_state: &MarketState,
-        position: &Position<M::PairedCurrency>,
+        market_state: &MarketState<T>,
+        position: &Position<T, BaseOrQuote>,
     ) -> Result<(), RiskError> {
         let maint_margin_req = self.contract_spec.maintenance_margin();
         match position {
             Position::Neutral => return Ok(()),
             Position::Long(inner) => {
-                let liquidation_price = inner.entry_price().as_ref() * (Dec!(1) - maint_margin_req);
-                if market_state.bid().as_ref() < &liquidation_price {
+                let liquidation_price = inner.entry_price().liquidation_price(maint_margin_req);
+                if market_state.bid() < liquidation_price {
                     return Err(RiskError::Liquidate);
                 }
             }
             Position::Short(inner) => {
-                let liquidation_price = inner.entry_price().as_ref() * (Dec!(1) + maint_margin_req);
-                if market_state.ask().as_ref() > &liquidation_price {
+                let liquidation_price = inner.entry_price().liquidation_price(maint_margin_req);
+                if market_state.ask() > liquidation_price {
                     return Err(RiskError::Liquidate);
                 }
             }
@@ -108,18 +111,19 @@ where
     }
 }
 
-impl<M> IsolatedMarginRiskEngine<M>
+impl<T, BaseOrQuote> IsolatedMarginRiskEngine<T, BaseOrQuote>
 where
-    M: Currency + MarginCurrency,
-    M::PairedCurrency: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+    // BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
 {
     fn check_market_buy_order<UserOrderId>(
         &self,
-        position: &Position<M::PairedCurrency>,
-        position_margin: M,
-        order: &MarketOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
-        fill_price: QuoteCurrency,
-        available_wallet_balance: M,
+        position: &Position<T, BaseOrQuote>,
+        position_margin: Monies<T, BaseOrQuote::PairedCurrency>,
+        order: &MarketOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>,
+        fill_price: Monies<T, Quote>,
+        available_wallet_balance: Monies<T, BaseOrQuote::PairedCurrency>,
     ) -> Result<(), RiskError>
     where
         UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
@@ -129,10 +133,11 @@ where
         match position {
             Position::Neutral | Position::Long(_) => {
                 // A long position increases in size.
-                let notional_value = order.quantity().convert(fill_price);
+                let notional_value =
+                    BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
                 let margin_req = notional_value * self.contract_spec.init_margin_req();
 
-                let fee = notional_value * self.contract_spec.fee_taker();
+                let fee = self.contract_spec.fee_taker().for_value(notional_value);
                 if margin_req + fee > available_wallet_balance {
                     return Err(RiskError::NotEnoughAvailableBalance);
                 }
@@ -146,10 +151,11 @@ where
                 let released_from_old_pos = position_margin;
 
                 let new_long_size = order.quantity() - pos_inner.quantity();
-                let new_notional_value = new_long_size.convert(fill_price);
+                let new_notional_value =
+                    BaseOrQuote::PairedCurrency::convert_from(new_long_size, fill_price);
                 let new_margin_req = new_notional_value * self.contract_spec.init_margin_req();
 
-                let fee = new_notional_value * self.contract_spec.fee_taker();
+                let fee = self.contract_spec.fee_taker().for_value(new_notional_value);
 
                 if new_margin_req + fee > available_wallet_balance + released_from_old_pos {
                     return Err(RiskError::NotEnoughAvailableBalance);
@@ -162,11 +168,11 @@ where
 
     fn check_market_sell_order<UserOrderId>(
         &self,
-        position: &Position<M::PairedCurrency>,
-        position_margin: M,
-        order: &MarketOrder<M::PairedCurrency, UserOrderId, Pending<M::PairedCurrency>>,
-        fill_price: QuoteCurrency,
-        available_wallet_balance: M,
+        position: &Position<T, BaseOrQuote>,
+        position_margin: Monies<T, BaseOrQuote::PairedCurrency>,
+        order: &MarketOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>,
+        fill_price: Monies<T, Quote>,
+        available_wallet_balance: Monies<T, BaseOrQuote::PairedCurrency>,
     ) -> Result<(), RiskError>
     where
         UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
@@ -175,9 +181,10 @@ where
 
         match position {
             Position::Neutral | Position::Short(_) => {
-                let notional_value = order.quantity().convert(fill_price);
+                let notional_value =
+                    BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
                 let margin_req = notional_value * self.contract_spec.init_margin_req();
-                let fee = notional_value * self.contract_spec.fee_taker();
+                let fee = self.contract_spec.fee_taker().for_value(notional_value);
 
                 if margin_req + fee > available_wallet_balance {
                     return Err(RiskError::NotEnoughAvailableBalance);
@@ -193,10 +200,11 @@ where
                 let released_from_old_pos = position_margin;
 
                 let new_short_size = order.quantity() - pos_inner.quantity();
-                let new_notional_value = new_short_size.convert(fill_price);
+                let new_notional_value =
+                    BaseOrQuote::PairedCurrency::convert_from(new_short_size, fill_price);
                 let new_margin_req = new_notional_value * self.contract_spec.init_margin_req();
 
-                let fee = new_notional_value * self.contract_spec.fee_taker();
+                let fee = self.contract_spec.fee_taker().for_value(new_notional_value);
 
                 if new_margin_req + fee > available_wallet_balance + released_from_old_pos {
                     return Err(RiskError::NotEnoughAvailableBalance);
@@ -213,9 +221,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        base,
-        prelude::{BaseCurrency, Leverage, PositionInner, PriceFilter, QuantityFilter},
-        quote, MockTransactionAccounting, TEST_FEE_MAKER, TEST_FEE_TAKER,
+        prelude::{Leverage, PositionInner, PriceFilter, QuantityFilter},
+        MockTransactionAccounting, TEST_FEE_MAKER, TEST_FEE_TAKER,
     };
 
     #[test_case::test_case(2, 75)]

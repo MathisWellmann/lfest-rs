@@ -1,11 +1,14 @@
-use super::{Currency, QuoteCurrency};
+use super::{smol_currency::CurrencyMarker, Mon, Monies, Quote};
 
 /// Each Currency that is used as margin has to implement this trait.
 /// The margin currency of an account defines which type of futures contract is
 /// traded. Here is how the margin `Currency` maps to the futures type:
 /// `QuoteCurrency`: linear futures.
 /// `BaseCurrency`: inverse futures.
-pub trait MarginCurrency: Currency {
+pub trait MarginCurrencyMarker<T>: CurrencyMarker<T>
+where
+    T: Mon,
+{
     /// Compute the profit and loss.
     ///
     /// # Arguments:
@@ -16,12 +19,15 @@ pub trait MarginCurrency: Currency {
     /// # Arguments:
     /// Returns the profit and loss measured in the `PairedCurrency` of the size
     /// currency.
-    fn pnl<S: Currency>(
-        entry_price: QuoteCurrency,
-        exit_price: QuoteCurrency,
-        quantity: S,
-    ) -> S::PairedCurrency;
+    fn pnl(
+        entry_price: Monies<T, Quote>,
+        exit_price: Monies<T, Quote>,
+        quantity: Monies<T, Self::PairedCurrency>,
+    ) -> Monies<T, Self>;
 
-    /// Compute the price paid for `self` (total_cost) for `quantity` number of contracts.
-    fn price_paid_for_qty(&self, quantity: <Self as Currency>::PairedCurrency) -> QuoteCurrency;
+    /// Compute the price paid for the `total_cost` for `quantity` number of contracts.
+    fn price_paid_for_qty(
+        total_cost: Monies<T, Self>,
+        quantity: Monies<T, Self::PairedCurrency>,
+    ) -> Monies<T, Quote>;
 }

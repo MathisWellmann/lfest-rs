@@ -58,7 +58,7 @@ fn update_state<Q, U>(
     trades: &[U],
 ) where
     Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    Q::PairedCurrency: MarginCurrencyMarker,
     U: MarketUpdate<Q, ()>,
 {
     for (i, trade) in trades.into_iter().enumerate() {

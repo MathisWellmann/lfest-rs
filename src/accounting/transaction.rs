@@ -1,28 +1,31 @@
 use getset::CopyGetters;
+use num_traits::Zero;
 
 use super::{
     AccountId, BROKER_MARGIN_ACCOUNT, EXCHANGE_FEE_ACCOUNT, TREASURY_ACCOUNT,
     USER_ORDER_MARGIN_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
 };
-use crate::types::Currency;
+use crate::prelude::{CurrencyMarker, Mon, Monies};
 
 /// A transaction involves two parties.
 #[derive(Clone, CopyGetters)]
-pub struct Transaction<Q>
+pub struct Transaction<T, BaseOrQuote>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
     #[getset(get_copy = "pub(crate)")]
     debit_account_id: AccountId,
     #[getset(get_copy = "pub(crate)")]
     credit_account_id: AccountId,
     #[getset(get_copy = "pub(crate)")]
-    amount: Q,
+    amount: Monies<T, BaseOrQuote>,
 }
 
-impl<Q> std::fmt::Debug for Transaction<Q>
+impl<T, BaseOrQuote> std::fmt::Debug for Transaction<T, BaseOrQuote>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -48,17 +51,18 @@ fn account_from_int(int: usize) -> &'static str {
     }
 }
 
-impl<Q> Transaction<Q>
+impl<T, BaseOrQuote> Transaction<T, BaseOrQuote>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
     pub(crate) fn new(
         debit_account_id: AccountId,
         credit_account_id: AccountId,
-        amount: Q,
+        amount: Monies<T, BaseOrQuote>,
     ) -> Self {
         assert!(
-            amount > Q::new_zero(),
+            amount > Monies::zero(),
             "The amount of a transaction must be greater than zero"
         );
         assert_ne!(

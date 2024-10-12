@@ -1,8 +1,8 @@
 use std::fmt::Formatter;
 
-use fpdec::{Dec, Decimal};
+use num_traits::Zero;
 
-use super::Currency;
+use super::{CurrencyMarker, Mon, Monies};
 
 /// Side of the order
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -23,10 +23,14 @@ impl Side {
     }
 
     /// Parse the side of a taker trade from the trade quantity.
-    pub fn from_taker_quantity<Q: Currency>(qty: Q) -> Self {
-        assert_ne!(*qty.as_ref(), Dec!(0), "A trade quantity cannot be zero");
+    pub fn from_taker_quantity<T, BaseOrQuote>(qty: Monies<T, BaseOrQuote>) -> Self
+    where
+        T: Mon,
+        BaseOrQuote: CurrencyMarker<T>,
+    {
+        assert!(qty.is_zero(), "A trade quantity cannot be zero");
 
-        if *qty.as_ref() < Dec!(0) {
+        if qty < Monies::zero() {
             Side::Sell
         } else {
             Side::Buy

@@ -1,32 +1,34 @@
 use getset::CopyGetters;
 
-use crate::types::Currency;
+use crate::prelude::{CurrencyMarker, Mon, Monies};
 
 /// A T-Account keeps track of debits and credits.
 #[derive(Debug, Default, Clone, Copy, CopyGetters)]
-pub struct TAccount<Q>
+pub struct TAccount<T, BaseOrQuote>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
     #[getset(get_copy = "pub(crate)")]
-    debits_posted: Q,
+    debits_posted: Monies<T, BaseOrQuote>,
     #[getset(get_copy = "pub(crate)")]
-    credits_posted: Q,
+    credits_posted: Monies<T, BaseOrQuote>,
 }
 
-impl<Q> TAccount<Q>
+impl<T, BaseOrQuote> TAccount<T, BaseOrQuote>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
-    pub(crate) fn post_debit(&mut self, amount: Q) {
+    pub(crate) fn post_debit(&mut self, amount: Monies<T, BaseOrQuote>) {
         self.debits_posted += amount;
     }
 
-    pub(crate) fn post_credit(&mut self, amount: Q) {
+    pub(crate) fn post_credit(&mut self, amount: Monies<T, BaseOrQuote>) {
         self.credits_posted += amount;
     }
 
-    pub(crate) fn net_balance(&self) -> Q {
+    pub(crate) fn net_balance(&self) -> Monies<T, BaseOrQuote> {
         self.debits_posted - self.credits_posted
     }
 }

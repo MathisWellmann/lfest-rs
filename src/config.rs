@@ -1,15 +1,17 @@
 use getset::{CopyGetters, Getters};
+use num_traits::Zero;
 
 use crate::{
     contract_specification::ContractSpecification,
-    prelude::{ConfigError, MarginCurrency},
+    prelude::{ConfigError, MarginCurrencyMarker, Mon, Monies},
 };
 
 #[derive(Debug, Clone, Getters, CopyGetters)]
 /// Define the Exchange configuration
-pub struct Config<M>
+pub struct Config<T, BaseOrQuote>
 where
-    M: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: MarginCurrencyMarker<T>,
 {
     /// The starting balance of account (denoted in margin currency).
     /// The concrete `Currency` here defines the futures type.
@@ -18,7 +20,7 @@ where
     /// If `BaseCurrency` is used as the margin currency,
     /// then its an inverse futures contract.
     #[getset(get_copy = "pub")]
-    starting_wallet_balance: M,
+    starting_wallet_balance: Monies<T, BaseOrQuote>,
 
     /// The maximum number of open orders the user can have at any given time
     #[getset(get_copy = "pub")]
@@ -26,7 +28,7 @@ where
 
     /// The contract specification.
     #[getset(get = "pub")]
-    contract_spec: ContractSpecification<M::PairedCurrency>,
+    contract_spec: ContractSpecification<T, BaseOrQuote::PairedCurrency>,
 
     /// The interval by which to sample the returns of user balances.
     /// This is used to analyze the trading performance later on, to enable things like `sharpe`, `sortino`, anything based on returns.
@@ -34,9 +36,10 @@ where
     sample_returns_every_n_seconds: u64,
 }
 
-impl<M> Config<M>
+impl<T, BaseOrQuote> Config<T, BaseOrQuote>
 where
-    M: MarginCurrency,
+    T: Mon,
+    BaseOrQuote: MarginCurrencyMarker<T>,
 {
     /// Create a new Config.
     ///
@@ -52,15 +55,15 @@ where
     /// # Returns:
     /// Either a valid `Config` or an Error
     pub fn new(
-        starting_balance: M,
+        starting_balance: Monies<T, BaseOrQuote>,
         max_num_open_orders: usize,
-        contract_specification: ContractSpecification<M::PairedCurrency>,
+        contract_specification: ContractSpecification<T, BaseOrQuote::PairedCurrency>,
         sample_returns_every_n_seconds: u64,
     ) -> Result<Self, ConfigError> {
         if max_num_open_orders == 0 {
             return Err(ConfigError::InvalidMaxNumOpenOrders);
         }
-        if starting_balance <= M::new_zero() {
+        if starting_balance <= Monies::zero() {
             return Err(ConfigError::InvalidStartingBalance);
         }
 

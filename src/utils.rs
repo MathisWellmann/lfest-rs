@@ -1,8 +1,9 @@
 use assert2::assert;
+use num_traits::Zero;
 
 use crate::{
-    prelude::{TransactionAccounting, UserBalances, USER_WALLET_ACCOUNT},
-    types::MarginCurrency,
+    prelude::{Mon, Monies, TransactionAccounting, UserBalances, USER_WALLET_ACCOUNT},
+    types::MarginCurrencyMarker,
 };
 
 /// Return the minimum of two values
@@ -32,19 +33,26 @@ where
 }
 
 /// Asserts that the users wallet balance is greater than zero.
-pub(crate) fn assert_user_wallet_balance<T, M>(transaction_accounting: &T)
+pub(crate) fn assert_user_wallet_balance<T, Acc, BaseOrQuote>(transaction_accounting: &Acc)
 where
-    T: TransactionAccounting<M>,
-    M: MarginCurrency,
+    Acc: TransactionAccounting<T, BaseOrQuote>,
+    T: Mon,
+    BaseOrQuote: MarginCurrencyMarker<T>,
 {
     let wallet_balance = transaction_accounting
         .margin_balance_of(USER_WALLET_ACCOUNT)
         .expect("is valid");
-    assert!(wallet_balance >= M::new_zero());
+    assert!(wallet_balance >= Monies::zero());
 }
 
 /// Sum of all balances in users `TAccount`s.
-pub(crate) fn balance_sum<M: MarginCurrency>(user_balances: &UserBalances<M>) -> M {
+pub(crate) fn balance_sum<T, BaseOrQuote>(
+    user_balances: &UserBalances<T, BaseOrQuote>,
+) -> Monies<T, BaseOrQuote>
+where
+    T: Mon,
+    BaseOrQuote: MarginCurrencyMarker<T>,
+{
     user_balances.available_wallet_balance
         + user_balances.position_margin
         + user_balances.order_margin

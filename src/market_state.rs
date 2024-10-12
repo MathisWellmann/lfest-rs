@@ -1,21 +1,20 @@
 use getset::{CopyGetters, Getters, Setters};
 
 use crate::{
-    prelude::{MarketUpdate, PriceFilter},
-    quote,
-    types::{Currency, QuoteCurrency, Result, TimestampNs},
+    prelude::{CurrencyMarker, MarketUpdate, Mon, Monies, PriceFilter, Quote},
+    types::{Result, TimestampNs},
 };
 
 /// Some information regarding the state of the market.
 #[derive(Debug, Default, Clone, Getters, CopyGetters, Setters)]
-pub struct MarketState {
+pub struct MarketState<T: Mon> {
     /// The current bid
     #[getset(get_copy = "pub", set = "pub(crate)")]
-    bid: QuoteCurrency,
+    bid: Monies<T, Quote>,
 
     /// The current ask
     #[getset(get_copy = "pub", set = "pub(crate)")]
-    ask: QuoteCurrency,
+    ask: Monies<T, Quote>,
 
     /// The current timestamp in nanoseconds
     #[getset(get_copy = "pub")]
@@ -26,7 +25,10 @@ pub struct MarketState {
     step: u64,
 }
 
-impl MarketState {
+impl<T> MarketState<T>
+where
+    T: Mon,
+{
     /// Update the exchange state with new information
     ///
     /// ### Parameters:
@@ -34,15 +36,15 @@ impl MarketState {
     ///     and if setting order timestamps is enabled in the config.
     /// `market_update`: Newest market information
     ///
-    pub(crate) fn update_state<U, Q, UserOrderId>(
+    pub(crate) fn update_state<U, BaseOrQuote, UserOrderId>(
         &mut self,
         timestamp_ns: TimestampNs,
         market_update: &U,
-        price_filter: &PriceFilter,
-    ) -> Result<()>
+        price_filter: &PriceFilter<T>,
+    ) -> Result<(), T>
     where
-        U: MarketUpdate<Q, UserOrderId>,
-        Q: Currency,
+        U: MarketUpdate<T, BaseOrQuote, UserOrderId>,
+        BaseOrQuote: CurrencyMarker<T>,
         UserOrderId: Clone,
     {
         market_update.validate_market_update(price_filter)?;
@@ -56,8 +58,8 @@ impl MarketState {
 
     /// Get the mid price
     #[inline]
-    pub fn mid_price(&self) -> QuoteCurrency {
-        (self.bid + self.ask) / quote!(2)
+    pub fn mid_price(&self) -> Monies<T, Quote> {
+        (self.bid + self.ask) / Monies::new(T::from(2_u8))
     }
 
     /// Get the last observed timestamp in nanoseconts
@@ -68,8 +70,8 @@ impl MarketState {
 
     #[cfg(test)]
     pub fn from_components(
-        bid: QuoteCurrency,
-        ask: QuoteCurrency,
+        bid: Monies<T, Quote>,
+        ask: Monies<T, Quote>,
         current_ts_ns: TimestampNs,
         step: u64,
     ) -> Self {

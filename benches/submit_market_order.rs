@@ -14,7 +14,7 @@ fn submit_market_orders<Q, U>(
     n: usize,
 ) where
     Q: Currency,
-    Q::PairedCurrency: MarginCurrency,
+    Q::PairedCurrency: MarginCurrencyMarker,
 {
     for _ in 0..n {
         exchange

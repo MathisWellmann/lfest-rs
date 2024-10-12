@@ -1,17 +1,17 @@
-use fpdec::{Dec, Decimal};
 use getset::{CopyGetters, Getters, Setters};
 
 use crate::{
     leverage,
-    prelude::{ConfigError, Currency, Maker, PriceFilter, QuantityFilter, Taker},
+    prelude::{ConfigError, CurrencyMarker, Maker, Mon, PriceFilter, QuantityFilter, Taker},
     types::{Fee, Leverage},
 };
 
 /// Specifies the details of the futures contract
 #[derive(Debug, Clone, Getters, CopyGetters, Setters)]
-pub struct ContractSpecification<Q>
+pub struct ContractSpecification<T, BaseOrQuote>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
     /// Identifying ticker symbol
     #[getset(get = "pub", set = "pub")]
@@ -21,14 +21,14 @@ where
     /// Expressed as a fraction.
     /// Eg. 1% (0.01) initial margin requirement, which is equal to 100x leverage.
     #[getset(get_copy = "pub")]
-    init_margin_req: Decimal,
+    init_margin_req: T,
 
     /// The minimum amount that must be maintained in the traders account to
     /// keep existing positions open.
     /// Expressed as a fraction.
     /// Eg. 0.5% (0.005).
     #[getset(get_copy = "pub")]
-    maintenance_margin: Decimal,
+    maintenance_margin: T,
 
     /// The method for computing `mark-to-market`.
     #[getset(get_copy = "pub", set = "pub")]
@@ -36,11 +36,11 @@ where
 
     /// Pricing rules
     #[getset(get = "pub")]
-    price_filter: PriceFilter,
+    price_filter: PriceFilter<T>,
 
     /// Quantity rules
     #[getset(get = "pub")]
-    quantity_filter: QuantityFilter<Q>,
+    quantity_filter: QuantityFilter<T, BaseOrQuote>,
 
     /// The maker fee as parts per 100_000
     #[getset(get_copy = "pub")]
@@ -51,9 +51,10 @@ where
     fee_taker: Fee<Taker>,
 }
 
-impl<Q> ContractSpecification<Q>
+impl<T, BaseOrQuote> ContractSpecification<T, BaseOrQuote>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
     /// Create a new `ContractSpecification` from the most basic parameters.
     ///
@@ -68,22 +69,22 @@ where
     /// `fee_taker`: The fee a taker pays.
     pub fn new(
         leverage: Leverage,
-        maintenance_margin_fraction: Decimal,
-        price_filter: PriceFilter,
-        quantity_filter: QuantityFilter<Q>,
+        maintenance_margin_fraction: T,
+        price_filter: PriceFilter<T>,
+        quantity_filter: QuantityFilter<T, BaseOrQuote>,
         fee_maker: Fee<Maker>,
         fee_taker: Fee<Taker>,
     ) -> Result<Self, ConfigError> {
-        if maintenance_margin_fraction > Dec!(1) || maintenance_margin_fraction <= Dec!(0) {
+        if maintenance_margin_fraction > T::one() || maintenance_margin_fraction <= T::zero() {
             return Err(ConfigError::InvalidMaintenanceMarginFraction);
         }
 
-        let initial_margin = Dec!(1) / leverage;
+        let init_margin_req = leverage.init_margin_req();
 
         Ok(Self {
             ticker: String::new(),
-            init_margin_req: initial_margin,
-            maintenance_margin: initial_margin * maintenance_margin_fraction,
+            init_margin_req,
+            maintenance_margin: init_margin_req * maintenance_margin_fraction,
             mark_method: MarkMethod::default(),
             price_filter,
             quantity_filter,
@@ -93,14 +94,15 @@ where
     }
 }
 
-impl<Q> Default for ContractSpecification<Q>
+impl<T, BaseOrQuote> Default for ContractSpecification<T, BaseOrQuote>
 where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
 {
     fn default() -> Self {
         Self::new(
             leverage!(1),
-            Dec!(0.5),
+            T::one() / T::from(2),
             PriceFilter::default(),
             QuantityFilter::default(),
             Fee::from_basis_points(2),
