@@ -39,7 +39,7 @@ fn submit_limit_sell_order_no_position() {
         .unwrap();
     let qty = base!(9);
     let entry_price = quote!(100);
-    let fee = qty.convert(entry_price) * TEST_FEE_MAKER;
+    let fee = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(

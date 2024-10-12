@@ -1,8 +1,33 @@
 use std::ops::Neg;
 
+use fpdec::Decimal;
 use num_traits::{Num, One, Signed, Zero};
 
-use super::{CurrencyMarker, Mon, Quote};
+use super::{Base, CurrencyMarker, Mon, Quote};
+
+/// type alias for easy construction of `Base` currency with `Decimal` data type.
+pub type QuoteCurrency = Monies<Decimal, Quote>;
+
+/// type alias for easy construction of `Quote` currency with `Decimal` data type.
+pub type BaseCurrency = Monies<Decimal, Base>;
+
+/// Allows the quick construction of `BaseCurrency`
+#[macro_export]
+macro_rules! base {
+    ( $a:literal ) => {{
+        use $crate::prelude::fpdec::Decimal;
+        $crate::prelude::BaseCurrency::new($crate::prelude::fpdec::Dec!($a))
+    }};
+}
+
+/// Allows the quick construction of `QuoteCurrency`
+#[macro_export]
+macro_rules! quote {
+    ( $a:literal ) => {{
+        use $crate::prelude::fpdec::Decimal;
+        $crate::prelude::QuoteCurrency::new($crate::prelude::fpdec::Dec!($a))
+    }};
+}
 
 /// A generic monetary data type with a marker for being either denominated in `Base` or `Quote` currency.
 #[derive(Default, Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -13,6 +38,19 @@ where
 {
     value: T,
     _marker: std::marker::PhantomData<BaseOrQuote>,
+}
+
+impl<T, BaseOrQuote> From<T> for Monies<T, BaseOrQuote>
+where
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+{
+    fn from(value: T) -> Self {
+        Self {
+            value,
+            _marker: std::marker::PhantomData,
+        }
+    }
 }
 
 impl<T, BaseOrQuote> std::fmt::Display for Monies<T, BaseOrQuote>

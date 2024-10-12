@@ -17,7 +17,7 @@ fn submit_limit_buy_order_no_position() {
     let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
     assert_eq!(exchange.position(), &Position::Neutral);
-    let fee = qty.convert(limit_price) * TEST_FEE_MAKER;
+    let fee = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, limit_price));
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
@@ -136,7 +136,7 @@ fn submit_limit_buy_order_with_long() {
     let order = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
 
-    let fee = qty.convert(ask) * TEST_FEE_TAKER;
+    let fee = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, ask));
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
@@ -206,7 +206,7 @@ fn submit_limit_buy_order_with_short() {
 
     let qty = base!(9);
     let entry_price = quote!(100);
-    let fee = qty.convert(entry_price) * TEST_FEE_TAKER;
+    let fee = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, entry_price));
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(

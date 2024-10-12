@@ -394,7 +394,7 @@ mod tests {
     use market_state::MarketState;
 
     use super::*;
-    use crate::market_state;
+    use crate::{market_state, prelude::*};
 
     #[test]
     fn full_track_update() {

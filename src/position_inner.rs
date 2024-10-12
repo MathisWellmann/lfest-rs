@@ -197,10 +197,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        prelude::{InMemoryTransactionAccounting, Side},
-        TEST_FEE_MAKER,
-    };
+    use crate::{prelude::*, TEST_FEE_MAKER};
 
     #[test_case::test_matrix([1, 2, 5])]
     fn position_inner_new(leverage: u32) {
@@ -208,7 +205,7 @@ mod tests {
         let init_margin_req = Dec!(1) / Decimal::from(leverage);
         let qty = base!(0.5);
         let entry_price = quote!(100);
-        let fees = qty.convert(entry_price) * TEST_FEE_MAKER;
+        let fees = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
         let pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fees);
         assert_eq!(
             pos,
@@ -235,11 +232,11 @@ mod tests {
         let init_margin_req = Dec!(1) / Decimal::from(leverage);
         let qty = base!(0.5);
         let entry_price = quote!(100);
-        let fee_0 = qty.convert(entry_price) * TEST_FEE_MAKER;
+        let fee_0 = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
         let mut pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fee_0);
 
         let entry_price = quote!(150);
-        let fee_1 = qty.convert(entry_price) * TEST_FEE_MAKER;
+        let fee_1 = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
         pos.increase_contracts(qty, entry_price, &mut ta, init_margin_req, fee_1);
         assert_eq!(
             pos,
@@ -266,15 +263,15 @@ mod tests {
         let init_margin_req = Dec!(1) / Decimal::from(leverage);
         let qty = base!(5);
         let entry_price = quote!(100);
-        let fees = qty.convert(entry_price) * TEST_FEE_MAKER;
+        let fees = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
         let mut pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fees);
         pos.decrease_contracts(
-            qty / Dec!(2),
+            qty / BaseCurrency::new(Dec!(2)),
             entry_price,
             &mut ta,
             init_margin_req,
             Dec!(1),
-            fees / Dec!(2),
+            fees / QuoteCurrency::new(Dec!(2)),
         );
         assert_eq!(
             pos,
@@ -296,12 +293,12 @@ mod tests {
         );
 
         pos.decrease_contracts(
-            qty / Dec!(2),
+            qty / BaseCurrency::new(Dec!(2)),
             entry_price,
             &mut ta,
             init_margin_req,
             Dec!(1),
-            fees / Dec!(2),
+            fees / QuoteCurrency::new(Dec!(2)),
         );
         assert_eq!(
             pos,
@@ -331,7 +328,7 @@ mod tests {
         let init_margin_req = Dec!(1) / Decimal::from(leverage);
         let qty = base!(5);
         let entry_price = quote!(100);
-        let fees = qty.convert(entry_price) * TEST_FEE_MAKER;
+        let fees = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
         let mut pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fees);
 
         let exit_price = quote!(110);
@@ -340,12 +337,12 @@ mod tests {
             Side::Sell => Dec!(-1),
         };
         pos.decrease_contracts(
-            qty / Dec!(2),
+            qty / BaseCurrency::new(Dec!(2)),
             exit_price,
             &mut ta,
             init_margin_req,
             side_mult,
-            fees / Dec!(2),
+            fees / QuoteCurrency::new(Dec!(2)),
         );
 
         assert_eq!(pos.quantity(), base!(2.5));
@@ -372,7 +369,7 @@ mod tests {
         let init_margin_req = Dec!(1) / Decimal::from(leverage);
         let qty = base!(5);
         let entry_price = quote!(100);
-        let fees = qty.convert(entry_price) * TEST_FEE_MAKER;
+        let fees = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
         let mut pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fees);
 
         let exit_price = quote!(90);
@@ -381,12 +378,12 @@ mod tests {
             Side::Sell => Dec!(-1),
         };
         pos.decrease_contracts(
-            qty / Dec!(2),
+            qty / BaseCurrency::new(Dec!(2)),
             exit_price,
             &mut ta,
             init_margin_req,
             side_mult,
-            fees / Dec!(2),
+            fees / QuoteCurrency::new(Dec!(2)),
         );
 
         assert_eq!(pos.quantity(), base!(2.5));
@@ -411,17 +408,17 @@ mod tests {
         let init_margin_req = Dec!(1) / Decimal::from(leverage);
         let qty = quote!(500);
         let entry_price = quote!(100);
-        let fees = qty.convert(entry_price) * TEST_FEE_MAKER;
+        let fees = TEST_FEE_MAKER.for_value(Base::convert_from(qty, entry_price));
         let mut pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fees);
 
         let exit_price = quote!(200);
         pos.decrease_contracts(
-            qty / Dec!(2),
+            qty / QuoteCurrency::new(Dec!(2)),
             exit_price,
             &mut ta,
             init_margin_req,
             Dec!(1),
-            fees / Dec!(2),
+            fees / BaseCurrency::new(Dec!(2)),
         );
 
         assert_eq!(pos.quantity(), quote!(250));

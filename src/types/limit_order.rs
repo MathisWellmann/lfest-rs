@@ -286,6 +286,7 @@ mod tests {
     use test_case::test_matrix;
 
     use super::*;
+    use crate::prelude::QuoteCurrency;
 
     #[test_matrix(
         [Side::Buy, Side::Sell],
@@ -293,8 +294,8 @@ mod tests {
         [1, 2, 3]
     )]
     fn limit_order_fill_full(side: Side, limit_price: u32, qty: u32) {
-        let limit_price = QuoteCurrency::from(Decimal::from(limit_price));
-        let qty = QuoteCurrency::from(Decimal::from(qty));
+        let limit_price = Monies::new(Decimal::from(limit_price));
+        let qty = Monies::<_, Quote>::new(Decimal::from(qty));
         let order = LimitOrder::new(side, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
 
@@ -313,9 +314,9 @@ mod tests {
         [1, 2, 3]
     )]
     fn limit_order_fill_partial(side: Side, limit_price: u32, qty: u32) {
-        let limit_price = QuoteCurrency::from(Decimal::from(limit_price));
-        let qty = QuoteCurrency::from(Decimal::from(qty));
-        let order = LimitOrder::new(side, limit_price, qty).unwrap();
+        let limit_price = Monies::new(Decimal::from(limit_price));
+        let quantity = Monies::<_, Quote>::new(Decimal::from(qty));
+        let order = LimitOrder::new(side, limit_price, quantity).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
 
         let qty = QuoteCurrency::from(Decimal::from(qty) / Dec!(2));

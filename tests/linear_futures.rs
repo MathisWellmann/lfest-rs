@@ -49,7 +49,7 @@ fn lin_long_market_win_full() {
     assert_eq!(exchange.account_tracker().buy_volume(), quote!(500));
     assert_eq!(exchange.account_tracker().sell_volume(), quote!(0));
 
-    let fees = qty.convert(bid) * TEST_FEE_TAKER;
+    let fees = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, bid));
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(

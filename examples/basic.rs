@@ -26,10 +26,11 @@ fn main() {
     .expect("is valid");
     let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
     let mut exchange = Exchange::<
-        FullAccountTracker<BaseCurrency>,
-        QuoteCurrency,
+        FullAccountTracker<Decimal, Base>,
+        Decimal,
+        Quote,
         (),
-        InMemoryTransactionAccounting<BaseCurrency>,
+        InMemoryTransactionAccounting<Decimal, Base>,
     >::new(acc_tracker, config);
 
     // load trades from csv file
@@ -58,7 +59,7 @@ fn main() {
             // Trade a fraction of the available wallet balance
             let order_value: BaseCurrency =
                 exchange.user_balances().available_wallet_balance * Dec!(0.1);
-            let order_size = order_value.convert(exchange.market_state().bid());
+            let order_size = Quote::convert_from(order_value, exchange.market_state().bid());
             let order = if rng.gen() {
                 MarketOrder::new(Side::Sell, order_size).unwrap() // Sell using
                                                                   // market order

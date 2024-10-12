@@ -20,7 +20,7 @@ fn limit_orders_only() {
     assert_eq!(exec_orders.len(), 0);
 
     let qty = base!(9.9);
-    let fee0 = qty.convert(bid) * fee_maker;
+    let fee0 = fee_maker.for_value(Quote::convert_from(qty, bid));
     let o = LimitOrder::new(Side::Buy, bid, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(
@@ -89,7 +89,7 @@ fn limit_orders_only() {
     assert_eq!(exchange.account_tracker().sell_volume(), quote!(0));
 
     let sell_price = quote!(105);
-    let fee1 = qty.convert(sell_price) * fee_maker;
+    let fee1 = fee_maker.for_value(Quote::convert_from(qty, sell_price));
     let o = LimitOrder::new(Side::Sell, sell_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
 

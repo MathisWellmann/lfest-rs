@@ -38,7 +38,7 @@ fn submit_market_sell_order() {
     exchange.submit_market_order(order).unwrap();
     // make sure its excuted immediately
     let entry_price = quote!(100);
-    let fees = qty.convert(entry_price) * TEST_FEE_TAKER;
+    let fees = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, entry_price));
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(
@@ -164,7 +164,7 @@ fn submit_market_sell_order_turnaround_long() {
     let qty = base!(9);
     let order = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
-    let fee0 = qty.convert(quote!(100)) * TEST_FEE_TAKER;
+    let fee0 = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, quote!(100)));
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
@@ -189,7 +189,7 @@ fn submit_market_sell_order_turnaround_long() {
     let qty = base!(18);
     let order = MarketOrder::new(Side::Sell, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
-    let fee1 = qty.convert(quote!(99)) * TEST_FEE_TAKER;
+    let fee1 = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, QuoteCurrency::new(Dec!(99))));
     assert_eq!(
         exchange.user_balances(),
         UserBalances {

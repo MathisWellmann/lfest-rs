@@ -38,7 +38,7 @@ fn submit_market_buy_order_no_position() {
 
     // make sure its excuted immediately
     let entry_price = quote!(101);
-    let fee = qty.convert(entry_price) * TEST_FEE_TAKER;
+    let fee = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, entry_price));
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
@@ -195,7 +195,7 @@ fn submit_market_buy_order_turnaround_short() {
     let order = MarketOrder::new(Side::Sell, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
     let entry_price = quote!(99);
-    let fee_0 = qty.convert(entry_price) * TEST_FEE_TAKER;
+    let fee_0 = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, entry_price));
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(

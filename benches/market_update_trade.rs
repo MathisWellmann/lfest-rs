@@ -11,7 +11,7 @@ use lfest::prelude::*;
 ///
 /// # Returns
 /// If Ok, A vector of the trades inside the file
-fn load_trades_from_csv(filename: &str) -> Vec<Trade<QuoteCurrency>> {
+fn load_trades_from_csv(filename: &str) -> Vec<Trade<Decimal, QuoteCurrency>> {
     let f = std::fs::File::open(filename).expect("Can open file");
 
     let mut r = csv::Reader::from_reader(f);
@@ -41,23 +41,25 @@ fn load_trades_from_csv(filename: &str) -> Vec<Trade<QuoteCurrency>> {
     out
 }
 
-fn generate_quotes_from_trades(trades: &[Trade<QuoteCurrency>]) -> Vec<Bba> {
+fn generate_quotes_from_trades(trades: &[Trade<Decimal, QuoteCurrency>]) -> Vec<Bba<Decimal>> {
     Vec::from_iter(trades.iter().map(|v| Bba {
-        bid: v.price - quote!(1),
-        ask: v.price + quote!(1),
+        bid: v.price - QuoteCurrency::new(Dec!(1)),
+        ask: v.price + QuoteCurrency::new(Dec!(1)),
     }))
 }
 
-fn update_state<Q, U>(
+fn update_state<T, BaseOrQuote, U>(
     exchange: &mut Exchange<
         NoAccountTracker,
-        Q,
+        T,
+        BaseOrQuote,
         (),
         InMemoryTransactionAccounting<Q::PairedCurrency>,
     >,
     trades: &[U],
 ) where
-    Q: Currency,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker,
     Q::PairedCurrency: MarginCurrencyMarker,
     U: MarketUpdate<Q, ()>,
 {
@@ -69,6 +71,7 @@ fn update_state<Q, U>(
     }
 }
 
+// TODO: benchmark for different types other than `Decimal`
 fn criterion_benchmark(c: &mut Criterion) {
     let starting_balance = base!(1);
     let acc_tracker = NoAccountTracker::default();

@@ -1,5 +1,3 @@
-// mod currency;
-// mod currency_trait;
 mod errors;
 mod fee;
 mod leverage;
@@ -15,8 +13,6 @@ mod side;
 mod smol_currency;
 mod timestamp_ns;
 
-// pub use currency::{BaseCurrency, Currency, MarginCurrency, QuoteCurrency};
-// pub use currency_trait::Currency;
 pub use errors::*;
 pub use fee::{Fee, Maker, Taker};
 pub use leverage::Leverage;
@@ -29,7 +25,7 @@ pub use order_status::{Filled, FilledQuantity, NewOrder, Pending};
 pub use order_update::LimitOrderUpdate;
 pub use re_pricing::RePricing;
 pub use side::Side;
-pub use smol_currency::{Base, CurrencyMarker, Mon, Monies, Quote};
+pub use smol_currency::{Base, BaseCurrency, CurrencyMarker, Mon, Monies, Quote, QuoteCurrency};
 pub use timestamp_ns::TimestampNs;
 
 /// Natural Logarithmic Returns newtype wrapping a borrowed slice of generic floats.

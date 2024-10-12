@@ -7,7 +7,7 @@ use super::MarginCurrencyMarker;
 
 mod monies;
 
-pub use monies::Monies;
+pub use monies::{BaseCurrency, Monies, QuoteCurrency};
 
 /// A money like trait which must satisfy a bunch of trait bounds.
 pub trait Mon:

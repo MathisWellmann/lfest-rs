@@ -84,11 +84,7 @@ mod tests {
     use fpdec::Decimal;
 
     use super::*;
-    use crate::{
-        base,
-        prelude::{BaseCurrency, ExchangeOrderMeta},
-        quote,
-    };
+    use crate::{base, prelude::*, quote};
 
     #[test_case::test_matrix(
         [100, 110, 120],
@@ -143,6 +139,7 @@ mod tests {
 
     #[test]
     fn size_of_trade() {
-        assert_eq!(std::mem::size_of::<Trade<BaseCurrency>>(), 80);
+        // TODO: reduce the size to 64 bytes.
+        assert_eq!(std::mem::size_of::<Trade<Decimal, Base>>(), 80);
     }
 }

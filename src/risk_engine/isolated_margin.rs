@@ -220,16 +220,13 @@ mod tests {
     use fpdec::{Dec, Decimal};
 
     use super::*;
-    use crate::{
-        prelude::{Leverage, PositionInner, PriceFilter, QuantityFilter},
-        MockTransactionAccounting, TEST_FEE_MAKER, TEST_FEE_TAKER,
-    };
+    use crate::{prelude::*, MockTransactionAccounting, TEST_FEE_MAKER, TEST_FEE_TAKER};
 
     #[test_case::test_case(2, 75)]
     #[test_case::test_case(3, 84)]
     #[test_case::test_case(5, 90)]
     fn isolated_margin_check_maintenance_margin_long(leverage: u8, expected_liq_price: u32) {
-        let contract_spec = ContractSpecification::<BaseCurrency>::new(
+        let contract_spec = ContractSpecification::<_, Base>::new(
             Leverage::new(leverage).unwrap(),
             Dec!(0.5),
             PriceFilter::default(),
@@ -239,17 +236,22 @@ mod tests {
         )
         .unwrap();
         let init_margin_req = contract_spec.init_margin_req();
-        let re = IsolatedMarginRiskEngine::<QuoteCurrency>::new(contract_spec);
-        let market_state = MarketState::from_components(quote!(100), quote!(101), 0.into(), 0);
+        let re = IsolatedMarginRiskEngine::<_, Base>::new(contract_spec);
+        let market_state = MarketState::from_components(
+            QuoteCurrency::from(Dec!(100)),
+            QuoteCurrency::from(Dec!(101)),
+            0.into(),
+            0,
+        );
         let mut accounting = MockTransactionAccounting::default();
 
         let position = Position::Neutral;
 
-        RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
+        RiskEngine::<_, _, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
 
-        let qty = base!(1);
-        let entry_price = quote!(100);
-        let fees = qty.convert(entry_price) * TEST_FEE_MAKER;
+        let qty = BaseCurrency::new(Dec!(1));
+        let entry_price = QuoteCurrency::new(Dec!(100));
+        let fees = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
         let position = Position::Long(PositionInner::new(
             qty,
             entry_price,
@@ -257,7 +259,7 @@ mod tests {
             init_margin_req,
             fees,
         ));
-        RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
+        RiskEngine::<_, _, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
 
         let position = Position::Long(PositionInner::new(
             qty,
@@ -266,27 +268,33 @@ mod tests {
             init_margin_req,
             fees,
         ));
-        let market_state = MarketState::from_components(quote!(200), quote!(201), 0.into(), 0);
-        RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
+        let market_state = MarketState::from_components(
+            QuoteCurrency::new(Dec!(200)),
+            QuoteCurrency::new(Dec!(201)),
+            0.into(),
+            0,
+        );
+        RiskEngine::<_, _, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
 
         let ask = QuoteCurrency::new(Decimal::from(expected_liq_price));
-        let bid = ask - quote!(1);
+        let bid = ask - QuoteCurrency::new(Dec!(1));
         let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
         assert_eq!(
-            RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position),
+            RiskEngine::<_, _, ()>::check_maintenance_margin(&re, &market_state, &position),
             Err(RiskError::Liquidate)
         );
-        let ask = QuoteCurrency::new(Decimal::from(expected_liq_price)) + quote!(1);
-        let bid = ask - quote!(1);
+        let ask =
+            QuoteCurrency::new(Decimal::from(expected_liq_price)) + QuoteCurrency::new(Dec!(1));
+        let bid = ask - QuoteCurrency::new(Dec!(1));
         let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
-        RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
+        RiskEngine::<_, _, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
     }
 
     #[test_case::test_case(2, 126)]
     #[test_case::test_case(3, 117)]
     #[test_case::test_case(5, 111)]
     fn isolated_margin_check_maintenance_margin_short(leverage: u8, expected_liq_price: u32) {
-        let contract_spec = ContractSpecification::<BaseCurrency>::new(
+        let contract_spec = ContractSpecification::<_, Base>::new(
             Leverage::new(leverage).unwrap(),
             Dec!(0.5),
             PriceFilter::default(),
@@ -296,32 +304,38 @@ mod tests {
         )
         .unwrap();
         let init_margin_req = contract_spec.init_margin_req();
-        let re = IsolatedMarginRiskEngine::<QuoteCurrency>::new(contract_spec);
-        let market_state = MarketState::from_components(quote!(100), quote!(101), 0.into(), 0);
+        let re = IsolatedMarginRiskEngine::<_, Base>::new(contract_spec);
+        let market_state = MarketState::from_components(
+            QuoteCurrency::new(Dec!(100)),
+            QuoteCurrency::new(Dec!(101)),
+            0.into(),
+            0,
+        );
         let mut accounting = MockTransactionAccounting::default();
 
-        let qty = base!(1);
-        let entry_price = quote!(100);
-        let fees = qty.convert(entry_price) * TEST_FEE_MAKER;
+        let qty = BaseCurrency::new(Dec!(1));
+        let entry_price = QuoteCurrency::new(Dec!(100));
+        let fees = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
         let position = Position::Short(PositionInner::new(
-            base!(1),
-            quote!(100),
+            BaseCurrency::new(Dec!(1)),
+            QuoteCurrency::new(Dec!(100)),
             &mut accounting,
             init_margin_req,
             fees,
         ));
-        RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
+        RiskEngine::<_, _, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
 
         let ask = QuoteCurrency::new(Decimal::from(expected_liq_price));
-        let bid = ask - quote!(1);
+        let bid = ask - QuoteCurrency::new(Dec!(1));
         let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
         assert_eq!(
-            RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position),
+            RiskEngine::<_, _, ()>::check_maintenance_margin(&re, &market_state, &position),
             Err(RiskError::Liquidate)
         );
-        let ask = QuoteCurrency::new(Decimal::from(expected_liq_price)) - quote!(1);
-        let bid = ask - quote!(1);
+        let ask =
+            QuoteCurrency::new(Decimal::from(expected_liq_price)) - QuoteCurrency::new(Dec!(1));
+        let bid = ask - QuoteCurrency::new(Dec!(1));
         let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
-        RiskEngine::<_, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
+        RiskEngine::<_, _, ()>::check_maintenance_margin(&re, &market_state, &position).unwrap();
     }
 }
