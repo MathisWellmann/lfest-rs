@@ -19,7 +19,7 @@ thiserror = "1"
 hashbrown = "0.15"
 derive_more = { version = "1", features = ["full"] }
 # fpdec = { version = "0.10", features = ["serde-as-str", "num-traits"] }
-fpdec = { git = "https://github.com/MathisWellmann/fpdec.rs", features = [
+fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs", features = [
   "serde-as-str",
   "num-traits",
 ] }
