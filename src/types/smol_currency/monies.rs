@@ -201,10 +201,18 @@ impl<T> Monies<T, Quote>
 where
     T: Mon,
 {
-    /// Compute the liquidation price given a maintenance margin requirement fraction
-    pub(crate) fn liquidation_price(&self, maint_margin_req: T) -> Self {
+    /// Compute the liquidation price of a long position given a maintenance margin requirement fraction
+    pub(crate) fn liquidation_price_long(&self, maint_margin_req: T) -> Self {
         Self {
             value: self.value * (T::one() - maint_margin_req),
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    /// Compute the liquidation price of a short position given a maintenance margin requirement fraction
+    pub(crate) fn liquidation_price_short(&self, maint_margin_req: T) -> Self {
+        Self {
+            value: self.value * (T::one() + maint_margin_req),
             _marker: std::marker::PhantomData,
         }
     }

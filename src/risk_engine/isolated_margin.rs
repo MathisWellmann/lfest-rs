@@ -94,13 +94,16 @@ where
         match position {
             Position::Neutral => return Ok(()),
             Position::Long(inner) => {
-                let liquidation_price = inner.entry_price().liquidation_price(maint_margin_req);
+                let liquidation_price =
+                    inner.entry_price().liquidation_price_long(maint_margin_req);
                 if market_state.bid() < liquidation_price {
                     return Err(RiskError::Liquidate);
                 }
             }
             Position::Short(inner) => {
-                let liquidation_price = inner.entry_price().liquidation_price(maint_margin_req);
+                let liquidation_price = inner
+                    .entry_price()
+                    .liquidation_price_short(maint_margin_req);
                 if market_state.ask() > liquidation_price {
                     return Err(RiskError::Liquidate);
                 }

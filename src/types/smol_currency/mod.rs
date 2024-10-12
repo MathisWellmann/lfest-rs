@@ -139,7 +139,7 @@ where
         if quantity.is_zero() {
             return Monies::zero();
         }
-        Base::convert_from(quantity, exit_price) - Base::convert_from(quantity, entry_price)
+        Base::convert_from(quantity, entry_price) - Base::convert_from(quantity, exit_price)
     }
 
     fn price_paid_for_qty(
@@ -158,6 +158,7 @@ mod tests {
     use fpdec::{Dec, Decimal};
 
     use super::*;
+    use crate::prelude::*;
 
     #[test]
     fn size_of_monies() {
@@ -179,5 +180,15 @@ mod tests {
             Base::convert_from(Monies::<_, Quote>::new(Dec!(250)), Monies::new(Dec!(1000))),
             Monies::<_, Base>::new(Dec!(0.25))
         );
+    }
+
+    #[test]
+    fn quote_currency_pnl() {
+        assert_eq!(Quote::pnl(quote!(100), quote!(110), base!(5)), quote!(50));
+    }
+
+    #[test]
+    fn base_currency_pnl() {
+        assert_eq!(Base::pnl(quote!(100), quote!(200), quote!(500)), base!(2.5))
     }
 }

@@ -28,7 +28,7 @@ impl Side {
         T: Mon,
         BaseOrQuote: CurrencyMarker<T>,
     {
-        assert!(qty.is_zero(), "A trade quantity cannot be zero");
+        assert!(!qty.is_zero(), "A trade quantity cannot be zero");
 
         if qty < Monies::zero() {
             Side::Sell
