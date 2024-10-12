@@ -311,6 +311,7 @@ checksum = "f81ec6369c545a7d40e4589b5597581fa1c441fe1cce96dd1de43159910a36a2"
 [[package]]
 name = "fpdec"
 version = "0.10.3"
+source = "git+https://github.com/MathisWellmann/fpdec.rs#40cf8025fccf786b845de6281589cc6b23e2a6d3"
 dependencies = [
  "fpdec-core",
  "fpdec-macros",
@@ -321,10 +322,12 @@ dependencies = [
 [[package]]
 name = "fpdec-core"
 version = "0.8.0"
+source = "git+https://github.com/MathisWellmann/fpdec.rs#40cf8025fccf786b845de6281589cc6b23e2a6d3"
 
 [[package]]
 name = "fpdec-macros"
 version = "0.8.0"
+source = "git+https://github.com/MathisWellmann/fpdec.rs#40cf8025fccf786b845de6281589cc6b23e2a6d3"
 dependencies = [
  "fpdec-core",
  "quote",
