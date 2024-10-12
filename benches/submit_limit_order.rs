@@ -3,7 +3,7 @@ use std::hint::black_box;
 use criterion::{criterion_group, criterion_main, Criterion};
 use lfest::prelude::*;
 
-fn submit_limit_orders<U>(order: &LimitOrder<QuoteCurrency, (), NewOrder>, n: usize) {
+fn submit_limit_orders<U>(order: &LimitOrder<Decimal, Quote, (), NewOrder>, n: usize) {
     // Technically the setup code should not be benchmarked.
     let starting_balance = base!(100000);
     let acc_tracker = NoAccountTracker::default();
@@ -19,9 +19,10 @@ fn submit_limit_orders<U>(order: &LimitOrder<QuoteCurrency, (), NewOrder>, n: us
     let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
     let mut exchange = Exchange::<
         NoAccountTracker,
-        QuoteCurrency,
+        Decimal,
+        Quote,
         (),
-        InMemoryTransactionAccounting<BaseCurrency>,
+        InMemoryTransactionAccounting<Decimal, Base>,
     >::new(acc_tracker, config);
     exchange
         .update_state(0.into(), &bba!(quote!(100), quote!(101)))
@@ -42,25 +43,25 @@ fn criterion_benchmark(c: &mut Criterion) {
     let n: usize = 1;
     group.throughput(criterion::Throughput::Elements(n as u64));
     group.bench_function(&format!("submit_limit_order_{n}"), |b| {
-        b.iter(|| submit_limit_orders::<Trade<QuoteCurrency>>(black_box(&order), n))
+        b.iter(|| submit_limit_orders::<Trade<Decimal, Quote>>(black_box(&order), n))
     });
 
     let n: usize = 10;
     group.throughput(criterion::Throughput::Elements(n as u64));
     group.bench_function(&format!("submit_limit_order_{n}"), |b| {
-        b.iter(|| submit_limit_orders::<Trade<QuoteCurrency>>(black_box(&order), n))
+        b.iter(|| submit_limit_orders::<Trade<Decimal, Quote>>(black_box(&order), n))
     });
 
     let n: usize = 100;
     group.throughput(criterion::Throughput::Elements(n as u64));
     group.bench_function(&format!("submit_limit_order_{n}"), |b| {
-        b.iter(|| submit_limit_orders::<Trade<QuoteCurrency>>(black_box(&order), n))
+        b.iter(|| submit_limit_orders::<Trade<Decimal, Quote>>(black_box(&order), n))
     });
 
     let n: usize = 1000;
     group.throughput(criterion::Throughput::Elements(n as u64));
     group.bench_function(&format!("submit_limit_order_{n}"), |b| {
-        b.iter(|| submit_limit_orders::<Trade<QuoteCurrency>>(black_box(&order), n))
+        b.iter(|| submit_limit_orders::<Trade<Decimal, Quote>>(black_box(&order), n))
     });
 }
 

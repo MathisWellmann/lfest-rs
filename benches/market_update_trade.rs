@@ -11,12 +11,12 @@ use lfest::prelude::*;
 ///
 /// # Returns
 /// If Ok, A vector of the trades inside the file
-fn load_trades_from_csv(filename: &str) -> Vec<Trade<Decimal, QuoteCurrency>> {
+fn load_trades_from_csv(filename: &str) -> Vec<Trade<Decimal, Quote>> {
     let f = std::fs::File::open(filename).expect("Can open file");
 
     let mut r = csv::Reader::from_reader(f);
 
-    let mut out: Vec<Trade<QuoteCurrency>> = Vec::new();
+    let mut out: Vec<Trade<Decimal, Quote>> = Vec::new();
     for record in r.records() {
         let row = record.expect("Can read record.");
 
@@ -41,7 +41,7 @@ fn load_trades_from_csv(filename: &str) -> Vec<Trade<Decimal, QuoteCurrency>> {
     out
 }
 
-fn generate_quotes_from_trades(trades: &[Trade<Decimal, QuoteCurrency>]) -> Vec<Bba<Decimal>> {
+fn generate_quotes_from_trades(trades: &[Trade<Decimal, Quote>]) -> Vec<Bba<Decimal>> {
     Vec::from_iter(trades.iter().map(|v| Bba {
         bid: v.price - QuoteCurrency::new(Dec!(1)),
         ask: v.price + QuoteCurrency::new(Dec!(1)),
@@ -54,14 +54,14 @@ fn update_state<T, BaseOrQuote, U>(
         T,
         BaseOrQuote,
         (),
-        InMemoryTransactionAccounting<Q::PairedCurrency>,
+        InMemoryTransactionAccounting<T, BaseOrQuote::PairedCurrency>,
     >,
     trades: &[U],
 ) where
     T: Mon,
-    BaseOrQuote: CurrencyMarker,
-    Q::PairedCurrency: MarginCurrencyMarker,
-    U: MarketUpdate<Q, ()>,
+    BaseOrQuote: CurrencyMarker<T>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
+    U: MarketUpdate<T, BaseOrQuote, ()>,
 {
     for (i, trade) in trades.into_iter().enumerate() {
         let ts_ns: TimestampNs = (i as i64).into();
@@ -95,7 +95,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     group.throughput(criterion::Throughput::Elements(COUNT as u64));
     group.bench_function("trades_1_million", |b| {
         b.iter(|| {
-            update_state::<QuoteCurrency, Trade<QuoteCurrency>>(
+            update_state::<_, Quote, Trade<Decimal, Quote>>(
                 black_box(&mut exchange),
                 black_box(&trades),
             )
@@ -103,7 +103,9 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     let bbas = generate_quotes_from_trades(&trades);
     group.bench_function("quotes_1_million", |b| {
-        b.iter(|| update_state::<QuoteCurrency, Bba>(black_box(&mut exchange), black_box(&bbas)))
+        b.iter(|| {
+            update_state::<_, Quote, Bba<Decimal>>(black_box(&mut exchange), black_box(&bbas))
+        })
     });
 }
 

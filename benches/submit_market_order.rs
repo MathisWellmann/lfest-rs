@@ -3,18 +3,20 @@ use std::hint::black_box;
 use criterion::{criterion_group, criterion_main, Criterion};
 use lfest::prelude::*;
 
-fn submit_market_orders<Q, U>(
+fn submit_market_orders<T, BaseOrQuote, U>(
     exchange: &mut Exchange<
         NoAccountTracker,
-        Q,
+        T,
+        BaseOrQuote,
         (),
-        InMemoryTransactionAccounting<Q::PairedCurrency>,
+        InMemoryTransactionAccounting<T, BaseOrQuote::PairedCurrency>,
     >,
-    order: &MarketOrder<Q, (), NewOrder>,
+    order: &MarketOrder<T, BaseOrQuote, (), NewOrder>,
     n: usize,
 ) where
-    Q: Currency,
-    Q::PairedCurrency: MarginCurrencyMarker,
+    T: Mon,
+    BaseOrQuote: CurrencyMarker<T>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
 {
     for _ in 0..n {
         exchange
@@ -47,7 +49,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     group.throughput(criterion::Throughput::Elements(N as u64));
     group.bench_function(&format!("submit_market_order_{N}"), |b| {
         b.iter(|| {
-            submit_market_orders::<QuoteCurrency, Trade<QuoteCurrency>>(
+            submit_market_orders::<Decimal, Quote, Trade<Decimal, Quote>>(
                 black_box(&mut exchange),
                 black_box(&order),
                 N,
