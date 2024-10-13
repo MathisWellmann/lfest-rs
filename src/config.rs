@@ -1,17 +1,22 @@
 use getset::{CopyGetters, Getters};
-use num_traits::Zero;
 
 use crate::{
     contract_specification::ContractSpecification,
-    prelude::{ConfigError, MarginCurrencyMarker, Mon, Monies},
+    prelude::{ConfigError, MarginCurrencyMarker, Mon},
 };
 
 #[derive(Debug, Clone, Getters, CopyGetters)]
-/// Define the Exchange configuration
-pub struct Config<T, BaseOrQuote>
+/// Define the Exchange configuration.
+///
+/// Generics:
+/// - `I`: The numeric data type of currencies.
+/// - `DB`: The constant decimal precision of the `BaseCurrency`.
+/// - `DQ`: The constant decimal precision of the `QuoteCurrency`.
+/// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
+pub struct Config<I, const DB: u8, const DQ: u8, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
 {
     /// The starting balance of account (denoted in margin currency).
     /// The concrete `Currency` here defines the futures type.
@@ -20,7 +25,7 @@ where
     /// If `BaseCurrency` is used as the margin currency,
     /// then its an inverse futures contract.
     #[getset(get_copy = "pub")]
-    starting_wallet_balance: Monies<T, BaseOrQuote>,
+    starting_wallet_balance: BaseOrQuote,
 
     /// The maximum number of open orders the user can have at any given time
     #[getset(get_copy = "pub")]
@@ -28,7 +33,7 @@ where
 
     /// The contract specification.
     #[getset(get = "pub")]
-    contract_spec: ContractSpecification<T, BaseOrQuote::PairedCurrency>,
+    contract_spec: ContractSpecification<I, DB, DQ, BaseOrQuote::PairedCurrency>,
 
     /// The interval by which to sample the returns of user balances.
     /// This is used to analyze the trading performance later on, to enable things like `sharpe`, `sortino`, anything based on returns.
@@ -36,10 +41,10 @@ where
     sample_returns_every_n_seconds: u64,
 }
 
-impl<T, BaseOrQuote> Config<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> Config<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
 {
     /// Create a new Config.
     ///
@@ -55,15 +60,15 @@ where
     /// # Returns:
     /// Either a valid `Config` or an Error
     pub fn new(
-        starting_balance: Monies<T, BaseOrQuote>,
+        starting_balance: BaseOrQuote,
         max_num_open_orders: usize,
-        contract_specification: ContractSpecification<T, BaseOrQuote::PairedCurrency>,
+        contract_specification: ContractSpecification<I, DB, DQ, BaseOrQuote::PairedCurrency>,
         sample_returns_every_n_seconds: u64,
     ) -> Result<Self, ConfigError> {
         if max_num_open_orders == 0 {
             return Err(ConfigError::InvalidMaxNumOpenOrders);
         }
-        if starting_balance <= Monies::zero() {
+        if starting_balance <= BaseOrQuote::zero() {
             return Err(ConfigError::InvalidStartingBalance);
         }
 

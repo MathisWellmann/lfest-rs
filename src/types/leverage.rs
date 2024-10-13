@@ -1,9 +1,6 @@
-use std::ops::Div;
-
 use derive_more::Display;
-use fpdec::{Dec, Decimal};
 
-use super::{ConfigError, Mon};
+use super::{BasisPointFrac, ConfigError};
 
 /// Allows the quick construction of `Leverage`
 ///
@@ -24,26 +21,16 @@ pub struct Leverage(u8);
 impl Leverage {
     /// Create a new instance from a `Decimal` value
     pub fn new(val: u8) -> Result<Self, ConfigError> {
-        if val < Dec!(1) {
+        if val < 1 {
             Err(ConfigError::InvalidLeverage)?
         }
         Ok(Self(val))
     }
 
     /// Compute the initial margin requirement from leverage.
-    pub fn init_margin_req<T>(&self) -> T
-    where
-        T: Mon,
-    {
-        T::one() / T::from(self.0)
-    }
-}
-
-impl Div<Leverage> for Decimal {
-    type Output = Decimal;
-
-    fn div(self, rhs: Leverage) -> Self::Output {
-        self / Decimal::from(rhs.0)
+    pub fn init_margin_req(&self) -> BasisPointFrac {
+        // Decimal::one() / Decimal::try_from_scaled(self.0 as i32, 1).unwrap()
+        todo!()
     }
 }
 
@@ -54,5 +41,14 @@ mod tests {
     #[test]
     fn size_of_leverage() {
         assert_eq!(std::mem::size_of::<Leverage>(), 1);
+    }
+
+    #[test]
+    fn leverage_init_margin_req() {
+        assert_eq!(Leverage(1).init_margin_req(), BasisPointFrac::one());
+        assert_eq!(
+            Leverage(2).init_margin_req(),
+            BasisPointFrac::one() / BasisPointFrac::TWO
+        );
     }
 }

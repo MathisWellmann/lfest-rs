@@ -1,70 +1,76 @@
+use const_decimal::Decimal;
 use getset::CopyGetters;
-use num_traits::Zero;
+use num_traits::{One, Zero};
 
 use crate::{
-    prelude::{ConfigError, CurrencyMarker, FilterError, Mon, Monies, OrderError, Quote},
+    prelude::{
+        BasisPointFrac, ConfigError, CurrencyMarker, FilterError, Mon, OrderError, QuoteCurrency,
+    },
     types::{LimitOrder, NewOrder},
 };
 
 /// The `PriceFilter` defines the price rules for a symbol
 #[derive(Debug, Clone, CopyGetters)]
-pub struct PriceFilter<T>
+pub struct PriceFilter<I, const DB: u8, const DQ: u8>
 where
-    T: Mon,
+    I: Mon<DB> + Mon<DQ>,
 {
     /// Defines the optional minimum price allowed.
     #[getset(get_copy = "pub")]
-    min_price: Option<Monies<T, Quote>>,
+    min_price: Option<QuoteCurrency<I, DB, DQ>>,
 
     /// Defines the optional maximum price allowed.
     #[getset(get_copy = "pub")]
-    max_price: Option<Monies<T, Quote>>,
+    max_price: Option<QuoteCurrency<I, DB, DQ>>,
 
     /// Defines the intervals that a price can be increased / decreased by.
     /// For the filter to pass,
     /// (order.limit_price - min_price) % tick_size == 0
     #[getset(get_copy = "pub")]
-    tick_size: Monies<T, Quote>,
+    tick_size: QuoteCurrency<I, DB, DQ>,
 
     /// Defines valid ranges for the order price relative to the mark price
     /// To pass this filter,
     /// order.limit_price <= mark_price * multiplier_up
     #[getset(get_copy = "pub")]
-    multiplier_up: T,
+    multiplier_up: BasisPointFrac,
 
     /// Defines valid ranges for the order price relative to the mark price
     /// To pass this filter,
     /// order.limit_price >= mark_price * multiplier_down
     #[getset(get_copy = "pub")]
-    multiplier_down: T,
+    multiplier_down: BasisPointFrac,
 }
 
-impl<T: Mon> Default for PriceFilter<T> {
+impl<I, const DB: u8, const DQ: u8> Default for PriceFilter<I, DB, DQ>
+where
+    I: Mon<DB> + Mon<DQ>,
+{
     fn default() -> Self {
         Self {
             min_price: None,
             max_price: None,
-            tick_size: Monies::new(T::one()),
-            multiplier_up: T::from(2),
-            multiplier_down: T::zero(),
+            tick_size: QuoteCurrency::from(Decimal::one()),
+            multiplier_up: BasisPointFrac::from(Decimal::TWO),
+            multiplier_down: BasisPointFrac::zero(),
         }
     }
 }
 
-impl<T> PriceFilter<T>
+impl<I, const DB: u8, const DQ: u8> PriceFilter<I, DB, DQ>
 where
-    T: Mon,
+    I: Mon<DB> + Mon<DQ>,
 {
     /// Create a new `PriceFilter`.
     pub fn new(
-        min_price: Option<Monies<T, Quote>>,
-        max_price: Option<Monies<T, Quote>>,
-        tick_size: Monies<T, Quote>,
-        multiplier_up: T,
-        multiplier_down: T,
+        min_price: Option<QuoteCurrency<I, DB, DQ>>,
+        max_price: Option<QuoteCurrency<I, DB, DQ>>,
+        tick_size: QuoteCurrency<I, DB, DQ>,
+        multiplier_up: BasisPointFrac,
+        multiplier_down: BasisPointFrac,
     ) -> Result<Self, ConfigError> {
         if let Some(min_qty) = min_price {
-            if (min_qty % tick_size) != Monies::zero() {
+            if (min_qty % tick_size) != QuoteCurrency::zero() {
                 return Err(ConfigError::InvalidMinPrice);
             }
         }
@@ -73,11 +79,11 @@ where
             return Err(ConfigError::InvalidTickSize);
         }
 
-        if multiplier_up <= T::one() {
+        if multiplier_up <= BasisPointFrac::one() {
             return Err(ConfigError::InvalidUpMultiplier);
         }
 
-        if multiplier_down >= T::one() {
+        if multiplier_down >= BasisPointFrac::one() {
             return Err(ConfigError::InvalidDownMultiplier);
         }
 
@@ -93,14 +99,14 @@ where
     /// check if an `Order` is valid
     pub(crate) fn validate_limit_order<BaseOrQuote, UserOrderId>(
         &self,
-        order: &LimitOrder<T, BaseOrQuote, UserOrderId, NewOrder>,
-        mark_price: Monies<T, Quote>,
-    ) -> Result<(), OrderError<T>>
+        order: &LimitOrder<I, DB, DQ, BaseOrQuote, UserOrderId, NewOrder>,
+        mark_price: QuoteCurrency<I, DB, DQ>,
+    ) -> Result<(), OrderError<I, DB, DQ>>
     where
-        BaseOrQuote: CurrencyMarker<T>,
+        BaseOrQuote: CurrencyMarker<I, DB, DQ>,
         UserOrderId: Clone,
     {
-        if order.limit_price() <= Monies::zero() {
+        if order.limit_price() <= QuoteCurrency::zero() {
             return Err(OrderError::LimitPriceBelowMin);
         }
 
@@ -116,18 +122,19 @@ where
             }
             min_price
         } else {
-            Monies::zero()
+            QuoteCurrency::zero()
         };
 
-        if ((order.limit_price() - min_price) % self.tick_size) != Monies::zero() {
+        if ((order.limit_price() - min_price) % self.tick_size) != QuoteCurrency::zero() {
             return Err(OrderError::InvalidOrderPriceStepSize);
         }
-        if order.limit_price() > mark_price * self.multiplier_up && self.multiplier_up != T::zero()
+        if order.limit_price() > mark_price * self.multiplier_up
+            && self.multiplier_up != BasisPointFrac::zero()
         {
             return Err(OrderError::LimitPriceAboveMultiple);
         }
         if order.limit_price() < mark_price * self.multiplier_down
-            && self.multiplier_down != T::zero()
+            && self.multiplier_down != BasisPointFrac::zero()
         {
             return Err(OrderError::LimitPriceBelowMultiple);
         }
@@ -136,10 +143,13 @@ where
 }
 
 /// Errors if there is no bid-ask spread
-pub(crate) fn enforce_bid_ask_spread<T: Mon>(
-    bid: Monies<T, Quote>,
-    ask: Monies<T, Quote>,
-) -> Result<(), FilterError<T>> {
+pub(crate) fn enforce_bid_ask_spread<I, const DB: u8, const DQ: u8>(
+    bid: QuoteCurrency<I, DB, DQ>,
+    ask: QuoteCurrency<I, DB, DQ>,
+) -> Result<(), FilterError<I, DB, DQ>>
+where
+    I: Mon<DB> + Mon<DQ>,
+{
     if bid >= ask {
         return Err(FilterError::InvalidMarketUpdateBidAskSpread);
     }
@@ -148,12 +158,15 @@ pub(crate) fn enforce_bid_ask_spread<T: Mon>(
 
 /// Make sure the price is not too low
 /// Disabled if `min_price` == 0
-pub(crate) fn enforce_min_price<T: Mon>(
-    min_price: Option<Monies<T, Quote>>,
-    price: Monies<T, Quote>,
-) -> Result<(), FilterError<T>> {
+pub(crate) fn enforce_min_price<I, const DB: u8, const DQ: u8>(
+    min_price: Option<QuoteCurrency<I, DB, DQ>>,
+    price: QuoteCurrency<I, DB, DQ>,
+) -> Result<(), FilterError<I, DB, DQ>>
+where
+    I: Mon<DB> + Mon<DQ>,
+{
     if let Some(min_price) = min_price {
-        if price < min_price && min_price != Monies::zero() {
+        if price < min_price && min_price != QuoteCurrency::zero() {
             return Err(FilterError::MarketUpdatePriceTooLow);
         }
     }
@@ -162,12 +175,15 @@ pub(crate) fn enforce_min_price<T: Mon>(
 
 /// Make sure the price is not too high
 /// Disabled if `max_price` == 0
-pub(crate) fn enforce_max_price<T: Mon>(
-    max_price: Option<Monies<T, Quote>>,
-    price: Monies<T, Quote>,
-) -> Result<(), FilterError<T>> {
+pub(crate) fn enforce_max_price<I, const DB: u8, const DQ: u8>(
+    max_price: Option<QuoteCurrency<I, DB, DQ>>,
+    price: QuoteCurrency<I, DB, DQ>,
+) -> Result<(), FilterError<I, DB, DQ>>
+where
+    I: Mon<DB> + Mon<DQ>,
+{
     if let Some(max_price) = max_price {
-        if price > max_price && max_price != Monies::zero() {
+        if price > max_price && max_price != QuoteCurrency::zero() {
             return Err(FilterError::MarketUpdatePriceTooHigh);
         }
     }
@@ -175,11 +191,14 @@ pub(crate) fn enforce_max_price<T: Mon>(
 }
 
 /// Make sure the price conforms to the step size
-pub(crate) fn enforce_step_size<T: Mon>(
-    step_size: Monies<T, Quote>,
-    price: Monies<T, Quote>,
-) -> Result<(), FilterError<T>> {
-    if (price % step_size) != Monies::zero() {
+pub(crate) fn enforce_step_size<I, const DB: u8, const DQ: u8>(
+    step_size: QuoteCurrency<I, DB, DQ>,
+    price: QuoteCurrency<I, DB, DQ>,
+) -> Result<(), FilterError<I, DB, DQ>>
+where
+    I: Mon<DB> + Mon<DQ>,
+{
+    if (price % step_size) != QuoteCurrency::zero() {
         return Err(FilterError::MarketUpdatePriceStepSize { price, step_size });
     }
     Ok(())

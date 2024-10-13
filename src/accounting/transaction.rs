@@ -1,31 +1,32 @@
 use getset::CopyGetters;
-use num_traits::Zero;
 
 use super::{
-    AccountId, BROKER_MARGIN_ACCOUNT, EXCHANGE_FEE_ACCOUNT, TREASURY_ACCOUNT,
-    USER_ORDER_MARGIN_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
+    AccountId, MarginCurrencyMarker, Mon, QuoteCurrency, BROKER_MARGIN_ACCOUNT,
+    EXCHANGE_FEE_ACCOUNT, TREASURY_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT,
+    USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
 };
-use crate::prelude::{CurrencyMarker, Mon, Monies};
 
 /// A transaction involves two parties.
 #[derive(Clone, CopyGetters)]
-pub struct Transaction<T, BaseOrQuote>
+pub struct Transaction<I, const DB: u8, const DQ: u8, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
 {
     #[getset(get_copy = "pub(crate)")]
     debit_account_id: AccountId,
     #[getset(get_copy = "pub(crate)")]
     credit_account_id: AccountId,
     #[getset(get_copy = "pub(crate)")]
-    amount: Monies<T, BaseOrQuote>,
+    amount: BaseOrQuote,
+    _quote: std::marker::PhantomData<QuoteCurrency<I, DB, DQ>>,
 }
 
-impl<T, BaseOrQuote> std::fmt::Debug for Transaction<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> std::fmt::Debug
+    for Transaction<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -51,18 +52,18 @@ fn account_from_int(int: usize) -> &'static str {
     }
 }
 
-impl<T, BaseOrQuote> Transaction<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> Transaction<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
 {
     pub(crate) fn new(
         debit_account_id: AccountId,
         credit_account_id: AccountId,
-        amount: Monies<T, BaseOrQuote>,
+        amount: BaseOrQuote,
     ) -> Self {
         assert!(
-            amount > Monies::zero(),
+            amount > BaseOrQuote::zero(),
             "The amount of a transaction must be greater than zero"
         );
         assert_ne!(
@@ -73,6 +74,7 @@ where
             debit_account_id,
             credit_account_id,
             amount,
+            _quote: std::marker::PhantomData,
         }
     }
 }

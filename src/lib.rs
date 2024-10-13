@@ -31,13 +31,12 @@ pub use types::Result;
 
 /// Exports common types
 pub mod prelude {
-    // To make the macros work
-    pub use fpdec::{self, Dec, Decimal};
+    pub use const_decimal;
 
     pub use crate::{
         account_tracker::{AccountTracker, FullAccountTracker, NoAccountTracker},
         accounting::*,
-        base, bba,
+        bba,
         config::Config,
         contract_specification::*,
         exchange::{Account, ActiveLimitOrders, Exchange},
@@ -47,7 +46,6 @@ pub mod prelude {
         order_filters::{PriceFilter, QuantityFilter},
         position::Position,
         position_inner::PositionInner,
-        quote,
         types::*,
     };
 }

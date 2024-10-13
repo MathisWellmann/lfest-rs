@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::Neg};
+use std::fmt::Display;
 
 use getset::CopyGetters;
 use num_traits::Zero;
@@ -10,7 +10,7 @@ use sliding_features::{
 
 use crate::{
     account_tracker::AccountTracker,
-    prelude::{Mon, Monies, Quote, Side, UserBalances},
+    prelude::{MarketState, Mon, QuoteCurrency, Side, UserBalances},
     types::{CurrencyMarker, MarginCurrencyMarker, TimestampNs},
     utils::balance_sum,
 };
@@ -20,14 +20,14 @@ const DAILY_NS: i64 = 86_400_000_000_000;
 /// Keep track of Account performance statistics.
 /// Must update in `O(1)` and also compute performance measures in `O(1)`.
 #[derive(Debug, CopyGetters)]
-pub struct FullAccountTracker<T, BaseOrQuote>
+pub struct FullAccountTracker<I, const DB: u8, const DQ: u8, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
 {
     /// Wallet balance at the start.
     #[getset(get_copy = "pub")]
-    wallet_balance_start: Monies<T, BaseOrQuote>,
+    wallet_balance_start: BaseOrQuote,
 
     /// The number of submitted limit orders.
     #[getset(get_copy = "pub")]
@@ -48,14 +48,14 @@ where
 
     /// The total volume bought.
     #[getset(get_copy = "pub")]
-    buy_volume: Monies<T, BaseOrQuote>,
+    buy_volume: BaseOrQuote,
 
     /// The total volume sold.
     #[getset(get_copy = "pub")]
-    sell_volume: Monies<T, BaseOrQuote>,
+    sell_volume: BaseOrQuote,
 
-    price_first: Monies<T, Quote>,
-    price_last: Monies<T, Quote>,
+    price_first: QuoteCurrency<I, DB, DQ>,
+    price_last: QuoteCurrency<I, DB, DQ>,
     ts_first: TimestampNs,
     ts_last: TimestampNs,
 
@@ -67,7 +67,7 @@ where
     user_balances_neg_ln_return_stats: WelfordRolling<f32, Echo<f32>>, // Used for `sortino`
 
     /// last sum of all user balances.
-    last_balance_sum: Monies<T, BaseOrQuote>,
+    last_balance_sum: BaseOrQuote,
 
     /// Keeps track of ln return distribution of user balances and can compute the quantiles needed for certain risk metrics.
     #[cfg(feature = "quantiles")]
@@ -84,16 +84,16 @@ where
 
 /// TODO: create its own `risk` crate out of these implementations for better
 /// reusability and testability
-impl<T, BaseOrQuote> FullAccountTracker<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> FullAccountTracker<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
 {
     /// Create a new instance of `Self`.
     #[must_use]
-    pub fn new(starting_wb: Monies<T, BaseOrQuote>) -> Self {
+    pub fn new(starting_wb: BaseOrQuote) -> Self {
         assert!(
-            starting_wb > Monies::zero(),
+            starting_wb > BaseOrQuote::zero(),
             "The starting wallet balance must be greater than zero"
         );
 
@@ -106,11 +106,11 @@ where
             num_submitted_market_orders: 0,
             num_filled_market_orders: 0,
 
-            buy_volume: Monies::zero(),
-            sell_volume: Monies::zero(),
+            buy_volume: BaseOrQuote::zero(),
+            sell_volume: BaseOrQuote::zero(),
 
-            price_first: Monies::zero(),
-            price_last: Monies::zero(),
+            price_first: QuoteCurrency::zero(),
+            price_last: QuoteCurrency::zero(),
             ts_first: TimestampNs::from(0),
             ts_last: TimestampNs::from(0),
 
@@ -120,7 +120,7 @@ where
             user_balances_ln_return_stats: WelfordRolling::default(),
             user_balances_neg_ln_return_stats: WelfordRolling::default(),
 
-            last_balance_sum: Monies::zero(),
+            last_balance_sum: BaseOrQuote::zero(),
 
             #[cfg(feature = "quantiles")]
             quantogram_user_balances_ln_returns: quantogram::QuantogramBuilder::new()
@@ -138,14 +138,14 @@ where
     }
 
     /// Would be the return of buy and hold strategy
-    pub fn buy_and_hold_return(&self) -> Monies<T, BaseOrQuote> {
+    pub fn buy_and_hold_return(&self) -> BaseOrQuote {
         let qty =
             BaseOrQuote::PairedCurrency::convert_from(self.wallet_balance_start, self.price_first);
         BaseOrQuote::pnl(self.price_first, self.price_last, qty)
     }
 
     /// Would be the return of sell and hold strategy
-    pub fn sell_and_hold_return(&self) -> Monies<T, BaseOrQuote> {
+    pub fn sell_and_hold_return(&self) -> BaseOrQuote {
         self.buy_and_hold_return().neg()
     }
 
@@ -172,7 +172,7 @@ where
     }
 
     /// The total volume traded.
-    pub fn turnover(&self) -> Monies<T, BaseOrQuote> {
+    pub fn turnover(&self) -> BaseOrQuote {
         self.buy_volume + self.sell_volume
     }
 
@@ -188,21 +188,21 @@ where
 
     /// The realized profit and loss of the users account.
     /// Unrealized pnl not included.
-    pub fn rpnl(&self) -> Monies<T, BaseOrQuote> {
+    pub fn rpnl(&self) -> BaseOrQuote {
         self.last_balance_sum - self.wallet_balance_start
     }
 
     /// The ratio of executed buy volume vs total.
     pub fn buy_volume_ratio(&self) -> Option<f32> {
-        assert!(self.buy_volume >= Monies::zero());
-        assert!(self.sell_volume >= Monies::zero());
+        assert!(self.buy_volume >= BaseOrQuote::zero());
+        assert!(self.sell_volume >= BaseOrQuote::zero());
 
         let total_volume = self.buy_volume + self.sell_volume;
         if total_volume.is_zero() {
             return None;
         }
 
-        Some((*(self.buy_volume / total_volume).as_ref()).into())
+        Some(Into::<f64>::into(self.buy_volume / total_volume) as f32)
     }
 
     /// Return the raw sharpe ratio that has been derived from the sampled returns of the users balances.
@@ -266,12 +266,13 @@ where
     }
 }
 
-impl<T, BaseOrQuote> AccountTracker<T, BaseOrQuote> for FullAccountTracker<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> AccountTracker<I, DB, DQ, BaseOrQuote>
+    for FullAccountTracker<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
 {
-    fn update(&mut self, market_state: &crate::prelude::MarketState<T>) {
+    fn update(&mut self, market_state: &MarketState<I, DB, DQ>) {
         if self.ts_first == 0.into() {
             self.ts_first = market_state.current_timestamp_ns();
         }
@@ -283,18 +284,18 @@ where
         self.price_last = market_state.mid_price();
 
         self.drawdown_market
-            .update((*market_state.mid_price().as_ref()).into());
+            .update(Into::<f64>::into(market_state.mid_price()) as f32);
     }
 
     fn sample_user_balances(
         &mut self,
-        user_balances: &UserBalances<T, BaseOrQuote>,
-        #[allow(unused)] mid_price: Monies<T, Quote>,
+        user_balances: &UserBalances<BaseOrQuote>,
+        #[allow(unused)] mid_price: QuoteCurrency<I, DB, DQ>,
     ) {
         let balance_sum = balance_sum(user_balances);
         self.last_balance_sum = balance_sum;
 
-        let balance_sum: f32 = (*balance_sum.as_ref()).into();
+        let balance_sum = Into::<f64>::into(balance_sum) as f32;
         self.drawdown_user_balances.update(balance_sum);
 
         self.user_balances_ln_return.update(balance_sum);
@@ -336,10 +337,10 @@ where
     fn log_trade(
         &mut self,
         side: Side,
-        price: Monies<T, Quote>,
-        quantity: Monies<T, BaseOrQuote::PairedCurrency>,
+        price: QuoteCurrency<I, DB, DQ>,
+        quantity: BaseOrQuote::PairedCurrency,
     ) {
-        assert!(quantity > Monies::zero());
+        assert!(quantity > BaseOrQuote::PairedCurrency::zero());
 
         let value = BaseOrQuote::convert_from(quantity, price);
         match side {
@@ -353,10 +354,11 @@ where
     }
 }
 
-impl<T, BaseOrQuote> Display for FullAccountTracker<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> Display
+    for FullAccountTracker<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

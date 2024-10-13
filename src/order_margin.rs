@@ -1,40 +1,41 @@
 use std::ops::Neg;
 
 use getset::{CopyGetters, Getters};
-use num_traits::Zero;
+use num_traits::{One, Zero};
 use tracing::trace;
 
 use crate::{
     exchange::ActiveLimitOrders,
-    prelude::{CurrencyMarker, Mon, Monies, OrderId, Position},
+    prelude::{BasisPointFrac, CurrencyMarker, Mon, OrderId, Position},
     types::{LimitOrder, MarginCurrencyMarker, Pending, Side},
     utils::{max, min},
 };
 
 /// An implementation for computing the order margin online, aka with every change to the active orders.
 #[derive(Debug, Clone, Default, CopyGetters, Getters)]
-pub(crate) struct OrderMargin<T, BaseOrQuote, UserOrderId>
+pub(crate) struct OrderMargin<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
     UserOrderId: Clone + Default,
 {
     #[getset(get = "pub(crate)")]
-    active_limit_orders: ActiveLimitOrders<T, BaseOrQuote, UserOrderId>,
+    active_limit_orders: ActiveLimitOrders<I, DB, DQ, BaseOrQuote, UserOrderId>,
 }
 
-impl<T, BaseOrQuote, UserOrderId> OrderMargin<T, BaseOrQuote, UserOrderId>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId>
+    OrderMargin<I, DB, DQ, BaseOrQuote, UserOrderId>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, DB, DQ>,
     UserOrderId: Clone + std::fmt::Debug + std::cmp::PartialEq + Default,
 {
     pub(crate) fn update(
         &mut self,
-        order: &LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>,
+        order: &LimitOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
     ) {
-        assert!(order.remaining_quantity() > Monies::zero());
+        assert!(order.remaining_quantity() > BaseOrQuote::zero());
         trace!("update_order: order: {order:?}");
         if let Some(active_order) = self.active_limit_orders.insert(order.id(), order.clone()) {
             assert_ne!(
@@ -46,7 +47,7 @@ where
 
             // when an existing limit order is updated for margin purposes here, its quantity is always reduced.
             let removed_qty = active_order.remaining_quantity() - order.remaining_quantity();
-            assert!(removed_qty > Monies::zero());
+            assert!(removed_qty > BaseOrQuote::zero());
         }
     }
 
@@ -60,19 +61,19 @@ where
     /// The margin requirement for all the tracked orders.
     pub(crate) fn order_margin(
         &self,
-        init_margin_req: T,
-        position: &Position<T, BaseOrQuote>,
-    ) -> Monies<T, BaseOrQuote::PairedCurrency> {
+        init_margin_req: BasisPointFrac,
+        position: &Position<I, DB, DQ, BaseOrQuote>,
+    ) -> BaseOrQuote::PairedCurrency {
         Self::order_margin_internal(&self.active_limit_orders, init_margin_req, position)
     }
 
     /// The margin requirement for all the tracked orders.
     fn order_margin_internal(
-        active_limit_orders: &ActiveLimitOrders<T, BaseOrQuote, UserOrderId>,
-        init_margin_req: T,
-        position: &Position<T, BaseOrQuote>,
-    ) -> Monies<T, BaseOrQuote::PairedCurrency> {
-        debug_assert!(init_margin_req <= T::one());
+        active_limit_orders: &ActiveLimitOrders<I, DB, DQ, BaseOrQuote, UserOrderId>,
+        init_margin_req: BasisPointFrac,
+        position: &Position<I, DB, DQ, BaseOrQuote>,
+    ) -> BaseOrQuote::PairedCurrency {
+        debug_assert!(init_margin_req <= BasisPointFrac::one());
         trace!("order_margin_internal: position: {position:?}, active_limit_orders: {active_limit_orders:?}");
 
         let mut buy_orders = Vec::from_iter(
@@ -96,11 +97,11 @@ where
             Position::Long(inner) => {
                 let mut outstanding_pos_qty = inner.quantity();
                 let mut i = 0;
-                while outstanding_pos_qty > Monies::zero() {
+                while outstanding_pos_qty > BaseOrQuote::zero() {
                     if i >= sell_orders.len() {
                         break;
                     }
-                    let new_qty = max(sell_orders[i].1 - outstanding_pos_qty, Monies::zero());
+                    let new_qty = max(sell_orders[i].1 - outstanding_pos_qty, BaseOrQuote::zero());
                     trace!("sells order_qty: {}, outstanding_pos_qty: {outstanding_pos_qty} new_qty: {new_qty}", sell_orders[i].1);
                     outstanding_pos_qty -= min(sell_orders[i].1, outstanding_pos_qty);
                     sell_orders[i].1 = new_qty;
@@ -110,11 +111,11 @@ where
             Position::Short(inner) => {
                 let mut outstanding_pos_qty = inner.quantity();
                 let mut i = 0;
-                while outstanding_pos_qty > Monies::zero() {
+                while outstanding_pos_qty > BaseOrQuote::zero() {
                     if i >= buy_orders.len() {
                         break;
                     }
-                    let new_qty = max(buy_orders[i].1 - outstanding_pos_qty, Monies::zero());
+                    let new_qty = max(buy_orders[i].1 - outstanding_pos_qty, BaseOrQuote::zero());
                     trace!("buys order_qty: {}, outstanding_pos_qty: {outstanding_pos_qty} new_qty: {new_qty}", buy_orders[i].1);
                     outstanding_pos_qty -= min(buy_orders[i].1, outstanding_pos_qty);
                     buy_orders[i].1 = new_qty;
@@ -123,26 +124,27 @@ where
             }
         }
 
-        let mut buy_value: Monies<T, BaseOrQuote::PairedCurrency> = Monies::zero();
+        let mut buy_value = BaseOrQuote::PairedCurrency::zero();
         buy_orders.iter().for_each(|(price, qty)| {
             buy_value += BaseOrQuote::PairedCurrency::convert_from(*qty, *price)
         });
 
-        let mut sell_value: Monies<T, BaseOrQuote::PairedCurrency> = Monies::zero();
+        let mut sell_value = BaseOrQuote::PairedCurrency::zero();
         sell_orders.iter().for_each(|(price, qty)| {
             sell_value += BaseOrQuote::PairedCurrency::convert_from(*qty, *price)
         });
 
-        max(buy_value, sell_value) * init_margin_req
+        // max(buy_value, sell_value) * init_margin_req
+        todo!()
     }
 
     /// Get the order margin if a new order were to be added.
     pub(crate) fn order_margin_with_order(
         &self,
-        order: &LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>,
-        init_margin_req: T,
-        position: &Position<T, BaseOrQuote>,
-    ) -> Monies<T, BaseOrQuote::PairedCurrency> {
+        order: &LimitOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
+        init_margin_req: BasisPointFrac,
+        position: &Position<I, DB, DQ, BaseOrQuote>,
+    ) -> BaseOrQuote::PairedCurrency {
         let mut active_orders = self.active_limit_orders.clone();
         assert!(active_orders.insert(order.id(), order.clone()).is_none());
         Self::order_margin_internal(&active_orders, init_margin_req, position)

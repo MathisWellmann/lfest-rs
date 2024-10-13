@@ -1,4 +1,4 @@
-use super::{CurrencyMarker, Mon, Monies};
+use super::{CurrencyMarker, Mon};
 
 /// Fee as a part per one hundred thousand.
 /// The generic `MarkerTaker` marker indicates to the type system if its a maker or taker fee.
@@ -30,12 +30,16 @@ impl<MakerTaker> Fee<MakerTaker> {
     }
 
     /// Compute the fraction of the `value` that is the fee.
-    pub fn for_value<T, BaseOrQuote>(&self, value: Monies<T, BaseOrQuote>) -> Monies<T, BaseOrQuote>
+    pub fn for_value<I, const DB: u8, const DQ: u8, BaseOrQuote>(
+        &self,
+        value: BaseOrQuote,
+    ) -> BaseOrQuote
     where
-        T: Mon,
-        BaseOrQuote: CurrencyMarker<T>,
+        I: Mon<DB> + Mon<DQ>,
+        BaseOrQuote: CurrencyMarker<I, DB, DQ>,
     {
-        Monies::new(*value.as_ref() * T::from(self.per_cent_mille) / T::from(100000))
+        // value * Decimal::try_from_scaled(self.per_cent_mille, 5).expect("Can construct")
+        todo!()
     }
 }
 

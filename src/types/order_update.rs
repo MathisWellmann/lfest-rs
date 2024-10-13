@@ -2,14 +2,16 @@ use super::{CurrencyMarker, Filled, LimitOrder, Mon, Pending};
 
 /// Contains the possible updates to limit orders.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum LimitOrderUpdate<T, BaseOrQuote, UserOrderId>
+pub enum LimitOrderUpdate<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DQ> + Mon<DB>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
     UserOrderId: Clone,
 {
     /// The limit order was partially filled.
-    PartiallyFilled(LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>),
+    PartiallyFilled(
+        LimitOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
+    ),
     /// The limit order was fully filled.
-    FullyFilled(LimitOrder<T, BaseOrQuote, UserOrderId, Filled<T, BaseOrQuote>>),
+    FullyFilled(LimitOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Filled<I, DB, DQ, BaseOrQuote>>),
 }

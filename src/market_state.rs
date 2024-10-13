@@ -1,20 +1,28 @@
+use const_decimal::Decimal;
 use getset::{CopyGetters, Getters, Setters};
 
 use crate::{
-    prelude::{CurrencyMarker, MarketUpdate, Mon, Monies, PriceFilter, Quote},
+    prelude::{CurrencyMarker, MarketUpdate, Mon, PriceFilter, QuoteCurrency},
     types::{Result, TimestampNs},
 };
 
 /// Some information regarding the state of the market.
+/// Generics:
+/// - `I`: The numeric data type of currencies.
+/// - `DB`: The constant decimal precision of the `BaseCurrency`.
+/// - `DQ`: The constant decimal precision of the `QuoteCurrency`.
 #[derive(Debug, Default, Clone, Getters, CopyGetters, Setters)]
-pub struct MarketState<T: Mon> {
+pub struct MarketState<I, const DB: u8, const DQ: u8>
+where
+    I: Mon<DB> + Mon<DQ>,
+{
     /// The current bid
     #[getset(get_copy = "pub", set = "pub(crate)")]
-    bid: Monies<T, Quote>,
+    bid: QuoteCurrency<I, DB, DQ>,
 
     /// The current ask
     #[getset(get_copy = "pub", set = "pub(crate)")]
-    ask: Monies<T, Quote>,
+    ask: QuoteCurrency<I, DB, DQ>,
 
     /// The current timestamp in nanoseconds
     #[getset(get_copy = "pub")]
@@ -25,9 +33,9 @@ pub struct MarketState<T: Mon> {
     step: u64,
 }
 
-impl<T> MarketState<T>
+impl<I, const DB: u8, const DQ: u8> MarketState<I, DB, DQ>
 where
-    T: Mon,
+    I: Mon<DB> + Mon<DQ>,
 {
     /// Update the exchange state with new information
     ///
@@ -40,11 +48,11 @@ where
         &mut self,
         timestamp_ns: TimestampNs,
         market_update: &U,
-        price_filter: &PriceFilter<T>,
-    ) -> Result<(), T>
+        price_filter: &PriceFilter<I, DB, DQ>,
+    ) -> Result<(), I, DB, DQ>
     where
-        U: MarketUpdate<T, BaseOrQuote, UserOrderId>,
-        BaseOrQuote: CurrencyMarker<T>,
+        U: MarketUpdate<I, DB, DQ, BaseOrQuote, UserOrderId>,
+        BaseOrQuote: CurrencyMarker<I, DB, DQ>,
         UserOrderId: Clone,
     {
         market_update.validate_market_update(price_filter)?;
@@ -58,8 +66,8 @@ where
 
     /// Get the mid price
     #[inline]
-    pub fn mid_price(&self) -> Monies<T, Quote> {
-        (self.bid + self.ask) / Monies::new(T::from(2_u8))
+    pub fn mid_price(&self) -> QuoteCurrency<I, DB, DQ> {
+        (self.bid + self.ask) / Decimal::try_from_scaled(I::from(2).unwrap(), 0).unwrap()
     }
 
     /// Get the last observed timestamp in nanoseconts
@@ -70,8 +78,8 @@ where
 
     #[cfg(test)]
     pub fn from_components(
-        bid: Monies<T, Quote>,
-        ask: Monies<T, Quote>,
+        bid: QuoteCurrency<I, DB, DQ>,
+        ask: QuoteCurrency<I, DB, DQ>,
         current_ts_ns: TimestampNs,
         step: u64,
     ) -> Self {

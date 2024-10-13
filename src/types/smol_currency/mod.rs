@@ -1,36 +1,41 @@
-use std::fmt::Display;
+mod base_currency;
+mod convert_decimal;
+mod margin_currency_trait;
+// mod monies;
+mod quote_currency;
 
-use fpdec::Decimal;
-use num_traits::{Num, Signed, Zero};
+pub use base_currency::BaseCurrency;
+use const_decimal::ScaledInteger;
+pub use margin_currency_trait::MarginCurrencyMarker;
+pub use quote_currency::QuoteCurrency;
 
-use super::MarginCurrencyMarker;
+use super::BasisPointFrac;
 
-mod monies;
-
-pub use monies::{BaseCurrency, Monies, QuoteCurrency};
-
-/// A money like trait which must satisfy a bunch of trait bounds.
-pub trait Mon:
-    Num
-    + Signed
+/// A trait for monetary values.
+pub trait Mon<const D: u8>:
+    ScaledInteger<D>
     + Default
-    + Clone
-    + Copy
-    + std::fmt::Debug
-    + std::cmp::PartialOrd
-    + Ord
+    + std::ops::Rem
+    + std::ops::Neg
+    + num_traits::CheckedNeg
+    + std::ops::SubAssign
     + std::hash::Hash
-    + From<u8>
-    + From<i32>
-    + From<u64>
-    + Into<f32>
+    + std::fmt::Debug
+    + num_traits::Signed
 {
 }
 
-impl Mon for Decimal {}
+impl<const D: u8> Mon<D> for i32 {}
+impl<const D: u8> Mon<D> for i64 {}
+impl<const D: u8> Mon<D> for i128 {}
 
 /// A currency must be marked as it can be either a `Base` or `Quote` currency.
-pub trait CurrencyMarker<T: Mon>:
+///
+/// # Generics:
+/// - `I` is the numeric type
+/// - `DB` is the decimal precision of the `BaseCurrency`.
+/// - `DQ` is the decimal precision of the `QuoteCurrency`.
+pub trait CurrencyMarker<I, const DB: u8, const DQ: u8>:
     Clone
     + Copy
     + Default
@@ -39,115 +44,23 @@ pub trait CurrencyMarker<T: Mon>:
     + std::cmp::PartialOrd
     + Eq
     + Ord
+    + std::ops::AddAssign
+    + std::ops::SubAssign
+    + std::ops::Mul<BasisPointFrac>
+    + std::ops::Div<I>
     + std::hash::Hash
+    + num_traits::Zero
+    + num_traits::One
+    + num_traits::Signed
+    + Into<f64>
+where
+    I: Mon<DQ> + Mon<DB>,
 {
-    /// The paired currency in the `Symbol`
-    type PairedCurrency: CurrencyMarker<T, PairedCurrency = Self>;
+    /// The paired currency in the `Symbol` with generic decimal precision `DP`.
+    type PairedCurrency: CurrencyMarker<I, DB, DQ, PairedCurrency = Self>;
 
     /// Convert from one currency to another at a given price per unit.
-    fn convert_from(
-        units: Monies<T, Self::PairedCurrency>,
-        price_per_unit: Monies<T, Quote>,
-    ) -> Monies<T, Self>;
-}
-
-/// The `Base` currency in a market is the prefix in the `Symbol`,
-/// e.g BTCUSD means BTC is the base currency, quoted in USD.
-#[derive(Debug, Default, Clone, Copy, PartialOrd, PartialEq, Eq, Ord, Hash)]
-pub struct Base;
-
-impl Display for Base {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Base")
-    }
-}
-
-/// The `Quote` currency in the market is the postfix in the `Symbol`,
-/// e.g BTCUSD means BTC is the base currency, quoted in USD.
-#[derive(Debug, Default, Clone, Copy, PartialOrd, PartialEq, Eq, Ord, Hash)]
-pub struct Quote;
-
-impl Display for Quote {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Quote")
-    }
-}
-
-impl<T: Mon> CurrencyMarker<T> for Base {
-    type PairedCurrency = Quote;
-
-    fn convert_from(
-        units: Monies<T, Self::PairedCurrency>,
-        price_per_unit: Monies<T, Quote>,
-    ) -> Monies<T, Self> {
-        Monies::new(*units.as_ref() / *price_per_unit.as_ref())
-    }
-}
-
-impl<T: Mon> CurrencyMarker<T> for Quote {
-    type PairedCurrency = Base;
-
-    fn convert_from(
-        units: Monies<T, Self::PairedCurrency>,
-        price_per_unit: Monies<T, Quote>,
-    ) -> Monies<T, Self> {
-        Monies::new(*units.as_ref() * *price_per_unit.as_ref())
-    }
-}
-
-/// Linear futures where the `Quote` currency is used as margin currency.
-impl<T> MarginCurrencyMarker<T> for Quote
-where
-    T: Mon,
-{
-    /// This represents a linear futures contract pnl calculation
-    fn pnl(
-        entry_price: Monies<T, Quote>,
-        exit_price: Monies<T, Quote>,
-        quantity: Monies<T, Base>,
-    ) -> Monies<T, Quote> {
-        if quantity.is_zero() {
-            return Monies::zero();
-        }
-        Quote::convert_from(quantity, exit_price) - Quote::convert_from(quantity, entry_price)
-    }
-
-    fn price_paid_for_qty(
-        total_cost: Monies<T, Self>,
-        quantity: Monies<T, Self::PairedCurrency>,
-    ) -> Monies<T, Quote> {
-        if quantity.is_zero() {
-            return Monies::zero();
-        }
-        Monies::new(*total_cost.as_ref() / *quantity.as_ref())
-    }
-}
-
-/// Inverse futures where the `Base` currency is used as margin currency.
-impl<T> MarginCurrencyMarker<T> for Base
-where
-    T: Mon,
-{
-    fn pnl(
-        entry_price: Monies<T, Quote>,
-        exit_price: Monies<T, Quote>,
-        quantity: Monies<T, Quote>,
-    ) -> Monies<T, Base> {
-        if quantity.is_zero() {
-            return Monies::zero();
-        }
-        Base::convert_from(quantity, entry_price) - Base::convert_from(quantity, exit_price)
-    }
-
-    fn price_paid_for_qty(
-        total_cost: Monies<T, Self>,
-        quantity: Monies<T, Self::PairedCurrency>,
-    ) -> Monies<T, Quote> {
-        if total_cost.is_zero() {
-            return Monies::zero();
-        }
-        Monies::new(*quantity.as_ref() / *total_cost.as_ref())
-    }
+    fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, DB, DQ>) -> Self;
 }
 
 #[cfg(test)]
@@ -156,12 +69,6 @@ mod tests {
 
     use super::*;
     use crate::prelude::*;
-
-    #[test]
-    fn size_of_monies() {
-        // assert_eq!(std::mem::size_of::<Monies<i32, Base>>(), 4);
-        assert_eq!(std::mem::size_of::<Monies<Decimal, Base>>(), 32);
-    }
 
     #[test]
     fn convert_base_to_quote() {

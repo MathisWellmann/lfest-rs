@@ -1,51 +1,49 @@
 use std::ops::Neg;
 
-use fpdec::Decimal;
+use const_decimal::Decimal;
 use num_traits::{Num, One, Signed, Zero};
 
-use super::{Base, CurrencyMarker, Mon, Quote};
+use super::Mon;
+use crate::prelude::BasisPointFrac;
 
-/// type alias for easy construction of `Base` currency with `Decimal` data type.
-pub type QuoteCurrency = Monies<Decimal, Quote>;
+/// A currency must be marked as it can be either a `Base` or `Quote` currency.
+trait CurrencyMarker:
+    Clone
+    + Copy
+    + Default
+    + std::fmt::Debug
+    + std::fmt::Display
+    + std::cmp::PartialOrd
+    + Eq
+    + Ord
+    + std::hash::Hash
+{
+    /// The paired currency in the `Symbol`
+    type PairedCurrency: CurrencyMarker<PairedCurrency = Self>;
 
-/// type alias for easy construction of `Quote` currency with `Decimal` data type.
-pub type BaseCurrency = Monies<Decimal, Base>;
-
-/// Allows the quick construction of `BaseCurrency`
-#[macro_export]
-macro_rules! base {
-    ( $a:literal ) => {{
-        use $crate::prelude::fpdec::Decimal;
-        $crate::prelude::BaseCurrency::new($crate::prelude::fpdec::Dec!($a))
-    }};
-}
-
-/// Allows the quick construction of `QuoteCurrency`
-#[macro_export]
-macro_rules! quote {
-    ( $a:literal ) => {{
-        use $crate::prelude::fpdec::Decimal;
-        $crate::prelude::QuoteCurrency::new($crate::prelude::fpdec::Dec!($a))
-    }};
+    // /// Convert from one currency to another at a given price per unit.
+    // fn convert_from<const DQ: u8>(
+    //     units: Monies<I, DP, Self::PairedCurrency>,
+    //     price_per_unit: Monies<I, DQ, Quote>,
+    // ) -> Monies<I, D_SELF, Self>;
 }
 
 /// A generic monetary data type with a marker for being either denominated in `Base` or `Quote` currency.
 #[derive(Default, Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub struct Monies<T, BaseOrQuote>
+pub struct Monies<I, const D: u8, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    BaseOrQuote: CurrencyMarker,
 {
-    value: T,
+    value: I,
     _marker: std::marker::PhantomData<BaseOrQuote>,
 }
 
-impl<T, BaseOrQuote> From<T> for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> From<Decimal<I, D>> for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
-    fn from(value: T) -> Self {
+    fn from(value: Decimal<I, D>) -> Self {
         Self {
             value,
             _marker: std::marker::PhantomData,
@@ -53,34 +51,34 @@ where
     }
 }
 
-impl<T, BaseOrQuote> std::fmt::Display for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> AsRef<Decimal<I, D>> for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
+{
+    fn as_ref(&self) -> &Decimal<I, D> {
+        &self.value
+    }
+}
+
+impl<I, const D: u8, BaseOrQuote> std::fmt::Display for Monies<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?} {:?}", self.value, self._marker)
     }
 }
 
-impl<T, BaseOrQuote> AsRef<T> for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> std::ops::Add for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
-{
-    fn as_ref(&self) -> &T {
-        &self.value
-    }
-}
-
-impl<T, BaseOrQuote> std::ops::Add<Monies<T, BaseOrQuote>> for Monies<T, BaseOrQuote>
-where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
     type Output = Self;
 
-    fn add(self, rhs: Monies<T, BaseOrQuote>) -> Self::Output {
+    fn add(self, rhs: Monies<I, D, BaseOrQuote>) -> Self::Output {
         Self {
             value: self.value + rhs.value,
             _marker: std::marker::PhantomData,
@@ -88,24 +86,24 @@ where
     }
 }
 
-impl<T, BaseOrQuote> std::ops::AddAssign<Monies<T, BaseOrQuote>> for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> std::ops::AddAssign for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
-    fn add_assign(&mut self, rhs: Monies<T, BaseOrQuote>) {
+    fn add_assign(&mut self, rhs: Monies<I, D, BaseOrQuote>) {
         *self = *self + rhs
     }
 }
 
-impl<T, BaseOrQuote> std::ops::Sub<Monies<T, BaseOrQuote>> for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> std::ops::Sub for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
     type Output = Self;
 
-    fn sub(self, rhs: Monies<T, BaseOrQuote>) -> Self::Output {
+    fn sub(self, rhs: Monies<I, D, BaseOrQuote>) -> Self::Output {
         Self {
             value: self.value - rhs.value,
             _marker: std::marker::PhantomData,
@@ -113,24 +111,24 @@ where
     }
 }
 
-impl<T, BaseOrQuote> std::ops::SubAssign<Monies<T, BaseOrQuote>> for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> std::ops::SubAssign for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
-    fn sub_assign(&mut self, rhs: Monies<T, BaseOrQuote>) {
+    fn sub_assign(&mut self, rhs: Monies<I, D, BaseOrQuote>) {
         *self = *self - rhs;
     }
 }
 
-impl<T, BaseOrQuote> std::ops::Mul<Monies<T, BaseOrQuote>> for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> std::ops::Mul for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
     type Output = Self;
 
-    fn mul(self, rhs: Monies<T, BaseOrQuote>) -> Self::Output {
+    fn mul(self, rhs: Monies<I, D, BaseOrQuote>) -> Self::Output {
         Self {
             value: self.value * rhs.value,
             _marker: std::marker::PhantomData,
@@ -138,29 +136,14 @@ where
     }
 }
 
-impl<T, BaseOrQuote> std::ops::Mul<T> for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> std::ops::Div for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
     type Output = Self;
 
-    fn mul(self, rhs: T) -> Self::Output {
-        Self {
-            value: self.value * rhs,
-            _marker: std::marker::PhantomData,
-        }
-    }
-}
-
-impl<T, BaseOrQuote> std::ops::Div<Monies<T, BaseOrQuote>> for Monies<T, BaseOrQuote>
-where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
-{
-    type Output = Self;
-
-    fn div(self, rhs: Monies<T, BaseOrQuote>) -> Self::Output {
+    fn div(self, rhs: Monies<I, D, BaseOrQuote>) -> Self::Output {
         Self {
             value: self.value / rhs.value,
             _marker: std::marker::PhantomData,
@@ -168,14 +151,14 @@ where
     }
 }
 
-impl<T, BaseOrQuote> std::ops::Rem<Monies<T, BaseOrQuote>> for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> std::ops::Rem for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
     type Output = Self;
 
-    fn rem(self, rhs: Monies<T, BaseOrQuote>) -> Self::Output {
+    fn rem(self, rhs: Monies<I, D, BaseOrQuote>) -> Self::Output {
         Self {
             value: self.value.rem(rhs.value),
             _marker: std::marker::PhantomData,
@@ -183,49 +166,35 @@ where
     }
 }
 
-impl<T, BaseOrQuote> Monies<T, BaseOrQuote>
+impl<I, const D: u8> Monies<I, D, Quote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
-{
-    /// Create a new instance from a value `T`
-    pub fn new(value: T) -> Self {
-        Self {
-            value,
-            _marker: std::marker::PhantomData,
-        }
-    }
-}
-
-impl<T> Monies<T, Quote>
-where
-    T: Mon,
+    I: Mon<D>,
 {
     /// Compute the liquidation price of a long position given a maintenance margin requirement fraction
-    pub(crate) fn liquidation_price_long(&self, maint_margin_req: T) -> Self {
+    pub(crate) fn liquidation_price_long(&self, maint_margin_req: BasisPointFrac) -> Self {
         Self {
-            value: self.value * (T::one() - maint_margin_req),
+            value: self.value * (Decimal::one() - maint_margin_req),
             _marker: std::marker::PhantomData,
         }
     }
 
     /// Compute the liquidation price of a short position given a maintenance margin requirement fraction
-    pub(crate) fn liquidation_price_short(&self, maint_margin_req: T) -> Self {
+    pub(crate) fn liquidation_price_short(&self, maint_margin_req: BasisPointFrac) -> Self {
         Self {
-            value: self.value * (T::one() + maint_margin_req),
+            value: self.value * (Decimal::one() + maint_margin_req),
             _marker: std::marker::PhantomData,
         }
     }
 }
 
-impl<T, BaseOrQuote> Zero for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> Zero for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
     fn zero() -> Self {
         Self {
-            value: T::zero(),
+            value: Decimal::zero(),
             _marker: std::marker::PhantomData,
         }
     }
@@ -235,38 +204,38 @@ where
     }
 }
 
-impl<T, BaseOrQuote> One for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> One for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
     fn one() -> Self {
         Self {
-            value: T::one(),
+            value: Decimal::one(),
             _marker: std::marker::PhantomData,
         }
     }
 }
 
-impl<T, BaseOrQuote> Num for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> Num for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
     type FromStrRadixErr = &'static str;
 
     fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
         Ok(Self {
-            value: T::from_str_radix(str, radix).map_err(|_| "Unsupported")?,
+            value: Decimal::from_str_radix(str, radix).map_err(|_| "Unsupported")?,
             _marker: std::marker::PhantomData,
         })
     }
 }
 
-impl<T, BaseOrQuote> Neg for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> Neg for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
     type Output = Self;
 
@@ -278,10 +247,10 @@ where
     }
 }
 
-impl<T, BaseOrQuote> Signed for Monies<T, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> Signed for Monies<I, D, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker,
 {
     fn abs(&self) -> Self {
         Self {
@@ -313,18 +282,101 @@ where
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use fpdec::{Dec, Decimal};
+/// The `Base` currency in a market is the prefix in the `Symbol`,
+/// e.g BTCUSD means BTC is the base currency, quoted in USD.
+#[derive(Debug, Default, Clone, Copy, PartialOrd, PartialEq, Eq, Ord, Hash)]
+pub struct Base;
 
-    use super::*;
-    use crate::prelude::Base;
+impl std::fmt::Display for Base {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Base")
+    }
+}
 
-    #[test]
-    fn add_monies() {
-        assert_eq!(
-            Monies::<_, Base>::new(Dec!(0.5)) + Monies::<_, Base>::new(Dec!(0.5)),
-            Monies::<_, Base>::new(Dec!(1))
-        );
+/// The `Quote` currency in the market is the postfix in the `Symbol`,
+/// e.g BTCUSD means BTC is the base currency, quoted in USD.
+#[derive(Debug, Default, Clone, Copy, PartialOrd, PartialEq, Eq, Ord, Hash)]
+pub struct Quote;
+
+impl std::fmt::Display for Quote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Quote")
+    }
+}
+
+impl CurrencyMarker for Base {
+    type PairedCurrency = Quote;
+
+    // fn convert_from<const DQ: u8>(
+    //     units: Monies<I, Self::DP, Self::PairedCurrency>,
+    //     price_per_unit: Monies<I, DB, Quote>,
+    // ) -> Monies<I, DQ, Self> {
+    //     Monies::new(*units.as_ref() / *price_per_unit.as_ref())
+    // }
+}
+
+impl CurrencyMarker for Quote {
+    type PairedCurrency = Base;
+
+    // fn convert_from(
+    //     units: Monies<T, Self::PairedCurrency>,
+    //     price_per_unit: Monies<T, Quote>,
+    // ) -> Monies<T, Self> {
+    //     Monies::new(*units.as_ref() * *price_per_unit.as_ref())
+    // }
+}
+
+/// Linear futures where the `Quote` currency is used as margin currency.
+impl<T> MarginCurrencyMarker<T> for Quote
+where
+    T: Mon,
+{
+    /// This represents a linear futures contract pnl calculation
+    fn pnl(
+        entry_price: Monies<T, Quote>,
+        exit_price: Monies<T, Quote>,
+        quantity: Monies<T, Base>,
+    ) -> Monies<T, Quote> {
+        if quantity.is_zero() {
+            return Monies::zero();
+        }
+        Quote::convert_from(quantity, exit_price) - Quote::convert_from(quantity, entry_price)
+    }
+
+    fn price_paid_for_qty(
+        total_cost: Monies<T, Self>,
+        quantity: Monies<T, Self::PairedCurrency>,
+    ) -> Monies<T, Quote> {
+        if quantity.is_zero() {
+            return Monies::zero();
+        }
+        Monies::new(*total_cost.as_ref() / *quantity.as_ref())
+    }
+}
+
+/// Inverse futures where the `Base` currency is used as margin currency.
+impl<T> MarginCurrencyMarker<T> for Base
+where
+    T: Mon,
+{
+    fn pnl(
+        entry_price: Monies<T, Quote>,
+        exit_price: Monies<T, Quote>,
+        quantity: Monies<T, Quote>,
+    ) -> Monies<T, Base> {
+        if quantity.is_zero() {
+            return Monies::zero();
+        }
+        Base::convert_from(quantity, entry_price) - Base::convert_from(quantity, exit_price)
+    }
+
+    fn price_paid_for_qty(
+        total_cost: Monies<T, Self>,
+        quantity: Monies<T, Self::PairedCurrency>,
+    ) -> Monies<T, Quote> {
+        if total_cost.is_zero() {
+            return Monies::zero();
+        }
+        Monies::new(*quantity.as_ref() / *total_cost.as_ref())
     }
 }

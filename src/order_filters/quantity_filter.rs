@@ -1,66 +1,68 @@
 //! This module contains order filtering related code
 
 use getset::CopyGetters;
-use num_traits::{One, Zero};
 
-use crate::prelude::{ConfigError, CurrencyMarker, Mon, Monies, OrderError};
+use crate::prelude::{ConfigError, CurrencyMarker, Mon, OrderError, QuoteCurrency};
 
 /// The `SizeFilter` defines the quantity rules that each order needs to follow
 /// The generic currency `S` is always the `PairedCurrency` of the margin
 /// currency
 #[derive(Debug, Clone, CopyGetters)]
-pub struct QuantityFilter<T, BaseOrQuote>
+pub struct QuantityFilter<I, const DB: u8, const DQ: u8, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
 {
     /// Defines the optional minimum `quantity` of any order
     #[getset(get_copy = "pub")]
-    min_quantity: Option<Monies<T, BaseOrQuote>>,
+    min_quantity: Option<BaseOrQuote>,
 
     /// Defines the optional maximum `quantity` of any order
     #[getset(get_copy = "pub")]
-    max_quantity: Option<Monies<T, BaseOrQuote>>,
+    max_quantity: Option<BaseOrQuote>,
 
     /// Defines the intervals that a `quantity` can be increased / decreased by.
     /// For the filter to pass,
     /// (quantity - min_qty) % tick_size == 0
     #[getset(get_copy = "pub")]
-    tick_size: Monies<T, BaseOrQuote>,
+    tick_size: BaseOrQuote,
+
+    _quote: std::marker::PhantomData<QuoteCurrency<I, DB, DQ>>,
 }
 
-impl<T, BaseOrQuote> Default for QuantityFilter<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> Default for QuantityFilter<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
 {
     fn default() -> Self {
         Self {
             min_quantity: None,
             max_quantity: None,
-            tick_size: Monies::one(),
+            tick_size: BaseOrQuote::one(),
+            _quote: std::marker::PhantomData,
         }
     }
 }
 
-impl<T, BaseOrQuote> QuantityFilter<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> QuantityFilter<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
 {
     /// Create a new instance of the QuantityFilter.
     /// Make sure the `min_quantity` is a multiple of `tick_size`.
     pub fn new(
-        min_quantity: Option<Monies<T, BaseOrQuote>>,
-        max_quantity: Option<Monies<T, BaseOrQuote>>,
-        tick_size: Monies<T, BaseOrQuote>,
+        min_quantity: Option<BaseOrQuote>,
+        max_quantity: Option<BaseOrQuote>,
+        tick_size: BaseOrQuote,
     ) -> Result<Self, ConfigError> {
         if let Some(min_qty) = min_quantity {
-            if (min_qty % tick_size) != Monies::zero() {
+            if (min_qty % tick_size) != BaseOrQuote::zero() {
                 return Err(ConfigError::InvalidMinQuantity);
             }
         }
-        if tick_size == Monies::zero() {
+        if tick_size == BaseOrQuote::zero() {
             return Err(ConfigError::InvalidTickSize);
         }
 
@@ -68,14 +70,15 @@ where
             min_quantity,
             max_quantity,
             tick_size,
+            _quote: std::marker::PhantomData,
         })
     }
 
     pub(crate) fn validate_order_quantity(
         &self,
-        quantity: Monies<T, BaseOrQuote>,
-    ) -> std::result::Result<(), OrderError<T>> {
-        if quantity == Monies::zero() {
+        quantity: BaseOrQuote,
+    ) -> std::result::Result<(), OrderError<I, DB, DQ>> {
+        if quantity == BaseOrQuote::zero() {
             return Err(OrderError::QuantityTooLow);
         }
 
@@ -91,10 +94,10 @@ where
             }
             min_qty
         } else {
-            Monies::zero()
+            BaseOrQuote::zero()
         };
 
-        if ((quantity - min_qty) % self.tick_size) != Monies::zero() {
+        if ((quantity - min_qty) % self.tick_size) != BaseOrQuote::zero() {
             return Err(OrderError::InvalidQuantityStepSize);
         }
         Ok(())

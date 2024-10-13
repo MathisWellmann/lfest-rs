@@ -6,78 +6,78 @@ use tracing::debug;
 use crate::{
     position_inner::PositionInner,
     prelude::{
-        CurrencyMarker, Mon, Monies, Quote, TransactionAccounting, USER_POSITION_MARGIN_ACCOUNT,
+        BasisPointFrac, CurrencyMarker, Mon, QuoteCurrency, TransactionAccounting,
+        USER_POSITION_MARGIN_ACCOUNT,
     },
     types::{MarginCurrencyMarker, Side},
 };
 
 /// A futures position can be one of three variants.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub enum Position<T, BaseOrQuote>
+pub enum Position<I, const DB: u8, const DQ: u8, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
-    // BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
 {
     /// No position present.
     #[default]
     Neutral,
     /// A position in the long direction.
-    Long(PositionInner<T, BaseOrQuote>),
+    Long(PositionInner<I, DB, DQ, BaseOrQuote>),
     /// A position in the short direction.
-    Short(PositionInner<T, BaseOrQuote>),
+    Short(PositionInner<I, DB, DQ, BaseOrQuote>),
 }
 
-impl<T, BaseOrQuote> Position<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> Position<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, DB, DQ>,
 {
     /// Return the positions unrealized profit and loss.
     pub fn unrealized_pnl(
         &self,
-        bid: Monies<T, Quote>,
-        ask: Monies<T, Quote>,
-    ) -> Monies<T, BaseOrQuote::PairedCurrency> {
+        bid: QuoteCurrency<I, DB, DQ>,
+        ask: QuoteCurrency<I, DB, DQ>,
+    ) -> BaseOrQuote::PairedCurrency {
         match self {
-            Position::Neutral => Monies::zero(),
+            Position::Neutral => BaseOrQuote::PairedCurrency::zero(),
             Position::Long(inner) => inner.unrealized_pnl(bid),
             Position::Short(inner) => inner.unrealized_pnl(ask).neg(),
         }
     }
 
     /// The quantity of the position, is negative when short.
-    pub fn quantity(&self) -> Monies<T, BaseOrQuote> {
+    pub fn quantity(&self) -> BaseOrQuote {
         match self {
-            Position::Neutral => Monies::zero(),
+            Position::Neutral => BaseOrQuote::zero(),
             Position::Long(inner) => inner.quantity(),
             Position::Short(inner) => inner.quantity().neg(),
         }
     }
 
     /// Get the outstanding fees of the position that will be payed when reducing the position.
-    pub fn outstanding_fees(&self) -> Monies<T, BaseOrQuote::PairedCurrency> {
+    pub fn outstanding_fees(&self) -> BaseOrQuote::PairedCurrency {
         match self {
-            Position::Neutral => Monies::zero(),
+            Position::Neutral => BaseOrQuote::PairedCurrency::zero(),
             Position::Long(inner) => inner.outstanding_fees(),
             Position::Short(inner) => inner.outstanding_fees(),
         }
     }
 
     /// The entry price of the position which is the total cost of the position relative to its quantity.
-    pub fn entry_price(&self) -> Monies<T, Quote> {
+    pub fn entry_price(&self) -> QuoteCurrency<I, DB, DQ> {
         match self {
-            Position::Neutral => Monies::zero(),
+            Position::Neutral => QuoteCurrency::zero(),
             Position::Long(inner) => inner.entry_price(),
             Position::Short(inner) => inner.entry_price(),
         }
     }
 
     /// The total value of the position which is composed of quantity and avg. entry price.
-    pub fn total_cost(&self) -> Monies<T, BaseOrQuote::PairedCurrency> {
+    pub fn total_cost(&self) -> BaseOrQuote::PairedCurrency {
         match self {
-            Position::Neutral => Monies::zero(),
+            Position::Neutral => BaseOrQuote::PairedCurrency::zero(),
             Position::Long(inner) => inner.total_cost(),
             Position::Short(inner) => inner.total_cost(),
         }
@@ -86,17 +86,17 @@ where
     /// Change a position while doing proper accounting and balance transfers.
     pub(crate) fn change_position<Acc>(
         &mut self,
-        filled_qty: Monies<T, BaseOrQuote>,
-        fill_price: Monies<T, Quote>,
+        filled_qty: BaseOrQuote,
+        fill_price: QuoteCurrency<I, DB, DQ>,
         side: Side,
         transaction_accounting: &mut Acc,
-        init_margin_req: T,
-        fees: Monies<T, BaseOrQuote::PairedCurrency>,
+        init_margin_req: BasisPointFrac,
+        fees: BaseOrQuote::PairedCurrency,
     ) where
-        Acc: TransactionAccounting<T, BaseOrQuote::PairedCurrency>,
+        Acc: TransactionAccounting<I, DB, DQ, BaseOrQuote::PairedCurrency>,
     {
         debug_assert!(
-            filled_qty > Monies::zero(),
+            filled_qty > BaseOrQuote::zero(),
             "The filled_qty must be greater than zero"
         );
         debug!("old position: {}", self);
@@ -106,7 +106,7 @@ where
                     transaction_accounting
                         .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
                         .expect("Is valid account"),
-                    Monies::zero()
+                    BaseOrQuote::PairedCurrency::zero()
                 );
                 match side {
                     Side::Buy => {
@@ -146,7 +146,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
-                            T::one(),
+                            1,
                             fees,
                         );
                     }
@@ -156,7 +156,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
-                            T::one(),
+                            1,
                             fees,
                         );
                         *self = Position::Neutral;
@@ -164,7 +164,7 @@ where
                             transaction_accounting
                                 .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
                                 .expect("Is valid account"),
-                            Monies::zero()
+                            BaseOrQuote::PairedCurrency::zero()
                         );
                     }
                     Ordering::Greater => {
@@ -174,22 +174,22 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
-                            T::one(),
+                            1,
                             fees,
                         );
-                        assert_eq!(inner.quantity(), Monies::zero());
+                        assert_eq!(inner.quantity(), BaseOrQuote::zero());
                         assert_eq!(
                             transaction_accounting
                                 .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
                                 .expect("Is valid account"),
-                            Monies::zero()
+                            BaseOrQuote::PairedCurrency::zero()
                         );
                         *self = Position::Short(PositionInner::new(
                             new_short_qty,
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
-                            Monies::zero(),
+                            BaseOrQuote::PairedCurrency::zero(),
                         ));
                     }
                 },
@@ -202,7 +202,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
-                            T::one().neg(),
+                            -1,
                             fees,
                         );
                     }
@@ -212,7 +212,7 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
-                            T::one().neg(),
+                            -1,
                             fees,
                         );
                         *self = Position::Neutral;
@@ -220,7 +220,7 @@ where
                             transaction_accounting
                                 .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
                                 .expect("Is valid account"),
-                            Monies::zero()
+                            BaseOrQuote::PairedCurrency::zero()
                         );
                     }
                     Ordering::Greater => {
@@ -230,22 +230,22 @@ where
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
-                            T::one().neg(),
+                            -1,
                             fees,
                         );
-                        assert_eq!(inner.quantity(), Monies::zero());
+                        assert_eq!(inner.quantity(), BaseOrQuote::zero());
                         assert_eq!(
                             transaction_accounting
                                 .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
                                 .expect("Is valid account"),
-                            Monies::zero()
+                            BaseOrQuote::PairedCurrency::zero()
                         );
                         *self = Position::Long(PositionInner::new(
                             new_long_qty,
                             fill_price,
                             transaction_accounting,
                             init_margin_req,
-                            Monies::zero(),
+                            BaseOrQuote::PairedCurrency::zero(),
                         ));
                     }
                 },
@@ -265,11 +265,12 @@ where
     }
 }
 
-impl<T, BaseOrQuote> std::fmt::Display for Position<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> std::fmt::Display
+    for Position<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, DB, DQ>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

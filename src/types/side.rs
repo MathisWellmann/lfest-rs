@@ -1,9 +1,5 @@
 use std::fmt::Formatter;
 
-use num_traits::Zero;
-
-use super::{CurrencyMarker, Mon, Monies};
-
 /// Side of the order
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Side {
@@ -23,14 +19,13 @@ impl Side {
     }
 
     /// Parse the side of a taker trade from the trade quantity.
-    pub fn from_taker_quantity<T, BaseOrQuote>(qty: Monies<T, BaseOrQuote>) -> Self
+    pub fn from_taker_quantity<BaseOrQuote>(qty: BaseOrQuote) -> Self
     where
-        T: Mon,
-        BaseOrQuote: CurrencyMarker<T>,
+        BaseOrQuote: num_traits::Signed,
     {
         assert!(!qty.is_zero(), "A trade quantity cannot be zero");
 
-        if qty < Monies::zero() {
+        if qty.is_negative() {
             Side::Sell
         } else {
             Side::Buy

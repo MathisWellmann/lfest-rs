@@ -1,34 +1,41 @@
+use const_decimal::Decimal;
 use getset::{CopyGetters, Getters, Setters};
+use num_traits::One;
 
 use crate::{
     leverage,
-    prelude::{ConfigError, CurrencyMarker, Maker, Mon, PriceFilter, QuantityFilter, Taker},
+    prelude::{
+        BasisPointFrac, ConfigError, CurrencyMarker, Maker, Mon, PriceFilter, QuantityFilter, Taker,
+    },
     types::{Fee, Leverage},
 };
 
 /// Specifies the details of the futures contract
+/// Generics:
+/// - `I`: The numeric data type of currencies.
+/// - `DB`: The constant decimal precision of the `BaseCurrency`.
+/// - `DQ`: The constant decimal precision of the `QuoteCurrency`.
+/// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 #[derive(Debug, Clone, Getters, CopyGetters, Setters)]
-pub struct ContractSpecification<T, BaseOrQuote>
+pub struct ContractSpecification<I, const DB: u8, const DQ: u8, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
 {
     /// Identifying ticker symbol
     #[getset(get = "pub", set = "pub")]
     ticker: String,
 
     /// The initial deposit required to open a new futures position.
-    /// Expressed as a fraction.
-    /// Eg. 1% (0.01) initial margin requirement, which is equal to 100x leverage.
+    /// Expressed as basis points.
     #[getset(get_copy = "pub")]
-    init_margin_req: T,
+    init_margin_req: BasisPointFrac,
 
     /// The minimum amount that must be maintained in the traders account to
     /// keep existing positions open.
-    /// Expressed as a fraction.
-    /// Eg. 0.5% (0.005).
+    /// Expressed as basis points.
     #[getset(get_copy = "pub")]
-    maintenance_margin: T,
+    maintenance_margin: BasisPointFrac,
 
     /// The method for computing `mark-to-market`.
     #[getset(get_copy = "pub", set = "pub")]
@@ -36,11 +43,11 @@ where
 
     /// Pricing rules
     #[getset(get = "pub")]
-    price_filter: PriceFilter<T>,
+    price_filter: PriceFilter<I, DB, DQ>,
 
     /// Quantity rules
     #[getset(get = "pub")]
-    quantity_filter: QuantityFilter<T, BaseOrQuote>,
+    quantity_filter: QuantityFilter<I, DB, DQ, BaseOrQuote>,
 
     /// The maker fee as parts per 100_000
     #[getset(get_copy = "pub")]
@@ -51,10 +58,10 @@ where
     fee_taker: Fee<Taker>,
 }
 
-impl<T, BaseOrQuote> ContractSpecification<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> ContractSpecification<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
 {
     /// Create a new `ContractSpecification` from the most basic parameters.
     ///
@@ -69,13 +76,15 @@ where
     /// `fee_taker`: The fee a taker pays.
     pub fn new(
         leverage: Leverage,
-        maintenance_margin_fraction: T,
-        price_filter: PriceFilter<T>,
-        quantity_filter: QuantityFilter<T, BaseOrQuote>,
+        maintenance_margin: BasisPointFrac,
+        price_filter: PriceFilter<I, DB, DQ>,
+        quantity_filter: QuantityFilter<I, DB, DQ, BaseOrQuote>,
         fee_maker: Fee<Maker>,
         fee_taker: Fee<Taker>,
     ) -> Result<Self, ConfigError> {
-        if maintenance_margin_fraction > T::one() || maintenance_margin_fraction <= T::zero() {
+        if maintenance_margin > BasisPointFrac::from(Decimal::one())
+            || maintenance_margin <= BasisPointFrac::from(Decimal::one())
+        {
             return Err(ConfigError::InvalidMaintenanceMarginFraction);
         }
 
@@ -84,7 +93,7 @@ where
         Ok(Self {
             ticker: String::new(),
             init_margin_req,
-            maintenance_margin: init_margin_req * maintenance_margin_fraction,
+            maintenance_margin: init_margin_req * maintenance_margin,
             mark_method: MarkMethod::default(),
             price_filter,
             quantity_filter,
@@ -94,15 +103,16 @@ where
     }
 }
 
-impl<T, BaseOrQuote> Default for ContractSpecification<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> Default
+    for ContractSpecification<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
 {
     fn default() -> Self {
         Self::new(
             leverage!(1),
-            T::one() / T::from(2),
+            BasisPointFrac::from(Decimal::try_from_scaled(5, 1).unwrap()),
             PriceFilter::default(),
             QuantityFilter::default(),
             Fee::from_basis_points(2),

@@ -4,15 +4,18 @@ use crate::prelude::{Mon, OrderId};
 /// Describes possible Errors that may occur when calling methods in this crate
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
 #[allow(missing_docs)]
-pub enum Error<T: Mon> {
+pub enum Error<I, const DB: u8, const DQ: u8>
+where
+    I: Mon<DB> + Mon<DQ>,
+{
     #[error(transparent)]
-    FilterError(#[from] FilterError<T>),
+    FilterError(#[from] FilterError<I, DB, DQ>),
 
     #[error(transparent)]
     ConfigError(#[from] ConfigError),
 
     #[error(transparent)]
-    OrderError(#[from] OrderError<T>),
+    OrderError(#[from] OrderError<I, DB, DQ>),
 
     #[error(transparent)]
     RiskError(#[from] RiskError),
@@ -29,12 +32,12 @@ pub enum Error<T: Mon> {
     #[error("The order is no longer active")]
     OrderNoLongerActive,
 
-    #[error(transparent)]
-    Decimal(#[from] fpdec::DecimalError),
-
     #[error("Failed to lookup account.")]
     AccountLookupFailure,
 
     #[error("The amended order quantity has already been filled in the original order. Remaining order was cancelled.")]
     AmendQtyAlreadyFilled,
+
+    #[error("The constant decimal precision is incompatible")]
+    WrongDecimalPrecision,
 }

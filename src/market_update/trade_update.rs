@@ -1,10 +1,8 @@
-use num_traits::Zero;
-
 use super::MarketUpdate;
 use crate::{
     order_filters::{enforce_max_price, enforce_min_price, enforce_step_size},
     prelude::{
-        CurrencyMarker, LimitOrder, MarketState, Mon, Monies, Pending, PriceFilter, Quote, Side,
+        CurrencyMarker, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side,
     },
     utils::min,
     Result,
@@ -12,37 +10,37 @@ use crate::{
 
 /// A taker trade that consumes liquidity in the book.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct Trade<T, BaseOrQuote>
+pub struct Trade<I, const DB: u8, const DQ: u8, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
 {
     /// The price at which the trade executed at.
-    pub price: Monies<T, Quote>,
+    pub price: QuoteCurrency<I, DB, DQ>,
     /// The executed quantity.
     /// Generic denotation, e.g either Quote or Base currency denoted.
-    pub quantity: Monies<T, BaseOrQuote>,
+    pub quantity: BaseOrQuote,
     /// Either a buy or sell order.
     // TODO: remove field and derive from sign of `quantity` to save size of struct.
     pub side: Side,
 }
 
-impl<T, BaseOrQuote, UserOrderId> MarketUpdate<T, BaseOrQuote, UserOrderId>
-    for Trade<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId>
+    MarketUpdate<I, DB, DQ, BaseOrQuote, UserOrderId> for Trade<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
     UserOrderId: Clone,
 {
     fn limit_order_filled(
         &self,
-        order: &LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>,
-    ) -> Option<Monies<T, BaseOrQuote>> {
+        order: &LimitOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
+    ) -> Option<BaseOrQuote> {
         assert!(
-            self.quantity > Monies::zero(),
+            self.quantity > BaseOrQuote::zero(),
             "The trade quantity must be greater than zero."
         );
-        assert!(order.remaining_quantity() > Monies::zero());
+        assert!(order.remaining_quantity() > BaseOrQuote::zero());
 
         // Notice that the limit order price must be strictly lower or higher than the limit order price,
         // because we assume the limit order has the worst possible queue position in the book.
@@ -58,14 +56,17 @@ where
         }
     }
 
-    fn validate_market_update(&self, price_filter: &PriceFilter<T>) -> Result<(), T> {
+    fn validate_market_update(
+        &self,
+        price_filter: &PriceFilter<I, DB, DQ>,
+    ) -> Result<(), I, DB, DQ> {
         enforce_min_price(price_filter.min_price(), self.price)?;
         enforce_max_price(price_filter.max_price(), self.price)?;
         enforce_step_size(price_filter.tick_size(), self.price)?;
         Ok(())
     }
 
-    fn update_market_state(&self, _market_state: &mut MarketState<T>) {}
+    fn update_market_state(&self, _market_state: &mut MarketState<I, DB, DQ>) {}
 }
 /// Creates the `Trade` struct used as a `MarketUpdate`.
 #[macro_export]

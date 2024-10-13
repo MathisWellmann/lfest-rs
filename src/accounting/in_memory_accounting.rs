@@ -2,10 +2,9 @@ use tracing::trace;
 
 use super::{
     account::TAccount, transaction::Transaction, utils::debug_assert_accounting_equation,
-    AccountId, TransactionAccounting,
+    AccountId, Mon, TransactionAccounting,
 };
 use crate::{
-    prelude::{Mon, Monies},
     types::{Error, MarginCurrencyMarker},
     Result,
 };
@@ -27,23 +26,23 @@ pub const TREASURY_ACCOUNT: usize = 5;
 
 /// Keeps track of transaction in memory.
 #[derive(Debug)]
-pub struct InMemoryTransactionAccounting<T, BaseOrQuote>
+pub struct InMemoryTransactionAccounting<I, const DB: u8, const DQ: u8, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
 {
     /// Accounts are allocated at the start as they are known upfront.
-    margin_accounts: [TAccount<T, BaseOrQuote>; N_ACCOUNTS],
+    margin_accounts: [TAccount<I, DB, DQ, BaseOrQuote>; N_ACCOUNTS],
     // TODO: keep track of transaction log or emit `Transactions` to users.
 }
 
-impl<T, BaseOrQuote> TransactionAccounting<T, BaseOrQuote>
-    for InMemoryTransactionAccounting<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> TransactionAccounting<I, DB, DQ, BaseOrQuote>
+    for InMemoryTransactionAccounting<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
 {
-    fn new(user_starting_wallet_balance: Monies<T, BaseOrQuote>) -> Self {
+    fn new(user_starting_wallet_balance: BaseOrQuote) -> Self {
         let mut s = Self {
             margin_accounts: [TAccount::default(); N_ACCOUNTS],
         };
@@ -56,8 +55,8 @@ where
 
     fn create_margin_transfer(
         &mut self,
-        transaction: Transaction<T, BaseOrQuote>,
-    ) -> Result<(), T> {
+        transaction: Transaction<I, DB, DQ, BaseOrQuote>,
+    ) -> Result<(), I, DB, DQ> {
         trace!("create_margin_transfer: {transaction:?}");
         let mut debit_account = self
             .margin_accounts
@@ -80,7 +79,7 @@ where
         Ok(())
     }
 
-    fn margin_balance_of(&self, account: AccountId) -> Result<Monies<T, BaseOrQuote>, T> {
+    fn margin_balance_of(&self, account: AccountId) -> Result<BaseOrQuote, I, DB, DQ> {
         self.margin_accounts
             .get(account)
             .ok_or(Error::AccountLookupFailure)

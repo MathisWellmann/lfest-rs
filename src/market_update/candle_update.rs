@@ -1,12 +1,10 @@
-use num_traits::Zero;
-
 use super::MarketUpdate;
 use crate::{
     order_filters::{
         enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
     },
     prelude::{
-        CurrencyMarker, LimitOrder, MarketState, Mon, Monies, Pending, PriceFilter, Quote, Side,
+        CurrencyMarker, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side,
     },
     Result,
 };
@@ -15,31 +13,32 @@ use crate::{
 /// Here we can use the `high` and `low` prices to see if our simulated resting orders
 /// have been executed over the last period as a proxy in absence of actual `Trade` flow.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct Candle<T>
+pub struct Candle<I, const DB: u8, const DQ: u8>
 where
-    T: Mon,
+    I: Mon<DB> + Mon<DQ>,
 {
     /// The best bid at the time of candle creation
-    pub bid: Monies<T, Quote>,
+    pub bid: QuoteCurrency<I, DB, DQ>,
     /// The best ask at the time of candle creation
-    pub ask: Monies<T, Quote>,
+    pub ask: QuoteCurrency<I, DB, DQ>,
     /// The low price of the candle
-    pub low: Monies<T, Quote>,
+    pub low: QuoteCurrency<I, DB, DQ>,
     /// The high price of the candle
-    pub high: Monies<T, Quote>,
+    pub high: QuoteCurrency<I, DB, DQ>,
 }
 
-impl<T, BaseOrQuote, UserOrderId> MarketUpdate<T, BaseOrQuote, UserOrderId> for Candle<T>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId>
+    MarketUpdate<I, DB, DQ, BaseOrQuote, UserOrderId> for Candle<I, DB, DQ>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
     UserOrderId: Clone,
 {
     fn limit_order_filled(
         &self,
-        order: &LimitOrder<T, BaseOrQuote, UserOrderId, Pending<T, BaseOrQuote>>,
-    ) -> Option<Monies<T, BaseOrQuote>> {
-        assert!(order.remaining_quantity() > Monies::zero());
+        order: &LimitOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
+    ) -> Option<BaseOrQuote> {
+        assert!(order.remaining_quantity() > BaseOrQuote::zero());
 
         // As a simplifying assumption, the order always get executed fully when using candles if the price is right.
         if match order.side() {
@@ -56,7 +55,10 @@ where
         }
     }
 
-    fn validate_market_update(&self, price_filter: &PriceFilter<T>) -> Result<(), T> {
+    fn validate_market_update(
+        &self,
+        price_filter: &PriceFilter<I, DB, DQ>,
+    ) -> Result<(), I, DB, DQ> {
         enforce_min_price(price_filter.min_price(), self.bid)?;
         enforce_min_price(price_filter.min_price(), self.ask)?;
         enforce_min_price(price_filter.min_price(), self.low)?;
@@ -74,7 +76,7 @@ where
         Ok(())
     }
 
-    fn update_market_state(&self, market_state: &mut MarketState<T>) {
+    fn update_market_state(&self, market_state: &mut MarketState<I, DB, DQ>) {
         market_state.set_bid(self.bid);
         market_state.set_ask(self.ask);
     }

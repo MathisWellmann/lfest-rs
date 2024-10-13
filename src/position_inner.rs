@@ -6,8 +6,8 @@ use tracing::{debug, trace};
 
 use crate::{
     prelude::{
-        CurrencyMarker, Mon, Monies, Quote, Transaction, TransactionAccounting,
-        EXCHANGE_FEE_ACCOUNT, TREASURY_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
+        BasisPointFrac, CurrencyMarker, Mon, QuoteCurrency, Transaction, TransactionAccounting,
+        TREASURY_ACCOUNT, USER_WALLET_ACCOUNT,
     },
     types::MarginCurrencyMarker,
 };
@@ -15,65 +15,66 @@ use crate::{
 /// Describes the position information of the account.
 /// It assumes isolated margining mechanism, because the margin is directly associated with the position.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Getters, CopyGetters)]
-pub struct PositionInner<T, BaseOrQuote>
+pub struct PositionInner<I, const DB: u8, const DQ: u8, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
 {
     /// The number of futures contracts making up the position.
     #[getset(get_copy = "pub")]
-    quantity: Monies<T, BaseOrQuote>,
+    quantity: BaseOrQuote,
 
     /// The total cost paid for the position (not margin though).
     #[getset(get_copy = "pub")]
-    total_cost: Monies<T, BaseOrQuote::PairedCurrency>,
+    total_cost: BaseOrQuote::PairedCurrency,
 
     /// The outstanding fees of the position that will be payed when reducing the position.
     #[getset(get_copy = "pub")]
-    outstanding_fees: Monies<T, BaseOrQuote::PairedCurrency>,
+    outstanding_fees: BaseOrQuote::PairedCurrency,
 }
 
-impl<T, BaseOrQuote> PositionInner<T, BaseOrQuote>
+impl<I, const DB: u8, const DQ: u8, BaseOrQuote> PositionInner<I, DB, DQ, BaseOrQuote>
 where
-    T: Mon,
-    BaseOrQuote: CurrencyMarker<T>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<T>,
+    I: Mon<DB> + Mon<DQ>,
+    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, DB, DQ>,
 {
     /// Create a new instance.
     ///
     /// # Panics:
     /// if `quantity` or `entry_price` are invalid.
     pub fn new<Acc>(
-        quantity: Monies<T, BaseOrQuote>,
-        entry_price: Monies<T, Quote>,
+        quantity: BaseOrQuote,
+        entry_price: QuoteCurrency<I, DB, DQ>,
         accounting: &mut Acc,
-        init_margin_req: T,
-        fees: Monies<T, BaseOrQuote::PairedCurrency>,
+        init_margin_req: BasisPointFrac,
+        fees: BaseOrQuote::PairedCurrency,
     ) -> Self
     where
-        Acc: TransactionAccounting<T, BaseOrQuote::PairedCurrency>,
+        Acc: TransactionAccounting<I, DB, DQ, BaseOrQuote::PairedCurrency>,
     {
         trace!("new position: qty {quantity} @ {entry_price}");
-        assert!(quantity > Monies::zero());
-        assert!(entry_price > Monies::zero());
+        assert!(quantity > BaseOrQuote::zero());
+        assert!(entry_price > QuoteCurrency::zero());
 
-        let margin =
-            BaseOrQuote::PairedCurrency::convert_from(quantity, entry_price) * init_margin_req;
-        let transaction =
-            Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
-        accounting
-            .create_margin_transfer(transaction)
-            .expect("margin transfer for opening a new position works.");
+        // let margin =
+        //     BaseOrQuote::PairedCurrency::convert_from(quantity, entry_price) * init_margin_req;
+        // let transaction =
+        //     Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
+        // accounting
+        //     .create_margin_transfer(transaction)
+        //     .expect("margin transfer for opening a new position works.");
 
-        Self {
-            quantity,
-            total_cost: BaseOrQuote::PairedCurrency::convert_from(quantity, entry_price),
-            outstanding_fees: fees,
-        }
+        // Self {
+        //     quantity,
+        //     total_cost: BaseOrQuote::PairedCurrency::convert_from(quantity, entry_price),
+        //     outstanding_fees: fees,
+        // }
+        todo!()
     }
 
     /// The average price at which this position was entered into.
-    pub fn entry_price(&self) -> Monies<T, Quote> {
+    pub fn entry_price(&self) -> QuoteCurrency<I, DB, DQ> {
         BaseOrQuote::PairedCurrency::price_paid_for_qty(self.total_cost, self.quantity)
     }
 
@@ -82,28 +83,28 @@ where
     /// denoted in BASE when using inverse futures
     pub fn unrealized_pnl(
         &self,
-        mark_to_market_price: Monies<T, Quote>,
-    ) -> Monies<T, BaseOrQuote::PairedCurrency> {
+        mark_to_market_price: QuoteCurrency<I, DB, DQ>,
+    ) -> BaseOrQuote::PairedCurrency {
         BaseOrQuote::PairedCurrency::pnl(self.entry_price(), mark_to_market_price, self.quantity)
     }
 
     /// Add contracts to the position.
     pub(crate) fn increase_contracts<Acc>(
         &mut self,
-        qty: Monies<T, BaseOrQuote>,
-        entry_price: Monies<T, Quote>,
+        qty: BaseOrQuote,
+        entry_price: QuoteCurrency<I, DB, DQ>,
         accounting: &mut Acc,
-        init_margin_req: T,
-        fees: Monies<T, BaseOrQuote::PairedCurrency>,
+        init_margin_req: BasisPointFrac,
+        fees: BaseOrQuote::PairedCurrency,
     ) where
-        Acc: TransactionAccounting<T, BaseOrQuote::PairedCurrency>,
+        Acc: TransactionAccounting<I, DB, DQ, BaseOrQuote::PairedCurrency>,
     {
         debug!(
             "increase_contracts: qty: {qty} @ {entry_price}; self: {:?}",
             self
         );
-        assert!(qty > Monies::zero());
-        assert!(entry_price > Monies::zero());
+        assert!(qty > BaseOrQuote::zero());
+        assert!(entry_price > QuoteCurrency::zero());
 
         let value = BaseOrQuote::PairedCurrency::convert_from(qty, entry_price);
 
@@ -111,33 +112,34 @@ where
         self.outstanding_fees += fees;
         self.total_cost += value;
 
-        let margin = value * init_margin_req;
-        let transaction =
-            Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
-        accounting
-            .create_margin_transfer(transaction)
-            .expect("is an internal call and must work");
+        // let margin = value * init_margin_req;
+        // let transaction =
+        //     Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
+        // accounting
+        //     .create_margin_transfer(transaction)
+        //     .expect("is an internal call and must work");
+        todo!()
     }
 
     /// Decrease the position.
     pub(crate) fn decrease_contracts<Acc>(
         &mut self,
-        qty: Monies<T, BaseOrQuote>,
-        liquidation_price: Monies<T, Quote>,
+        qty: BaseOrQuote,
+        liquidation_price: QuoteCurrency<I, DB, DQ>,
         accounting: &mut Acc,
-        init_margin_req: T,
-        direction_multiplier: T,
-        fees: Monies<T, BaseOrQuote::PairedCurrency>,
+        init_margin_req: BasisPointFrac,
+        direction_multiplier: i8,
+        fees: BaseOrQuote::PairedCurrency,
     ) where
-        Acc: TransactionAccounting<T, BaseOrQuote::PairedCurrency>,
+        Acc: TransactionAccounting<I, DB, DQ, BaseOrQuote::PairedCurrency>,
     {
         debug!(
             "decrease_contracts: qty: {qty} @ {liquidation_price}; self: {:?}",
             self
         );
-        assert!(qty > Monies::zero());
+        assert!(qty > BaseOrQuote::zero());
         assert!(qty <= self.quantity);
-        debug_assert!(direction_multiplier == T::one() || direction_multiplier == T::from(-1));
+        debug_assert!(direction_multiplier == 1 || direction_multiplier == -1);
 
         let entry_price = self.entry_price();
 
@@ -145,17 +147,17 @@ where
         self.outstanding_fees += fees;
         self.total_cost -= BaseOrQuote::PairedCurrency::convert_from(qty, entry_price);
 
-        debug_assert!(self.quantity >= Monies::zero());
+        debug_assert!(self.quantity >= BaseOrQuote::zero());
         if self.quantity.is_zero() {
-            assert_eq!(*self.total_cost.as_ref(), T::zero());
+            assert_eq!(self.total_cost, BaseOrQuote::PairedCurrency::zero());
         }
 
         let pnl = BaseOrQuote::PairedCurrency::pnl(
             entry_price,
             liquidation_price,
-            qty * direction_multiplier,
+            if direction_multiplier == 1 { qty } else { -qty },
         );
-        match pnl.cmp(&Monies::zero()) {
+        match pnl.cmp(&BaseOrQuote::PairedCurrency::zero()) {
             Ordering::Greater => {
                 let transaction = Transaction::new(USER_WALLET_ACCOUNT, TREASURY_ACCOUNT, pnl);
                 accounting
@@ -171,26 +173,27 @@ where
             }
             Ordering::Equal => {}
         }
-        let margin_to_free =
-            BaseOrQuote::PairedCurrency::convert_from(qty, entry_price) * init_margin_req;
-        let transaction = Transaction::new(
-            USER_WALLET_ACCOUNT,
-            USER_POSITION_MARGIN_ACCOUNT,
-            margin_to_free,
-        );
-        accounting
-            .create_margin_transfer(transaction)
-            .expect("margin transfer must work");
+        // let margin_to_free =
+        //     BaseOrQuote::PairedCurrency::convert_from(qty, entry_price) * init_margin_req;
+        // let transaction = Transaction::new(
+        //     USER_WALLET_ACCOUNT,
+        //     USER_POSITION_MARGIN_ACCOUNT,
+        //     margin_to_free,
+        // );
+        // accounting
+        //     .create_margin_transfer(transaction)
+        //     .expect("margin transfer must work");
 
-        let transaction = Transaction::new(
-            EXCHANGE_FEE_ACCOUNT,
-            USER_WALLET_ACCOUNT,
-            self.outstanding_fees,
-        );
-        accounting
-            .create_margin_transfer(transaction)
-            .expect("margin transfer must work");
-        self.outstanding_fees = Monies::zero();
+        // let transaction = Transaction::new(
+        //     EXCHANGE_FEE_ACCOUNT,
+        //     USER_WALLET_ACCOUNT,
+        //     self.outstanding_fees,
+        // );
+        // accounting
+        //     .create_margin_transfer(transaction)
+        //     .expect("margin transfer must work");
+        // self.outstanding_fees = BaseOrQuote::PairedCurrency::zero();
+        todo!()
     }
 }
 
