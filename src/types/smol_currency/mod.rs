@@ -22,15 +22,12 @@ pub trait Mon:
     + std::hash::Hash
     + From<u8>
     + From<i32>
+    + From<u64>
     + Into<f32>
 {
 }
 
 impl Mon for Decimal {}
-
-// TODO: Cant really implement this for primitive types as fractions need to be elegantly supported.
-// impl Mon for i32 {}
-// impl Mon for i64 {}
 
 /// A currency must be marked as it can be either a `Base` or `Quote` currency.
 pub trait CurrencyMarker<T: Mon>:

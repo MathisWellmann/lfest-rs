@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.78.0"
+version = "0.78.1"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2021"
 license-file = "LICENSE"
@@ -19,10 +19,11 @@ thiserror = "1"
 hashbrown = "0.15"
 derive_more = { version = "1", features = ["full"] }
 # fpdec = { version = "0.10", features = ["serde-as-str", "num-traits"] }
-fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs", features = [
+fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs", rev = "40cf802", features = [
   "serde-as-str",
   "num-traits",
 ] }
+const-decimal = { version = "0.3", features = ["serde"]}
 distrs = "0.2"
 num-traits = "0.2"
 getset = "0.1.2"
@@ -54,4 +55,8 @@ harness = false
 
 [[bench]]
 name = "submit_limit_order"
+harness = false
+
+[[bench]]
+name = "decimal_comparison"
 harness = false
