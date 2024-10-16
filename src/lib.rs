@@ -32,6 +32,7 @@ pub use types::Result;
 /// Exports common types
 pub mod prelude {
     pub use const_decimal;
+    pub use num_traits::{One, Zero};
 
     pub use crate::{
         account_tracker::{AccountTracker, FullAccountTracker, NoAccountTracker},

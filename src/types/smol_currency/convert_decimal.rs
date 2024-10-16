@@ -20,16 +20,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use const_decimal::Decimal;
-
     #[test]
     fn mul_converting() {
         // price of 100 * 2.5 basis points = 0.025 = 0.03 rounded up
-        assert_eq!(
-            Decimal::<i32, 2>::try_from_scaled(100, 0)
-                .unwrap()
-                .mul_converting(Decimal::<i32, 5>::try_from_scaled(25, 1)),
-            Decimal::<i32, 2>::try_from_scaled(3, 2).unwrap()
-        );
+        // assert_eq!(
+        //     Decimal::<i32, 2>::try_from_scaled(100, 0)
+        //         .unwrap()
+        //         .mul_converting(Decimal::<i32, 5>::try_from_scaled(25, 1)),
+        //     Decimal::<i32, 2>::try_from_scaled(3, 2).unwrap()
+        // );
+        todo!()
     }
 }

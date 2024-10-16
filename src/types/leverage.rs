@@ -36,6 +36,9 @@ impl Leverage {
 
 #[cfg(test)]
 mod tests {
+    use const_decimal::Decimal;
+    use num_traits::One;
+
     use super::*;
 
     #[test]
@@ -48,7 +51,7 @@ mod tests {
         assert_eq!(Leverage(1).init_margin_req(), BasisPointFrac::one());
         assert_eq!(
             Leverage(2).init_margin_req(),
-            BasisPointFrac::one() / BasisPointFrac::TWO
+            BasisPointFrac::one() / BasisPointFrac::from(Decimal::TWO)
         );
     }
 }

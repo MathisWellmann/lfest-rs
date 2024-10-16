@@ -1,7 +1,6 @@
 mod base_currency;
 mod convert_decimal;
 mod margin_currency_trait;
-// mod monies;
 mod quote_currency;
 
 pub use base_currency::BaseCurrency;
@@ -65,34 +64,51 @@ where
 
 #[cfg(test)]
 mod tests {
-    use fpdec::{Dec, Decimal};
-
     use super::*;
-    use crate::prelude::*;
 
     #[test]
     fn convert_base_to_quote() {
         assert_eq!(
-            Quote::convert_from(Monies::<_, Base>::new(Dec!(0.5)), Monies::new(Dec!(1000))),
-            Monies::<_, Quote>::new(Dec!(500))
+            QuoteCurrency::convert_from(
+                BaseCurrency::<i32, 4, 2>::new(5, 1),
+                QuoteCurrency::new(1000, 1)
+            ),
+            QuoteCurrency::new(500, 0)
         );
     }
 
     #[test]
     fn convert_quote_to_base() {
         assert_eq!(
-            Base::convert_from(Monies::<_, Quote>::new(Dec!(250)), Monies::new(Dec!(1000))),
-            Monies::<_, Base>::new(Dec!(0.25))
+            BaseCurrency::convert_from(
+                QuoteCurrency::<i32, 4, 2>::new(250, 0),
+                QuoteCurrency::new(1000, 0)
+            ),
+            BaseCurrency::new(25, 2)
         );
     }
 
     #[test]
     fn quote_currency_pnl() {
-        assert_eq!(Quote::pnl(quote!(100), quote!(110), base!(5)), quote!(50));
+        assert_eq!(
+            QuoteCurrency::pnl(
+                QuoteCurrency::<i64, 4, 2>::new(100, 0),
+                QuoteCurrency::new(110, 0),
+                BaseCurrency::new(5, 0),
+            ),
+            QuoteCurrency::new(50, 0)
+        );
     }
 
     #[test]
     fn base_currency_pnl() {
-        assert_eq!(Base::pnl(quote!(100), quote!(200), quote!(500)), base!(2.5))
+        assert_eq!(
+            BaseCurrency::pnl(
+                QuoteCurrency::<i32, 4, 2>::new(100, 0),
+                QuoteCurrency::new(200, 0),
+                QuoteCurrency::new(500, 0),
+            ),
+            BaseCurrency::new(25, 1)
+        )
     }
 }

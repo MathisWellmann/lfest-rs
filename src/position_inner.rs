@@ -199,126 +199,129 @@ where
 
 #[cfg(test)]
 mod tests {
+    use const_decimal::Decimal;
+    use num_traits::One;
+
     use super::*;
     use crate::{prelude::*, TEST_FEE_MAKER};
 
     #[test_case::test_matrix([1, 2, 5])]
-    fn position_inner_new(leverage: u32) {
-        let mut ta = InMemoryTransactionAccounting::new(quote!(1000));
-        let init_margin_req = Dec!(1) / Decimal::from(leverage);
-        let qty = base!(0.5);
-        let entry_price = quote!(100);
-        let fees = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
+    fn position_inner_new(leverage: u8) {
+        let mut ta = InMemoryTransactionAccounting::new(QuoteCurrency::<i32, 4, 2>::new(1000, 0));
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+        let qty = BaseCurrency::new(5, 1);
+        let entry_price = QuoteCurrency::new(100, 0);
+        let fees = TEST_FEE_MAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
         let pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fees);
         assert_eq!(
             pos,
             PositionInner {
                 quantity: qty,
-                total_cost: quote!(50),
+                total_cost: QuoteCurrency::new(50, 0),
                 outstanding_fees: fees,
             }
         );
-        assert_eq!(pos.entry_price(), quote!(100));
+        assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
         assert_eq!(
             ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
-            quote!(50) * init_margin_req
+            QuoteCurrency::new(50, 0) * init_margin_req
         );
         assert_eq!(
             ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
-            quote!(1000) - quote!(50) * init_margin_req
+            QuoteCurrency::new(1000, 0) - QuoteCurrency::new(50, 0) * init_margin_req
         );
     }
 
     #[test_case::test_matrix([1, 2, 5])]
-    fn position_inner_increase_contracts(leverage: u32) {
-        let mut ta = InMemoryTransactionAccounting::new(quote!(1000));
-        let init_margin_req = Dec!(1) / Decimal::from(leverage);
-        let qty = base!(0.5);
-        let entry_price = quote!(100);
-        let fee_0 = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
+    fn position_inner_increase_contracts(leverage: u8) {
+        let mut ta = InMemoryTransactionAccounting::new(QuoteCurrency::<i32, 4, 2>::new(1000, 0));
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+        let qty = BaseCurrency::new(5, 1);
+        let entry_price = QuoteCurrency::new(100, 0);
+        let fee_0 = TEST_FEE_MAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
         let mut pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fee_0);
 
-        let entry_price = quote!(150);
-        let fee_1 = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
+        let entry_price = QuoteCurrency::new(150, 0);
+        let fee_1 = TEST_FEE_MAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
         pos.increase_contracts(qty, entry_price, &mut ta, init_margin_req, fee_1);
         assert_eq!(
             pos,
             PositionInner {
-                quantity: base!(1),
-                total_cost: quote!(125),
+                quantity: BaseCurrency::one(),
+                total_cost: QuoteCurrency::new(125, 0),
                 outstanding_fees: fee_0 + fee_1
             }
         );
-        assert_eq!(pos.entry_price(), quote!(125));
+        assert_eq!(pos.entry_price(), QuoteCurrency::new(125, 0));
         assert_eq!(
             ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
-            quote!(125) * init_margin_req
+            QuoteCurrency::new(125, 0) * init_margin_req
         );
         assert_eq!(
             ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
-            quote!(1000) - quote!(125) * init_margin_req
+            QuoteCurrency::new(1000, 0) - QuoteCurrency::new(125, 0) * init_margin_req
         );
     }
 
     #[test_case::test_matrix([1, 2, 5])]
-    fn position_inner_decrease_contracts_basic(leverage: u32) {
-        let mut ta = InMemoryTransactionAccounting::new(quote!(1000));
-        let init_margin_req = Dec!(1) / Decimal::from(leverage);
-        let qty = base!(5);
-        let entry_price = quote!(100);
-        let fees = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
+    fn position_inner_decrease_contracts_basic(leverage: u8) {
+        let mut ta = InMemoryTransactionAccounting::new(QuoteCurrency::<i32, 4, 2>::new(1000, 0));
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+        let qty = BaseCurrency::new(5, 0);
+        let entry_price = QuoteCurrency::new(100, 0);
+        let fees = TEST_FEE_MAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
         let mut pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fees);
         pos.decrease_contracts(
-            qty / BaseCurrency::new(Dec!(2)),
+            qty / BaseCurrency::new(2, 0),
             entry_price,
             &mut ta,
             init_margin_req,
-            Dec!(1),
-            fees / QuoteCurrency::new(Dec!(2)),
+            1,
+            fees / QuoteCurrency::new(2, 0),
         );
         assert_eq!(
             pos,
             PositionInner {
-                quantity: base!(2.5),
-                total_cost: quote!(250),
-                outstanding_fees: quote!(0),
+                quantity: BaseCurrency::new(25, 1),
+                total_cost: QuoteCurrency::new(250, 0),
+                outstanding_fees: QuoteCurrency::new(0, 0),
             }
         );
-        assert_eq!(pos.entry_price(), quote!(100));
-        let margin = quote!(250) * init_margin_req;
+        assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
+        let margin = QuoteCurrency::new(250, 0) * init_margin_req;
         assert_eq!(
             ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
             margin,
         );
         assert_eq!(
             ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
-            quote!(1000) - margin - fees * Dec!(1.5)
+            QuoteCurrency::new(1000, 0) - margin - fees * Decimal::try_from_scaled(15, 1).unwrap()
         );
 
         pos.decrease_contracts(
-            qty / BaseCurrency::new(Dec!(2)),
+            qty / BaseCurrency::new(2, 0),
             entry_price,
             &mut ta,
             init_margin_req,
-            Dec!(1),
-            fees / QuoteCurrency::new(Dec!(2)),
+            1,
+            fees / QuoteCurrency::new(2, 0),
         );
         assert_eq!(
             pos,
             PositionInner {
-                quantity: base!(0),
-                total_cost: quote!(0),
-                outstanding_fees: quote!(0),
+                quantity: BaseCurrency::new(0, 0),
+                total_cost: QuoteCurrency::new(0, 0),
+                outstanding_fees: QuoteCurrency::new(0, 0),
             }
         );
-        assert_eq!(pos.entry_price(), quote!(0));
+        assert_eq!(pos.entry_price(), QuoteCurrency::new(0, 0));
         assert_eq!(
             ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
-            quote!(0)
+            QuoteCurrency::new(0, 0)
         );
         assert_eq!(
             ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
-            quote!(1000) - fees * Dec!(2)
+            QuoteCurrency::new(1000, 0) - fees * Decimal::try_from_scaled(2, 0).unwrap()
         );
     }
 
@@ -326,40 +329,42 @@ mod tests {
         [1, 2, 5],
         [Side::Buy, Side::Sell]
     )]
-    fn position_inner_decrease_contracts_win(leverage: u32, position_side: Side) {
-        let mut ta = InMemoryTransactionAccounting::new(quote!(1000));
-        let init_margin_req = Dec!(1) / Decimal::from(leverage);
-        let qty = base!(5);
-        let entry_price = quote!(100);
-        let fees = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
+    fn position_inner_decrease_contracts_win(leverage: u8, position_side: Side) {
+        let mut ta = InMemoryTransactionAccounting::new(QuoteCurrency::<i32, 4, 2>::new(1000, 0));
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+        let qty = BaseCurrency::new(5, 0);
+        let entry_price = QuoteCurrency::new(100, 0);
+        let fees = TEST_FEE_MAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
         let mut pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fees);
 
-        let exit_price = quote!(110);
+        let exit_price = QuoteCurrency::new(110, 0);
         let side_mult = match position_side {
-            Side::Buy => Dec!(1),
-            Side::Sell => Dec!(-1),
+            Side::Buy => 1,
+            Side::Sell => -1,
         };
         pos.decrease_contracts(
-            qty / BaseCurrency::new(Dec!(2)),
+            qty / BaseCurrency::new(2, 0),
             exit_price,
             &mut ta,
             init_margin_req,
             side_mult,
-            fees / QuoteCurrency::new(Dec!(2)),
+            fees / QuoteCurrency::new(2, 0),
         );
 
-        assert_eq!(pos.quantity(), base!(2.5));
-        assert_eq!(pos.entry_price(), quote!(100));
-        assert_eq!(pos.total_cost(), quote!(250));
-        let margin = quote!(250) * init_margin_req;
+        assert_eq!(pos.quantity(), BaseCurrency::new(25, 1));
+        assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
+        assert_eq!(pos.total_cost(), QuoteCurrency::new(250, 0));
+        let margin = QuoteCurrency::new(250, 0) * init_margin_req;
         assert_eq!(
             ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
             margin
         );
-        let profit = quote!(25) * side_mult;
+        let profit = QuoteCurrency::new(25_i32 * side_mult as i32, 0);
         assert_eq!(
             ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
-            quote!(1000) + profit - margin - fees * Dec!(1.5)
+            QuoteCurrency::new(1000, 0) + profit
+                - margin
+                - fees * Decimal::try_from_scaled(15, 1).unwrap()
         );
     }
 
@@ -367,97 +372,112 @@ mod tests {
         [1, 2, 5],
         [Side::Buy, Side::Sell]
     )]
-    fn position_inner_decrease_contracts_2(leverage: u32, position_side: Side) {
-        let mut ta = InMemoryTransactionAccounting::new(quote!(1000));
-        let init_margin_req = Dec!(1) / Decimal::from(leverage);
-        let qty = base!(5);
-        let entry_price = quote!(100);
-        let fees = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, entry_price));
+    fn position_inner_decrease_contracts_2(leverage: u8, position_side: Side) {
+        let mut ta = InMemoryTransactionAccounting::new(QuoteCurrency::<i32, 4, 2>::new(1000, 0));
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+        let qty = BaseCurrency::new(5, 0);
+        let entry_price = QuoteCurrency::new(100, 0);
+        let fees = TEST_FEE_MAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
         let mut pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fees);
 
-        let exit_price = quote!(90);
+        let exit_price = QuoteCurrency::new(90, 0);
         let side_mult = match position_side {
-            Side::Buy => Dec!(1),
-            Side::Sell => Dec!(-1),
+            Side::Buy => 1,
+            Side::Sell => -1,
         };
         pos.decrease_contracts(
-            qty / BaseCurrency::new(Dec!(2)),
+            qty / BaseCurrency::new(2, 0),
             exit_price,
             &mut ta,
             init_margin_req,
             side_mult,
-            fees / QuoteCurrency::new(Dec!(2)),
+            fees / QuoteCurrency::new(2, 0),
         );
 
-        assert_eq!(pos.quantity(), base!(2.5));
-        assert_eq!(pos.entry_price(), quote!(100));
-        assert_eq!(pos.total_cost(), quote!(250));
-        let margin = quote!(250) * init_margin_req;
+        assert_eq!(pos.quantity(), BaseCurrency::new(25, 1));
+        assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
+        assert_eq!(pos.total_cost(), QuoteCurrency::new(250, 0));
+        let margin = QuoteCurrency::new(250, 0) * init_margin_req;
         assert_eq!(
             ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
             margin
         );
-        let loss = quote!(25) * side_mult;
+        let loss = QuoteCurrency::new(25_i32 * side_mult as i32, 0);
         assert_eq!(
             ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
-            quote!(1000) - loss - margin - fees * Dec!(1.5)
+            QuoteCurrency::new(1000, 0)
+                - loss
+                - margin
+                - fees * Decimal::try_from_scaled(15, 1).unwrap()
         );
     }
 
     #[tracing_test::traced_test]
     #[test_case::test_matrix([1, 2, 5])]
     #[ignore]
-    fn position_inner_decrease_contracts_inverse(leverage: u32) {
-        let mut ta = InMemoryTransactionAccounting::new(base!(10));
-        let init_margin_req = Dec!(1) / Decimal::from(leverage);
-        let qty = quote!(500);
-        let entry_price = quote!(100);
-        let val = Base::convert_from(qty, entry_price);
-        assert_eq!(val, base!(5));
+    fn position_inner_decrease_contracts_inverse(leverage: u8) {
+        let mut ta = InMemoryTransactionAccounting::new(BaseCurrency::<i32, 4, 2>::new(10, 0));
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+        let qty = QuoteCurrency::new(500, 0);
+        let entry_price = QuoteCurrency::new(100, 0);
+        let val = BaseCurrency::convert_from(qty, entry_price);
+        assert_eq!(val, BaseCurrency::new(5, 0));
         let fees = TEST_FEE_MAKER.for_value(val);
         let mut pos = PositionInner::new(qty, entry_price, &mut ta, init_margin_req, fees);
 
-        let exit_price = quote!(200);
+        let exit_price = QuoteCurrency::new(200, 0);
         pos.decrease_contracts(
-            qty / QuoteCurrency::new(Dec!(2)),
+            qty / QuoteCurrency::new(2, 0),
             exit_price,
             &mut ta,
             init_margin_req,
-            Dec!(1),
-            fees / BaseCurrency::new(Dec!(2)),
+            1,
+            fees / BaseCurrency::new(2, 0),
         );
 
-        assert_eq!(pos.quantity(), quote!(250));
-        assert_eq!(pos.entry_price(), quote!(100));
-        assert_eq!(pos.total_cost(), base!(2.5));
-        let margin = base!(2.5) * init_margin_req;
+        assert_eq!(pos.quantity(), QuoteCurrency::new(250, 0));
+        assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
+        assert_eq!(pos.total_cost(), BaseCurrency::new(25, 1));
+        let margin = BaseCurrency::new(25, 1) * init_margin_req;
         assert_eq!(
             ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
             margin
         );
         assert_eq!(
             ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
-            base!(11.25) - margin - fees * Dec!(1.5)
+            BaseCurrency::new(1125, 2) - margin - fees * Decimal::try_from_scaled(15, 1).unwrap()
         );
     }
 
     #[test_case::test_matrix([1, 2, 5, 9])]
-    fn position_inner_entry_price_linear(qty: u32) {
-        let qty = BaseCurrency::from(Decimal::from(qty));
-        let mut ta = InMemoryTransactionAccounting::new(quote!(1000));
-        let init_margin_req = Dec!(1);
-        let fees = quote!(0);
-        let pos = PositionInner::new(qty, quote!(100), &mut ta, init_margin_req, fees);
-        assert_eq!(pos.entry_price(), quote!(100));
+    fn position_inner_entry_price_linear(qty: i32) {
+        let qty = BaseCurrency::<i32, 4, 2>::new(qty, 0);
+        let mut ta = InMemoryTransactionAccounting::new(QuoteCurrency::new(1000, 0));
+        let init_margin_req = BasisPointFrac::one();
+        let fees = QuoteCurrency::new(0, 0);
+        let pos = PositionInner::new(
+            qty,
+            QuoteCurrency::new(100, 0),
+            &mut ta,
+            init_margin_req,
+            fees,
+        );
+        assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
     }
 
     #[test_case::test_matrix([10, 20, 50, 90])]
-    fn position_inner_entry_price_inverse(qty: u32) {
-        let qty = QuoteCurrency::from(Decimal::from(qty));
-        let mut ta = InMemoryTransactionAccounting::new(base!(10));
-        let init_margin_req = Dec!(1);
-        let fees = base!(0);
-        let pos = PositionInner::new(qty, quote!(100), &mut ta, init_margin_req, fees);
-        assert_eq!(pos.entry_price(), quote!(100));
+    fn position_inner_entry_price_inverse(qty: i32) {
+        let qty = QuoteCurrency::<i32, 4, 2>::new(qty, 0);
+        let mut ta = InMemoryTransactionAccounting::new(BaseCurrency::new(10, 0));
+        let init_margin_req = BasisPointFrac::one();
+        let fees = BaseCurrency::new(0, 0);
+        let pos = PositionInner::new(
+            qty,
+            QuoteCurrency::new(100, 0),
+            &mut ta,
+            init_margin_req,
+            fees,
+        );
+        assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
     }
 }

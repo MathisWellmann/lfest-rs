@@ -41,18 +41,26 @@ impl std::fmt::Display for Side {
 
 #[cfg(test)]
 mod tests {
+    use num_traits::Zero;
+
     use super::*;
-    use crate::quote;
+    use crate::prelude::QuoteCurrency;
 
     #[test]
     fn side_from_taker_quantity() {
-        assert_eq!(Side::from_taker_quantity(quote!(1)), Side::Buy);
-        assert_eq!(Side::from_taker_quantity(quote!(-1)), Side::Sell);
+        assert_eq!(
+            Side::from_taker_quantity(QuoteCurrency::<i32, 4, 2>::new(1, 0)),
+            Side::Buy
+        );
+        assert_eq!(
+            Side::from_taker_quantity(QuoteCurrency::<i32, 4, 2>::new(-1, 0)),
+            Side::Sell
+        );
     }
 
     #[test]
     #[should_panic]
     fn side_from_taker_quantity_panic() {
-        Side::from_taker_quantity(quote!(0));
+        Side::from_taker_quantity(QuoteCurrency::<i64, 4, 2>::zero());
     }
 }

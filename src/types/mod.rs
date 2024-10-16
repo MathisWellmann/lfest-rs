@@ -49,9 +49,19 @@ pub const BASIS_POINT_SCALE: u8 = 4;
 /// It needs to be able to represent 4 decimal places.
 /// BasisPointFrac::one() is 1 percent.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, derive_more::Add, derive_more::Mul,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    derive_more::Add,
+    derive_more::Mul,
+    derive_more::Div,
 )]
 #[mul(forward)]
+#[div(forward)]
 #[repr(transparent)]
 pub struct BasisPointFrac(Decimal<i32, 4>);
 
@@ -90,11 +100,16 @@ impl num_traits::One for BasisPointFrac {
 
 #[cfg(test)]
 mod tests {
+    use num_traits::One;
+
     use super::*;
 
     #[test]
     fn basis_points_one() {
         // BasisPointFrac::one() is 1 percent.
-        assert_eq!(BasisPointFrac::one(), Decimal::try_from_parts(10_000, 0));
+        assert_eq!(
+            BasisPointFrac::one(),
+            BasisPointFrac(Decimal::try_from_scaled(10_000, 0).unwrap())
+        );
     }
 }

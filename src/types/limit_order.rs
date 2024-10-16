@@ -301,7 +301,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use fpdec::{Dec, Decimal};
     use test_case::test_matrix;
 
     use super::*;
@@ -312,9 +311,9 @@ mod tests {
         [100, 110, 120],
         [1, 2, 3]
     )]
-    fn limit_order_fill_full(side: Side, limit_price: u32, qty: u32) {
-        let limit_price = Monies::new(Decimal::from(limit_price));
-        let qty = Monies::<_, Quote>::new(Decimal::from(qty));
+    fn limit_order_fill_full(side: Side, limit_price: u32, qty: i32) {
+        let limit_price = QuoteCurrency::<i32, 4, 2>::new(limit_price as i32, 0);
+        let qty = QuoteCurrency::new(qty, 0);
         let order = LimitOrder::new(side, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
 
@@ -332,13 +331,13 @@ mod tests {
         [100, 110, 120],
         [1, 2, 3]
     )]
-    fn limit_order_fill_partial(side: Side, limit_price: u32, qty: u32) {
-        let limit_price = Monies::new(Decimal::from(limit_price));
-        let quantity = Monies::<_, Quote>::new(Decimal::from(qty));
+    fn limit_order_fill_partial(side: Side, limit_price: u32, qty: i32) {
+        let limit_price = QuoteCurrency::<i32, 4, 2>::new(limit_price as _, 0);
+        let quantity = QuoteCurrency::new(qty, 0);
         let order = LimitOrder::new(side, limit_price, quantity).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
 
-        let qty = QuoteCurrency::from(Decimal::from(qty) / Dec!(2));
+        let qty = quantity / QuoteCurrency::new(2, 0);
         let mut order = order.into_pending(meta.clone());
         assert!(order.fill(qty, 0.into()).is_none());
         let mut expected_state = Pending::new(meta);

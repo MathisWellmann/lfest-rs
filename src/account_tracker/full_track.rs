@@ -400,9 +400,13 @@ mod tests {
 
     #[test]
     fn full_track_update() {
-        let mut at = FullAccountTracker::new(quote!(1000));
-        let market_state =
-            MarketState::from_components(quote!(100), quote!(101), 1_000_000.into(), 0);
+        let mut at = FullAccountTracker::new(QuoteCurrency::<i64, 4, 2>::new(1000, 0));
+        let market_state = MarketState::from_components(
+            QuoteCurrency::new(100, 0),
+            QuoteCurrency::new(101, 0),
+            1_000_000.into(),
+            0,
+        );
         at.update(&market_state);
         assert_eq!(at.num_submitted_limit_orders(), 0);
         assert_eq!(at.num_cancelled_limit_orders(), 0);
@@ -412,27 +416,27 @@ mod tests {
 
         assert_eq!(at.ts_first, 1_000_000.into());
         assert_eq!(at.ts_last, 1_000_000.into());
-        assert_eq!(at.price_first, quote!(100.5));
-        assert_eq!(at.price_last, quote!(100.5));
+        assert_eq!(at.price_first, QuoteCurrency::new(1005, 1));
+        assert_eq!(at.price_last, QuoteCurrency::new(1005, 1));
         assert_eq!(at.drawdown_market(), 0.0);
     }
 
     #[test]
     fn full_track_sharpe() {
-        let mut at = FullAccountTracker::new(quote!(1000));
+        let mut at = FullAccountTracker::new(QuoteCurrency::<i64, 4, 2>::new(1000, 0));
         let balances = UserBalances {
-            available_wallet_balance: quote!(100),
-            position_margin: quote!(0),
-            order_margin: quote!(0),
+            available_wallet_balance: QuoteCurrency::new(100, 0),
+            position_margin: QuoteCurrency::zero(),
+            order_margin: QuoteCurrency::zero(),
         };
-        at.sample_user_balances(&balances, quote!(100));
+        at.sample_user_balances(&balances, QuoteCurrency::new(100, 0));
 
         let balances = UserBalances {
-            available_wallet_balance: quote!(101),
-            position_margin: quote!(0),
-            order_margin: quote!(0),
+            available_wallet_balance: QuoteCurrency::new(101, 0),
+            position_margin: QuoteCurrency::zero(),
+            order_margin: QuoteCurrency::zero(),
         };
-        at.sample_user_balances(&balances, quote!(100));
+        at.sample_user_balances(&balances, QuoteCurrency::new(100, 0));
         assert_eq!(at.user_balances_ln_return.last().unwrap(), 0.009950321);
         assert_eq!(at.drawdown_user_balances(), 0.0);
         assert_eq!(at.user_balances_ln_return_stats.last().unwrap(), 0.0);
@@ -441,11 +445,11 @@ mod tests {
         assert_eq!(at.kelly_leverage(), 0.0);
 
         let balances = UserBalances {
-            available_wallet_balance: quote!(102),
-            position_margin: quote!(0),
-            order_margin: quote!(0),
+            available_wallet_balance: QuoteCurrency::new(102, 0),
+            position_margin: QuoteCurrency::zero(),
+            order_margin: QuoteCurrency::zero(),
         };
-        at.sample_user_balances(&balances, quote!(100));
+        at.sample_user_balances(&balances, QuoteCurrency::new(100, 0));
         assert_eq!(at.user_balances_ln_return.last().unwrap(), 0.009852353);
         assert_eq!(at.user_balances_ln_return_stats.mean(), 0.009901337);
         assert_eq!(at.user_balances_ln_return_stats.variance(), 2.3994853e-9);

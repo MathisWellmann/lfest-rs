@@ -1,18 +1,17 @@
-use crate::{
-    base, bba, mock_exchange_linear,
-    prelude::{ExchangeOrderMeta, LimitOrder, OrderId, Side, UserBalances},
-    quote,
-};
+use crate::{bba, mock_exchange_linear, prelude::*};
 
 #[test]
 fn cancel_limit_order() {
     let mut exchange = mock_exchange_linear();
     exchange
-        .update_state(0.into(), &bba!(quote!(100), quote!(101)))
+        .update_state(
+            0.into(),
+            &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0)),
+        )
         .unwrap();
 
-    let limit_price = quote!(100);
-    let qty = base!(1);
+    let limit_price = QuoteCurrency::new(100, 0);
+    let qty = BaseCurrency::one();
     let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
 
     exchange.submit_limit_order(order.clone()).unwrap();
@@ -29,21 +28,24 @@ fn cancel_limit_order() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(900),
-            position_margin: quote!(0),
-            order_margin: quote!(100)
+            available_wallet_balance: QuoteCurrency::new(900, 0),
+            position_margin: QuoteCurrency::zero(),
+            order_margin: QuoteCurrency::new(100, 0)
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), quote!(0));
+    assert_eq!(
+        exchange.position().outstanding_fees(),
+        QuoteCurrency::zero()
+    );
 
     exchange.cancel_limit_order(order_id).unwrap();
     assert!(exchange.active_limit_orders().is_empty());
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(1000),
-            position_margin: quote!(0),
-            order_margin: quote!(000)
+            available_wallet_balance: QuoteCurrency::new(1000, 0),
+            position_margin: QuoteCurrency::zero(),
+            order_margin: QuoteCurrency::zero()
         }
     );
 }

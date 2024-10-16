@@ -67,14 +67,6 @@ where
     }
 }
 
-// /// Allows the quick construction of `QuoteCurrency`
-// #[macro_export]
-// macro_rules! quote {
-//     ( $a:literal ) => {{
-//         $crate::prelude::QuoteCurrency::new($crate::prelude::fpdec::Dec!($a))
-//     }};
-// }
-
 /// # Generics:
 /// - `I`: The numeric data type of `Decimal`.
 /// - `DQ`: The constant decimal precision of the `QuoteCurrency`.

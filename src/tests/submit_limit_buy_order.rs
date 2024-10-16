@@ -1,3 +1,5 @@
+use const_decimal::Decimal;
+
 use crate::{
     mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, trade,
     TEST_FEE_MAKER, TEST_FEE_TAKER,
@@ -8,22 +10,25 @@ use crate::{
 fn submit_limit_buy_order_no_position() {
     let mut exchange = mock_exchange_linear();
     assert!(exchange
-        .update_state(0.into(), &bba!(quote!(99), quote!(100)))
+        .update_state(
+            0.into(),
+            &bba!(QuoteCurrency::new(99, 0), QuoteCurrency::new(100, 0))
+        )
         .unwrap()
         .is_empty());
 
-    let limit_price = quote!(98);
-    let qty = base!(5);
+    let limit_price = QuoteCurrency::new(98, 0);
+    let qty = BaseCurrency::new(5, 0);
     let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
     assert_eq!(exchange.position(), &Position::Neutral);
-    let fee = TEST_FEE_MAKER.for_value(Quote::convert_from(qty, limit_price));
+    let fee = TEST_FEE_MAKER.for_value(QuoteCurrency::convert_from(qty, limit_price));
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(510),
-            position_margin: quote!(0),
-            order_margin: quote!(490)
+            available_wallet_balance: QuoteCurrency::new(510, 0),
+            position_margin: QuoteCurrency::new(0, 0),
+            order_margin: QuoteCurrency::new(490, 0)
         }
     );
 
@@ -37,18 +42,25 @@ fn submit_limit_buy_order_no_position() {
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0.into(), &trade!(quote!(97), base!(5), Side::Sell))
+            .update_state(
+                0.into(),
+                &trade!(
+                    QuoteCurrency::new(97, 0),
+                    BaseCurrency::new(5, 0),
+                    Side::Sell
+                )
+            )
             .unwrap(),
         vec![expected_order_update]
     );
-    let bid = quote!(96);
-    let ask = quote!(99);
+    let bid = QuoteCurrency::new(96, 0);
+    let ask = QuoteCurrency::new(99, 0);
     assert!(exchange
         .update_state(0.into(), &bba!(bid, ask))
         .unwrap()
         .is_empty());
-    let mut accounting = InMemoryTransactionAccounting::new(quote!(1000));
-    let init_margin_req = Dec!(1);
+    let mut accounting = InMemoryTransactionAccounting::new(QuoteCurrency::new(1000, 0));
+    let init_margin_req = BasisPointFrac::from(Decimal::one());
     assert_eq!(
         exchange.position(),
         &Position::Long(PositionInner::new(
@@ -62,19 +74,30 @@ fn submit_limit_buy_order_no_position() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(510),
-            position_margin: quote!(490),
-            order_margin: quote!(0),
+            available_wallet_balance: QuoteCurrency::new(510, 0),
+            position_margin: QuoteCurrency::new(490, 0),
+            order_margin: QuoteCurrency::new(0, 0),
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), quote!(0.098));
+    assert_eq!(
+        exchange.position().outstanding_fees(),
+        QuoteCurrency::new(98, 3)
+    );
 
     // close the position again with a limit order.
-    let order = LimitOrder::new(Side::Sell, quote!(98), base!(5)).unwrap();
+    let order = LimitOrder::new(
+        Side::Sell,
+        QuoteCurrency::new(98, 0),
+        BaseCurrency::new(5, 0),
+    )
+    .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
     assert!(exchange
-        .update_state(0.into(), &bba!(quote!(96), quote!(97)))
+        .update_state(
+            0.into(),
+            &bba!(QuoteCurrency::new(96, 0), QuoteCurrency::new(97, 0))
+        )
         .unwrap()
         .is_empty());
 
@@ -86,7 +109,14 @@ fn submit_limit_buy_order_no_position() {
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0.into(), &trade!(quote!(99), base!(5), Side::Buy))
+            .update_state(
+                0.into(),
+                &trade!(
+                    QuoteCurrency::new(99, 0),
+                    BaseCurrency::new(5, 0),
+                    Side::Buy
+                )
+            )
             .unwrap(),
         vec![expected_order_update]
     );
@@ -99,22 +129,55 @@ fn submit_limit_buy_order_no_position() {
 fn submit_limit_buy_order_no_position_max() {
     let mut exchange = mock_exchange_linear();
     assert!(exchange
-        .update_state(0.into(), &bba!(quote!(100), quote!(101)))
+        .update_state(
+            0.into(),
+            &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
+        )
         .unwrap()
         .is_empty());
 
-    let order = LimitOrder::new(Side::Buy, quote!(100), base!(5)).unwrap();
+    let order = LimitOrder::new(
+        Side::Buy,
+        QuoteCurrency::new(100, 0),
+        BaseCurrency::new(5, 0),
+    )
+    .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
-    let order = LimitOrder::new(Side::Buy, quote!(100), base!(4)).unwrap();
+    let order = LimitOrder::new(
+        Side::Buy,
+        QuoteCurrency::new(100, 0),
+        BaseCurrency::new(4, 0),
+    )
+    .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
-    let order = LimitOrder::new(Side::Buy, quote!(100), base!(1)).unwrap();
+    let order = LimitOrder::new(
+        Side::Buy,
+        QuoteCurrency::new(100, 0),
+        BaseCurrency::new(1, 0),
+    )
+    .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
-    let order = LimitOrder::new(Side::Sell, quote!(101), base!(5)).unwrap();
+    let order = LimitOrder::new(
+        Side::Sell,
+        QuoteCurrency::new(101, 0),
+        BaseCurrency::new(5, 0),
+    )
+    .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
-    let order = LimitOrder::new(Side::Sell, quote!(101), base!(4)).unwrap();
+    let order = LimitOrder::new(
+        Side::Sell,
+        QuoteCurrency::new(101, 0),
+        BaseCurrency::new(4, 0),
+    )
+    .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
-    let order = LimitOrder::new(Side::Sell, quote!(101), base!(1)).unwrap();
+    let order = LimitOrder::new(
+        Side::Sell,
+        QuoteCurrency::new(101, 0),
+        BaseCurrency::new(1, 0),
+    )
+    .unwrap();
     assert_eq!(
         exchange.submit_limit_order(order.clone()),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
@@ -126,22 +189,22 @@ fn submit_limit_buy_order_with_long() {
     let mut exchange = mock_exchange_linear();
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
-    let bid = quote!(99);
-    let ask = quote!(100);
+    let bid = QuoteCurrency::new(99, 0);
+    let ask = QuoteCurrency::new(100, 0);
     assert!(exchange
         .update_state(0.into(), &bba!(bid, ask))
         .unwrap()
         .is_empty());
-    let qty = base!(9);
+    let qty = BaseCurrency::new(90, 0);
     let order = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
 
-    let fee = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, ask));
+    let fee = TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, ask));
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
-            base!(9),
-            quote!(100),
+            BaseCurrency::new(9, 0),
+            QuoteCurrency::new(100, 0),
             &mut accounting,
             init_margin_req,
             fee,
@@ -150,29 +213,45 @@ fn submit_limit_buy_order_with_long() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(100),
-            position_margin: quote!(900),
-            order_margin: quote!(0)
+            available_wallet_balance: QuoteCurrency::new(100, 0),
+            position_margin: QuoteCurrency::new(900, 0),
+            order_margin: QuoteCurrency::new(0, 0)
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), quote!(0.54));
+    assert_eq!(
+        exchange.position().outstanding_fees(),
+        QuoteCurrency::new(54, 2)
+    );
 
     assert_eq!(
         exchange
-            .update_state(0.into(), &bba!(quote!(100), quote!(101)))
+            .update_state(
+                0.into(),
+                &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
+            )
             .unwrap(),
         Vec::new()
     );
 
     // Another buy limit order should not work
-    let order = LimitOrder::new(Side::Buy, quote!(100), base!(1.1)).unwrap();
+    let order = LimitOrder::new(
+        Side::Buy,
+        QuoteCurrency::new(100, 0),
+        BaseCurrency::new(11, 1),
+    )
+    .unwrap();
     assert_eq!(
         exchange.submit_limit_order(order),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
     );
 
     // But sell order should work
-    let order = LimitOrder::new(Side::Sell, quote!(101), base!(9)).unwrap();
+    let order = LimitOrder::new(
+        Side::Sell,
+        QuoteCurrency::new(101, 0),
+        BaseCurrency::new(9, 0),
+    )
+    .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
     let ts = 0;
@@ -184,7 +263,14 @@ fn submit_limit_buy_order_with_long() {
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0.into(), &trade!(quote!(102), base!(9), Side::Buy))
+            .update_state(
+                0.into(),
+                &trade!(
+                    QuoteCurrency::new(102, 0),
+                    BaseCurrency::new(9, 0),
+                    Side::Buy
+                )
+            )
             .unwrap(),
         vec![expected_order_update]
     );
@@ -198,15 +284,18 @@ fn submit_limit_buy_order_with_short() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
-        .update_state(0.into(), &bba!(quote!(100), quote!(101)))
+        .update_state(
+            0.into(),
+            &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
+        )
         .unwrap()
         .is_empty());
-    let order = MarketOrder::new(Side::Sell, base!(9)).unwrap();
+    let order = MarketOrder::new(Side::Sell, BaseCurrency::new(9, 0)).unwrap();
     exchange.submit_market_order(order).unwrap();
 
-    let qty = base!(9);
-    let entry_price = quote!(100);
-    let fee = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, entry_price));
+    let qty = BaseCurrency::new(9, 0);
+    let entry_price = QuoteCurrency::new(100, 0);
+    let fee = TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(
@@ -220,22 +309,35 @@ fn submit_limit_buy_order_with_short() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(100),
-            position_margin: quote!(900),
-            order_margin: quote!(0)
+            available_wallet_balance: QuoteCurrency::new(100, 0),
+            position_margin: QuoteCurrency::new(900, 0),
+            order_margin: QuoteCurrency::new(0, 0)
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), quote!(0.54));
+    assert_eq!(
+        exchange.position().outstanding_fees(),
+        QuoteCurrency::new(54, 2)
+    );
 
     // Another sell limit order should not work
-    let order = LimitOrder::new(Side::Sell, quote!(101), base!(1)).unwrap();
+    let order = LimitOrder::new(
+        Side::Sell,
+        QuoteCurrency::new(101, 0),
+        BaseCurrency::new(1, 0),
+    )
+    .unwrap();
     assert_eq!(
         exchange.submit_limit_order(order),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
     );
 
     // But buy order should work
-    let order = LimitOrder::new(Side::Buy, quote!(100), base!(9)).unwrap();
+    let order = LimitOrder::new(
+        Side::Buy,
+        QuoteCurrency::new(100, 0),
+        BaseCurrency::new(9, 0),
+    )
+    .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
     let ts = 0;
@@ -247,7 +349,14 @@ fn submit_limit_buy_order_with_short() {
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(0.into(), &trade!(quote!(99), base!(9), Side::Sell))
+            .update_state(
+                0.into(),
+                &trade!(
+                    QuoteCurrency::new(99, 0),
+                    BaseCurrency::new(9, 0),
+                    Side::Sell
+                )
+            )
             .unwrap(),
         vec![expected_order_update]
     );
@@ -261,17 +370,25 @@ fn submit_limit_buy_order_above_ask() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
-            .update_state(0.into(), &bba!(quote!(99), quote!(100)))
+            .update_state(
+                0.into(),
+                &bba!(QuoteCurrency::new(99, 0), QuoteCurrency::new(100, 0))
+            )
             .unwrap(),
         Vec::new()
     );
-    let order = LimitOrder::new(Side::Buy, quote!(100), base!(9)).unwrap();
+    let order = LimitOrder::new(
+        Side::Buy,
+        QuoteCurrency::new(100, 0),
+        BaseCurrency::new(9, 0),
+    )
+    .unwrap();
     assert_eq!(
         exchange.submit_limit_order(order),
         Err(Error::OrderError(
             OrderError::GoodTillCrossingRejectedOrder {
-                limit_price: quote!(100),
-                away_market_quotation_price: quote!(100)
+                limit_price: QuoteCurrency::new(100, 0),
+                away_market_quotation_price: QuoteCurrency::new(100, 0)
             }
         ))
     );
@@ -284,29 +401,29 @@ fn submit_limit_buy_order_turnaround_short() {
     // let mut exchange = mock_exchange_base();
     // assert_eq!(
     //     exchange
-    //         .update_state(0, bba!(quote!(100), quote!(101)))
+    //         .update_state(0, bba!(QuoteCurrency::new(100), QuoteCurrency::new(101)))
     //         .unwrap(),
     //     vec![]
     // );
-    // let order = Order::market(Side::Sell, base!(9)).unwrap();
+    // let order = Order::market(Side::Sell, BaseCurrency::new(9)).unwrap();
     // exchange.submit_limit_order(order).unwrap();
 
-    // let order = LimitOrder::new(Side::Buy, quote!(100), base!(18)).unwrap();
+    // let order = LimitOrder::new(Side::Buy, QuoteCurrency::new(100), BaseCurrency::new(18)).unwrap();
     // exchange.submit_limit_order(order.clone()).unwrap();
 
     // // Execute the limit buy order
     // assert_eq!(
     //     exchange
-    //         .update_state(0, bba!(quote!(98), quote!(99)))
+    //         .update_state(0, bba!(QuoteCurrency::new(98), QuoteCurrency::new(99)))
     //         .unwrap(),
     //     vec![order]
     // );
     // assert_eq!(
     //     exchange.account().position(),
     //     &Position {
-    //         size: base!(9),
-    //         entry_price: quote!(100),
-    //         position_margin: quote!(900),
+    //         size: BaseCurrency::new(9),
+    //         entry_price: QuoteCurrency::new(100),
+    //         position_margin: QuoteCurrency::new(900),
     //         leverage: leverage!(1),
     //     }
     // );

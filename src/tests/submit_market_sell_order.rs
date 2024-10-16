@@ -9,12 +9,15 @@ fn submit_market_sell_order_reject() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
-            .update_state(0.into(), &bba!(quote!(100), quote!(101)))
+            .update_state(
+                0.into(),
+                &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
+            )
             .unwrap(),
         Vec::new()
     );
 
-    let order = MarketOrder::new(Side::Sell, base!(10)).unwrap();
+    let order = MarketOrder::new(Side::Sell, BaseCurrency::new(10, 0)).unwrap();
     assert_eq!(
         exchange.submit_market_order(order),
         Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
@@ -28,17 +31,20 @@ fn submit_market_sell_order() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
-            .update_state(0.into(), &bba!(quote!(100), quote!(101)))
+            .update_state(
+                0.into(),
+                &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
+            )
             .unwrap(),
         Vec::new()
     );
 
-    let qty = base!(5);
+    let qty = BaseCurrency::new(5, 0);
     let order = MarketOrder::new(Side::Sell, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
     // make sure its excuted immediately
-    let entry_price = quote!(100);
-    let fees = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, entry_price));
+    let entry_price = QuoteCurrency::new(100, 0);
+    let fees = TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(
@@ -52,12 +58,15 @@ fn submit_market_sell_order() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(500),
-            position_margin: quote!(500),
-            order_margin: quote!(0)
+            available_wallet_balance: QuoteCurrency::new(500, 0),
+            position_margin: QuoteCurrency::new(500, 0),
+            order_margin: QuoteCurrency::new(0, 0)
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), quote!(0.3));
+    assert_eq!(
+        exchange.position().outstanding_fees(),
+        QuoteCurrency::new(3, 1)
+    );
 }
 
 #[test]
@@ -67,28 +76,31 @@ fn submit_market_sell_order_with_short_position() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
-            .update_state(0.into(), &bba!(quote!(100), quote!(101)))
+            .update_state(
+                0.into(),
+                &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
+            )
             .unwrap(),
         Vec::new()
     );
 
     // First enter a short position
-    let order = MarketOrder::new(Side::Sell, base!(5)).unwrap();
+    let order = MarketOrder::new(Side::Sell, BaseCurrency::new(5, 0)).unwrap();
     exchange.submit_market_order(order).unwrap();
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(500),
-            position_margin: quote!(500),
-            order_margin: quote!(0)
+            available_wallet_balance: QuoteCurrency::new(500, 0),
+            position_margin: QuoteCurrency::new(500, 0),
+            order_margin: QuoteCurrency::new(0, 0)
         }
     );
-    let fee0 = quote!(0.3);
+    let fee0 = QuoteCurrency::new(3, 1);
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(
-            base!(5),
-            quote!(100),
+            BaseCurrency::new(5, 0),
+            QuoteCurrency::new(100, 0),
             &mut accounting,
             init_margin_req,
             fee0,
@@ -97,22 +109,22 @@ fn submit_market_sell_order_with_short_position() {
     assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 
     // Sell again
-    let order = MarketOrder::new(Side::Sell, base!(4)).unwrap();
+    let order = MarketOrder::new(Side::Sell, BaseCurrency::new(4, 0)).unwrap();
     exchange.submit_market_order(order).unwrap();
-    let fee1 = quote!(0.24);
+    let fee1 = QuoteCurrency::new(24, 2);
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(100),
-            position_margin: quote!(900),
-            order_margin: quote!(0)
+            available_wallet_balance: QuoteCurrency::new(100, 0),
+            position_margin: QuoteCurrency::new(900, 0),
+            order_margin: QuoteCurrency::new(0, 0)
         }
     );
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(
-            base!(9),
-            quote!(100),
+            BaseCurrency::new(9, 0),
+            QuoteCurrency::new(100, 0),
             &mut accounting,
             init_margin_req,
             fee0 + fee1
@@ -126,26 +138,32 @@ fn submit_market_sell_order_with_long_position() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
-            .update_state(0.into(), &bba!(quote!(99), quote!(100)))
+            .update_state(
+                0.into(),
+                &bba!(QuoteCurrency::new(99, 0), QuoteCurrency::new(100, 0))
+            )
             .unwrap(),
         Vec::new()
     );
 
     // First enter a long position
-    let order = MarketOrder::new(Side::Buy, base!(9)).unwrap();
+    let order = MarketOrder::new(Side::Buy, BaseCurrency::new(9, 0)).unwrap();
     exchange.submit_market_order(order).unwrap();
 
     // Now close the position with a sell order
-    let order = MarketOrder::new(Side::Sell, base!(9)).unwrap();
+    let order = MarketOrder::new(Side::Sell, BaseCurrency::new(9, 0)).unwrap();
     exchange.submit_market_order(order).unwrap();
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
             // - fee - fee - spread loss
-            available_wallet_balance: quote!(1000) - quote!(0.54) - quote!(0.5346) - quote!(9),
-            position_margin: quote!(0),
-            order_margin: quote!(0)
+            available_wallet_balance: QuoteCurrency::new(1000, 0)
+                - QuoteCurrency::new(54, 2)
+                - QuoteCurrency::new(5346, 4)
+                - QuoteCurrency::new(9, 0),
+            position_margin: QuoteCurrency::new(0, 0),
+            order_margin: QuoteCurrency::new(0, 0)
         }
     );
 }
@@ -156,28 +174,32 @@ fn submit_market_sell_order_turnaround_long() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
-        .update_state(0.into(), &bba!(quote!(99), quote!(100)))
+        .update_state(
+            0.into(),
+            &bba!(QuoteCurrency::new(99, 0), QuoteCurrency::new(100, 0))
+        )
         .unwrap()
         .is_empty());
 
     // First enter a long position
-    let qty = base!(9);
+    let qty = BaseCurrency::new(9, 0);
     let order = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
-    let fee0 = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, quote!(100)));
+    let fee0 =
+        TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, QuoteCurrency::new(100, 0)));
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(100),
-            position_margin: quote!(900),
-            order_margin: quote!(0)
+            available_wallet_balance: QuoteCurrency::new(100, 0),
+            position_margin: QuoteCurrency::new(900, 0),
+            order_margin: QuoteCurrency::new(0, 0)
         }
     );
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
-            base!(9),
-            quote!(100),
+            BaseCurrency::new(9, 0),
+            QuoteCurrency::new(100, 0),
             &mut accounting,
             init_margin_req,
             fee0,
@@ -186,26 +208,27 @@ fn submit_market_sell_order_turnaround_long() {
     assert_eq!(exchange.active_limit_orders(), &HashMap::default());
 
     // Now reverse the position
-    let qty = base!(18);
+    let qty = BaseCurrency::new(18, 0);
     let order = MarketOrder::new(Side::Sell, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
-    let fee1 = TEST_FEE_TAKER.for_value(Quote::convert_from(qty, QuoteCurrency::new(Dec!(99))));
+    let fee1 =
+        TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, QuoteCurrency::new(99, 0)));
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: quote!(100) - fee0 - fee1,
-            position_margin: quote!(891),
-            order_margin: quote!(0)
+            available_wallet_balance: QuoteCurrency::new(100, 0) - fee0 - fee1,
+            position_margin: QuoteCurrency::new(891, 0),
+            order_margin: QuoteCurrency::new(0, 0)
         }
     );
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(
-            base!(9),
-            quote!(99),
+            BaseCurrency::new(9, 0),
+            QuoteCurrency::new(99, 0),
             &mut accounting,
             init_margin_req,
-            quote!(0),
+            QuoteCurrency::new(0, 0),
         ))
     );
     assert_eq!(exchange.active_limit_orders(), &HashMap::default());

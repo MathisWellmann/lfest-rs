@@ -206,60 +206,99 @@ where
 
 #[cfg(test)]
 mod tests {
-    use fpdec::Dec;
-
     use super::*;
     use crate::prelude::*;
 
     #[test]
     fn price_filter() {
         let filter = PriceFilter {
-            min_price: Some(quote!(0.1)),
-            max_price: Some(quote!(1000.0)),
-            tick_size: quote!(0.1),
-            multiplier_up: Dec!(1.2),
-            multiplier_down: Dec!(0.8),
+            min_price: Some(QuoteCurrency::<i32, 4, 2>::new(1, 1)),
+            max_price: Some(QuoteCurrency::new(1000, 0)),
+            tick_size: QuoteCurrency::new(1, 1),
+            multiplier_up: BasisPointFrac::from(Decimal::try_from_scaled(12, 1).unwrap()),
+            multiplier_down: BasisPointFrac::from(Decimal::try_from_scaled(8, 1).unwrap()),
         };
-        let mark_price = quote!(100.0);
+        let mark_price = QuoteCurrency::new(100, 0);
 
         // Some passing orders
-        let order = LimitOrder::new(Side::Buy, quote!(99.0), base!(0.1)).unwrap();
+        let order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(99, 0),
+            BaseCurrency::new(1, 1),
+        )
+        .unwrap();
         filter.validate_limit_order(&order, mark_price).unwrap();
-        let order = LimitOrder::new(Side::Sell, quote!(99.0), base!(0.1)).unwrap();
+        let order = LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(99, 0),
+            BaseCurrency::new(1, 1),
+        )
+        .unwrap();
         filter.validate_limit_order(&order, mark_price).unwrap();
 
         // beyond max and min
-        let order = LimitOrder::new(Side::Buy, quote!(0.05), base!(0.1)).unwrap();
+        let order =
+            LimitOrder::new(Side::Buy, QuoteCurrency::new(5, 2), BaseCurrency::new(1, 1)).unwrap();
         assert_eq!(
             filter.validate_limit_order(&order, mark_price),
             Err(OrderError::LimitPriceBelowMin)
         );
-        let order = LimitOrder::new(Side::Buy, quote!(1001), base!(0.1)).unwrap();
+        let order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(1001, 0),
+            BaseCurrency::new(1, 1),
+        )
+        .unwrap();
         assert_eq!(
             filter.validate_limit_order(&order, mark_price),
             Err(OrderError::LimitPriceAboveMax)
         );
 
         // Test upper price band
-        let order = LimitOrder::new(Side::Buy, quote!(120), base!(0.1)).unwrap();
+        let order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(120, 0),
+            BaseCurrency::new(1, 1),
+        )
+        .unwrap();
         filter.validate_limit_order(&order, mark_price).unwrap();
-        let order = LimitOrder::new(Side::Buy, quote!(121), base!(0.1)).unwrap();
+        let order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(121, 0),
+            BaseCurrency::new(1, 1),
+        )
+        .unwrap();
         assert_eq!(
             filter.validate_limit_order(&order, mark_price),
             Err(OrderError::LimitPriceAboveMultiple)
         );
 
         // Test lower price band
-        let order = LimitOrder::new(Side::Buy, quote!(80), base!(0.1)).unwrap();
+        let order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(80, 0),
+            BaseCurrency::new(1, 1),
+        )
+        .unwrap();
         filter.validate_limit_order(&order, mark_price).unwrap();
-        let order = LimitOrder::new(Side::Buy, quote!(79), base!(0.1)).unwrap();
+        let order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(79, 0),
+            BaseCurrency::new(1, 1),
+        )
+        .unwrap();
         assert_eq!(
             filter.validate_limit_order(&order, mark_price),
             Err(OrderError::LimitPriceBelowMultiple)
         );
 
         // Test step size
-        let order = LimitOrder::new(Side::Buy, quote!(100.05), base!(0.1)).unwrap();
+        let order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(10005, 2),
+            BaseCurrency::new(1, 1),
+        )
+        .unwrap();
         assert_eq!(
             filter.validate_limit_order(&order, mark_price),
             Err(OrderError::InvalidOrderPriceStepSize)

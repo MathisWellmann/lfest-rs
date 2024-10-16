@@ -106,36 +106,41 @@ where
 
 #[cfg(test)]
 mod tests {
+    use num_traits::{One, Zero};
+
     use super::*;
     use crate::prelude::*;
 
     #[test]
     fn quantity_filter() {
         let filter = QuantityFilter {
-            min_quantity: Some(quote!(10)),
-            max_quantity: Some(quote!(1000)),
-            tick_size: quote!(1),
+            min_quantity: Some(QuoteCurrency::<i32, 4, 2>::new(10, 0)),
+            max_quantity: Some(QuoteCurrency::new(1000, 0)),
+            tick_size: QuoteCurrency::one(),
+            _quote: std::marker::PhantomData,
         };
 
         assert_eq!(
-            filter.validate_order_quantity(quote!(0)),
+            filter.validate_order_quantity(QuoteCurrency::zero()),
             Err(OrderError::QuantityTooLow)
         );
 
-        filter.validate_order_quantity(quote!(50)).unwrap();
+        filter
+            .validate_order_quantity(QuoteCurrency::new(50, 0))
+            .unwrap();
 
         assert_eq!(
-            filter.validate_order_quantity(quote!(5)),
+            filter.validate_order_quantity(QuoteCurrency::new(5, 0)),
             Err(OrderError::QuantityTooLow)
         );
 
         assert_eq!(
-            filter.validate_order_quantity(quote!(5000)),
+            filter.validate_order_quantity(QuoteCurrency::new(5000, 0)),
             Err(OrderError::QuantityTooHigh)
         );
 
         assert_eq!(
-            filter.validate_order_quantity(quote!(50.5)),
+            filter.validate_order_quantity(QuoteCurrency::new(505, 1)),
             Err(OrderError::InvalidQuantityStepSize)
         );
     }
@@ -145,14 +150,15 @@ mod tests {
         let filter = QuantityFilter {
             min_quantity: None,
             max_quantity: None,
-            tick_size: quote!(1),
+            tick_size: QuoteCurrency::one(),
+            _quote: std::marker::PhantomData::<QuoteCurrency<i32, 4, 2>>::default(),
         };
         assert_eq!(
-            filter.validate_order_quantity(quote!(0)),
+            filter.validate_order_quantity(QuoteCurrency::zero()),
             Err(OrderError::QuantityTooLow)
         );
         assert_eq!(
-            filter.validate_order_quantity(quote!(0.5)),
+            filter.validate_order_quantity(QuoteCurrency::new(5, 1)),
             Err(OrderError::InvalidQuantityStepSize)
         );
     }

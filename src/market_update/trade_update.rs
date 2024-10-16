@@ -82,19 +82,17 @@ macro_rules! trade {
 
 #[cfg(test)]
 mod tests {
-    use fpdec::Decimal;
-
     use super::*;
-    use crate::{base, prelude::*, quote};
+    use crate::prelude::*;
 
     #[test_case::test_matrix(
         [100, 110, 120],
         [1, 2, 3],
         [Side::Buy, Side::Sell]
     )]
-    fn trade_limit_order_filled_some(price: u32, qty: u32, side: Side) {
-        let price = QuoteCurrency::new(Decimal::from(price));
-        let quantity = BaseCurrency::new(Decimal::from(qty));
+    fn trade_limit_order_filled_some(price: i32, qty: i32, side: Side) {
+        let price = QuoteCurrency::<i32, 4, 2>::new(price, 0);
+        let quantity = BaseCurrency::new(qty, 0);
         let trade = Trade {
             price,
             quantity,
@@ -102,8 +100,8 @@ mod tests {
         };
 
         let offset = match side {
-            Side::Buy => quote!(-1),
-            Side::Sell => quote!(1),
+            Side::Buy => QuoteCurrency::new(-1, 0),
+            Side::Sell => QuoteCurrency::new(1, 0),
         };
         let limit_order = LimitOrder::new(side.inverted(), price + offset, quantity).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
@@ -116,31 +114,41 @@ mod tests {
         [1, 2, 3],
         [Side::Buy, Side::Sell]
     )]
-    fn trade_limit_order_filled_none(price: u32, qty: u32, side: Side) {
-        let price = QuoteCurrency::new(Decimal::from(price));
-        let quantity = BaseCurrency::new(Decimal::from(qty));
+    fn trade_limit_order_filled_none(price: i32, qty: i32, side: Side) {
+        let price = QuoteCurrency::<i32, 4, 2>::new(price, 0);
+        let quantity = BaseCurrency::new(qty, 0);
         let trade = Trade {
             price,
             quantity,
             side,
         };
         let offset = match side {
-            Side::Buy => quote!(-1),
-            Side::Sell => quote!(1),
+            Side::Buy => QuoteCurrency::new(-1, 0),
+            Side::Sell => QuoteCurrency::new(1, 0),
         };
-        let limit_order =
-            LimitOrder::new(side.inverted(), price + offset, quantity / base!(2)).unwrap();
+        let limit_order = LimitOrder::new(
+            side.inverted(),
+            price + offset,
+            quantity / BaseCurrency::new(2, 0),
+        )
+        .unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let limit_order = limit_order.into_pending(meta);
         assert_eq!(
             trade.limit_order_filled(&limit_order).unwrap(),
-            quantity / base!(2)
+            quantity / BaseCurrency::new(2, 0)
         );
     }
 
     #[test]
     fn size_of_trade() {
-        // TODO: reduce the size to 64 bytes.
-        assert_eq!(std::mem::size_of::<Trade<Decimal, Base>>(), 80);
+        assert_eq!(
+            std::mem::size_of::<Trade<i32, 4, 2, BaseCurrency<i32, 4, 2>>>(),
+            12
+        );
+        assert_eq!(
+            std::mem::size_of::<Trade<i64, 4, 2, BaseCurrency<i64, 4, 2>>>(),
+            24
+        );
     }
 }

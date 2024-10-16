@@ -34,14 +34,6 @@ pub struct BaseCurrency<I, const DB: u8, const DQ: u8>(Decimal<I, DB>)
 where
     I: Mon<DQ> + Mon<DB>;
 
-// /// Allows the quick construction of `BaseCurrency`
-// #[macro_export]
-// macro_rules! base {
-//     ( $a:literal ) => {{
-//         $crate::prelude::BaseCurrency::new($crate::prelude::const_decimal::Dec!($a))
-//     }};
-// }
-
 impl<I, const DB: u8, const DQ: u8> BaseCurrency<I, DB, DQ>
 where
     I: Mon<DQ> + Mon<DB>,
