@@ -5,11 +5,11 @@ use crate::types::MarginCurrencyMarker;
 ///
 /// # Panics:
 /// If the cumulative debits of all accounts don't equal credits.
-pub(crate) fn debug_assert_accounting_equation<I, const DB: u8, const DQ: u8, BaseOrQuote>(
-    accounts: &[TAccount<I, DB, DQ, BaseOrQuote>],
+pub(crate) fn debug_assert_accounting_equation<I, const D: u8, BaseOrQuote>(
+    accounts: &[TAccount<I, D, BaseOrQuote>],
 ) where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     debug_assert!(
         {

@@ -1,13 +1,14 @@
 use std::cmp::Ordering;
 
+use const_decimal::Decimal;
 use getset::{CopyGetters, Getters};
 use num_traits::{Signed, Zero};
 use tracing::{debug, trace};
 
 use crate::{
     prelude::{
-        BasisPointFrac, CurrencyMarker, Mon, QuoteCurrency, Transaction, TransactionAccounting,
-        TREASURY_ACCOUNT, USER_WALLET_ACCOUNT,
+        CurrencyMarker, Mon, QuoteCurrency, Transaction, TransactionAccounting, TREASURY_ACCOUNT,
+        USER_WALLET_ACCOUNT,
     },
     types::MarginCurrencyMarker,
 };
@@ -15,10 +16,10 @@ use crate::{
 /// Describes the position information of the account.
 /// It assumes isolated margining mechanism, because the margin is directly associated with the position.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Getters, CopyGetters)]
-pub struct PositionInner<I, const DB: u8, const DQ: u8, BaseOrQuote>
+pub struct PositionInner<I, const D: u8, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
     /// The number of futures contracts making up the position.
     #[getset(get_copy = "pub")]
@@ -33,11 +34,11 @@ where
     outstanding_fees: BaseOrQuote::PairedCurrency,
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> PositionInner<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> PositionInner<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
 {
     /// Create a new instance.
     ///
@@ -45,13 +46,13 @@ where
     /// if `quantity` or `entry_price` are invalid.
     pub fn new<Acc>(
         quantity: BaseOrQuote,
-        entry_price: QuoteCurrency<I, DB, DQ>,
+        entry_price: QuoteCurrency<I, D>,
         accounting: &mut Acc,
-        init_margin_req: BasisPointFrac,
+        init_margin_req: Decimal<I, D>,
         fees: BaseOrQuote::PairedCurrency,
     ) -> Self
     where
-        Acc: TransactionAccounting<I, DB, DQ, BaseOrQuote::PairedCurrency>,
+        Acc: TransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
     {
         trace!("new position: qty {quantity} @ {entry_price}");
         assert!(quantity > BaseOrQuote::zero());
@@ -74,7 +75,7 @@ where
     }
 
     /// The average price at which this position was entered into.
-    pub fn entry_price(&self) -> QuoteCurrency<I, DB, DQ> {
+    pub fn entry_price(&self) -> QuoteCurrency<I, D> {
         BaseOrQuote::PairedCurrency::price_paid_for_qty(self.total_cost, self.quantity)
     }
 
@@ -83,7 +84,7 @@ where
     /// denoted in BASE when using inverse futures
     pub fn unrealized_pnl(
         &self,
-        mark_to_market_price: QuoteCurrency<I, DB, DQ>,
+        mark_to_market_price: QuoteCurrency<I, D>,
     ) -> BaseOrQuote::PairedCurrency {
         BaseOrQuote::PairedCurrency::pnl(self.entry_price(), mark_to_market_price, self.quantity)
     }
@@ -92,12 +93,12 @@ where
     pub(crate) fn increase_contracts<Acc>(
         &mut self,
         qty: BaseOrQuote,
-        entry_price: QuoteCurrency<I, DB, DQ>,
+        entry_price: QuoteCurrency<I, D>,
         accounting: &mut Acc,
-        init_margin_req: BasisPointFrac,
+        init_margin_req: Decimal<I, D>,
         fees: BaseOrQuote::PairedCurrency,
     ) where
-        Acc: TransactionAccounting<I, DB, DQ, BaseOrQuote::PairedCurrency>,
+        Acc: TransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
     {
         debug!(
             "increase_contracts: qty: {qty} @ {entry_price}; self: {:?}",
@@ -125,13 +126,13 @@ where
     pub(crate) fn decrease_contracts<Acc>(
         &mut self,
         qty: BaseOrQuote,
-        liquidation_price: QuoteCurrency<I, DB, DQ>,
+        liquidation_price: QuoteCurrency<I, D>,
         accounting: &mut Acc,
-        init_margin_req: BasisPointFrac,
+        init_margin_req: Decimal<I, D>,
         direction_multiplier: i8,
         fees: BaseOrQuote::PairedCurrency,
     ) where
-        Acc: TransactionAccounting<I, DB, DQ, BaseOrQuote::PairedCurrency>,
+        Acc: TransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
     {
         debug!(
             "decrease_contracts: qty: {qty} @ {liquidation_price}; self: {:?}",

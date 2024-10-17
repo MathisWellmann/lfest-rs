@@ -4,23 +4,20 @@ use num_traits::One;
 
 use crate::{
     leverage,
-    prelude::{
-        BasisPointFrac, ConfigError, CurrencyMarker, Maker, Mon, PriceFilter, QuantityFilter, Taker,
-    },
+    prelude::{ConfigError, CurrencyMarker, Maker, Mon, PriceFilter, QuantityFilter, Taker},
     types::{Fee, Leverage},
 };
 
 /// Specifies the details of the futures contract
 /// Generics:
 /// - `I`: The numeric data type of currencies.
-/// - `DB`: The constant decimal precision of the `BaseCurrency`.
-/// - `DQ`: The constant decimal precision of the `QuoteCurrency`.
+/// - `D`: The constant decimal precision of the currencies
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 #[derive(Debug, Clone, Getters, CopyGetters, Setters)]
-pub struct ContractSpecification<I, const DB: u8, const DQ: u8, BaseOrQuote>
+pub struct ContractSpecification<I, const D: u8, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
     /// Identifying ticker symbol
     #[getset(get = "pub", set = "pub")]
@@ -29,13 +26,13 @@ where
     /// The initial deposit required to open a new futures position.
     /// Expressed as basis points.
     #[getset(get_copy = "pub")]
-    init_margin_req: BasisPointFrac,
+    init_margin_req: Decimal<I, D>,
 
     /// The minimum amount that must be maintained in the traders account to
     /// keep existing positions open.
     /// Expressed as basis points.
     #[getset(get_copy = "pub")]
-    maintenance_margin: BasisPointFrac,
+    maintenance_margin: Decimal<I, D>,
 
     /// The method for computing `mark-to-market`.
     #[getset(get_copy = "pub", set = "pub")]
@@ -43,11 +40,11 @@ where
 
     /// Pricing rules
     #[getset(get = "pub")]
-    price_filter: PriceFilter<I, DB, DQ>,
+    price_filter: PriceFilter<I, D>,
 
     /// Quantity rules
     #[getset(get = "pub")]
-    quantity_filter: QuantityFilter<I, DB, DQ, BaseOrQuote>,
+    quantity_filter: QuantityFilter<I, D, BaseOrQuote>,
 
     /// The maker fee as parts per 100_000
     #[getset(get_copy = "pub")]
@@ -58,10 +55,10 @@ where
     fee_taker: Fee<Taker>,
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> ContractSpecification<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> ContractSpecification<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D> + Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
     /// Create a new `ContractSpecification` from the most basic parameters.
     ///
@@ -76,15 +73,13 @@ where
     /// `fee_taker`: The fee a taker pays.
     pub fn new(
         leverage: Leverage,
-        maintenance_margin: BasisPointFrac,
-        price_filter: PriceFilter<I, DB, DQ>,
-        quantity_filter: QuantityFilter<I, DB, DQ, BaseOrQuote>,
+        maintenance_margin: Decimal<I, D>,
+        price_filter: PriceFilter<I, D>,
+        quantity_filter: QuantityFilter<I, D, BaseOrQuote>,
         fee_maker: Fee<Maker>,
         fee_taker: Fee<Taker>,
     ) -> Result<Self, ConfigError> {
-        if maintenance_margin > BasisPointFrac::from(Decimal::one())
-            || maintenance_margin <= BasisPointFrac::from(Decimal::one())
-        {
+        if maintenance_margin > Decimal::one() || maintenance_margin <= Decimal::one() {
             return Err(ConfigError::InvalidMaintenanceMarginFraction);
         }
 
@@ -103,16 +98,15 @@ where
     }
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> Default
-    for ContractSpecification<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> Default for ContractSpecification<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
     fn default() -> Self {
         Self::new(
             leverage!(1),
-            BasisPointFrac::from(Decimal::try_from_scaled(5, 1).unwrap()),
+            Decimal::one() / Decimal::TWO,
             PriceFilter::default(),
             QuantityFilter::default(),
             Fee::from_basis_points(2),

@@ -4,7 +4,7 @@ use crate::{bba, mock_exchange_linear, prelude::*};
 
 #[tracing_test::traced_test]
 #[test_matrix([BaseCurrency::new(1, 0), BaseCurrency::new(3, 0), BaseCurrency::new(5, 0), BaseCurrency::new(10, 0)])]
-fn amend_limit_order_qty(new_qty: BaseCurrency<i32, 4, 2>) {
+fn amend_limit_order_qty(new_qty: BaseCurrency<i32, 4>) {
     let mut exchange = mock_exchange_linear();
 
     assert!(exchange
@@ -40,7 +40,7 @@ fn amend_limit_order_qty(new_qty: BaseCurrency<i32, 4, 2>) {
 
 #[tracing_test::traced_test]
 #[test_matrix([BaseCurrency::new(1, 0), BaseCurrency::new(2, 0), BaseCurrency::new(3, 0)])]
-fn amend_limit_order_qty_with_partial_fill_leading_to_cancel(new_qty: BaseCurrency<i32, 4, 2>) {
+fn amend_limit_order_qty_with_partial_fill_leading_to_cancel(new_qty: BaseCurrency<i32, 4>) {
     let mut exchange = mock_exchange_linear();
 
     assert!(exchange
@@ -89,7 +89,7 @@ fn amend_limit_order_qty_with_partial_fill_leading_to_cancel(new_qty: BaseCurren
 
 #[tracing_test::traced_test]
 #[test_matrix([BaseCurrency::new(4, 0), BaseCurrency::new(5 ,0), BaseCurrency::new(6, 0)])]
-fn amend_limit_order_qty_with_partial_fill(new_qty: BaseCurrency<i32, 4, 2>) {
+fn amend_limit_order_qty_with_partial_fill(new_qty: BaseCurrency<i32, 4>) {
     let mut exchange = mock_exchange_linear();
 
     assert!(exchange

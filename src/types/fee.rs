@@ -30,13 +30,10 @@ impl<MakerTaker> Fee<MakerTaker> {
     }
 
     /// Compute the fraction of the `value` that is the fee.
-    pub fn for_value<I, const DB: u8, const DQ: u8, BaseOrQuote>(
-        &self,
-        value: BaseOrQuote,
-    ) -> BaseOrQuote
+    pub fn for_value<I, const D: u8, BaseOrQuote>(&self, value: BaseOrQuote) -> BaseOrQuote
     where
-        I: Mon<DB> + Mon<DQ>,
-        BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+        I: Mon<D>,
+        BaseOrQuote: CurrencyMarker<I, D>,
     {
         // value * Decimal::try_from_scaled(self.per_cent_mille, 5).expect("Can construct")
         todo!()

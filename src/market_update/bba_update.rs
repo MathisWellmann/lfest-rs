@@ -11,41 +11,31 @@ use crate::{
 /// For now we don't handle the quantity a these price levels.
 /// This will change in future versions.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct Bba<I, const DB: u8, const DQ: u8>
+pub struct Bba<I, const D: u8>
 where
-    I: Mon<DB> + Mon<DQ>,
+    I: Mon<D>,
 {
     /// The new best bid
-    pub bid: QuoteCurrency<I, DB, DQ>,
+    pub bid: QuoteCurrency<I, D>,
     /// The new best ask
-    pub ask: QuoteCurrency<I, DB, DQ>,
+    pub ask: QuoteCurrency<I, D>,
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId>
-    MarketUpdate<I, DB, DQ, BaseOrQuote, UserOrderId> for Bba<I, DB, DQ>
+impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketUpdate<I, D, BaseOrQuote, UserOrderId>
+    for Bba<I, D>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
     UserOrderId: Clone,
 {
     fn limit_order_filled(
         &self,
-        _limit_order: &LimitOrder<
-            I,
-            DB,
-            DQ,
-            BaseOrQuote,
-            UserOrderId,
-            Pending<I, DB, DQ, BaseOrQuote>,
-        >,
+        _limit_order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
     ) -> Option<BaseOrQuote> {
         None
     }
 
-    fn validate_market_update(
-        &self,
-        price_filter: &PriceFilter<I, DB, DQ>,
-    ) -> Result<(), I, DB, DQ> {
+    fn validate_market_update(&self, price_filter: &PriceFilter<I, D>) -> Result<(), I, D> {
         enforce_min_price(price_filter.min_price(), self.bid)?;
         enforce_min_price(price_filter.min_price(), self.ask)?;
         enforce_max_price(price_filter.max_price(), self.bid)?;
@@ -56,7 +46,7 @@ where
         Ok(())
     }
 
-    fn update_market_state(&self, market_state: &mut MarketState<I, DB, DQ>) {
+    fn update_market_state(&self, market_state: &mut MarketState<I, D>) {
         market_state.set_bid(self.bid);
         market_state.set_ask(self.ask);
     }

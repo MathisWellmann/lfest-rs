@@ -1,44 +1,44 @@
 use std::{cmp::Ordering, ops::Neg};
 
+use const_decimal::Decimal;
 use num_traits::Zero;
 use tracing::debug;
 
 use crate::{
     position_inner::PositionInner,
     prelude::{
-        BasisPointFrac, CurrencyMarker, Mon, QuoteCurrency, TransactionAccounting,
-        USER_POSITION_MARGIN_ACCOUNT,
+        CurrencyMarker, Mon, QuoteCurrency, TransactionAccounting, USER_POSITION_MARGIN_ACCOUNT,
     },
     types::{MarginCurrencyMarker, Side},
 };
 
 /// A futures position can be one of three variants.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub enum Position<I, const DB: u8, const DQ: u8, BaseOrQuote>
+pub enum Position<I, const D: u8, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
     /// No position present.
     #[default]
     Neutral,
     /// A position in the long direction.
-    Long(PositionInner<I, DB, DQ, BaseOrQuote>),
+    Long(PositionInner<I, D, BaseOrQuote>),
     /// A position in the short direction.
-    Short(PositionInner<I, DB, DQ, BaseOrQuote>),
+    Short(PositionInner<I, D, BaseOrQuote>),
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> Position<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> Position<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
 {
     /// Return the positions unrealized profit and loss.
     pub fn unrealized_pnl(
         &self,
-        bid: QuoteCurrency<I, DB, DQ>,
-        ask: QuoteCurrency<I, DB, DQ>,
+        bid: QuoteCurrency<I, D>,
+        ask: QuoteCurrency<I, D>,
     ) -> BaseOrQuote::PairedCurrency {
         match self {
             Position::Neutral => BaseOrQuote::PairedCurrency::zero(),
@@ -66,7 +66,7 @@ where
     }
 
     /// The entry price of the position which is the total cost of the position relative to its quantity.
-    pub fn entry_price(&self) -> QuoteCurrency<I, DB, DQ> {
+    pub fn entry_price(&self) -> QuoteCurrency<I, D> {
         match self {
             Position::Neutral => QuoteCurrency::zero(),
             Position::Long(inner) => inner.entry_price(),
@@ -87,13 +87,13 @@ where
     pub(crate) fn change_position<Acc>(
         &mut self,
         filled_qty: BaseOrQuote,
-        fill_price: QuoteCurrency<I, DB, DQ>,
+        fill_price: QuoteCurrency<I, D>,
         side: Side,
         transaction_accounting: &mut Acc,
-        init_margin_req: BasisPointFrac,
+        init_margin_req: Decimal<I, D>,
         fees: BaseOrQuote::PairedCurrency,
     ) where
-        Acc: TransactionAccounting<I, DB, DQ, BaseOrQuote::PairedCurrency>,
+        Acc: TransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
     {
         debug_assert!(
             filled_qty > BaseOrQuote::zero(),
@@ -265,12 +265,11 @@ where
     }
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> std::fmt::Display
-    for Position<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> std::fmt::Display for Position<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

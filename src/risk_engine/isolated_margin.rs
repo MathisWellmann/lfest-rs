@@ -10,39 +10,38 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub(crate) struct IsolatedMarginRiskEngine<I, const DB: u8, const DQ: u8, BaseOrQuote>
+pub(crate) struct IsolatedMarginRiskEngine<I, const D: u8, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
-    contract_spec: ContractSpecification<I, DB, DQ, BaseOrQuote>,
+    contract_spec: ContractSpecification<I, D, BaseOrQuote>,
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> IsolatedMarginRiskEngine<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> IsolatedMarginRiskEngine<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
-    pub(crate) fn new(contract_spec: ContractSpecification<I, DB, DQ, BaseOrQuote>) -> Self {
+    pub(crate) fn new(contract_spec: ContractSpecification<I, D, BaseOrQuote>) -> Self {
         Self { contract_spec }
     }
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId>
-    RiskEngine<I, DB, DQ, BaseOrQuote, UserOrderId>
-    for IsolatedMarginRiskEngine<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote, UserOrderId> RiskEngine<I, D, BaseOrQuote, UserOrderId>
+    for IsolatedMarginRiskEngine<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default,
 {
     fn check_market_order(
         &self,
-        position: &Position<I, DB, DQ, BaseOrQuote>,
+        position: &Position<I, D, BaseOrQuote>,
         position_margin: BaseOrQuote::PairedCurrency,
-        order: &MarketOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
-        fill_price: QuoteCurrency<I, DB, DQ>,
+        order: &MarketOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        fill_price: QuoteCurrency<I, D>,
         available_wallet_balance: BaseOrQuote::PairedCurrency,
     ) -> Result<(), RiskError> {
         match order.side() {
@@ -65,10 +64,10 @@ where
 
     fn check_limit_order(
         &self,
-        position: &Position<I, DB, DQ, BaseOrQuote>,
-        order: &LimitOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
+        position: &Position<I, D, BaseOrQuote>,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
         available_wallet_balance: BaseOrQuote::PairedCurrency,
-        order_margin_online: &OrderMargin<I, DB, DQ, BaseOrQuote, UserOrderId>,
+        order_margin_online: &OrderMargin<I, D, BaseOrQuote, UserOrderId>,
     ) -> Result<(), RiskError> {
         let order_margin =
             order_margin_online.order_margin(self.contract_spec.init_margin_req(), position);
@@ -88,8 +87,8 @@ where
 
     fn check_maintenance_margin(
         &self,
-        market_state: &MarketState<I, DB, DQ>,
-        position: &Position<I, DB, DQ, BaseOrQuote>,
+        market_state: &MarketState<I, D>,
+        position: &Position<I, D, BaseOrQuote>,
     ) -> Result<(), RiskError> {
         let maint_margin_req = self.contract_spec.maintenance_margin();
         match position {
@@ -115,17 +114,17 @@ where
     }
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> IsolatedMarginRiskEngine<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> IsolatedMarginRiskEngine<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
     fn check_market_buy_order<UserOrderId>(
         &self,
-        position: &Position<I, DB, DQ, BaseOrQuote>,
+        position: &Position<I, D, BaseOrQuote>,
         position_margin: BaseOrQuote::PairedCurrency,
-        order: &MarketOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
-        fill_price: QuoteCurrency<I, DB, DQ>,
+        order: &MarketOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        fill_price: QuoteCurrency<I, D>,
         available_wallet_balance: BaseOrQuote::PairedCurrency,
     ) -> Result<(), RiskError>
     where
@@ -173,10 +172,10 @@ where
 
     fn check_market_sell_order<UserOrderId>(
         &self,
-        position: &Position<I, DB, DQ, BaseOrQuote>,
+        position: &Position<I, D, BaseOrQuote>,
         position_margin: BaseOrQuote::PairedCurrency,
-        order: &MarketOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
-        fill_price: QuoteCurrency<I, DB, DQ>,
+        order: &MarketOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        fill_price: QuoteCurrency<I, D>,
         available_wallet_balance: BaseOrQuote::PairedCurrency,
     ) -> Result<(), RiskError>
     where

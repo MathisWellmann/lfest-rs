@@ -10,13 +10,13 @@ use crate::{
 
 /// A taker trade that consumes liquidity in the book.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct Trade<I, const DB: u8, const DQ: u8, BaseOrQuote>
+pub struct Trade<I, const D: u8, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
     /// The price at which the trade executed at.
-    pub price: QuoteCurrency<I, DB, DQ>,
+    pub price: QuoteCurrency<I, D>,
     /// The executed quantity.
     /// Generic denotation, e.g either Quote or Base currency denoted.
     pub quantity: BaseOrQuote,
@@ -25,16 +25,16 @@ where
     pub side: Side,
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId>
-    MarketUpdate<I, DB, DQ, BaseOrQuote, UserOrderId> for Trade<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketUpdate<I, D, BaseOrQuote, UserOrderId>
+    for Trade<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
     UserOrderId: Clone,
 {
     fn limit_order_filled(
         &self,
-        order: &LimitOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
     ) -> Option<BaseOrQuote> {
         assert!(
             self.quantity > BaseOrQuote::zero(),
@@ -56,17 +56,14 @@ where
         }
     }
 
-    fn validate_market_update(
-        &self,
-        price_filter: &PriceFilter<I, DB, DQ>,
-    ) -> Result<(), I, DB, DQ> {
+    fn validate_market_update(&self, price_filter: &PriceFilter<I, D>) -> Result<(), I, D> {
         enforce_min_price(price_filter.min_price(), self.price)?;
         enforce_max_price(price_filter.max_price(), self.price)?;
         enforce_step_size(price_filter.tick_size(), self.price)?;
         Ok(())
     }
 
-    fn update_market_state(&self, _market_state: &mut MarketState<I, DB, DQ>) {}
+    fn update_market_state(&self, _market_state: &mut MarketState<I, D>) {}
 }
 /// Creates the `Trade` struct used as a `MarketUpdate`.
 #[macro_export]

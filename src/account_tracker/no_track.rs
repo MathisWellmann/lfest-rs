@@ -10,18 +10,17 @@ use crate::{
 #[derive(Default, Debug, Clone)]
 pub struct NoAccountTracker;
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> AccountTracker<I, DB, DQ, BaseOrQuote>
-    for NoAccountTracker
+impl<I, const D: u8, BaseOrQuote> AccountTracker<I, D, BaseOrQuote> for NoAccountTracker
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
-    fn update(&mut self, _market_state: &MarketState<I, DB, DQ>) {}
+    fn update(&mut self, _market_state: &MarketState<I, D>) {}
 
     fn sample_user_balances(
         &mut self,
         _user_balances: &UserBalances<BaseOrQuote>,
-        _mid_price: QuoteCurrency<I, DB, DQ>,
+        _mid_price: QuoteCurrency<I, D>,
     ) {
     }
 
@@ -38,7 +37,7 @@ where
     fn log_trade(
         &mut self,
         _side: Side,
-        _price: QuoteCurrency<I, DB, DQ>,
+        _price: QuoteCurrency<I, D>,
         _quantity: BaseOrQuote::PairedCurrency,
     ) {
     }

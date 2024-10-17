@@ -1,6 +1,8 @@
+use const_decimal::Decimal;
 use derive_more::Display;
+use num_traits::One;
 
-use super::{BasisPointFrac, ConfigError};
+use super::{ConfigError, Mon};
 
 /// Allows the quick construction of `Leverage`
 ///
@@ -28,16 +30,17 @@ impl Leverage {
     }
 
     /// Compute the initial margin requirement from leverage.
-    pub fn init_margin_req(&self) -> BasisPointFrac {
-        // Decimal::one() / Decimal::try_from_scaled(self.0 as i32, 1).unwrap()
-        todo!()
+    pub fn init_margin_req<I, const D: u8>(&self) -> Decimal<I, D>
+    where
+        I: Mon<D>,
+    {
+        Decimal::one() / Decimal::try_from_scaled(I::from(self.0).unwrap(), 1).unwrap()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use const_decimal::Decimal;
-    use num_traits::One;
 
     use super::*;
 

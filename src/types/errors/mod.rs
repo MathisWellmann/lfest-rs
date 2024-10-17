@@ -11,5 +11,4 @@ pub use order::OrderError;
 pub use risk::RiskError;
 
 /// This is defined as a convenience.
-pub type Result<Inner, I, const DB: u8, const DQ: u8> =
-    std::result::Result<Inner, Error<I, DB, DQ>>;
+pub type Result<Inner, I, const D: u8> = std::result::Result<Inner, Error<I, D>>;

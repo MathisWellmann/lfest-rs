@@ -7,22 +7,22 @@ use crate::prelude::CurrencyMarker;
 
 /// A T-Account keeps track of debits and credits.
 #[derive(Debug, Default, Clone, Copy, CopyGetters)]
-pub struct TAccount<I, const DB: u8, const DQ: u8, BaseOrQuote>
+pub struct TAccount<I, const D: u8, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
     #[getset(get_copy = "pub(crate)")]
     debits_posted: BaseOrQuote,
     #[getset(get_copy = "pub(crate)")]
     credits_posted: BaseOrQuote,
-    _quote: PhantomData<QuoteCurrency<I, DB, DQ>>,
+    _quote: PhantomData<QuoteCurrency<I, D>>,
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> TAccount<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> TAccount<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
     pub(crate) fn post_debit(&mut self, amount: BaseOrQuote) {
         self.debits_posted += amount;

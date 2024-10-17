@@ -9,20 +9,19 @@ use crate::{
 /// Some information regarding the state of the market.
 /// Generics:
 /// - `I`: The numeric data type of currencies.
-/// - `DB`: The constant decimal precision of the `BaseCurrency`.
-/// - `DQ`: The constant decimal precision of the `QuoteCurrency`.
+/// - `D`: The constant decimal precision of the currency.
 #[derive(Debug, Default, Clone, Getters, CopyGetters, Setters)]
-pub struct MarketState<I, const DB: u8, const DQ: u8>
+pub struct MarketState<I, const D: u8>
 where
-    I: Mon<DB> + Mon<DQ>,
+    I: Mon<D>,
 {
     /// The current bid
     #[getset(get_copy = "pub", set = "pub(crate)")]
-    bid: QuoteCurrency<I, DB, DQ>,
+    bid: QuoteCurrency<I, D>,
 
     /// The current ask
     #[getset(get_copy = "pub", set = "pub(crate)")]
-    ask: QuoteCurrency<I, DB, DQ>,
+    ask: QuoteCurrency<I, D>,
 
     /// The current timestamp in nanoseconds
     #[getset(get_copy = "pub")]
@@ -33,9 +32,9 @@ where
     step: u64,
 }
 
-impl<I, const DB: u8, const DQ: u8> MarketState<I, DB, DQ>
+impl<I, const D: u8> MarketState<I, D>
 where
-    I: Mon<DB> + Mon<DQ>,
+    I: Mon<D>,
 {
     /// Update the exchange state with new information
     ///
@@ -48,11 +47,11 @@ where
         &mut self,
         timestamp_ns: TimestampNs,
         market_update: &U,
-        price_filter: &PriceFilter<I, DB, DQ>,
-    ) -> Result<(), I, DB, DQ>
+        price_filter: &PriceFilter<I, D>,
+    ) -> Result<(), I, D>
     where
-        U: MarketUpdate<I, DB, DQ, BaseOrQuote, UserOrderId>,
-        BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+        U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
+        BaseOrQuote: CurrencyMarker<I, D>,
         UserOrderId: Clone,
     {
         market_update.validate_market_update(price_filter)?;
@@ -66,7 +65,7 @@ where
 
     /// Get the mid price
     #[inline]
-    pub fn mid_price(&self) -> QuoteCurrency<I, DB, DQ> {
+    pub fn mid_price(&self) -> QuoteCurrency<I, D> {
         (self.bid + self.ask) / Decimal::try_from_scaled(I::from(2).unwrap(), 0).unwrap()
     }
 
@@ -78,8 +77,8 @@ where
 
     #[cfg(test)]
     pub fn from_components(
-        bid: QuoteCurrency<I, DB, DQ>,
-        ask: QuoteCurrency<I, DB, DQ>,
+        bid: QuoteCurrency<I, D>,
+        ask: QuoteCurrency<I, D>,
         current_ts_ns: TimestampNs,
         step: u64,
     ) -> Self {

@@ -29,12 +29,12 @@ where
 }
 
 /// Asserts that the users wallet balance is greater than zero.
-pub(crate) fn assert_user_wallet_balance<I, const DQ: u8, const DB: u8, Acc, BaseOrQuote>(
+pub(crate) fn assert_user_wallet_balance<I, const D: u8, Acc, BaseOrQuote>(
     transaction_accounting: &Acc,
 ) where
-    I: Mon<DB> + Mon<DQ>,
-    Acc: TransactionAccounting<I, DB, DQ, BaseOrQuote>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    Acc: TransactionAccounting<I, D, BaseOrQuote>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     let wallet_balance = transaction_accounting
         .margin_balance_of(USER_WALLET_ACCOUNT)
@@ -43,12 +43,12 @@ pub(crate) fn assert_user_wallet_balance<I, const DQ: u8, const DB: u8, Acc, Bas
 }
 
 /// Sum of all balances in users `TAccount`s.
-pub(crate) fn balance_sum<I, const DB: u8, const DQ: u8, BaseOrQuote>(
+pub(crate) fn balance_sum<I, const D: u8, BaseOrQuote>(
     user_balances: &UserBalances<BaseOrQuote>,
 ) -> BaseOrQuote
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     user_balances.available_wallet_balance
         + user_balances.position_margin

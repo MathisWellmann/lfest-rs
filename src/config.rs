@@ -10,13 +10,12 @@ use crate::{
 ///
 /// Generics:
 /// - `I`: The numeric data type of currencies.
-/// - `DB`: The constant decimal precision of the `BaseCurrency`.
-/// - `DQ`: The constant decimal precision of the `QuoteCurrency`.
+/// - `D`: The constant decimal precision of the currencies.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
-pub struct Config<I, const DB: u8, const DQ: u8, BaseOrQuote>
+pub struct Config<I, const D: u8, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     /// The starting balance of account (denoted in margin currency).
     /// The concrete `Currency` here defines the futures type.
@@ -33,7 +32,7 @@ where
 
     /// The contract specification.
     #[getset(get = "pub")]
-    contract_spec: ContractSpecification<I, DB, DQ, BaseOrQuote::PairedCurrency>,
+    contract_spec: ContractSpecification<I, D, BaseOrQuote::PairedCurrency>,
 
     /// The interval by which to sample the returns of user balances.
     /// This is used to analyze the trading performance later on, to enable things like `sharpe`, `sortino`, anything based on returns.
@@ -41,10 +40,10 @@ where
     sample_returns_every_n_seconds: u64,
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> Config<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> Config<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     /// Create a new Config.
     ///
@@ -62,7 +61,7 @@ where
     pub fn new(
         starting_balance: BaseOrQuote,
         max_num_open_orders: usize,
-        contract_specification: ContractSpecification<I, DB, DQ, BaseOrQuote::PairedCurrency>,
+        contract_specification: ContractSpecification<I, D, BaseOrQuote::PairedCurrency>,
         sample_returns_every_n_seconds: u64,
     ) -> Result<Self, ConfigError> {
         if max_num_open_orders == 0 {

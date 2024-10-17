@@ -18,12 +18,11 @@ use crate::{
 const DAILY_NS: i64 = 86_400_000_000_000;
 
 /// Keep track of Account performance statistics.
-/// Must update in `O(1)` and also compute performance measures in `O(1)`.
 #[derive(Debug, CopyGetters)]
-pub struct FullAccountTracker<I, const DB: u8, const DQ: u8, BaseOrQuote>
+pub struct FullAccountTracker<I, const D: u8, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     /// Wallet balance at the start.
     #[getset(get_copy = "pub")]
@@ -54,8 +53,8 @@ where
     #[getset(get_copy = "pub")]
     sell_volume: BaseOrQuote,
 
-    price_first: QuoteCurrency<I, DB, DQ>,
-    price_last: QuoteCurrency<I, DB, DQ>,
+    price_first: QuoteCurrency<I, D>,
+    price_last: QuoteCurrency<I, D>,
     ts_first: TimestampNs,
     ts_last: TimestampNs,
 
@@ -84,10 +83,10 @@ where
 
 /// TODO: create its own `risk` crate out of these implementations for better
 /// reusability and testability
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> FullAccountTracker<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> FullAccountTracker<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     /// Create a new instance of `Self`.
     #[must_use]
@@ -266,13 +265,13 @@ where
     }
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> AccountTracker<I, DB, DQ, BaseOrQuote>
-    for FullAccountTracker<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> AccountTracker<I, D, BaseOrQuote>
+    for FullAccountTracker<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
-    fn update(&mut self, market_state: &MarketState<I, DB, DQ>) {
+    fn update(&mut self, market_state: &MarketState<I, D>) {
         if self.ts_first == 0.into() {
             self.ts_first = market_state.current_timestamp_ns();
         }
@@ -290,7 +289,7 @@ where
     fn sample_user_balances(
         &mut self,
         user_balances: &UserBalances<BaseOrQuote>,
-        #[allow(unused)] mid_price: QuoteCurrency<I, DB, DQ>,
+        #[allow(unused)] mid_price: QuoteCurrency<I, D>,
     ) {
         let balance_sum = balance_sum(user_balances);
         self.last_balance_sum = balance_sum;
@@ -337,7 +336,7 @@ where
     fn log_trade(
         &mut self,
         side: Side,
-        price: QuoteCurrency<I, DB, DQ>,
+        price: QuoteCurrency<I, D>,
         quantity: BaseOrQuote::PairedCurrency,
     ) {
         assert!(quantity > BaseOrQuote::PairedCurrency::zero());
@@ -354,11 +353,10 @@ where
     }
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> Display
-    for FullAccountTracker<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> Display for FullAccountTracker<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

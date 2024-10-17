@@ -8,11 +8,10 @@ use super::{CurrencyMarker, Mon, QuoteCurrency};
 ///
 /// # Generics:
 /// - `I` is the numeric type,
-/// - `DB` is the constant decimal precision of the `BaseCurrency`.
-/// - `DQ` is the constant decimal precision of the `QuoteCurrency`.
-pub trait MarginCurrencyMarker<I, const DB: u8, const DQ: u8>: CurrencyMarker<I, DB, DQ>
+/// - `D` is the constant decimal precision.
+pub trait MarginCurrencyMarker<I, const D: u8>: CurrencyMarker<I, D>
 where
-    I: Mon<DQ> + Mon<DB>,
+    I: Mon<D>,
 {
     /// Compute the profit and loss.
     ///
@@ -26,14 +25,11 @@ where
     /// currency.
     ///
     fn pnl(
-        entry_price: QuoteCurrency<I, DB, DQ>,
-        exit_price: QuoteCurrency<I, DB, DQ>,
+        entry_price: QuoteCurrency<I, D>,
+        exit_price: QuoteCurrency<I, D>,
         quantity: Self::PairedCurrency,
     ) -> Self;
 
     /// Compute the price paid for the `total_cost` for `quantity` number of contracts.
-    fn price_paid_for_qty(
-        total_cost: Self,
-        quantity: Self::PairedCurrency,
-    ) -> QuoteCurrency<I, DB, DQ>;
+    fn price_paid_for_qty(total_cost: Self, quantity: Self::PairedCurrency) -> QuoteCurrency<I, D>;
 }

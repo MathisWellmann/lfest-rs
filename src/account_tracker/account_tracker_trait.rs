@@ -7,21 +7,20 @@ use crate::{
 ///
 /// # Generics:
 /// - `I` is the numeric type,
-/// - `DB` is the constant decimal precision of the `BaseCurrency`.
-/// - `DQ` is the constant decimal precision of the `QuoteCurrency`.
-pub trait AccountTracker<I, const DB: u8, const DQ: u8, BaseOrQuote>
+/// - `D` is the constant decimal precision of the currencies
+pub trait AccountTracker<I, const D: u8, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     /// Update with newest market info.
-    fn update(&mut self, market_state: &MarketState<I, DB, DQ>);
+    fn update(&mut self, market_state: &MarketState<I, D>);
 
     /// Process information about the user balances.
     fn sample_user_balances(
         &mut self,
         user_balances: &UserBalances<BaseOrQuote>,
-        mid_price: QuoteCurrency<I, DB, DQ>,
+        mid_price: QuoteCurrency<I, D>,
     );
 
     /// Log a `LimitOrder` submission event.
@@ -43,7 +42,7 @@ where
     fn log_trade(
         &mut self,
         side: Side,
-        price: QuoteCurrency<I, DB, DQ>,
+        price: QuoteCurrency<I, D>,
         quantity: BaseOrQuote::PairedCurrency,
     );
 }

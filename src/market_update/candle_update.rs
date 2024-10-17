@@ -13,30 +13,30 @@ use crate::{
 /// Here we can use the `high` and `low` prices to see if our simulated resting orders
 /// have been executed over the last period as a proxy in absence of actual `Trade` flow.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct Candle<I, const DB: u8, const DQ: u8>
+pub struct Candle<I, const D: u8>
 where
-    I: Mon<DB> + Mon<DQ>,
+    I: Mon<D>,
 {
     /// The best bid at the time of candle creation
-    pub bid: QuoteCurrency<I, DB, DQ>,
+    pub bid: QuoteCurrency<I, D>,
     /// The best ask at the time of candle creation
-    pub ask: QuoteCurrency<I, DB, DQ>,
+    pub ask: QuoteCurrency<I, D>,
     /// The low price of the candle
-    pub low: QuoteCurrency<I, DB, DQ>,
+    pub low: QuoteCurrency<I, D>,
     /// The high price of the candle
-    pub high: QuoteCurrency<I, DB, DQ>,
+    pub high: QuoteCurrency<I, D>,
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId>
-    MarketUpdate<I, DB, DQ, BaseOrQuote, UserOrderId> for Candle<I, DB, DQ>
+impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketUpdate<I, D, BaseOrQuote, UserOrderId>
+    for Candle<I, D>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
     UserOrderId: Clone,
 {
     fn limit_order_filled(
         &self,
-        order: &LimitOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
     ) -> Option<BaseOrQuote> {
         assert!(order.remaining_quantity() > BaseOrQuote::zero());
 
@@ -55,10 +55,7 @@ where
         }
     }
 
-    fn validate_market_update(
-        &self,
-        price_filter: &PriceFilter<I, DB, DQ>,
-    ) -> Result<(), I, DB, DQ> {
+    fn validate_market_update(&self, price_filter: &PriceFilter<I, D>) -> Result<(), I, D> {
         enforce_min_price(price_filter.min_price(), self.bid)?;
         enforce_min_price(price_filter.min_price(), self.ask)?;
         enforce_min_price(price_filter.min_price(), self.low)?;
@@ -76,7 +73,7 @@ where
         Ok(())
     }
 
-    fn update_market_state(&self, market_state: &mut MarketState<I, DB, DQ>) {
+    fn update_market_state(&self, market_state: &mut MarketState<I, D>) {
         market_state.set_bid(self.bid);
         market_state.set_ask(self.ask);
     }

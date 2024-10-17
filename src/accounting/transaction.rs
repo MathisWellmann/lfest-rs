@@ -8,10 +8,10 @@ use super::{
 
 /// A transaction involves two parties.
 #[derive(Clone, CopyGetters)]
-pub struct Transaction<I, const DB: u8, const DQ: u8, BaseOrQuote>
+pub struct Transaction<I, const D: u8, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     #[getset(get_copy = "pub(crate)")]
     debit_account_id: AccountId,
@@ -19,14 +19,13 @@ where
     credit_account_id: AccountId,
     #[getset(get_copy = "pub(crate)")]
     amount: BaseOrQuote,
-    _quote: std::marker::PhantomData<QuoteCurrency<I, DB, DQ>>,
+    _quote: std::marker::PhantomData<QuoteCurrency<I, D>>,
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> std::fmt::Debug
-    for Transaction<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> std::fmt::Debug for Transaction<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -52,10 +51,10 @@ fn account_from_int(int: usize) -> &'static str {
     }
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> Transaction<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> Transaction<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     pub(crate) fn new(
         debit_account_id: AccountId,

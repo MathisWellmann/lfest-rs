@@ -8,16 +8,15 @@ use super::{
 /// Defines an market order aka taker order.
 /// Generics:
 /// - `I`: The numeric data type of currencies.
-/// - `DB`: The constant decimal precision of the `BaseCurrency`.
-/// - `DQ`: The constant decimal precision of the `QuoteCurrency`.
+/// - `D`: The constant decimal precision of the currencies.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 /// - `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
 /// - `OrderStatus`: The status of the order for each stage, contains different information based on the stage.
 #[derive(Debug, Clone, PartialEq, Eq, Getters, CopyGetters)]
-pub struct MarketOrder<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId, OrderStatus>
+pub struct MarketOrder<I, const D: u8, BaseOrQuote, UserOrderId, OrderStatus>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
     OrderStatus: Clone,
 {
     /// Order Id provided by the user, can be any type really.
@@ -36,14 +35,13 @@ where
     #[getset(get = "pub")]
     state: OrderStatus,
 
-    _quote: std::marker::PhantomData<QuoteCurrency<I, DB, DQ>>,
+    _quote: std::marker::PhantomData<QuoteCurrency<I, D>>,
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId>
-    MarketOrder<I, DB, DQ, BaseOrQuote, UserOrderId, NewOrder>
+impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
     UserOrderId: Default,
 {
     /// Create a new market order without a `user_order_id`.
@@ -54,7 +52,7 @@ where
     ///
     /// # Returns:
     /// Either a successfully created instance or an [`OrderError`]
-    pub fn new(side: Side, quantity: BaseOrQuote) -> Result<Self, OrderError<I, DB, DQ>> {
+    pub fn new(side: Side, quantity: BaseOrQuote) -> Result<Self, OrderError<I, D>> {
         if quantity <= BaseOrQuote::zero() {
             return Err(OrderError::OrderQuantityLTEZero);
         }
@@ -80,7 +78,7 @@ where
         side: Side,
         quantity: BaseOrQuote,
         user_order_id: UserOrderId,
-    ) -> Result<Self, OrderError<I, DB, DQ>> {
+    ) -> Result<Self, OrderError<I, D>> {
         if quantity <= BaseOrQuote::zero() {
             return Err(OrderError::OrderQuantityLTEZero);
         }
@@ -97,7 +95,7 @@ where
     pub fn into_pending(
         self,
         meta: ExchangeOrderMeta,
-    ) -> MarketOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>> {
+    ) -> MarketOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>> {
         MarketOrder {
             user_order_id: self.user_order_id,
             side: self.side,
@@ -108,19 +106,19 @@ where
     }
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId>
-    MarketOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>
+impl<I, const D: u8, BaseOrQuote, UserOrderId>
+    MarketOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
     UserOrderId: Clone,
 {
     /// Mark the order as filled, by modifying its state.
     pub(crate) fn into_filled(
         self,
-        fill_price: QuoteCurrency<I, DB, DQ>,
+        fill_price: QuoteCurrency<I, D>,
         ts_ns_executed: TimestampNs,
-    ) -> MarketOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Filled<I, DB, DQ, BaseOrQuote>> {
+    ) -> MarketOrder<I, D, BaseOrQuote, UserOrderId, Filled<I, D, BaseOrQuote>> {
         MarketOrder {
             user_order_id: self.user_order_id,
             state: Filled::new(

@@ -1,14 +1,11 @@
 mod base_currency;
-mod convert_decimal;
 mod margin_currency_trait;
 mod quote_currency;
 
 pub use base_currency::BaseCurrency;
-use const_decimal::ScaledInteger;
+use const_decimal::{Decimal, ScaledInteger};
 pub use margin_currency_trait::MarginCurrencyMarker;
 pub use quote_currency::QuoteCurrency;
-
-use super::BasisPointFrac;
 
 /// A trait for monetary values.
 pub trait Mon<const D: u8>:
@@ -32,9 +29,8 @@ impl<const D: u8> Mon<D> for i128 {}
 ///
 /// # Generics:
 /// - `I` is the numeric type
-/// - `DB` is the decimal precision of the `BaseCurrency`.
-/// - `DQ` is the decimal precision of the `QuoteCurrency`.
-pub trait CurrencyMarker<I, const DB: u8, const DQ: u8>:
+/// - `D` is the decimal precision.
+pub trait CurrencyMarker<I, const D: u8>:
     Clone
     + Copy
     + Default
@@ -45,21 +41,20 @@ pub trait CurrencyMarker<I, const DB: u8, const DQ: u8>:
     + Ord
     + std::ops::AddAssign
     + std::ops::SubAssign
-    + std::ops::Mul<BasisPointFrac>
-    + std::ops::Div<I>
+    + std::ops::Mul<Decimal<I, D>>
     + std::hash::Hash
     + num_traits::Zero
     + num_traits::One
     + num_traits::Signed
     + Into<f64>
 where
-    I: Mon<DQ> + Mon<DB>,
+    I: Mon<D>,
 {
     /// The paired currency in the `Symbol` with generic decimal precision `DP`.
-    type PairedCurrency: CurrencyMarker<I, DB, DQ, PairedCurrency = Self>;
+    type PairedCurrency: CurrencyMarker<I, D, PairedCurrency = Self>;
 
     /// Convert from one currency to another at a given price per unit.
-    fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, DB, DQ>) -> Self;
+    fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self;
 }
 
 #[cfg(test)]

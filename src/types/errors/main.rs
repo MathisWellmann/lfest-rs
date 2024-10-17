@@ -4,18 +4,18 @@ use crate::prelude::{Mon, OrderId};
 /// Describes possible Errors that may occur when calling methods in this crate
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
 #[allow(missing_docs)]
-pub enum Error<I, const DB: u8, const DQ: u8>
+pub enum Error<I, const D: u8>
 where
-    I: Mon<DB> + Mon<DQ>,
+    I: Mon<D>,
 {
     #[error(transparent)]
-    FilterError(#[from] FilterError<I, DB, DQ>),
+    FilterError(#[from] FilterError<I, D>),
 
     #[error(transparent)]
     ConfigError(#[from] ConfigError),
 
     #[error(transparent)]
-    OrderError(#[from] OrderError<I, DB, DQ>),
+    OrderError(#[from] OrderError<I, D>),
 
     #[error(transparent)]
     RiskError(#[from] RiskError),

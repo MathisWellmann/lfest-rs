@@ -5,13 +5,11 @@ use getset::CopyGetters;
 use crate::prelude::{ConfigError, CurrencyMarker, Mon, OrderError, QuoteCurrency};
 
 /// The `SizeFilter` defines the quantity rules that each order needs to follow
-/// The generic currency `S` is always the `PairedCurrency` of the margin
-/// currency
 #[derive(Debug, Clone, CopyGetters)]
-pub struct QuantityFilter<I, const DB: u8, const DQ: u8, BaseOrQuote>
+pub struct QuantityFilter<I, const D: u8, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
     /// Defines the optional minimum `quantity` of any order
     #[getset(get_copy = "pub")]
@@ -27,13 +25,13 @@ where
     #[getset(get_copy = "pub")]
     tick_size: BaseOrQuote,
 
-    _quote: std::marker::PhantomData<QuoteCurrency<I, DB, DQ>>,
+    _quote: std::marker::PhantomData<QuoteCurrency<I, D>>,
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> Default for QuantityFilter<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> Default for QuantityFilter<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
     fn default() -> Self {
         Self {
@@ -45,10 +43,10 @@ where
     }
 }
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> QuantityFilter<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> QuantityFilter<I, D, BaseOrQuote>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
 {
     /// Create a new instance of the QuantityFilter.
     /// Make sure the `min_quantity` is a multiple of `tick_size`.
@@ -77,7 +75,7 @@ where
     pub(crate) fn validate_order_quantity(
         &self,
         quantity: BaseOrQuote,
-    ) -> std::result::Result<(), OrderError<I, DB, DQ>> {
+    ) -> std::result::Result<(), OrderError<I, D>> {
         if quantity == BaseOrQuote::zero() {
             return Err(OrderError::QuantityTooLow);
         }

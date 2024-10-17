@@ -12,25 +12,23 @@ pub const TEST_FEE_MAKER: Fee<Maker> = Fee::from_basis_points(2);
 /// The taker fee used in tests.
 pub const TEST_FEE_TAKER: Fee<Taker> = Fee::from_basis_points(6);
 
-const DB: u8 = 4;
-const DQ: u8 = 2;
+const DECIMALS: u8 = 4;
 
 /// Constructs a mock exchange (for linear futures) for testing.
 /// The size is denoted in `BaseCurrency`
 /// and the margin currency is `QuoteCurency`
 pub fn mock_exchange_linear() -> Exchange<
     i32,
-    DB,
-    DQ,
-    BaseCurrency<i32, DB, DQ>,
+    DECIMALS,
+    BaseCurrency<i32, DECIMALS>,
     (),
-    InMemoryTransactionAccounting<i32, DB, DQ, QuoteCurrency<i32, DB, DQ>>,
+    InMemoryTransactionAccounting<i32, DECIMALS, QuoteCurrency<i32, DECIMALS>>,
     NoAccountTracker,
 > {
     let acc_tracker = NoAccountTracker;
     let contract_spec = ContractSpecification::new(
         leverage!(1),
-        BasisPointFrac::from(Decimal::try_from_scaled(5, 1).unwrap()),
+        Decimal::try_from_scaled(5, 1).unwrap(),
         PriceFilter::default(),
         QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).unwrap(),
         TEST_FEE_MAKER,
@@ -45,20 +43,19 @@ pub fn mock_exchange_linear() -> Exchange<
 /// The size is denoted in `BaseCurrency`
 /// and the margin currency is `QuoteCurency`
 pub fn mock_exchange_linear_with_account_tracker(
-    starting_balance: QuoteCurrency<i32, DB, DQ>,
+    starting_balance: QuoteCurrency<i32, DECIMALS>,
 ) -> Exchange<
     i32,
-    DB,
-    DQ,
-    BaseCurrency<i32, DB, DQ>,
+    DECIMALS,
+    BaseCurrency<i32, DECIMALS>,
     (),
-    InMemoryTransactionAccounting<i32, DB, DQ, QuoteCurrency<i32, DB, DQ>>,
-    FullAccountTracker<i32, DB, DQ, QuoteCurrency<i32, DB, DQ>>,
+    InMemoryTransactionAccounting<i32, DECIMALS, QuoteCurrency<i32, DECIMALS>>,
+    FullAccountTracker<i32, DECIMALS, QuoteCurrency<i32, DECIMALS>>,
 > {
     let acc_tracker = FullAccountTracker::new(starting_balance);
     let contract_spec = ContractSpecification::new(
         leverage!(1),
-        BasisPointFrac::from(Decimal::try_from_scaled(5, 1).unwrap()),
+        Decimal::try_from_scaled(5, 1).unwrap(),
         PriceFilter::default(),
         QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).unwrap(),
         TEST_FEE_MAKER,
@@ -71,20 +68,19 @@ pub fn mock_exchange_linear_with_account_tracker(
 
 /// Constructs a mock exchange (for inverse futures) for testing.
 pub fn mock_exchange_inverse(
-    starting_balance: BaseCurrency<i32, DB, DQ>,
+    starting_balance: BaseCurrency<i32, DECIMALS>,
 ) -> Exchange<
     i32,
-    DB,
-    DQ,
-    QuoteCurrency<i32, DB, DQ>,
+    DECIMALS,
+    QuoteCurrency<i32, DECIMALS>,
     (),
-    InMemoryTransactionAccounting<i32, DB, DQ, BaseCurrency<i32, DB, DQ>>,
+    InMemoryTransactionAccounting<i32, DECIMALS, BaseCurrency<i32, DECIMALS>>,
     NoAccountTracker,
 > {
     let acc_tracker = NoAccountTracker;
     let contract_spec = ContractSpecification::new(
         leverage!(1),
-        BasisPointFrac::from(Decimal::try_from_scaled(50, 1).expect("works")),
+        Decimal::try_from_scaled(50, 1).expect("works"),
         PriceFilter::default(),
         QuantityFilter::default(),
         TEST_FEE_MAKER,
@@ -99,11 +95,11 @@ pub fn mock_exchange_inverse(
 #[derive(Default, Clone)]
 pub struct MockTransactionAccounting;
 
-impl<I, const DB: u8, const DQ: u8, BaseOrQuote> TransactionAccounting<I, DB, DQ, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> TransactionAccounting<I, D, BaseOrQuote>
     for MockTransactionAccounting
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrencyMarker<I, D>,
 {
     fn new(_user_starting_wallet_balance: BaseOrQuote) -> Self {
         Self {}
@@ -111,12 +107,12 @@ where
 
     fn create_margin_transfer(
         &mut self,
-        _transaction: Transaction<I, DB, DQ, BaseOrQuote>,
-    ) -> Result<(), I, DB, DQ> {
+        _transaction: Transaction<I, D, BaseOrQuote>,
+    ) -> Result<(), I, D> {
         Ok(())
     }
 
-    fn margin_balance_of(&self, _account: AccountId) -> Result<BaseOrQuote, I, DB, DQ> {
+    fn margin_balance_of(&self, _account: AccountId) -> Result<BaseOrQuote, I, D> {
         Ok(BaseOrQuote::zero())
     }
 }

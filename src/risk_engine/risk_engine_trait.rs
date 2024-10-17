@@ -5,11 +5,11 @@ use crate::{
     types::{LimitOrder, MarginCurrencyMarker, MarketOrder, Pending},
 };
 
-pub(crate) trait RiskEngine<I, const DB: u8, const DQ: u8, BaseOrQuote, UserOrderId>
+pub(crate) trait RiskEngine<I, const D: u8, BaseOrQuote, UserOrderId>
 where
-    I: Mon<DB> + Mon<DQ>,
-    BaseOrQuote: CurrencyMarker<I, DB, DQ>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, DB, DQ>,
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default,
 {
     /// Checks if the account it able to satisfy the margin requirements for a new market order.
@@ -28,20 +28,20 @@ where
     /// If Err, the account cannot satisfy the margin requirements.
     fn check_market_order(
         &self,
-        position: &Position<I, DB, DQ, BaseOrQuote>,
+        position: &Position<I, D, BaseOrQuote>,
         position_margin: BaseOrQuote::PairedCurrency,
-        order: &MarketOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
-        fill_price: QuoteCurrency<I, DB, DQ>,
+        order: &MarketOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        fill_price: QuoteCurrency<I, D>,
         available_wallet_balance: BaseOrQuote::PairedCurrency,
     ) -> Result<(), RiskError>;
 
     /// Checks if the account it able to satisfy the margin requirements for a new limit order.
     fn check_limit_order(
         &self,
-        position: &Position<I, DB, DQ, BaseOrQuote>,
-        order: &LimitOrder<I, DB, DQ, BaseOrQuote, UserOrderId, Pending<I, DB, DQ, BaseOrQuote>>,
+        position: &Position<I, D, BaseOrQuote>,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
         available_wallet_balance: BaseOrQuote::PairedCurrency,
-        order_margin: &OrderMargin<I, DB, DQ, BaseOrQuote, UserOrderId>,
+        order_margin: &OrderMargin<I, D, BaseOrQuote, UserOrderId>,
     ) -> Result<(), RiskError>;
 
     /// Ensure the account has enough maintenance margin, to keep the position open.
@@ -56,7 +56,7 @@ where
     /// If Err, the account must be liquidated.
     fn check_maintenance_margin(
         &self,
-        market_state: &MarketState<I, DB, DQ>,
-        position: &Position<I, DB, DQ, BaseOrQuote>,
+        market_state: &MarketState<I, D>,
+        position: &Position<I, D, BaseOrQuote>,
     ) -> Result<(), RiskError>;
 }
