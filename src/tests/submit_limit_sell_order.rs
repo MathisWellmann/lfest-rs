@@ -1,6 +1,6 @@
 use crate::{
-    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, trade,
-    TEST_FEE_MAKER,
+    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, test_fee_maker,
+    trade,
 };
 
 #[test]
@@ -52,7 +52,7 @@ fn submit_limit_sell_order_no_position() {
         .unwrap();
     let qty = BaseCurrency::new(9, 0);
     let entry_price = QuoteCurrency::new(100, 0);
-    let fee = TEST_FEE_MAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
+    let fee = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_maker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(

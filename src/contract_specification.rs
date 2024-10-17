@@ -1,6 +1,6 @@
 use const_decimal::Decimal;
 use getset::{CopyGetters, Getters, Setters};
-use num_traits::One;
+use num_traits::{One, Zero};
 
 use crate::{
     leverage,
@@ -48,11 +48,11 @@ where
 
     /// The maker fee as parts per 100_000
     #[getset(get_copy = "pub")]
-    fee_maker: Fee<Maker>,
+    fee_maker: Fee<I, D, Maker>,
 
     /// The taker fee as parts per 100_000
     #[getset(get_copy = "pub")]
-    fee_taker: Fee<Taker>,
+    fee_taker: Fee<I, D, Taker>,
 }
 
 impl<I, const D: u8, BaseOrQuote> ContractSpecification<I, D, BaseOrQuote>
@@ -76,10 +76,10 @@ where
         maintenance_margin: Decimal<I, D>,
         price_filter: PriceFilter<I, D>,
         quantity_filter: QuantityFilter<I, D, BaseOrQuote>,
-        fee_maker: Fee<Maker>,
-        fee_taker: Fee<Taker>,
+        fee_maker: Fee<I, D, Maker>,
+        fee_taker: Fee<I, D, Taker>,
     ) -> Result<Self, ConfigError> {
-        if maintenance_margin > Decimal::one() || maintenance_margin <= Decimal::one() {
+        if maintenance_margin > Decimal::one() || maintenance_margin <= Decimal::zero() {
             return Err(ConfigError::InvalidMaintenanceMarginFraction);
         }
 
@@ -109,8 +109,8 @@ where
             Decimal::one() / Decimal::TWO,
             PriceFilter::default(),
             QuantityFilter::default(),
-            Fee::from_basis_points(2),
-            Fee::from_basis_points(6),
+            Fee::from(Decimal::try_from_scaled(I::from(2).unwrap(), 4).unwrap()),
+            Fee::from(Decimal::try_from_scaled(I::from(6).unwrap(), 4).unwrap()),
         )
         .expect("Is valid")
     }

@@ -210,11 +210,11 @@ mod tests {
     #[test]
     fn price_filter() {
         let filter = PriceFilter {
-            min_price: Some(QuoteCurrency::<i32, 4, 2>::new(1, 1)),
+            min_price: Some(QuoteCurrency::<i32, 2>::new(1, 1)),
             max_price: Some(QuoteCurrency::new(1000, 0)),
             tick_size: QuoteCurrency::new(1, 1),
-            multiplier_up: BasisPointFrac::from(Decimal::try_from_scaled(12, 1).unwrap()),
-            multiplier_down: BasisPointFrac::from(Decimal::try_from_scaled(8, 1).unwrap()),
+            multiplier_up: Decimal::try_from_scaled(12, 1).unwrap(),
+            multiplier_down: Decimal::try_from_scaled(8, 1).unwrap(),
         };
         let mark_price = QuoteCurrency::new(100, 0);
 

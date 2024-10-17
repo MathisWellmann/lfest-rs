@@ -282,7 +282,7 @@ where
         assert!(fill_price > QuoteCurrency::zero());
 
         let value = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price);
-        let fees = self.config.contract_spec().fee_taker().for_value(value);
+        let fees = value * *self.config.contract_spec().fee_taker().as_ref();
 
         self.position.change_position(
             filled_qty,
@@ -653,7 +653,7 @@ where
 
                 let value =
                     BaseOrQuote::PairedCurrency::convert_from(filled_qty, order.limit_price());
-                let fees = self.config.contract_spec().fee_maker().for_value(value);
+                let fees = value * *self.config.contract_spec().fee_maker().as_ref();
                 self.position.change_position(
                     filled_qty,
                     order.limit_price(),

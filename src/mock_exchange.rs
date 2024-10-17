@@ -7,12 +7,17 @@ use crate::{
     prelude::*,
 };
 
+/// The constant decimal precision.
+pub const DECIMALS: u8 = 5;
 /// The maker fee used in tests.
-pub const TEST_FEE_MAKER: Fee<Maker> = Fee::from_basis_points(2);
-/// The taker fee used in tests.
-pub const TEST_FEE_TAKER: Fee<Taker> = Fee::from_basis_points(6);
+pub fn test_fee_maker() -> Fee<i32, DECIMALS, Maker> {
+    Fee::from(Decimal::try_from_scaled(2, 4).unwrap())
+}
 
-const DECIMALS: u8 = 4;
+/// The taker fee used in tests.
+pub fn test_fee_taker() -> Fee<i32, DECIMALS, Taker> {
+    Fee::from(Decimal::try_from_scaled(6, 4).unwrap())
+}
 
 /// Constructs a mock exchange (for linear futures) for testing.
 /// The size is denoted in `BaseCurrency`
@@ -31,8 +36,8 @@ pub fn mock_exchange_linear() -> Exchange<
         Decimal::try_from_scaled(5, 1).unwrap(),
         PriceFilter::default(),
         QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).unwrap(),
-        TEST_FEE_MAKER,
-        TEST_FEE_TAKER,
+        test_fee_maker(),
+        test_fee_taker(),
     )
     .expect("works");
     let config = Config::new(QuoteCurrency::new(1000, 0), 200, contract_spec, 3600).unwrap();
@@ -58,8 +63,8 @@ pub fn mock_exchange_linear_with_account_tracker(
         Decimal::try_from_scaled(5, 1).unwrap(),
         PriceFilter::default(),
         QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).unwrap(),
-        TEST_FEE_MAKER,
-        TEST_FEE_TAKER,
+        test_fee_maker(),
+        test_fee_taker(),
     )
     .expect("works");
     let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
@@ -83,8 +88,8 @@ pub fn mock_exchange_inverse(
         Decimal::try_from_scaled(50, 1).expect("works"),
         PriceFilter::default(),
         QuantityFilter::default(),
-        TEST_FEE_MAKER,
-        TEST_FEE_TAKER,
+        test_fee_maker(),
+        test_fee_taker(),
     )
     .expect("works");
     let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();

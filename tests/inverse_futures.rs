@@ -1,8 +1,8 @@
 //! Test file for the inverse futures mode of the exchange
 
 use lfest::{
-    mock_exchange_inverse, prelude::*, trade, MockTransactionAccounting, TEST_FEE_MAKER,
-    TEST_FEE_TAKER,
+    mock_exchange_inverse, prelude::*, test_fee_maker, test_fee_taker, trade,
+    MockTransactionAccounting,
 };
 use num_traits::{One, Zero};
 
@@ -29,14 +29,10 @@ fn inv_long_market_win_full() {
     let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_quote = exchange
-        .config()
-        .contract_spec()
-        .fee_taker()
-        .for_value(size);
+    let fee_quote = size * *exchange.config().contract_spec().fee_taker().as_ref();
     let fee_1 = BaseCurrency::convert_from(fee_quote, exchange.market_state().bid());
 
-    let fees = TEST_FEE_TAKER.for_value(BaseCurrency::convert_from(size, bid));
+    let fees = BaseCurrency::convert_from(size, bid) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
@@ -73,11 +69,7 @@ fn inv_long_market_win_full() {
     );
 
     let size = QuoteCurrency::new(800, 0);
-    let fee_quote2 = exchange
-        .config()
-        .contract_spec()
-        .fee_taker()
-        .for_value(size);
+    let fee_quote2 = size * *exchange.config().contract_spec().fee_taker().as_ref();
     let fee_base2 = BaseCurrency::convert_from(fee_quote2, QuoteCurrency::new(2000, 0));
 
     let o = MarketOrder::new(Side::Sell, size).unwrap();
@@ -116,7 +108,7 @@ fn inv_long_market_loss_full() {
 
     let qty = QuoteCurrency::new(800, 0);
     let entry_price = QuoteCurrency::new(1000, 0);
-    let fees = TEST_FEE_TAKER.for_value(BaseCurrency::convert_from(qty, entry_price));
+    let fees = BaseCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
@@ -158,18 +150,10 @@ fn inv_long_market_loss_full() {
     let o = MarketOrder::new(Side::Sell, size).unwrap();
     exchange.submit_market_order(o).unwrap();
 
-    let fee_quote0 = exchange
-        .config()
-        .contract_spec()
-        .fee_taker()
-        .for_value(size);
+    let fee_quote0 = size * *exchange.config().contract_spec().fee_taker().as_ref();
     let fee_base0 = BaseCurrency::convert_from(fee_quote0, QuoteCurrency::new(1000, 0));
 
-    let fee_quote1 = exchange
-        .config()
-        .contract_spec()
-        .fee_taker()
-        .for_value(size);
+    let fee_quote1 = size * *exchange.config().contract_spec().fee_taker().as_ref();
     let fee_base1 = BaseCurrency::convert_from(fee_quote1, QuoteCurrency::new(800, 0));
 
     let fee_combined = fee_base0 + fee_base1;
@@ -203,12 +187,12 @@ fn inv_short_market_win_full() {
         .is_empty());
 
     let qty = QuoteCurrency::new(800, 0);
-    let fee0 = fee_taker.for_value(BaseCurrency::convert_from(qty, bid));
+    let fee0 = BaseCurrency::convert_from(qty, bid) * *fee_taker.as_ref();
     let o = MarketOrder::new(Side::Sell, qty).unwrap();
     exchange.submit_market_order(o).unwrap();
 
     let entry_price = QuoteCurrency::new(1000, 0);
-    let fees = TEST_FEE_TAKER.for_value(BaseCurrency::convert_from(qty, bid));
+    let fees = BaseCurrency::convert_from(qty, bid) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(
@@ -253,18 +237,10 @@ fn inv_short_market_win_full() {
     let order_updates = exchange.update_state(2.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_quote0 = exchange
-        .config()
-        .contract_spec()
-        .fee_taker()
-        .for_value(size);
+    let fee_quote0 = size * *exchange.config().contract_spec().fee_taker().as_ref();
     let fee_base0 = BaseCurrency::convert_from(fee_quote0, QuoteCurrency::new(1000, 0));
 
-    let fee_quote1 = exchange
-        .config()
-        .contract_spec()
-        .fee_taker()
-        .for_value(size);
+    let fee_quote1 = size * *exchange.config().contract_spec().fee_taker().as_ref();
     let fee_base1 = BaseCurrency::convert_from(fee_quote1, QuoteCurrency::new(800, 0));
 
     let fee_combined = fee_base0 + fee_base1;
@@ -310,7 +286,7 @@ fn inv_short_market_loss_full() {
         .unwrap()
         .is_empty());
 
-    let fees = TEST_FEE_TAKER.for_value(BaseCurrency::convert_from(size, ask));
+    let fees = BaseCurrency::convert_from(size, ask) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(
@@ -380,7 +356,7 @@ fn inv_long_market_win_partial() {
     let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_0 = TEST_FEE_TAKER.for_value(BaseCurrency::convert_from(size, bid));
+    let fee_0 = BaseCurrency::convert_from(size, bid) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
@@ -414,10 +390,8 @@ fn inv_long_market_win_partial() {
         .is_empty());
 
     let size = QuoteCurrency::new(400, 0);
-    let fee_1 = TEST_FEE_TAKER.for_value(BaseCurrency::convert_from(
-        size,
-        QuoteCurrency::new(2000, 0),
-    ));
+    let fee_1 =
+        BaseCurrency::convert_from(size, QuoteCurrency::new(2000, 0)) * *test_fee_taker().as_ref();
 
     assert_eq!(
         exchange
@@ -466,7 +440,7 @@ fn inv_long_market_loss_partial() {
     assert!(order_updates.is_empty());
 
     let qty = QuoteCurrency::new(800, 0);
-    let fee_0 = TEST_FEE_TAKER.for_value(BaseCurrency::convert_from(qty, ask));
+    let fee_0 = BaseCurrency::convert_from(qty, ask) * *test_fee_taker().as_ref();
     let o = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(o).unwrap();
     assert!(exchange
@@ -474,7 +448,7 @@ fn inv_long_market_loss_partial() {
         .unwrap()
         .is_empty());
     let entry_price = QuoteCurrency::new(1000, 0);
-    let fee = TEST_FEE_TAKER.for_value(BaseCurrency::convert_from(qty, entry_price));
+    let fee = BaseCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
@@ -499,7 +473,7 @@ fn inv_long_market_loss_partial() {
     );
 
     let qty = QuoteCurrency::new(400, 0);
-    let fee_1 = TEST_FEE_TAKER.for_value(BaseCurrency::convert_from(qty, bid));
+    let fee_1 = BaseCurrency::convert_from(qty, bid) * *test_fee_taker().as_ref();
     let o = MarketOrder::new(Side::Sell, qty).unwrap();
     exchange.submit_market_order(o).unwrap();
 
@@ -543,7 +517,7 @@ fn inv_short_market_win_partial() {
         .unwrap();
 
     let qty = QuoteCurrency::new(800, 0);
-    let fee_0 = TEST_FEE_TAKER.for_value(BaseCurrency::convert_from(qty, bid));
+    let fee_0 = BaseCurrency::convert_from(qty, bid) * *test_fee_taker().as_ref();
     let o = MarketOrder::new(Side::Sell, qty).unwrap();
     exchange.submit_market_order(o).unwrap();
     let bid = QuoteCurrency::new(999, 0);
@@ -589,7 +563,7 @@ fn inv_short_market_win_partial() {
     );
 
     let qty = QuoteCurrency::new(400, 0);
-    let fee_1 = TEST_FEE_TAKER.for_value(BaseCurrency::convert_from(qty, ask));
+    let fee_1 = BaseCurrency::convert_from(qty, ask) * *test_fee_taker().as_ref();
     let o = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(o).unwrap();
     let bid = QuoteCurrency::new(799, 0);
@@ -640,7 +614,7 @@ fn inv_short_market_loss_partial() {
 
     let value = BaseCurrency::new(8, 1);
     let size = QuoteCurrency::convert_from(value, exchange.market_state().bid());
-    let fee_0 = TEST_FEE_TAKER.for_value(value);
+    let fee_0 = value * *test_fee_taker().as_ref();
     let o = MarketOrder::new(Side::Sell, size).unwrap();
     exchange.submit_market_order(o).unwrap();
 
@@ -649,11 +623,7 @@ fn inv_short_market_loss_partial() {
     let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
     assert!(order_updates.is_empty());
 
-    let fee_quote1 = exchange
-        .config()
-        .contract_spec()
-        .fee_taker()
-        .for_value(size);
+    let fee_quote1 = size * *exchange.config().contract_spec().fee_taker().as_ref();
     let fee_base1 = BaseCurrency::convert_from(fee_quote1, ask);
 
     assert_eq!(
@@ -709,7 +679,7 @@ fn inv_test_market_roundtrip() {
         .is_empty());
 
     let qty = QuoteCurrency::new(900, 0);
-    let fee0 = fee_taker.for_value(BaseCurrency::convert_from(qty, ask));
+    let fee0 = BaseCurrency::convert_from(qty, ask) * *fee_taker.as_ref();
     let buy_order = MarketOrder::new(Side::Buy, QuoteCurrency::new(900, 0)).unwrap();
     exchange.submit_market_order(buy_order).unwrap();
     let bid = QuoteCurrency::new(1000, 0);
@@ -780,7 +750,7 @@ fn inv_execute_limit() {
     assert_eq!(exchange.market_state().bid(), QuoteCurrency::new(750, 0));
     assert_eq!(exchange.market_state().ask(), QuoteCurrency::new(751, 0));
     assert_eq!(exchange.active_limit_orders().len(), 0);
-    let fee_0 = TEST_FEE_MAKER.for_value(BaseCurrency::convert_from(qty, limit_price));
+    let fee_0 = BaseCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
@@ -802,7 +772,7 @@ fn inv_execute_limit() {
     assert_eq!(exchange.position().outstanding_fees(), fee_0);
 
     let limit_price = QuoteCurrency::new(1000, 0);
-    let fee_1 = TEST_FEE_MAKER.for_value(BaseCurrency::convert_from(qty, limit_price));
+    let fee_1 = BaseCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     let o = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.active_limit_orders().len(), 1);
@@ -836,7 +806,7 @@ fn inv_execute_limit() {
 
     let qty = QuoteCurrency::new(600, 0);
     let limit_price = QuoteCurrency::new(1200, 0);
-    let fee_2 = TEST_FEE_MAKER.for_value(BaseCurrency::convert_from(qty, limit_price));
+    let fee_2 = BaseCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     let o = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.active_limit_orders().len(), 1);

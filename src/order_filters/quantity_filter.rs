@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn quantity_filter() {
         let filter = QuantityFilter {
-            min_quantity: Some(QuoteCurrency::<i32, 4, 2>::new(10, 0)),
+            min_quantity: Some(QuoteCurrency::<i32, 2>::new(10, 0)),
             max_quantity: Some(QuoteCurrency::new(1000, 0)),
             tick_size: QuoteCurrency::one(),
             _quote: std::marker::PhantomData,
@@ -149,7 +149,7 @@ mod tests {
             min_quantity: None,
             max_quantity: None,
             tick_size: QuoteCurrency::one(),
-            _quote: std::marker::PhantomData::<QuoteCurrency<i32, 4, 2>>::default(),
+            _quote: std::marker::PhantomData::<QuoteCurrency<i32, 2>>::default(),
         };
         assert_eq!(
             filter.validate_order_quantity(QuoteCurrency::zero()),

@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn full_track_update() {
-        let mut at = FullAccountTracker::new(QuoteCurrency::<i64, 4, 2>::new(1000, 0));
+        let mut at = FullAccountTracker::new(QuoteCurrency::<i64, 4>::new(1000, 0));
         let market_state = MarketState::from_components(
             QuoteCurrency::new(100, 0),
             QuoteCurrency::new(101, 0),
@@ -421,7 +421,7 @@ mod tests {
 
     #[test]
     fn full_track_sharpe() {
-        let mut at = FullAccountTracker::new(QuoteCurrency::<i64, 4, 2>::new(1000, 0));
+        let mut at = FullAccountTracker::new(QuoteCurrency::<i64, 4>::new(1000, 0));
         let balances = UserBalances {
             available_wallet_balance: QuoteCurrency::new(100, 0),
             position_margin: QuoteCurrency::zero(),

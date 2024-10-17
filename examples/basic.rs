@@ -11,7 +11,7 @@ use load_trades::load_prices_from_csv;
 use rand::{thread_rng, Rng};
 use tracing::error;
 
-const PRICE_DECIMALS: u8 = 1;
+const DECIMALS: u8 = 4;
 
 fn main() {
     let t0 = Instant::now();
@@ -20,34 +20,32 @@ fn main() {
     let acc_tracker = FullAccountTracker::new(starting_balance);
     let contract_spec = ContractSpecification::new(
         leverage!(1),
-        BasisPointFrac::from(Decimal::try_from_scaled(5, 1).unwrap()),
+        Decimal::try_from_scaled(5, 1).unwrap(),
         PriceFilter::new(
             None,
             None,
             QuoteCurrency::new(1, 1),
-            BasisPointFrac::from(Decimal::try_from_scaled(2, 0).unwrap()),
-            BasisPointFrac::from(Decimal::zero()),
+            Decimal::try_from_scaled(2, 0).unwrap(),
+            Decimal::zero(),
         )
         .expect("is valid price filter"),
         QuantityFilter::default(),
-        Fee::from_basis_points(2),
-        Fee::from_basis_points(6),
+        Fee::from(Decimal::try_from_scaled(2, 4).unwrap()),
+        Fee::from(Decimal::try_from_scaled(6, 4).unwrap()),
     )
     .expect("is valid");
     let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
     let mut exchange = Exchange::<
         i64,
-        4,
-        PRICE_DECIMALS,
-        QuoteCurrency<i64, 4, PRICE_DECIMALS>,
+        DECIMALS,
+        QuoteCurrency<i64, DECIMALS>,
         (),
-        InMemoryTransactionAccounting<i64, 4, PRICE_DECIMALS, BaseCurrency<i64, 4, PRICE_DECIMALS>>,
-        FullAccountTracker<i64, 4, PRICE_DECIMALS, BaseCurrency<i64, 4, PRICE_DECIMALS>>,
+        InMemoryTransactionAccounting<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
+        FullAccountTracker<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
     >::new(acc_tracker, config);
 
     // load trades from csv file
-    let prices =
-        load_prices_from_csv::<i64, PRICE_DECIMALS>("./data/Bitmex_XBTUSD_1M.csv").unwrap();
+    let prices = load_prices_from_csv::<i64, DECIMALS>("./data/Bitmex_XBTUSD_1M.csv").unwrap();
 
     // use random action every 100 trades to buy or sell
     let mut rng = thread_rng();

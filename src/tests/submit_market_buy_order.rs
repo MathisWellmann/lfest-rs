@@ -1,7 +1,7 @@
 use hashbrown::HashMap;
 
 use crate::{
-    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, TEST_FEE_TAKER,
+    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, test_fee_taker,
 };
 
 #[test]
@@ -44,7 +44,7 @@ fn submit_market_buy_order_no_position() {
 
     // make sure its excuted immediately
     let entry_price = QuoteCurrency::new(101, 0);
-    let fee = TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
+    let fee = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
@@ -216,7 +216,7 @@ fn submit_market_buy_order_turnaround_short() {
     let order = MarketOrder::new(Side::Sell, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
     let entry_price = QuoteCurrency::new(99, 0);
-    let fee_0 = TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
+    let fee_0 = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(

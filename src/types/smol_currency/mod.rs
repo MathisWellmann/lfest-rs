@@ -41,7 +41,7 @@ pub trait CurrencyMarker<I, const D: u8>:
     + Ord
     + std::ops::AddAssign
     + std::ops::SubAssign
-    + std::ops::Mul<Decimal<I, D>>
+    + std::ops::Mul<Decimal<I, D>, Output = Self>
     + std::hash::Hash
     + num_traits::Zero
     + num_traits::One
@@ -65,7 +65,7 @@ mod tests {
     fn convert_base_to_quote() {
         assert_eq!(
             QuoteCurrency::convert_from(
-                BaseCurrency::<i32, 4, 2>::new(5, 1),
+                BaseCurrency::<i32, 4>::new(5, 1),
                 QuoteCurrency::new(1000, 1)
             ),
             QuoteCurrency::new(500, 0)
@@ -76,7 +76,7 @@ mod tests {
     fn convert_quote_to_base() {
         assert_eq!(
             BaseCurrency::convert_from(
-                QuoteCurrency::<i32, 4, 2>::new(250, 0),
+                QuoteCurrency::<i32, 4>::new(250, 0),
                 QuoteCurrency::new(1000, 0)
             ),
             BaseCurrency::new(25, 2)
@@ -87,7 +87,7 @@ mod tests {
     fn quote_currency_pnl() {
         assert_eq!(
             QuoteCurrency::pnl(
-                QuoteCurrency::<i64, 4, 2>::new(100, 0),
+                QuoteCurrency::<i64, 4>::new(100, 0),
                 QuoteCurrency::new(110, 0),
                 BaseCurrency::new(5, 0),
             ),
@@ -99,7 +99,7 @@ mod tests {
     fn base_currency_pnl() {
         assert_eq!(
             BaseCurrency::pnl(
-                QuoteCurrency::<i32, 4, 2>::new(100, 0),
+                QuoteCurrency::<i32, 4>::new(100, 0),
                 QuoteCurrency::new(200, 0),
                 QuoteCurrency::new(500, 0),
             ),

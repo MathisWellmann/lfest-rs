@@ -154,17 +154,17 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{prelude::*, MockTransactionAccounting, TEST_FEE_MAKER};
+    use crate::{prelude::*, test_fee_maker, MockTransactionAccounting, DECIMALS};
 
     #[test_case::test_matrix(
         [1, 2, 5]
     )]
     fn order_margin_neutral_no_orders(leverage: u8) {
-        let order_margin = OrderMargin::<_, 4, 2, _, ()>::default();
+        let order_margin = OrderMargin::<_, 4, _, ()>::default();
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
-        let position = Position::<_, 4, 2, BaseCurrency<i32, 4, 2>>::Neutral;
+        let position = Position::<_, 4, BaseCurrency<i32, 4>>::Neutral;
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(0, 0)
@@ -177,7 +177,7 @@ mod tests {
         [100, 200, 300]
     )]
     fn order_margin_long_no_orders(leverage: u8, position_qty: i32, entry_price: i32) {
-        let order_margin = OrderMargin::<_, 4, 2, _, ()>::default();
+        let order_margin = OrderMargin::<_, 4, _, ()>::default();
 
         let mut accounting = MockTransactionAccounting::default();
         let qty = BaseCurrency::new(position_qty, 0);
@@ -203,7 +203,7 @@ mod tests {
         [100, 200, 300]
     )]
     fn order_margin_short_no_orders(leverage: u8, position_qty: i32, entry_price: i32) {
-        let order_margin = OrderMargin::<_, 4, 2, _, ()>::default();
+        let order_margin = OrderMargin::<_, 4, _, ()>::default();
 
         let mut accounting = MockTransactionAccounting::default();
         let qty = BaseCurrency::new(position_qty, 0);
@@ -237,7 +237,7 @@ mod tests {
         qty: i32,
         n: usize,
     ) {
-        let mut order_margin = OrderMargin::<_, 4, 2, _, ()>::default();
+        let mut order_margin = OrderMargin::<_, 4, _, ()>::default();
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -256,7 +256,7 @@ mod tests {
         assert_eq!(
             order_margin.order_margin(
                 init_margin_req,
-                &Position::<_, 4, 2, BaseCurrency<i32, 4, 2>>::Neutral
+                &Position::<_, 4, BaseCurrency<i32, 4>>::Neutral
             ),
             mult * QuoteCurrency::convert_from(qty, limit_price) * init_margin_req
         );
@@ -267,7 +267,7 @@ mod tests {
         assert_eq!(
             order_margin.order_margin(
                 init_margin_req,
-                &Position::<_, 4, 2, BaseCurrency<i32, 4, 2>>::Neutral
+                &Position::<_, 4, BaseCurrency<i32, 4>>::Neutral
             ),
             QuoteCurrency::new(0, 0)
         );
@@ -287,7 +287,7 @@ mod tests {
         qty: i32,
         n: usize,
     ) {
-        let mut order_margin = OrderMargin::<_, 4, 2, _, ()>::default();
+        let mut order_margin = OrderMargin::<_, 4, _, ()>::default();
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -316,7 +316,7 @@ mod tests {
         assert_eq!(
             order_margin.order_margin(
                 init_margin_req,
-                &Position::<_, 4, 2, BaseCurrency<i32, 4, 2>>::Neutral,
+                &Position::<_, 4, BaseCurrency<i32, 4>>::Neutral,
             ),
             mult * QuoteCurrency::convert_from(qty, limit_price) * init_margin_req
         );
@@ -330,7 +330,7 @@ mod tests {
         assert_eq!(
             order_margin.order_margin(
                 init_margin_req,
-                &Position::<_, 4, 2, BaseCurrency<i32, 4, 2>>::Neutral
+                &Position::<_, 4, BaseCurrency<i32, 4>>::Neutral
             ),
             QuoteCurrency::new(0, 0)
         );
@@ -351,7 +351,7 @@ mod tests {
         qty: i32,
         pos_entry_price: i32,
     ) {
-        let mut order_margin = OrderMargin::<_, 4, 2, _, ()>::default();
+        let mut order_margin = OrderMargin::<_, 4, _, ()>::default();
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -402,7 +402,7 @@ mod tests {
         limit_price: i32,
         qty: i32,
     ) {
-        let mut order_margin = OrderMargin::<_, 4, 2, _, ()>::default();
+        let mut order_margin = OrderMargin::<_, DECIMALS, _, ()>::default();
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -431,7 +431,7 @@ mod tests {
     #[tracing_test::traced_test]
     fn order_margin_no_position() {
         let position = Position::default();
-        let init_margin_req = BasisPointFrac::one();
+        let init_margin_req = Decimal::one();
         let mut order_margin = OrderMargin::default();
 
         assert_eq!(
@@ -439,7 +439,7 @@ mod tests {
             QuoteCurrency::new(0, 0)
         );
 
-        let qty = BaseCurrency::<i32, 4, 2>::new(1, 0);
+        let qty = BaseCurrency::<i32, 4>::new(1, 0);
         let limit_price = QuoteCurrency::new(90, 0);
         let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
@@ -476,13 +476,13 @@ mod tests {
     #[tracing_test::traced_test]
     fn order_margin_with_long() {
         let mut accounting =
-            InMemoryTransactionAccounting::new(QuoteCurrency::<i32, 4, 2>::new(1000, 0));
+            InMemoryTransactionAccounting::new(QuoteCurrency::<i32, DECIMALS>::new(1000, 0));
         let mut order_margin = OrderMargin::default();
-        let init_margin_req = BasisPointFrac::one();
+        let init_margin_req = Decimal::one();
 
         let qty = BaseCurrency::new(1, 0);
         let entry_price = QuoteCurrency::new(100, 0);
-        let fee = TEST_FEE_MAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
+        let fee = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_maker().as_ref();
         let position = Position::Long(PositionInner::new(
             qty,
             entry_price,
@@ -490,7 +490,7 @@ mod tests {
             init_margin_req,
             fee,
         ));
-        let init_margin_req = BasisPointFrac::one();
+        let init_margin_req = Decimal::one();
 
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
@@ -544,11 +544,11 @@ mod tests {
     fn order_margin_with_short() {
         let mut accounting = InMemoryTransactionAccounting::new(QuoteCurrency::new(1000, 0));
         let mut order_margin = OrderMargin::default();
-        let init_margin_req = BasisPointFrac::one();
+        let init_margin_req = Decimal::one();
 
-        let qty = BaseCurrency::<i32, 4, 2>::one();
+        let qty = BaseCurrency::<i32, DECIMALS>::one();
         let entry_price = QuoteCurrency::new(100, 0);
-        let fee = TEST_FEE_MAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
+        let fee = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_maker().as_ref();
         let position = Position::Short(PositionInner::new(
             qty,
             entry_price,
@@ -556,7 +556,7 @@ mod tests {
             init_margin_req,
             fee,
         ));
-        let init_margin_req = BasisPointFrac::one();
+        let init_margin_req = Decimal::one();
 
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),

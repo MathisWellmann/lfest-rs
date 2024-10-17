@@ -1,8 +1,8 @@
 use const_decimal::Decimal;
 
 use crate::{
-    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, trade,
-    TEST_FEE_MAKER, TEST_FEE_TAKER,
+    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, test_fee_maker,
+    test_fee_taker, trade,
 };
 
 #[test]
@@ -22,7 +22,7 @@ fn submit_limit_buy_order_no_position() {
     let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
     assert_eq!(exchange.position(), &Position::Neutral);
-    let fee = TEST_FEE_MAKER.for_value(QuoteCurrency::convert_from(qty, limit_price));
+    let fee = QuoteCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
@@ -60,7 +60,7 @@ fn submit_limit_buy_order_no_position() {
         .unwrap()
         .is_empty());
     let mut accounting = InMemoryTransactionAccounting::new(QuoteCurrency::new(1000, 0));
-    let init_margin_req = BasisPointFrac::from(Decimal::one());
+    let init_margin_req = Decimal::one();
     assert_eq!(
         exchange.position(),
         &Position::Long(PositionInner::new(
@@ -199,7 +199,7 @@ fn submit_limit_buy_order_with_long() {
     let order = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
 
-    let fee = TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, ask));
+    let fee = QuoteCurrency::convert_from(qty, ask) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
@@ -295,7 +295,7 @@ fn submit_limit_buy_order_with_short() {
 
     let qty = BaseCurrency::new(9, 0);
     let entry_price = QuoteCurrency::new(100, 0);
-    let fee = TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
+    let fee = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(

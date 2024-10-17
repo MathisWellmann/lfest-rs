@@ -51,10 +51,10 @@ mod tests {
 
     #[test]
     fn leverage_init_margin_req() {
-        assert_eq!(Leverage(1).init_margin_req(), BasisPointFrac::one());
+        assert_eq!(Leverage(1).init_margin_req::<i32, 2>(), Decimal::one());
         assert_eq!(
-            Leverage(2).init_margin_req(),
-            BasisPointFrac::one() / BasisPointFrac::from(Decimal::TWO)
+            Leverage(2).init_margin_req::<i32, 2>(),
+            Decimal::one() / Decimal::TWO
         );
     }
 }

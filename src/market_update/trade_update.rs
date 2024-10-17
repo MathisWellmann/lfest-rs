@@ -88,7 +88,7 @@ mod tests {
         [Side::Buy, Side::Sell]
     )]
     fn trade_limit_order_filled_some(price: i32, qty: i32, side: Side) {
-        let price = QuoteCurrency::<i32, 4, 2>::new(price, 0);
+        let price = QuoteCurrency::<i32, 2>::new(price, 0);
         let quantity = BaseCurrency::new(qty, 0);
         let trade = Trade {
             price,
@@ -112,7 +112,7 @@ mod tests {
         [Side::Buy, Side::Sell]
     )]
     fn trade_limit_order_filled_none(price: i32, qty: i32, side: Side) {
-        let price = QuoteCurrency::<i32, 4, 2>::new(price, 0);
+        let price = QuoteCurrency::<i32, 2>::new(price, 0);
         let quantity = BaseCurrency::new(qty, 0);
         let trade = Trade {
             price,
@@ -140,11 +140,11 @@ mod tests {
     #[test]
     fn size_of_trade() {
         assert_eq!(
-            std::mem::size_of::<Trade<i32, 4, 2, BaseCurrency<i32, 4, 2>>>(),
+            std::mem::size_of::<Trade<i32, 2, BaseCurrency<i32, 2>>>(),
             12
         );
         assert_eq!(
-            std::mem::size_of::<Trade<i64, 4, 2, BaseCurrency<i64, 4, 2>>>(),
+            std::mem::size_of::<Trade<i64, 2, BaseCurrency<i64, 2>>>(),
             24
         );
     }

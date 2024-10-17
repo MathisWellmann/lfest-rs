@@ -1,6 +1,6 @@
 //! Test file for the linear futures mode of the exchange
 
-use lfest::{mock_exchange_linear_with_account_tracker, prelude::*, TEST_FEE_TAKER};
+use lfest::{mock_exchange_linear_with_account_tracker, prelude::*, test_fee_taker};
 
 #[test]
 #[tracing_test::traced_test]
@@ -61,7 +61,7 @@ fn lin_long_market_win_full() {
         QuoteCurrency::zero()
     );
 
-    let fees = TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, bid));
+    let fees = QuoteCurrency::convert_from(qty, bid) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(

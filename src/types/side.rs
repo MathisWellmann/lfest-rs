@@ -49,11 +49,11 @@ mod tests {
     #[test]
     fn side_from_taker_quantity() {
         assert_eq!(
-            Side::from_taker_quantity(QuoteCurrency::<i32, 4, 2>::new(1, 0)),
+            Side::from_taker_quantity(QuoteCurrency::<i32, 4>::new(1, 0)),
             Side::Buy
         );
         assert_eq!(
-            Side::from_taker_quantity(QuoteCurrency::<i32, 4, 2>::new(-1, 0)),
+            Side::from_taker_quantity(QuoteCurrency::<i32, 4>::new(-1, 0)),
             Side::Sell
         );
     }
@@ -61,6 +61,6 @@ mod tests {
     #[test]
     #[should_panic]
     fn side_from_taker_quantity_panic() {
-        Side::from_taker_quantity(QuoteCurrency::<i64, 4, 2>::zero());
+        Side::from_taker_quantity(QuoteCurrency::<i64, 4>::zero());
     }
 }

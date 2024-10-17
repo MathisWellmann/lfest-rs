@@ -1,7 +1,7 @@
 use hashbrown::HashMap;
 
 use crate::{
-    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, TEST_FEE_TAKER,
+    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, test_fee_taker,
 };
 
 #[test]
@@ -44,7 +44,7 @@ fn submit_market_sell_order() {
     exchange.submit_market_order(order).unwrap();
     // make sure its excuted immediately
     let entry_price = QuoteCurrency::new(100, 0);
-    let fees = TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, entry_price));
+    let fees = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Short(PositionInner::new(
@@ -186,7 +186,7 @@ fn submit_market_sell_order_turnaround_long() {
     let order = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
     let fee0 =
-        TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, QuoteCurrency::new(100, 0)));
+        QuoteCurrency::convert_from(qty, QuoteCurrency::new(100, 0)) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
@@ -212,7 +212,7 @@ fn submit_market_sell_order_turnaround_long() {
     let order = MarketOrder::new(Side::Sell, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
     let fee1 =
-        TEST_FEE_TAKER.for_value(QuoteCurrency::convert_from(qty, QuoteCurrency::new(99, 0)));
+        QuoteCurrency::convert_from(qty, QuoteCurrency::new(99, 0)) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.user_balances(),
         UserBalances {

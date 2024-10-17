@@ -309,7 +309,7 @@ mod tests {
         [1, 2, 3]
     )]
     fn limit_order_fill_full(side: Side, limit_price: u32, qty: i32) {
-        let limit_price = QuoteCurrency::<i32, 4, 2>::new(limit_price as i32, 0);
+        let limit_price = QuoteCurrency::<i32, 4>::new(limit_price as i32, 0);
         let qty = QuoteCurrency::new(qty, 0);
         let order = LimitOrder::new(side, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
@@ -329,7 +329,7 @@ mod tests {
         [1, 2, 3]
     )]
     fn limit_order_fill_partial(side: Side, limit_price: u32, qty: i32) {
-        let limit_price = QuoteCurrency::<i32, 4, 2>::new(limit_price as _, 0);
+        let limit_price = QuoteCurrency::<i32, 4>::new(limit_price as _, 0);
         let quantity = QuoteCurrency::new(qty, 0);
         let order = LimitOrder::new(side, limit_price, quantity).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
