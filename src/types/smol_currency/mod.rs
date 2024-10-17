@@ -63,12 +63,13 @@ mod tests {
 
     #[test]
     fn convert_base_to_quote() {
+        // 0.5 BTC @ 100 USD = 50 USD
         assert_eq!(
             QuoteCurrency::convert_from(
                 BaseCurrency::<i32, 4>::new(5, 1),
-                QuoteCurrency::new(1000, 1)
+                QuoteCurrency::new(100, 0)
             ),
-            QuoteCurrency::new(500, 0)
+            QuoteCurrency::new(50, 0)
         );
     }
 

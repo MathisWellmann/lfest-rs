@@ -135,15 +135,14 @@ where
         match position {
             Position::Neutral | Position::Long(_) => {
                 // A long position increases in size.
-                // let notional_value =
-                //     BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
-                // let margin_req = notional_value * self.contract_spec.init_margin_req();
+                let notional_value =
+                    BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
+                let margin_req = notional_value * self.contract_spec.init_margin_req();
 
-                // let fee = self.contract_spec.fee_taker().for_value(notional_value);
-                // if margin_req + fee > available_wallet_balance {
-                //     return Err(RiskError::NotEnoughAvailableBalance);
-                // }
-                todo!()
+                let fee = notional_value * *self.contract_spec.fee_taker().as_ref();
+                if margin_req + fee > available_wallet_balance {
+                    return Err(RiskError::NotEnoughAvailableBalance);
+                }
             }
             Position::Short(pos_inner) => {
                 if order.quantity() <= pos_inner.quantity() {
@@ -153,21 +152,20 @@ where
                 // The order reduces the short and puts on a long
                 let released_from_old_pos = position_margin;
 
-                // let new_long_size = order.quantity() - pos_inner.quantity();
-                // let new_notional_value =
-                //     BaseOrQuote::PairedCurrency::convert_from(new_long_size, fill_price);
-                // let new_margin_req = new_notional_value * self.contract_spec.init_margin_req();
+                let new_long_size = order.quantity() - pos_inner.quantity();
+                let new_notional_value =
+                    BaseOrQuote::PairedCurrency::convert_from(new_long_size, fill_price);
+                let new_margin_req = new_notional_value * self.contract_spec.init_margin_req();
 
-                // let fee = self.contract_spec.fee_taker().for_value(new_notional_value);
+                let fee = new_notional_value * *self.contract_spec.fee_taker().as_ref();
 
-                // if new_margin_req + fee > available_wallet_balance + released_from_old_pos {
-                //     return Err(RiskError::NotEnoughAvailableBalance);
-                // }
-                todo!()
+                if new_margin_req + fee > available_wallet_balance + released_from_old_pos {
+                    return Err(RiskError::NotEnoughAvailableBalance);
+                }
             }
         }
 
-        // Ok(())
+        Ok(())
     }
 
     fn check_market_sell_order<UserOrderId>(
@@ -190,10 +188,9 @@ where
                 let margin_req = notional_value * self.contract_spec.init_margin_req();
                 let fee = notional_value * *self.contract_spec.fee_taker().as_ref();
 
-                // if margin_req + fee > available_wallet_balance {
-                //     return Err(RiskError::NotEnoughAvailableBalance);
-                // }
-                todo!()
+                if margin_req + fee > available_wallet_balance {
+                    return Err(RiskError::NotEnoughAvailableBalance);
+                }
             }
             Position::Long(pos_inner) => {
                 // Else its a long position which needs to be reduced
@@ -211,13 +208,12 @@ where
 
                 let fee = new_notional_value * *self.contract_spec.fee_taker().as_ref();
 
-                // if new_margin_req + fee > available_wallet_balance + released_from_old_pos {
-                //     return Err(RiskError::NotEnoughAvailableBalance);
-                // }
-                todo!()
+                if new_margin_req + fee > available_wallet_balance + released_from_old_pos {
+                    return Err(RiskError::NotEnoughAvailableBalance);
+                }
             }
         }
-        // Ok(())
+        Ok(())
     }
 }
 
@@ -232,8 +228,8 @@ mod tests {
     #[test_case::test_case(2, 75)]
     #[test_case::test_case(3, 84)]
     #[test_case::test_case(5, 90)]
-    fn isolated_margin_check_maintenance_margin_long(leverage: u8, expected_liq_price: i32) {
-        let contract_spec = ContractSpecification::<_, DECIMALS, BaseCurrency<i32, DECIMALS>>::new(
+    fn isolated_margin_check_maintenance_margin_long(leverage: u8, expected_liq_price: i64) {
+        let contract_spec = ContractSpecification::<_, DECIMALS, BaseCurrency<_, DECIMALS>>::new(
             Leverage::new(leverage).unwrap(),
             Decimal::try_from_scaled(5, 1).unwrap(),
             PriceFilter::default(),
@@ -243,9 +239,8 @@ mod tests {
         )
         .unwrap();
         let init_margin_req = contract_spec.init_margin_req();
-        let re = IsolatedMarginRiskEngine::<_, DECIMALS, BaseCurrency<i32, DECIMALS>>::new(
-            contract_spec,
-        );
+        let re =
+            IsolatedMarginRiskEngine::<_, DECIMALS, BaseCurrency<_, DECIMALS>>::new(contract_spec);
         let market_state = MarketState::from_components(
             QuoteCurrency::new(100, 0),
             QuoteCurrency::new(101, 0),
@@ -309,8 +304,8 @@ mod tests {
     #[test_case::test_case(2, 126)]
     #[test_case::test_case(3, 117)]
     #[test_case::test_case(5, 111)]
-    fn isolated_margin_check_maintenance_margin_short(leverage: u8, expected_liq_price: i32) {
-        let contract_spec = ContractSpecification::<_, DECIMALS, BaseCurrency<i32, DECIMALS>>::new(
+    fn isolated_margin_check_maintenance_margin_short(leverage: u8, expected_liq_price: i64) {
+        let contract_spec = ContractSpecification::<_, DECIMALS, BaseCurrency<_, DECIMALS>>::new(
             Leverage::new(leverage).unwrap(),
             Decimal::try_from_scaled(5, 1).unwrap(),
             PriceFilter::default(),
@@ -320,9 +315,8 @@ mod tests {
         )
         .unwrap();
         let init_margin_req = contract_spec.init_margin_req();
-        let re = IsolatedMarginRiskEngine::<_, DECIMALS, BaseCurrency<i32, DECIMALS>>::new(
-            contract_spec,
-        );
+        let re =
+            IsolatedMarginRiskEngine::<_, DECIMALS, BaseCurrency<_, DECIMALS>>::new(contract_spec);
         let market_state = MarketState::from_components(
             QuoteCurrency::new(100, 0),
             QuoteCurrency::new(101, 0),
@@ -341,14 +335,14 @@ mod tests {
             init_margin_req,
             fees,
         ));
-        RiskEngine::<_, DECIMALS, _, ()>::check_maintenance_margin(&re, &market_state, &position)
+        RiskEngine::<i64, DECIMALS, _, ()>::check_maintenance_margin(&re, &market_state, &position)
             .unwrap();
 
         let ask = QuoteCurrency::new(expected_liq_price, 0);
         let bid = ask - QuoteCurrency::one();
         let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
         assert_eq!(
-            RiskEngine::<_, DECIMALS, _, ()>::check_maintenance_margin(
+            RiskEngine::<i64, DECIMALS, _, ()>::check_maintenance_margin(
                 &re,
                 &market_state,
                 &position

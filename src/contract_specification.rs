@@ -72,7 +72,7 @@ where
     /// `fee_maker`: The fee a maker pays.
     /// `fee_taker`: The fee a taker pays.
     pub fn new(
-        leverage: Leverage,
+        leverage: Leverage<I, D>,
         maintenance_margin: Decimal<I, D>,
         price_filter: PriceFilter<I, D>,
         quantity_filter: QuantityFilter<I, D, BaseOrQuote>,

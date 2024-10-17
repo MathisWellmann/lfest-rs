@@ -7,8 +7,8 @@ use tracing::{debug, trace};
 
 use crate::{
     prelude::{
-        CurrencyMarker, Mon, QuoteCurrency, Transaction, TransactionAccounting, TREASURY_ACCOUNT,
-        USER_WALLET_ACCOUNT,
+        CurrencyMarker, Mon, QuoteCurrency, Transaction, TransactionAccounting,
+        EXCHANGE_FEE_ACCOUNT, TREASURY_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
     },
     types::MarginCurrencyMarker,
 };
@@ -58,20 +58,19 @@ where
         assert!(quantity > BaseOrQuote::zero());
         assert!(entry_price > QuoteCurrency::zero());
 
-        // let margin =
-        //     BaseOrQuote::PairedCurrency::convert_from(quantity, entry_price) * init_margin_req;
-        // let transaction =
-        //     Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
-        // accounting
-        //     .create_margin_transfer(transaction)
-        //     .expect("margin transfer for opening a new position works.");
+        let margin =
+            BaseOrQuote::PairedCurrency::convert_from(quantity, entry_price) * init_margin_req;
+        let transaction =
+            Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
+        accounting
+            .create_margin_transfer(transaction)
+            .expect("margin transfer for opening a new position works.");
 
-        // Self {
-        //     quantity,
-        //     total_cost: BaseOrQuote::PairedCurrency::convert_from(quantity, entry_price),
-        //     outstanding_fees: fees,
-        // }
-        todo!()
+        Self {
+            quantity,
+            total_cost: BaseOrQuote::PairedCurrency::convert_from(quantity, entry_price),
+            outstanding_fees: fees,
+        }
     }
 
     /// The average price at which this position was entered into.
@@ -113,13 +112,12 @@ where
         self.outstanding_fees += fees;
         self.total_cost += value;
 
-        // let margin = value * init_margin_req;
-        // let transaction =
-        //     Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
-        // accounting
-        //     .create_margin_transfer(transaction)
-        //     .expect("is an internal call and must work");
-        todo!()
+        let margin = value * init_margin_req;
+        let transaction =
+            Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
+        accounting
+            .create_margin_transfer(transaction)
+            .expect("is an internal call and must work");
     }
 
     /// Decrease the position.
@@ -174,27 +172,26 @@ where
             }
             Ordering::Equal => {}
         }
-        // let margin_to_free =
-        //     BaseOrQuote::PairedCurrency::convert_from(qty, entry_price) * init_margin_req;
-        // let transaction = Transaction::new(
-        //     USER_WALLET_ACCOUNT,
-        //     USER_POSITION_MARGIN_ACCOUNT,
-        //     margin_to_free,
-        // );
-        // accounting
-        //     .create_margin_transfer(transaction)
-        //     .expect("margin transfer must work");
+        let margin_to_free =
+            BaseOrQuote::PairedCurrency::convert_from(qty, entry_price) * init_margin_req;
+        let transaction = Transaction::new(
+            USER_WALLET_ACCOUNT,
+            USER_POSITION_MARGIN_ACCOUNT,
+            margin_to_free,
+        );
+        accounting
+            .create_margin_transfer(transaction)
+            .expect("margin transfer must work");
 
-        // let transaction = Transaction::new(
-        //     EXCHANGE_FEE_ACCOUNT,
-        //     USER_WALLET_ACCOUNT,
-        //     self.outstanding_fees,
-        // );
-        // accounting
-        //     .create_margin_transfer(transaction)
-        //     .expect("margin transfer must work");
-        // self.outstanding_fees = BaseOrQuote::PairedCurrency::zero();
-        todo!()
+        let transaction = Transaction::new(
+            EXCHANGE_FEE_ACCOUNT,
+            USER_WALLET_ACCOUNT,
+            self.outstanding_fees,
+        );
+        accounting
+            .create_margin_transfer(transaction)
+            .expect("margin transfer must work");
+        self.outstanding_fees = BaseOrQuote::PairedCurrency::zero();
     }
 }
 
@@ -209,7 +206,7 @@ mod tests {
     #[test_case::test_matrix([1, 2, 5])]
     fn position_inner_new(leverage: u8) {
         let mut ta =
-            InMemoryTransactionAccounting::new(QuoteCurrency::<i32, DECIMALS>::new(1000, 0));
+            InMemoryTransactionAccounting::new(QuoteCurrency::<i64, DECIMALS>::new(1000, 0));
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
         let qty = BaseCurrency::new(5, 1);
         let entry_price = QuoteCurrency::new(100, 0);
@@ -236,8 +233,7 @@ mod tests {
 
     #[test_case::test_matrix([1, 2, 5])]
     fn position_inner_increase_contracts(leverage: u8) {
-        let mut ta =
-            InMemoryTransactionAccounting::new(QuoteCurrency::<i32, DECIMALS>::new(1000, 0));
+        let mut ta = InMemoryTransactionAccounting::new(QuoteCurrency::<_, DECIMALS>::new(1000, 0));
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
         let qty = BaseCurrency::new(5, 1);
         let entry_price = QuoteCurrency::new(100, 0);
@@ -268,8 +264,7 @@ mod tests {
 
     #[test_case::test_matrix([1, 2, 5])]
     fn position_inner_decrease_contracts_basic(leverage: u8) {
-        let mut ta =
-            InMemoryTransactionAccounting::new(QuoteCurrency::<i32, DECIMALS>::new(1000, 0));
+        let mut ta = InMemoryTransactionAccounting::new(QuoteCurrency::<_, DECIMALS>::new(1000, 0));
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
         let qty = BaseCurrency::new(5, 0);
         let entry_price = QuoteCurrency::new(100, 0);
@@ -334,8 +329,7 @@ mod tests {
         [Side::Buy, Side::Sell]
     )]
     fn position_inner_decrease_contracts_win(leverage: u8, position_side: Side) {
-        let mut ta =
-            InMemoryTransactionAccounting::new(QuoteCurrency::<i32, DECIMALS>::new(1000, 0));
+        let mut ta = InMemoryTransactionAccounting::new(QuoteCurrency::<_, DECIMALS>::new(1000, 0));
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
         let qty = BaseCurrency::new(5, 0);
         let entry_price = QuoteCurrency::new(100, 0);
@@ -364,7 +358,7 @@ mod tests {
             ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
             margin
         );
-        let profit = QuoteCurrency::new(25_i32 * side_mult as i32, 0);
+        let profit = QuoteCurrency::new(25 * side_mult as i64, 0);
         assert_eq!(
             ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
             QuoteCurrency::new(1000, 0) + profit
@@ -378,8 +372,7 @@ mod tests {
         [Side::Buy, Side::Sell]
     )]
     fn position_inner_decrease_contracts_2(leverage: u8, position_side: Side) {
-        let mut ta =
-            InMemoryTransactionAccounting::new(QuoteCurrency::<i32, DECIMALS>::new(1000, 0));
+        let mut ta = InMemoryTransactionAccounting::new(QuoteCurrency::<_, DECIMALS>::new(1000, 0));
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
         let qty = BaseCurrency::new(5, 0);
         let entry_price = QuoteCurrency::new(100, 0);
@@ -408,7 +401,7 @@ mod tests {
             ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
             margin
         );
-        let loss = QuoteCurrency::new(25_i32 * side_mult as i32, 0);
+        let loss = QuoteCurrency::new(25 * side_mult as i64, 0);
         assert_eq!(
             ta.margin_balance_of(USER_WALLET_ACCOUNT).unwrap(),
             QuoteCurrency::new(1000, 0)
@@ -422,7 +415,7 @@ mod tests {
     #[test_case::test_matrix([1, 2, 5])]
     #[ignore]
     fn position_inner_decrease_contracts_inverse(leverage: u8) {
-        let mut ta = InMemoryTransactionAccounting::new(BaseCurrency::<i32, DECIMALS>::new(10, 0));
+        let mut ta = InMemoryTransactionAccounting::new(BaseCurrency::<_, DECIMALS>::new(10, 0));
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
         let qty = QuoteCurrency::new(500, 0);
         let entry_price = QuoteCurrency::new(100, 0);

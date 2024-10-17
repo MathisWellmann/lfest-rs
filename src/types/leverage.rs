@@ -18,23 +18,27 @@ macro_rules! leverage {
 
 /// Leverage
 #[derive(Default, Debug, Clone, Copy, PartialEq, Display, Eq)]
-pub struct Leverage(u8);
+pub struct Leverage<I, const D: u8>(Decimal<I, D>);
 
-impl Leverage {
+impl<I, const D: u8> Leverage<I, D>
+where
+    I: Mon<D>,
+{
     /// Create a new instance from a `Decimal` value
     pub fn new(val: u8) -> Result<Self, ConfigError> {
         if val < 1 {
             Err(ConfigError::InvalidLeverage)?
         }
-        Ok(Self(val))
+        Ok(Self(
+            Decimal::try_from_scaled(I::from(val).expect("u8 leverage can convert to I"), 0)
+                .expect("Can create `Decimal` for `Leverage`"),
+        ))
     }
 
     /// Compute the initial margin requirement from leverage.
-    pub fn init_margin_req<I, const D: u8>(&self) -> Decimal<I, D>
-    where
-        I: Mon<D>,
-    {
-        Decimal::one() / Decimal::try_from_scaled(I::from(self.0).unwrap(), 1).unwrap()
+    #[inline]
+    pub fn init_margin_req(&self) -> Decimal<I, D> {
+        Decimal::one() / self.0
     }
 }
 
@@ -46,14 +50,26 @@ mod tests {
 
     #[test]
     fn size_of_leverage() {
-        assert_eq!(std::mem::size_of::<Leverage>(), 1);
+        assert_eq!(std::mem::size_of::<Leverage<i32, 0>>(), 4);
+        assert_eq!(std::mem::size_of::<Leverage<i64, 0>>(), 8);
+    }
+
+    #[test]
+    fn leverage() {
+        for i in 1..100 {
+            let _ = Leverage::<i32, 0>::new(i).unwrap();
+            let _ = Leverage::<i64, 0>::new(i).unwrap();
+        }
     }
 
     #[test]
     fn leverage_init_margin_req() {
-        assert_eq!(Leverage(1).init_margin_req::<i32, 2>(), Decimal::one());
         assert_eq!(
-            Leverage(2).init_margin_req::<i32, 2>(),
+            Leverage::<i32, 0>::new(1).unwrap().init_margin_req(),
+            Decimal::one()
+        );
+        assert_eq!(
+            Leverage::<i32, 0>::new(2).unwrap().init_margin_req(),
             Decimal::one() / Decimal::TWO
         );
     }

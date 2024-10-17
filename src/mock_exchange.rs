@@ -8,14 +8,14 @@ use crate::{
 };
 
 /// The constant decimal precision.
-pub const DECIMALS: u8 = 5;
+pub const DECIMALS: u8 = 9;
 /// The maker fee used in tests.
-pub fn test_fee_maker() -> Fee<i32, DECIMALS, Maker> {
+pub fn test_fee_maker() -> Fee<i64, DECIMALS, Maker> {
     Fee::from(Decimal::try_from_scaled(2, 4).unwrap())
 }
 
 /// The taker fee used in tests.
-pub fn test_fee_taker() -> Fee<i32, DECIMALS, Taker> {
+pub fn test_fee_taker() -> Fee<i64, DECIMALS, Taker> {
     Fee::from(Decimal::try_from_scaled(6, 4).unwrap())
 }
 
@@ -23,11 +23,11 @@ pub fn test_fee_taker() -> Fee<i32, DECIMALS, Taker> {
 /// The size is denoted in `BaseCurrency`
 /// and the margin currency is `QuoteCurency`
 pub fn mock_exchange_linear() -> Exchange<
-    i32,
+    i64,
     DECIMALS,
-    BaseCurrency<i32, DECIMALS>,
+    BaseCurrency<i64, DECIMALS>,
     (),
-    InMemoryTransactionAccounting<i32, DECIMALS, QuoteCurrency<i32, DECIMALS>>,
+    InMemoryTransactionAccounting<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>,
     NoAccountTracker,
 > {
     let acc_tracker = NoAccountTracker;
@@ -48,14 +48,14 @@ pub fn mock_exchange_linear() -> Exchange<
 /// The size is denoted in `BaseCurrency`
 /// and the margin currency is `QuoteCurency`
 pub fn mock_exchange_linear_with_account_tracker(
-    starting_balance: QuoteCurrency<i32, DECIMALS>,
+    starting_balance: QuoteCurrency<i64, DECIMALS>,
 ) -> Exchange<
-    i32,
+    i64,
     DECIMALS,
-    BaseCurrency<i32, DECIMALS>,
+    BaseCurrency<i64, DECIMALS>,
     (),
-    InMemoryTransactionAccounting<i32, DECIMALS, QuoteCurrency<i32, DECIMALS>>,
-    FullAccountTracker<i32, DECIMALS, QuoteCurrency<i32, DECIMALS>>,
+    InMemoryTransactionAccounting<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>,
+    FullAccountTracker<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>,
 > {
     let acc_tracker = FullAccountTracker::new(starting_balance);
     let contract_spec = ContractSpecification::new(
@@ -73,13 +73,13 @@ pub fn mock_exchange_linear_with_account_tracker(
 
 /// Constructs a mock exchange (for inverse futures) for testing.
 pub fn mock_exchange_inverse(
-    starting_balance: BaseCurrency<i32, DECIMALS>,
+    starting_balance: BaseCurrency<i64, DECIMALS>,
 ) -> Exchange<
-    i32,
+    i64,
     DECIMALS,
-    QuoteCurrency<i32, DECIMALS>,
+    QuoteCurrency<i64, DECIMALS>,
     (),
-    InMemoryTransactionAccounting<i32, DECIMALS, BaseCurrency<i32, DECIMALS>>,
+    InMemoryTransactionAccounting<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
     NoAccountTracker,
 > {
     let acc_tracker = NoAccountTracker;

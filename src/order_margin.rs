@@ -134,8 +134,7 @@ where
             sell_value += BaseOrQuote::PairedCurrency::convert_from(*qty, *price)
         });
 
-        // max(buy_value, sell_value) * init_margin_req
-        todo!()
+        max(buy_value, sell_value) * init_margin_req
     }
 
     /// Get the order margin if a new order were to be added.
@@ -159,6 +158,7 @@ mod tests {
     #[test_case::test_matrix(
         [1, 2, 5]
     )]
+    #[tracing_test::traced_test]
     fn order_margin_neutral_no_orders(leverage: u8) {
         let order_margin = OrderMargin::<_, 4, _, ()>::default();
 
@@ -476,7 +476,7 @@ mod tests {
     #[tracing_test::traced_test]
     fn order_margin_with_long() {
         let mut accounting =
-            InMemoryTransactionAccounting::new(QuoteCurrency::<i32, DECIMALS>::new(1000, 0));
+            InMemoryTransactionAccounting::new(QuoteCurrency::<i64, DECIMALS>::new(1000, 0));
         let mut order_margin = OrderMargin::default();
         let init_margin_req = Decimal::one();
 
@@ -546,7 +546,7 @@ mod tests {
         let mut order_margin = OrderMargin::default();
         let init_margin_req = Decimal::one();
 
-        let qty = BaseCurrency::<i32, DECIMALS>::one();
+        let qty = BaseCurrency::<i64, DECIMALS>::one();
         let entry_price = QuoteCurrency::new(100, 0);
         let fee = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_maker().as_ref();
         let position = Position::Short(PositionInner::new(

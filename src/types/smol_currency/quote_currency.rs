@@ -47,18 +47,14 @@ where
         Self(Decimal::try_from_scaled(integer, scale).expect("Make sure the inputs are correct."))
     }
 
+    #[inline]
     pub(crate) fn liquidation_price_long(&self, maint_margin_req: Decimal<I, D>) -> Self {
-        // let mult = Decimal::<i32, BASIS_POINT_SCALE>::one() - maint_margin_req;
-        // let scaled = Decimal::try_from_scaled(mult.0, BASIS_POINT_SCALE);
-        // Self(self.0 * scaled)
-        todo!()
+        Self(self.0 * (Decimal::one() - maint_margin_req))
     }
 
+    #[inline]
     pub(crate) fn liquidation_price_short(&self, maint_margin_req: Decimal<I, D>) -> Self {
-        // let mult = Decimal::<i32, BASIS_POINT_SCALE>::one() + maint_margin_req;
-        // let scaled = Decimal::try_from_scaled(mult.0, BASIS_POINT_SCALE);
-        // Self(self.0 * scaled)
-        todo!()
+        Self(self.0 * (Decimal::one() + maint_margin_req))
     }
 
     pub(crate) fn new_weighted_price(
@@ -112,8 +108,7 @@ where
             return QuoteCurrency::zero();
         }
 
-        // QuoteCurrency(*total_cost.as_ref() / *quantity.as_ref())
-        todo!()
+        QuoteCurrency(*total_cost.as_ref() / *quantity.as_ref())
     }
 }
 
@@ -162,7 +157,7 @@ where
     type FromStrRadixErr = &'static str;
 
     fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
-        panic!("Not needed")
+        Ok(QuoteCurrency(Decimal::from_str_radix(str, radix)?))
     }
 }
 
@@ -177,7 +172,7 @@ where
 
     #[inline]
     fn abs_sub(&self, other: &Self) -> Self {
-        todo!()
+        Self(self.0.abs_sub(&other.0))
     }
 
     #[inline]

@@ -88,8 +88,7 @@ where
         if total_cost.is_zero() {
             return QuoteCurrency::zero();
         }
-        // QuoteCurrency::new(quantity / total_cost)
-        todo!()
+        QuoteCurrency::from(*quantity.as_ref() / *total_cost.as_ref())
     }
 }
 
@@ -138,7 +137,7 @@ where
     type FromStrRadixErr = &'static str;
 
     fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
-        panic!("Not needed")
+        Ok(Self(Decimal::from_str_radix(str, radix)?))
     }
 }
 
@@ -153,7 +152,7 @@ where
 
     #[inline]
     fn abs_sub(&self, other: &Self) -> Self {
-        todo!("not needed")
+        Self(self.0.abs_sub(&other.0))
     }
 
     #[inline]
