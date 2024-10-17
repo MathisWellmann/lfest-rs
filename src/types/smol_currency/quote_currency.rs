@@ -27,8 +27,14 @@ use crate::prelude::BasisPointFrac;
     derive_more::AddAssign,
     derive_more::Sub,
     derive_more::SubAssign,
+    derive_more::Mul,
+    derive_more::Div,
     derive_more::Neg,
+    derive_more::From,
+    derive_more::AsRef,
 )]
+#[mul(forward)]
+#[div(forward)]
 #[repr(transparent)]
 pub struct QuoteCurrency<I, const DB: u8, const DQ: u8>(Decimal<I, DQ>)
 where
@@ -118,25 +124,6 @@ where
     }
 }
 
-impl<I, const DB: u8, const DQ: u8> From<Decimal<I, DQ>> for QuoteCurrency<I, DB, DQ>
-where
-    I: Mon<DQ> + Mon<DB>,
-{
-    fn from(value: Decimal<I, DQ>) -> Self {
-        Self(value)
-    }
-}
-
-impl<I, const DB: u8, const DQ: u8> AsRef<Decimal<I, DQ>> for QuoteCurrency<I, DB, DQ>
-where
-    I: Mon<DQ> + Mon<DB>,
-{
-    #[inline]
-    fn as_ref(&self) -> &Decimal<I, DQ> {
-        &self.0
-    }
-}
-
 impl<I, const DB: u8, const DQ: u8> Zero for QuoteCurrency<I, DB, DQ>
 where
     I: Mon<DQ> + Mon<DB>,
@@ -219,27 +206,14 @@ where
     }
 }
 
-impl<I, const DB: u8, const DQ: u8> std::ops::Mul for QuoteCurrency<I, DB, DQ>
-where
-    I: Mon<DQ> + Mon<DB>,
-{
-    type Output = Self;
-
-    #[inline]
-    fn mul(self, rhs: Self) -> Self::Output {
-        Self(self.0 * rhs.0)
-    }
-}
-
 impl<I, const DB: u8, const DQ: u8> std::ops::Mul<Decimal<I, DQ>> for QuoteCurrency<I, DB, DQ>
 where
     I: Mon<DQ> + Mon<DB>,
 {
     type Output = Self;
 
-    #[inline]
     fn mul(self, rhs: Decimal<I, DQ>) -> Self::Output {
-        Self(self.0 * rhs)
+        Self(self.0 / rhs)
     }
 }
 
@@ -252,17 +226,6 @@ where
     fn mul(self, rhs: BasisPointFrac) -> Self::Output {
         // Self(self.0 * *rhs.as_ref())
         todo!()
-    }
-}
-
-impl<I, const DB: u8, const DQ: u8> std::ops::Div for QuoteCurrency<I, DB, DQ>
-where
-    I: Mon<DQ> + Mon<DB>,
-{
-    type Output = Self;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        Self(self.0 / rhs.0)
     }
 }
 
