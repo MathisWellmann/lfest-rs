@@ -21,6 +21,15 @@ where
     pub ask: QuoteCurrency<I, D>,
 }
 
+impl<I, const D: u8> std::fmt::Display for Bba<I, D>
+where
+    I: Mon<D>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "bid: {}, ask: {}", self.bid, self.ask)
+    }
+}
+
 impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketUpdate<I, D, BaseOrQuote, UserOrderId>
     for Bba<I, D>
 where

@@ -4,7 +4,8 @@ use crate::{
 };
 
 /// The interface of what a market update must be able to do.
-pub trait MarketUpdate<I, const D: u8, BaseOrQuote, UserOrderId>: std::fmt::Debug
+pub trait MarketUpdate<I, const D: u8, BaseOrQuote, UserOrderId>:
+    std::fmt::Debug + std::fmt::Display
 where
     I: Mon<D>,
     BaseOrQuote: CurrencyMarker<I, D>,

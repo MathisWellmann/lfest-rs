@@ -25,6 +25,20 @@ where
     pub side: Side,
 }
 
+impl<I, const D: u8, BaseOrQuote> std::fmt::Display for Trade<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "price {}, quantity: {}, side: {}",
+            self.price, self.quantity, self.side
+        )
+    }
+}
+
 impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketUpdate<I, D, BaseOrQuote, UserOrderId>
     for Trade<I, D, BaseOrQuote>
 where

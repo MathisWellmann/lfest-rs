@@ -27,6 +27,19 @@ where
     pub high: QuoteCurrency<I, D>,
 }
 
+impl<I, const D: u8> std::fmt::Display for Candle<I, D>
+where
+    I: Mon<D>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "bid: {}, ask: {}, high: {}, low: {}",
+            self.bid, self.ask, self.high, self.low
+        )
+    }
+}
+
 impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketUpdate<I, D, BaseOrQuote, UserOrderId>
     for Candle<I, D>
 where

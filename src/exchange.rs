@@ -176,7 +176,7 @@ where
     where
         U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
     {
-        trace!("update_state: market_update: {market_update:?}");
+        trace!("update_state: market_update: {market_update}");
 
         self.market_state.update_state(
             timestamp_ns,
