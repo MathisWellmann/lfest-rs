@@ -166,7 +166,7 @@ fn inv_long_market_loss_full() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            available_wallet_balance: BaseCurrency::new(8, 0) - fee_combined,
+            available_wallet_balance: BaseCurrency::new(8, 1) - fee_combined,
             position_margin: BaseCurrency::zero(),
             order_margin: BaseCurrency::zero()
         }

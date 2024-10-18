@@ -4,6 +4,7 @@ use num_traits::Zero;
 use super::{
     order_meta::ExchangeOrderMeta, order_status::NewOrder, CurrencyMarker, Filled, FilledQuantity,
     MarginCurrencyMarker, Mon, OrderId, Pending, QuoteCurrency, RePricing, TimestampNs,
+    UserOrderIdT,
 };
 use crate::types::{OrderError, Side};
 
@@ -46,6 +47,23 @@ where
     /// Depending on the status, different information is available.
     #[getset(get = "pub")]
     state: OrderStatus,
+}
+
+impl<I, const D: u8, BaseOrQuote, UserOrderId, OrderStatus> std::fmt::Display
+    for LimitOrder<I, D, BaseOrQuote, UserOrderId, OrderStatus>
+where
+    I: Mon<D>,
+    BaseOrQuote: CurrencyMarker<I, D>,
+    UserOrderId: UserOrderIdT,
+    OrderStatus: Clone + std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "user_id: {:?}, limit {} {} @ {}, state: {:?}",
+            self.user_order_id, self.side, self.remaining_quantity, self.limit_price, self.state
+        )
+    }
 }
 
 impl<I, const D: u8, BaseOrQuote> LimitOrder<I, D, BaseOrQuote, (), NewOrder>

@@ -204,7 +204,7 @@ where
 
     #[inline]
     fn mul(self, rhs: Decimal<I, D>) -> Self::Output {
-        Self(self.0 / rhs)
+        Self(self.0 * rhs)
     }
 }
 

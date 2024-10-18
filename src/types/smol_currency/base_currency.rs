@@ -44,7 +44,10 @@ where
 {
     /// Create a new instance from an `integer` and a `scale`.
     pub fn new(integer: I, scale: u8) -> Self {
-        Self(Decimal::try_from_scaled(integer, scale).expect("Make sure the inputs are correct."))
+        Self(
+            Decimal::try_from_scaled(integer, scale)
+                .expect("Can construct `Decimal` from `integer` and `scale`"),
+        )
     }
 }
 
@@ -184,7 +187,7 @@ where
 
     #[inline]
     fn mul(self, rhs: Decimal<I, D>) -> Self::Output {
-        Self(self.0 / rhs)
+        Self(self.0 * rhs)
     }
 }
 
@@ -217,7 +220,7 @@ where
     I: Mon<D>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} Quote", self.0)
+        write!(f, "{} Base", self.0)
     }
 }
 

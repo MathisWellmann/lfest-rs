@@ -39,3 +39,15 @@ pub struct UserBalances<BaseOrQuote> {
     /// The margin reserved for the open limit orders.
     pub order_margin: BaseOrQuote,
 }
+
+/// A custom user order id must satisfy this trait bound.
+pub trait UserOrderIdT:
+    Clone + Eq + PartialEq + std::hash::Hash + std::fmt::Debug + Default
+{
+}
+
+// Blanket impl
+impl<T> UserOrderIdT for T where
+    T: Clone + Eq + PartialEq + std::hash::Hash + std::fmt::Debug + Default
+{
+}

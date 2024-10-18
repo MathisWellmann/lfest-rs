@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// The constant decimal precision.
-pub const DECIMALS: u8 = 9;
+pub const DECIMALS: u8 = 5;
 /// The maker fee used in tests.
 pub fn test_fee_maker() -> Fee<i64, DECIMALS, Maker> {
     Fee::from(Decimal::try_from_scaled(2, 4).unwrap())
@@ -85,7 +85,7 @@ pub fn mock_exchange_inverse(
     let acc_tracker = NoAccountTracker;
     let contract_spec = ContractSpecification::new(
         leverage!(1),
-        Decimal::try_from_scaled(50, 1).expect("works"),
+        Decimal::try_from_scaled(5, 1).expect("works"),
         PriceFilter::default(),
         QuantityFilter::default(),
         test_fee_maker(),

@@ -185,6 +185,7 @@ fn submit_limit_buy_order_no_position_max() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn submit_limit_buy_order_with_long() {
     let mut exchange = mock_exchange_linear();
     let mut accounting = MockTransactionAccounting::default();
@@ -195,7 +196,7 @@ fn submit_limit_buy_order_with_long() {
         .update_state(0.into(), &bba!(bid, ask))
         .unwrap()
         .is_empty());
-    let qty = BaseCurrency::new(90, 0);
+    let qty = BaseCurrency::new(9, 0);
     let order = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
 

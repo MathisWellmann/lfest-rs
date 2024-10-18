@@ -22,6 +22,7 @@ use crate::{
     types::{
         Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderUpdate, MarginCurrencyMarker,
         MarketOrder, NewOrder, OrderId, Pending, Result, Side, TimestampNs, UserBalances,
+        UserOrderIdT,
     },
     utils::assert_user_wallet_balance,
 };
@@ -113,7 +114,7 @@ where
     BaseOrQuote: CurrencyMarker<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
     A: AccountTracker<I, D, BaseOrQuote::PairedCurrency> + std::fmt::Debug,
-    UserOrderId: Clone + Eq + PartialEq + std::hash::Hash + std::fmt::Debug + Default,
+    UserOrderId: UserOrderIdT,
     TransactionAccountingT:
         TransactionAccounting<I, D, BaseOrQuote::PairedCurrency> + std::fmt::Debug,
 {
@@ -338,7 +339,7 @@ where
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>,
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>, I, D> {
-        trace!("submit_order: {:?}", order);
+        trace!("submit_order: {}", order);
 
         // Basic checks
         self.config
