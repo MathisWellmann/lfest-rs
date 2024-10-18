@@ -1,4 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use fpdec::{Dec, Decimal};
 use lfest::prelude::*;
 
 fn criterion_benchmark(c: &mut Criterion) {
@@ -6,9 +7,9 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     group.bench_function(&format!("fpdec_quote_convert_from"), |b| {
         b.iter(|| {
-            let qty = Monies::<Decimal, Base>::new(Dec!(5));
-            let price = Monies::<Decimal, Quote>::new(Dec!(100));
-            let _ = black_box(Quote::convert_from(qty, price));
+            let qty = Dec!(5);
+            let price = Dec!(100);
+            let _ = black_box(qty * price);
         })
     });
     group.bench_function(&format!("const_decimal_i32_quote_convert_from"), |b| {
@@ -20,9 +21,9 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     group.bench_function(&format!("fpdec_base_convert_from"), |b| {
         b.iter(|| {
-            let qty = Monies::<Decimal, Quote>::new(Dec!(500));
-            let price = Monies::<Decimal, Quote>::new(Dec!(100));
-            let _ = black_box(Base::convert_from(qty, price));
+            let qty = Dec!(500);
+            let price = Dec!(100);
+            let _ = black_box(qty / price);
         })
     });
     group.bench_function(&format!("const_decimal_i32_base_convert_from"), |b| {
@@ -32,15 +33,15 @@ fn criterion_benchmark(c: &mut Criterion) {
             let _ = black_box(qty / price);
         })
     });
-    group.bench_function(&format!("fpdec_quote_pnl"), |b| {
+    group.bench_function(&format!("fpdec_linear_futures_pnl"), |b| {
         b.iter(|| {
-            let entry_price = Monies::<Decimal, Quote>::new(Dec!(100));
-            let exit_price = Monies::<Decimal, Quote>::new(Dec!(110));
-            let qty = Monies::<Decimal, Base>::new(Dec!(5));
-            let _ = black_box(Quote::pnl(entry_price, exit_price, qty));
+            let entry_price = Dec!(100);
+            let exit_price = Dec!(110);
+            let qty = Dec!(5);
+            let _ = black_box(exit_price * qty - entry_price * qty);
         })
     });
-    group.bench_function(&format!("const_decimal_i32_quote_pnl"), |b| {
+    group.bench_function(&format!("const_decimal_i32_linear_futures_pnl"), |b| {
         b.iter(|| {
             let entry_price = const_decimal::Decimal::<i32, 2>::try_from_scaled(100, 0).unwrap();
             let exit_price = const_decimal::Decimal::<i32, 2>::try_from_scaled(110, 0).unwrap();
@@ -48,7 +49,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             let _pnl = black_box(exit_price * qty - entry_price * qty);
         })
     });
-    group.bench_function(&format!("const_decimal_i64_quote_pnl"), |b| {
+    group.bench_function(&format!("const_decimal_i64_linear_futures_pnl"), |b| {
         b.iter(|| {
             let entry_price = const_decimal::Decimal::<i64, 2>::try_from_scaled(100, 0).unwrap();
             let exit_price = const_decimal::Decimal::<i64, 2>::try_from_scaled(100, 0).unwrap();
@@ -56,15 +57,15 @@ fn criterion_benchmark(c: &mut Criterion) {
             let _pnl = black_box(exit_price * qty - entry_price * qty);
         })
     });
-    group.bench_function(&format!("fpdec_base_pnl"), |b| {
+    group.bench_function(&format!("fpdec_inverse_futures_pnl"), |b| {
         b.iter(|| {
-            let entry_price = Monies::<Decimal, Quote>::new(Dec!(100));
-            let exit_price = Monies::<Decimal, Quote>::new(Dec!(110));
-            let qty = Monies::<Decimal, Quote>::new(Dec!(500));
-            let _ = black_box(Base::pnl(entry_price, exit_price, qty));
+            let entry_price = Dec!(100);
+            let exit_price = Dec!(110);
+            let qty = Dec!(500);
+            let _ = black_box(qty / entry_price - qty / exit_price);
         })
     });
-    group.bench_function(&format!("const_decimal_i32_base_pnl"), |b| {
+    group.bench_function(&format!("const_decimal_i32_inverse_futures_pnl"), |b| {
         b.iter(|| {
             let entry_price = const_decimal::Decimal::<i32, 2>::try_from_scaled(100, 0).unwrap();
             let exit_price = const_decimal::Decimal::<i32, 2>::try_from_scaled(110, 0).unwrap();
@@ -72,7 +73,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             let _pnl = black_box(qty / entry_price - qty / exit_price);
         })
     });
-    group.bench_function(&format!("const_decimal_i64_base_pnl"), |b| {
+    group.bench_function(&format!("const_decimal_i64_inverse_futures_pnl"), |b| {
         b.iter(|| {
             let entry_price = const_decimal::Decimal::<i64, 2>::try_from_scaled(100, 0).unwrap();
             let exit_price = const_decimal::Decimal::<i64, 2>::try_from_scaled(110, 0).unwrap();
