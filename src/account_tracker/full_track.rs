@@ -309,7 +309,7 @@ where
 
         #[cfg(feature = "quantiles")]
         {
-            let mid_price: f32 = (*mid_price.as_ref()).into();
+            let mid_price = mid_price.as_ref().to_f64() as f32;
             self.sampled_market_ln_return.update(mid_price);
             if let Some(market_ln_ret) = self.sampled_market_ln_return.last() {
                 self.quantogram_market_ln_returns.add(market_ln_ret as f64);
