@@ -3,7 +3,7 @@ use getset::CopyGetters;
 use num_traits::{One, Zero};
 
 use crate::{
-    prelude::{ConfigError, CurrencyMarker, FilterError, Mon, OrderError, QuoteCurrency},
+    prelude::{ConfigError, Currency, FilterError, Mon, OrderError, QuoteCurrency},
     types::{LimitOrder, NewOrder},
 };
 
@@ -101,7 +101,7 @@ where
         mark_price: QuoteCurrency<I, D>,
     ) -> Result<(), OrderError<I, D>>
     where
-        BaseOrQuote: CurrencyMarker<I, D>,
+        BaseOrQuote: Currency<I, D>,
         UserOrderId: Clone,
     {
         if order.limit_price() <= QuoteCurrency::zero() {

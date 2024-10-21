@@ -1,9 +1,8 @@
 use getset::CopyGetters;
 
 use super::{
-    AccountId, MarginCurrencyMarker, Mon, QuoteCurrency, BROKER_MARGIN_ACCOUNT,
-    EXCHANGE_FEE_ACCOUNT, TREASURY_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT,
-    USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
+    AccountId, MarginCurrency, Mon, QuoteCurrency, BROKER_MARGIN_ACCOUNT, EXCHANGE_FEE_ACCOUNT,
+    TREASURY_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
 };
 
 /// A transaction involves two parties.
@@ -11,7 +10,7 @@ use super::{
 pub struct Transaction<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     #[getset(get_copy = "pub(crate)")]
     debit_account_id: AccountId,
@@ -25,7 +24,7 @@ where
 impl<I, const D: u8, BaseOrQuote> std::fmt::Debug for Transaction<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -54,7 +53,7 @@ fn account_from_int(int: usize) -> &'static str {
 impl<I, const D: u8, BaseOrQuote> Transaction<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     pub(crate) fn new(
         debit_account_id: AccountId,

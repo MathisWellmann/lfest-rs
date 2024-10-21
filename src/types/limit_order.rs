@@ -2,9 +2,8 @@ use getset::{CopyGetters, Getters, Setters};
 use num_traits::Zero;
 
 use super::{
-    order_meta::ExchangeOrderMeta, order_status::NewOrder, CurrencyMarker, Filled, FilledQuantity,
-    MarginCurrencyMarker, Mon, OrderId, Pending, QuoteCurrency, RePricing, TimestampNs,
-    UserOrderIdT,
+    order_meta::ExchangeOrderMeta, order_status::NewOrder, Currency, Filled, FilledQuantity,
+    MarginCurrency, Mon, OrderId, Pending, QuoteCurrency, RePricing, TimestampNs, UserOrderIdT,
 };
 use crate::types::{OrderError, Side};
 
@@ -20,7 +19,7 @@ use crate::types::{OrderError, Side};
 pub struct LimitOrder<I, const D: u8, BaseOrQuote, UserOrderId, OrderStatus>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
     UserOrderId: Clone,
     OrderStatus: Clone,
 {
@@ -53,7 +52,7 @@ impl<I, const D: u8, BaseOrQuote, UserOrderId, OrderStatus> std::fmt::Display
     for LimitOrder<I, D, BaseOrQuote, UserOrderId, OrderStatus>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
     UserOrderId: UserOrderIdT,
     OrderStatus: Clone + std::fmt::Debug,
 {
@@ -69,8 +68,8 @@ where
 impl<I, const D: u8, BaseOrQuote> LimitOrder<I, D, BaseOrQuote, (), NewOrder>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     /// Create a new limit order without a user_order_id.
     ///
@@ -106,8 +105,8 @@ where
 impl<I, const D: u8, BaseOrQuote, UserOrderId> LimitOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderId: Clone + Default,
 {
     /// Create a new limit order
@@ -181,8 +180,8 @@ impl<I, const D: u8, BaseOrQuote, UserOrderId>
     LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderId: Clone,
 {
     /// Used when an order gets some `quantity` filled at a `price`.
@@ -299,8 +298,8 @@ impl<I, const D: u8, BaseOrQuote, UserOrderId>
     LimitOrder<I, D, BaseOrQuote, UserOrderId, Filled<I, D, BaseOrQuote>>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderId: Clone,
 {
     /// Get the total quantity that this order is for.

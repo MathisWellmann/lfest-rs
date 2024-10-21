@@ -2,7 +2,7 @@ use getset::{CopyGetters, Getters};
 
 use crate::{
     contract_specification::ContractSpecification,
-    prelude::{ConfigError, MarginCurrencyMarker, Mon},
+    prelude::{ConfigError, MarginCurrency, Mon},
 };
 
 #[derive(Debug, Clone, Getters, CopyGetters)]
@@ -15,7 +15,7 @@ use crate::{
 pub struct Config<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     /// The starting balance of account (denoted in margin currency).
     /// The concrete `Currency` here defines the futures type.
@@ -43,7 +43,7 @@ where
 impl<I, const D: u8, BaseOrQuote> Config<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     /// Create a new Config.
     ///

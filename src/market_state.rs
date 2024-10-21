@@ -2,7 +2,7 @@ use const_decimal::Decimal;
 use getset::{CopyGetters, Getters, Setters};
 
 use crate::{
-    prelude::{CurrencyMarker, MarketUpdate, Mon, PriceFilter, QuoteCurrency},
+    prelude::{Currency, MarketUpdate, Mon, PriceFilter, QuoteCurrency},
     types::{Result, TimestampNs},
 };
 
@@ -51,7 +51,7 @@ where
     ) -> Result<(), I, D>
     where
         U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
-        BaseOrQuote: CurrencyMarker<I, D>,
+        BaseOrQuote: Currency<I, D>,
         UserOrderId: Clone,
     {
         market_update.validate_market_update(price_filter)?;

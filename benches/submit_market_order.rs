@@ -19,8 +19,8 @@ fn submit_market_orders<I, const D: u8, BaseOrQuote, U>(
     n: usize,
 ) where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     for _ in 0..n {
         exchange

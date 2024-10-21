@@ -1,9 +1,9 @@
 use std::ops::Neg;
 
-use const_decimal::Decimal;
+use const_decimal::{Decimal, ParseDecimalError};
 use num_traits::{Num, One, Signed, Zero};
 
-use super::{CurrencyMarker, MarginCurrencyMarker, Mon, QuoteCurrency};
+use super::{Currency, MarginCurrency, Mon, QuoteCurrency};
 
 /// Representation of a Base currency,
 /// e.g in the symbol BTCUSD, the prefix BTC is the `BaseCurrency` and the postfix `USD` is the `QuoteCurrency`.
@@ -54,7 +54,7 @@ where
 /// # Generics:
 /// - `I`: The numeric data type of `Decimal`.
 /// - `D`: The constant decimal precision of the `BaseCurrency`.
-impl<I, const D: u8> CurrencyMarker<I, D> for BaseCurrency<I, D>
+impl<I, const D: u8> Currency<I, D> for BaseCurrency<I, D>
 where
     I: Mon<D>,
 {
@@ -71,7 +71,7 @@ where
 /// # Generics:
 /// - `I`: The numeric data type of `Decimal`.
 /// - `D`: The constant decimal precision of the `BaseCurrency`.
-impl<I, const D: u8> MarginCurrencyMarker<I, D> for BaseCurrency<I, D>
+impl<I, const D: u8> MarginCurrency<I, D> for BaseCurrency<I, D>
 where
     I: Mon<D>,
 {
@@ -137,7 +137,7 @@ impl<I, const D: u8> Num for BaseCurrency<I, D>
 where
     I: Mon<D>,
 {
-    type FromStrRadixErr = &'static str;
+    type FromStrRadixErr = ParseDecimalError<I>;
 
     fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
         Ok(Self(Decimal::from_str_radix(str, radix)?))

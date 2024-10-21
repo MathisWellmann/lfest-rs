@@ -4,7 +4,7 @@ mod quote_currency;
 
 pub use base_currency::BaseCurrency;
 use const_decimal::{Decimal, ScaledInteger};
-pub use margin_currency_trait::MarginCurrencyMarker;
+pub use margin_currency_trait::MarginCurrency;
 pub use quote_currency::QuoteCurrency;
 
 /// A trait for monetary values.
@@ -30,7 +30,7 @@ impl<const D: u8> Mon<D> for i128 {}
 /// # Generics:
 /// - `I` is the numeric type
 /// - `D` is the decimal precision.
-pub trait CurrencyMarker<I, const D: u8>:
+pub trait Currency<I, const D: u8>:
     Clone
     + Copy
     + Default
@@ -47,11 +47,12 @@ pub trait CurrencyMarker<I, const D: u8>:
     + num_traits::One
     + num_traits::Signed
     + Into<f64>
+    + From<Decimal<I, D>>
 where
     I: Mon<D>,
 {
     /// The paired currency in the `Symbol` with generic decimal precision `DP`.
-    type PairedCurrency: CurrencyMarker<I, D, PairedCurrency = Self>;
+    type PairedCurrency: Currency<I, D, PairedCurrency = Self>;
 
     /// Convert from one currency to another at a given price per unit.
     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self;

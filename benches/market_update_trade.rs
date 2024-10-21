@@ -68,8 +68,8 @@ fn update_state<I, const D: u8, BaseOrQuote, U>(
     trades: &[U],
 ) where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     U: MarketUpdate<I, D, BaseOrQuote, ()>,
 {
     for (i, trade) in trades.into_iter().enumerate() {

@@ -5,7 +5,7 @@ use super::{
     AccountId, Mon, TransactionAccounting,
 };
 use crate::{
-    types::{Error, MarginCurrencyMarker},
+    types::{Error, MarginCurrency},
     Result,
 };
 
@@ -29,7 +29,7 @@ pub const TREASURY_ACCOUNT: usize = 5;
 pub struct InMemoryTransactionAccounting<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     /// Accounts are allocated at the start as they are known upfront.
     margin_accounts: [TAccount<I, D, BaseOrQuote>; N_ACCOUNTS],
@@ -40,7 +40,7 @@ impl<I, const D: u8, BaseOrQuote> TransactionAccounting<I, D, BaseOrQuote>
     for InMemoryTransactionAccounting<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     fn new(user_starting_wallet_balance: BaseOrQuote) -> Self {
         let mut s = Self {

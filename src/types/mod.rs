@@ -23,7 +23,7 @@ pub use order_status::{Filled, FilledQuantity, NewOrder, Pending};
 pub use order_update::LimitOrderUpdate;
 pub use re_pricing::RePricing;
 pub use side::Side;
-pub use smol_currency::{BaseCurrency, CurrencyMarker, MarginCurrencyMarker, Mon, QuoteCurrency};
+pub use smol_currency::{BaseCurrency, Currency, MarginCurrency, Mon, QuoteCurrency};
 pub use timestamp_ns::TimestampNs;
 
 /// Natural Logarithmic Returns newtype wrapping a borrowed slice of generic floats.

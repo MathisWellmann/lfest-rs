@@ -104,7 +104,7 @@ impl<I, const D: u8, BaseOrQuote> TransactionAccounting<I, D, BaseOrQuote>
     for MockTransactionAccounting
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     fn new(_user_starting_wallet_balance: BaseOrQuote) -> Self {
         Self {}

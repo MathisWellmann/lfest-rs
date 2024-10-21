@@ -7,8 +7,8 @@ use tracing::trace;
 
 use crate::{
     exchange::ActiveLimitOrders,
-    prelude::{CurrencyMarker, Mon, OrderId, Position},
-    types::{LimitOrder, MarginCurrencyMarker, Pending, Side},
+    prelude::{Currency, Mon, OrderId, Position},
+    types::{LimitOrder, MarginCurrency, Pending, Side},
     utils::{max, min},
 };
 
@@ -17,7 +17,7 @@ use crate::{
 pub(crate) struct OrderMargin<I, const D: u8, BaseOrQuote, UserOrderId>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
     UserOrderId: Clone + Default,
 {
     #[getset(get = "pub(crate)")]
@@ -27,8 +27,8 @@ where
 impl<I, const D: u8, BaseOrQuote, UserOrderId> OrderMargin<I, D, BaseOrQuote, UserOrderId>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderId: Clone + std::fmt::Debug + std::cmp::PartialEq + Default,
 {
     pub(crate) fn update(

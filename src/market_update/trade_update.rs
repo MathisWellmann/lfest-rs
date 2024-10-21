@@ -1,9 +1,7 @@
 use super::MarketUpdate;
 use crate::{
     order_filters::{enforce_max_price, enforce_min_price, enforce_step_size},
-    prelude::{
-        CurrencyMarker, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side,
-    },
+    prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side},
     utils::min,
     Result,
 };
@@ -13,7 +11,7 @@ use crate::{
 pub struct Trade<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     /// The price at which the trade executed at.
     pub price: QuoteCurrency<I, D>,
@@ -28,7 +26,7 @@ where
 impl<I, const D: u8, BaseOrQuote> std::fmt::Display for Trade<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -43,7 +41,7 @@ impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketUpdate<I, D, BaseOrQuote, U
     for Trade<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
     UserOrderId: Clone,
 {
     fn limit_order_filled(

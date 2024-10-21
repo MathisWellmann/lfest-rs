@@ -5,15 +5,15 @@ use crate::{
     contract_specification::ContractSpecification,
     market_state::MarketState,
     order_margin::OrderMargin,
-    prelude::{CurrencyMarker, Mon, Position, QuoteCurrency, RiskError},
-    types::{LimitOrder, MarginCurrencyMarker, MarketOrder, Pending, Side},
+    prelude::{Currency, Mon, Position, QuoteCurrency, RiskError},
+    types::{LimitOrder, MarginCurrency, MarketOrder, Pending, Side},
 };
 
 #[derive(Debug, Clone)]
 pub(crate) struct IsolatedMarginRiskEngine<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     contract_spec: ContractSpecification<I, D, BaseOrQuote>,
 }
@@ -21,7 +21,7 @@ where
 impl<I, const D: u8, BaseOrQuote> IsolatedMarginRiskEngine<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     pub(crate) fn new(contract_spec: ContractSpecification<I, D, BaseOrQuote>) -> Self {
         Self { contract_spec }
@@ -32,8 +32,8 @@ impl<I, const D: u8, BaseOrQuote, UserOrderId> RiskEngine<I, D, BaseOrQuote, Use
     for IsolatedMarginRiskEngine<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default,
 {
     fn check_market_order(
@@ -117,7 +117,7 @@ where
 impl<I, const D: u8, BaseOrQuote> IsolatedMarginRiskEngine<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     fn check_market_buy_order<UserOrderId>(
         &self,

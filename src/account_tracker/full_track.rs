@@ -11,7 +11,7 @@ use sliding_features::{
 use crate::{
     account_tracker::AccountTracker,
     prelude::{MarketState, Mon, QuoteCurrency, Side, UserBalances},
-    types::{CurrencyMarker, MarginCurrencyMarker, TimestampNs},
+    types::{Currency, MarginCurrency, TimestampNs},
     utils::balance_sum,
 };
 
@@ -22,7 +22,7 @@ const DAILY_NS: i64 = 86_400_000_000_000;
 pub struct FullAccountTracker<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     /// Wallet balance at the start.
     #[getset(get_copy = "pub")]
@@ -86,7 +86,7 @@ where
 impl<I, const D: u8, BaseOrQuote> FullAccountTracker<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     /// Create a new instance of `Self`.
     #[must_use]
@@ -269,7 +269,7 @@ impl<I, const D: u8, BaseOrQuote> AccountTracker<I, D, BaseOrQuote>
     for FullAccountTracker<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     fn update(&mut self, market_state: &MarketState<I, D>) {
         if self.ts_first == 0.into() {
@@ -356,7 +356,7 @@ where
 impl<I, const D: u8, BaseOrQuote> Display for FullAccountTracker<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

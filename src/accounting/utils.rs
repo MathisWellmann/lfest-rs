@@ -1,5 +1,5 @@
 use super::{account::TAccount, Mon};
-use crate::types::MarginCurrencyMarker;
+use crate::types::MarginCurrency;
 
 /// Asserts that the accounting equation holds true.
 ///
@@ -9,7 +9,7 @@ pub(crate) fn debug_assert_accounting_equation<I, const D: u8, BaseOrQuote>(
     accounts: &[TAccount<I, D, BaseOrQuote>],
 ) where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     debug_assert!(
         {

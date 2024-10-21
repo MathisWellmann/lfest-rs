@@ -1,6 +1,6 @@
 use getset::{CopyGetters, Getters};
 
-use super::{order_meta::ExchangeOrderMeta, CurrencyMarker, Mon, QuoteCurrency, TimestampNs};
+use super::{order_meta::ExchangeOrderMeta, Currency, Mon, QuoteCurrency, TimestampNs};
 
 /// A new order has not been received by the exchange and has thus some pieces of information not available.
 /// This also means the various filters (e.g `PriceFilter` and `QuantityFilter`) have not been checked.
@@ -15,7 +15,7 @@ pub struct NewOrder;
 pub struct Pending<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     /// The now filled in order metadata.
     #[getset(get = "pub")]
@@ -29,7 +29,7 @@ where
 impl<I, const D: u8, BaseOrQuote> Pending<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     /// Create a new instance of `Self`
     pub(crate) fn new(meta: ExchangeOrderMeta) -> Self {
@@ -45,7 +45,7 @@ where
 pub enum FilledQuantity<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     /// All the order quantity has yet to be filled.
     Unfilled,
@@ -65,7 +65,7 @@ where
 pub struct Filled<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     /// The now filled in order metadata.
     #[getset(get = "pub")]
@@ -88,7 +88,7 @@ where
 impl<I, const D: u8, BaseOrQuote> Filled<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     /// Create a new instance of `Self`.
     pub(crate) fn new(

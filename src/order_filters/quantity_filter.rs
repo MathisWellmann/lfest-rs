@@ -2,14 +2,14 @@
 
 use getset::CopyGetters;
 
-use crate::prelude::{ConfigError, CurrencyMarker, Mon, OrderError, QuoteCurrency};
+use crate::prelude::{ConfigError, Currency, Mon, OrderError, QuoteCurrency};
 
 /// The `SizeFilter` defines the quantity rules that each order needs to follow
 #[derive(Debug, Clone, CopyGetters)]
 pub struct QuantityFilter<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     /// Defines the optional minimum `quantity` of any order
     #[getset(get_copy = "pub")]
@@ -31,7 +31,7 @@ where
 impl<I, const D: u8, BaseOrQuote> Default for QuantityFilter<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     fn default() -> Self {
         Self {
@@ -46,7 +46,7 @@ where
 impl<I, const D: u8, BaseOrQuote> QuantityFilter<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     /// Create a new instance of the QuantityFilter.
     /// Make sure the `min_quantity` is a multiple of `tick_size`.

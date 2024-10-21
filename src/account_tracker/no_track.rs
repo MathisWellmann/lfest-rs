@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::{
     account_tracker::AccountTracker,
     prelude::{MarketState, Mon, QuoteCurrency, Side, UserBalances},
-    types::MarginCurrencyMarker,
+    types::MarginCurrency,
 };
 
 /// Performs no tracking of account performance
@@ -13,7 +13,7 @@ pub struct NoAccountTracker;
 impl<I, const D: u8, BaseOrQuote> AccountTracker<I, D, BaseOrQuote> for NoAccountTracker
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     fn update(&mut self, _market_state: &MarketState<I, D>) {}
 

@@ -1,5 +1,5 @@
 use crate::{
-    prelude::{CurrencyMarker, LimitOrder, MarketState, Mon, Pending, PriceFilter},
+    prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter},
     Result,
 };
 
@@ -8,7 +8,7 @@ pub trait MarketUpdate<I, const D: u8, BaseOrQuote, UserOrderId>:
     std::fmt::Debug + std::fmt::Display
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
     UserOrderId: Clone,
 {
     /// Checks if this market update triggered a specific limit order,

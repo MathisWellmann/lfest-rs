@@ -1,15 +1,15 @@
 use crate::{
     market_state::MarketState,
     order_margin::OrderMargin,
-    prelude::{CurrencyMarker, Mon, Position, QuoteCurrency, RiskError},
-    types::{LimitOrder, MarginCurrencyMarker, MarketOrder, Pending},
+    prelude::{Currency, Mon, Position, QuoteCurrency, RiskError},
+    types::{LimitOrder, MarginCurrency, MarketOrder, Pending},
 };
 
 pub(crate) trait RiskEngine<I, const D: u8, BaseOrQuote, UserOrderId>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default,
 {
     /// Checks if the account it able to satisfy the margin requirements for a new market order.

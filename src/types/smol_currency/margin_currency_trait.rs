@@ -1,4 +1,4 @@
-use super::{CurrencyMarker, Mon, QuoteCurrency};
+use super::{Currency, Mon, QuoteCurrency};
 
 /// Each Currency that is used as margin has to implement this trait.
 /// The margin currency of an account defines which type of futures contract is
@@ -9,7 +9,7 @@ use super::{CurrencyMarker, Mon, QuoteCurrency};
 /// # Generics:
 /// - `I` is the numeric type,
 /// - `D` is the constant decimal precision.
-pub trait MarginCurrencyMarker<I, const D: u8>: CurrencyMarker<I, D>
+pub trait MarginCurrency<I, const D: u8>: Currency<I, D>
 where
     I: Mon<D>,
 {

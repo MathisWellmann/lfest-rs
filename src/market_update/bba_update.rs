@@ -3,7 +3,7 @@ use crate::{
     order_filters::{
         enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
     },
-    prelude::{CurrencyMarker, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency},
+    prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency},
     Result,
 };
 
@@ -34,7 +34,7 @@ impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketUpdate<I, D, BaseOrQuote, U
     for Bba<I, D>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
     UserOrderId: Clone,
 {
     fn limit_order_filled(

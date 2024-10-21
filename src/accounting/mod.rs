@@ -12,7 +12,7 @@ use crate::prelude::*;
 pub trait TransactionAccounting<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     /// Create a new instance with an initial balance for the user account.
     fn new(user_starting_wallet_balance: BaseOrQuote) -> Self;

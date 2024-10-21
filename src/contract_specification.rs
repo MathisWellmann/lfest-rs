@@ -4,7 +4,7 @@ use num_traits::{One, Zero};
 
 use crate::{
     leverage,
-    prelude::{ConfigError, CurrencyMarker, Maker, Mon, PriceFilter, QuantityFilter, Taker},
+    prelude::{ConfigError, Currency, Maker, Mon, PriceFilter, QuantityFilter, Taker},
     types::{Fee, Leverage},
 };
 
@@ -17,7 +17,7 @@ use crate::{
 pub struct ContractSpecification<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     /// Identifying ticker symbol
     #[getset(get = "pub", set = "pub")]
@@ -58,7 +58,7 @@ where
 impl<I, const D: u8, BaseOrQuote> ContractSpecification<I, D, BaseOrQuote>
 where
     I: Mon<D> + Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     /// Create a new `ContractSpecification` from the most basic parameters.
     ///
@@ -101,7 +101,7 @@ where
 impl<I, const D: u8, BaseOrQuote> Default for ContractSpecification<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     fn default() -> Self {
         Self::new(

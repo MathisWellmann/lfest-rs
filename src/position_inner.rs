@@ -7,10 +7,10 @@ use tracing::{debug, trace};
 
 use crate::{
     prelude::{
-        CurrencyMarker, Mon, QuoteCurrency, Transaction, TransactionAccounting,
-        EXCHANGE_FEE_ACCOUNT, TREASURY_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
+        Currency, Mon, QuoteCurrency, Transaction, TransactionAccounting, EXCHANGE_FEE_ACCOUNT,
+        TREASURY_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
     },
-    types::MarginCurrencyMarker,
+    types::MarginCurrency,
 };
 
 /// Describes the position information of the account.
@@ -19,7 +19,7 @@ use crate::{
 pub struct PositionInner<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     /// The number of futures contracts making up the position.
     #[getset(get_copy = "pub")]
@@ -37,8 +37,8 @@ where
 impl<I, const D: u8, BaseOrQuote> PositionInner<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     /// Create a new instance.
     ///

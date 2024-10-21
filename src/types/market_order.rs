@@ -1,7 +1,7 @@
 use getset::{CopyGetters, Getters};
 
 use super::{
-    order_status::NewOrder, CurrencyMarker, ExchangeOrderMeta, Filled, Mon, OrderError, Pending,
+    order_status::NewOrder, Currency, ExchangeOrderMeta, Filled, Mon, OrderError, Pending,
     QuoteCurrency, Side, TimestampNs,
 };
 
@@ -16,7 +16,7 @@ use super::{
 pub struct MarketOrder<I, const D: u8, BaseOrQuote, UserOrderId, OrderStatus>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
     OrderStatus: Clone,
 {
     /// Order Id provided by the user, can be any type really.
@@ -41,7 +41,7 @@ where
 impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
     UserOrderId: Default,
 {
     /// Create a new market order without a `user_order_id`.
@@ -110,7 +110,7 @@ impl<I, const D: u8, BaseOrQuote, UserOrderId>
     MarketOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
     UserOrderId: Clone,
 {
     /// Mark the order as filled, by modifying its state.

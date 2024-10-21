@@ -6,10 +6,8 @@ use tracing::debug;
 
 use crate::{
     position_inner::PositionInner,
-    prelude::{
-        CurrencyMarker, Mon, QuoteCurrency, TransactionAccounting, USER_POSITION_MARGIN_ACCOUNT,
-    },
-    types::{MarginCurrencyMarker, Side},
+    prelude::{Currency, Mon, QuoteCurrency, TransactionAccounting, USER_POSITION_MARGIN_ACCOUNT},
+    types::{MarginCurrency, Side},
 };
 
 /// A futures position can be one of three variants.
@@ -17,7 +15,7 @@ use crate::{
 pub enum Position<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
 {
     /// No position present.
     #[default]
@@ -31,8 +29,8 @@ where
 impl<I, const D: u8, BaseOrQuote> Position<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     /// Return the positions unrealized profit and loss.
     pub fn unrealized_pnl(
@@ -268,8 +266,8 @@ where
 impl<I, const D: u8, BaseOrQuote> std::fmt::Display for Position<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

@@ -1,6 +1,6 @@
 use crate::{
     prelude::{MarketState, Mon, QuoteCurrency, Side, UserBalances},
-    types::MarginCurrencyMarker,
+    types::MarginCurrency,
 };
 
 /// Something that tracks the performance of the Account.
@@ -11,7 +11,7 @@ use crate::{
 pub trait AccountTracker<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     /// Update with newest market info.
     fn update(&mut self, market_state: &MarketState<I, D>);

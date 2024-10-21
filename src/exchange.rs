@@ -13,14 +13,14 @@ use crate::{
     market_state::MarketState,
     order_margin::OrderMargin,
     prelude::{
-        CurrencyMarker, MarketUpdate, Mon, OrderError, Position, QuoteCurrency, RePricing,
-        Transaction, EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT,
+        Currency, MarketUpdate, Mon, OrderError, Position, QuoteCurrency, RePricing, Transaction,
+        EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT,
         USER_WALLET_ACCOUNT,
     },
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     sample_returns_trigger::SampleReturnsTrigger,
     types::{
-        Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderUpdate, MarginCurrencyMarker,
+        Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderUpdate, MarginCurrency,
         MarketOrder, NewOrder, OrderId, Pending, Result, Side, TimestampNs, UserBalances,
         UserOrderIdT,
     },
@@ -47,8 +47,8 @@ pub type ActiveLimitOrders<I, const D: u8, BaseOrQuote, UserOrderId> =
 pub struct Account<'a, I, const D: u8, BaseOrQuote, UserOrderId, A>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderId: Clone,
 {
     /// tracks the performance of the account
@@ -66,8 +66,8 @@ where
 pub struct Exchange<I, const D: u8, BaseOrQuote, UserOrderId, TransactionAccountingT, A>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default,
 {
     /// The exchange configuration.
@@ -111,8 +111,8 @@ impl<I, const D: u8, BaseOrQuote, UserOrderId, TransactionAccountingT, A>
     Exchange<I, D, BaseOrQuote, UserOrderId, TransactionAccountingT, A>
 where
     I: Mon<D>,
-    BaseOrQuote: CurrencyMarker<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     A: AccountTracker<I, D, BaseOrQuote::PairedCurrency> + std::fmt::Debug,
     UserOrderId: UserOrderIdT,
     TransactionAccountingT:

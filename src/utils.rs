@@ -34,7 +34,7 @@ pub(crate) fn assert_user_wallet_balance<I, const D: u8, Acc, BaseOrQuote>(
 ) where
     I: Mon<D>,
     Acc: TransactionAccounting<I, D, BaseOrQuote>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     let wallet_balance = transaction_accounting
         .margin_balance_of(USER_WALLET_ACCOUNT)
@@ -48,7 +48,7 @@ pub(crate) fn balance_sum<I, const D: u8, BaseOrQuote>(
 ) -> BaseOrQuote
 where
     I: Mon<D>,
-    BaseOrQuote: MarginCurrencyMarker<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     user_balances.available_wallet_balance
         + user_balances.position_margin
