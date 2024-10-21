@@ -328,6 +328,7 @@ checksum = "1462739cb27611015575c0c11df5df7601141071f07518d56fcc1be504cbec97"
 [[package]]
 name = "const-decimal"
 version = "0.3.0"
+source = "git+https://github.com/OliverNChalk/const-decimal?rev=47fe246#47fe2469d8702de5c3136c45a60d503124617d58"
 dependencies = [
  "num-traits",
  "paste",
