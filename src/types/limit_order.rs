@@ -234,14 +234,13 @@ where
                 avg_price,
             } => {
                 let new_qty = *cumulative_qty + filled_quantity;
-                // *avg_price = QuoteCurrency::new_weighted_price(
-                //     *avg_price,
-                //     *cumulative_qty.as_ref(),
-                //     price,
-                //     *filled_quantity.as_ref(),
-                // );
-                // *cumulative_qty = new_qty;
-                todo!();
+                *avg_price = QuoteCurrency::new_weighted_price(
+                    *avg_price,
+                    *cumulative_qty.as_ref(),
+                    price,
+                    *filled_quantity.as_ref(),
+                );
+                *cumulative_qty = new_qty;
 
                 self.remaining_quantity -= filled_quantity;
 

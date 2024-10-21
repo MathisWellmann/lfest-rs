@@ -48,6 +48,7 @@ pub trait Currency<I, const D: u8>:
     + num_traits::Signed
     + Into<f64>
     + From<Decimal<I, D>>
+    + AsRef<Decimal<I, D>>
 where
     I: Mon<D>,
 {

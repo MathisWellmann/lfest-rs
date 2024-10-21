@@ -63,7 +63,8 @@ where
         price_1: Self,
         weight_1: Decimal<I, D>,
     ) -> Self {
-        todo!()
+        let total_weight = weight_0 + weight_1;
+        (price_0 * weight_0 + price_1 * weight_1) / total_weight
     }
 }
 
