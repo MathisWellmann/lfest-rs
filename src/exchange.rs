@@ -584,7 +584,8 @@ where
     }
 
     /// Checks for the execution of active limit orders in the account.
-    fn check_active_orders<U>(
+    /// NOTE: only public for benchmarking purposes.
+    pub fn check_active_orders<U>(
         &mut self,
         market_update: &U,
         ts_ns: TimestampNs,

@@ -60,8 +60,6 @@ fn criterion_benchmark(c: &mut Criterion) {
     .unwrap();
     let mut group = c.benchmark_group("submit_limit_order");
 
-    // TODO: clearly the performance of `exchange::submit_limit_order` leaves a lot to be desired.
-
     let n: usize = 1;
     group.throughput(criterion::Throughput::Elements(n as u64));
     group.bench_function(&format!("submit_limit_order_{n}"), |b| {

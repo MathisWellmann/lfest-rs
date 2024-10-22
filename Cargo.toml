@@ -63,3 +63,7 @@ harness = false
 [[bench]]
 name = "decimal_comparison"
 harness = false
+
+[[bench]]
+name = "check_active_orders"
+harness = false
