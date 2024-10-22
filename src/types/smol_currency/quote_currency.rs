@@ -66,6 +66,28 @@ where
         let total_weight = weight_0 + weight_1;
         (price_0 * weight_0 + price_1 * weight_1) / total_weight
     }
+
+    /// Round a number to a multiple of a given `quantum` toward zero.
+    /// general ref: <https://en.wikipedia.org/wiki/Quantization_(signal_processing)>
+    ///
+    /// By default, rust is rounding towards zero and so does this method.
+    ///
+    /// # Example:
+    /// ```rust
+    /// use lfest::prelude::QuoteCurrency;
+    /// // 11.65
+    /// let d = QuoteCurrency::<i64, 5>::new(1165, 2);
+    /// // Allow only increments of 0.5
+    /// let quantum = QuoteCurrency::<i64, 5>::new(5, 1);
+    /// let q = d.quantize_toward_zero(quantum);
+    /// // 11.5 rounded down to the nearest `quantum`.
+    /// assert_eq!(q, QuoteCurrency::new(115, 1));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn quantize_toward_zero(&self, quantum: Self) -> Self {
+        Self(self.0.quantize_toward_zero(*quantum.as_ref()))
+    }
 }
 
 /// # Generics:
