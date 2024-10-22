@@ -43,7 +43,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             Decimal::try_from_scaled(5, 1).unwrap(),
         )
         .expect("is valid filter"),
-        QuantityFilter::new(None, None, QuoteCurrency::new(1, 1)).expect("is valid filter"),
+        QuantityFilter::new(None, None, QuoteCurrency::new(1, 2)).expect("is valid filter"),
         Fee::from(Decimal::try_from_scaled(2, 1).unwrap()),
         Fee::from(Decimal::try_from_scaled(6, 1).unwrap()),
     )
@@ -53,11 +53,11 @@ fn criterion_benchmark(c: &mut Criterion) {
     exchange
         .update_state(
             0.into(),
-            &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 1)),
+            &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0)),
         )
         .expect("is valid market update");
 
-    let order = MarketOrder::new(Side::Buy, QuoteCurrency::new(1, 1)).unwrap();
+    let order = MarketOrder::new(Side::Buy, QuoteCurrency::new(1, 2)).unwrap();
     let mut group = c.benchmark_group("submit_market_order");
     const N: usize = 1_000;
     group.throughput(criterion::Throughput::Elements(N as u64));
