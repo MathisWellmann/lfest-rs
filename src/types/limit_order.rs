@@ -317,7 +317,7 @@ mod tests {
     use test_case::test_matrix;
 
     use super::*;
-    use crate::prelude::QuoteCurrency;
+    use crate::{prelude::QuoteCurrency, types::BaseCurrency};
 
     #[test_matrix(
         [Side::Buy, Side::Sell],
@@ -359,5 +359,21 @@ mod tests {
             avg_price: limit_price,
         };
         assert_eq!(order.state(), &expected_state);
+    }
+
+    #[test]
+    fn size_of_limit_order() {
+        assert_eq!(
+            std::mem::size_of::<LimitOrder<i64, 5, BaseCurrency<i64, 5>, i64, NewOrder>>(),
+            32
+        );
+        assert_eq!(
+            std::mem::size_of::<LimitOrder<i32, 2, BaseCurrency<i32, 2>, i64, NewOrder>>(),
+            24
+        );
+        assert_eq!(
+            std::mem::size_of::<LimitOrder<i32, 2, BaseCurrency<i32, 2>, i32, NewOrder>>(),
+            16
+        );
     }
 }
