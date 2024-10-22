@@ -84,7 +84,7 @@ where
         side: Side,
         limit_price: QuoteCurrency<I, D>,
         quantity: BaseOrQuote,
-    ) -> Result<Self, OrderError<I, D>> {
+    ) -> Result<Self, OrderError> {
         if limit_price <= QuoteCurrency::zero() {
             return Err(OrderError::LimitPriceLTEZero);
         }
@@ -124,7 +124,7 @@ where
         limit_price: QuoteCurrency<I, D>,
         quantity: BaseOrQuote,
         user_order_id: UserOrderId,
-    ) -> Result<Self, OrderError<I, D>> {
+    ) -> Result<Self, OrderError> {
         if limit_price <= QuoteCurrency::zero() {
             return Err(OrderError::LimitPriceLTEZero);
         }

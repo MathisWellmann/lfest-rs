@@ -388,8 +388,8 @@ fn submit_limit_buy_order_above_ask() {
         exchange.submit_limit_order(order),
         Err(Error::OrderError(
             OrderError::GoodTillCrossingRejectedOrder {
-                limit_price: QuoteCurrency::new(100, 0),
-                away_market_quotation_price: QuoteCurrency::new(100, 0)
+                limit_price: QuoteCurrency::<i64, 5>::new(100, 0).to_string(),
+                away_market_quotation_price: QuoteCurrency::<i64, 5>::new(100, 0).to_string()
             }
         ))
     );

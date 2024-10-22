@@ -113,11 +113,11 @@ where
     fn create_margin_transfer(
         &mut self,
         _transaction: Transaction<I, D, BaseOrQuote>,
-    ) -> Result<(), I, D> {
+    ) -> Result<()> {
         Ok(())
     }
 
-    fn margin_balance_of(&self, _account: AccountId) -> Result<BaseOrQuote, I, D> {
+    fn margin_balance_of(&self, _account: AccountId) -> Result<BaseOrQuote> {
         Ok(BaseOrQuote::zero())
     }
 }

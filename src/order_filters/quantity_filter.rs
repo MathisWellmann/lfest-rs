@@ -75,7 +75,7 @@ where
     pub(crate) fn validate_order_quantity(
         &self,
         quantity: BaseOrQuote,
-    ) -> std::result::Result<(), OrderError<I, D>> {
+    ) -> std::result::Result<(), OrderError> {
         if quantity == BaseOrQuote::zero() {
             return Err(OrderError::QuantityTooLow);
         }

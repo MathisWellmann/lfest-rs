@@ -1,12 +1,7 @@
-use crate::prelude::{Mon, QuoteCurrency};
-
 /// Defines the possible order errors that can occur when submitting a new order
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[allow(missing_docs)]
-pub enum OrderError<I, const D: u8>
-where
-    I: Mon<D>,
-{
+pub enum OrderError {
     #[error("The limit order price is lower than the low price multiple.")]
     LimitPriceBelowMultiple,
 
@@ -24,8 +19,8 @@ where
 
     #[error("The limit order `RePricing` was `GoodTillCrossing` leading to its rejection as the limit_price {limit_price} locks or crosses the away market quotation price {away_market_quotation_price}")]
     GoodTillCrossingRejectedOrder {
-        limit_price: QuoteCurrency<I, D>,
-        away_market_quotation_price: QuoteCurrency<I, D>,
+        limit_price: String,
+        away_market_quotation_price: String,
     },
 
     #[error("The order price does not conform to the step size.")]

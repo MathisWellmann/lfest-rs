@@ -199,8 +199,8 @@ fn submit_limit_sell_order_below_bid() {
         exchange.submit_limit_order(order),
         Err(Error::OrderError(
             OrderError::GoodTillCrossingRejectedOrder {
-                limit_price: QuoteCurrency::new(99, 0),
-                away_market_quotation_price: QuoteCurrency::new(99, 0)
+                limit_price: QuoteCurrency::<i64, 5>::new(99, 0).to_string(),
+                away_market_quotation_price: QuoteCurrency::<i64, 5>::new(99, 0).to_string()
             }
         ))
     );

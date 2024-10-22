@@ -52,7 +52,7 @@ where
     ///
     /// # Returns:
     /// Either a successfully created instance or an [`OrderError`]
-    pub fn new(side: Side, quantity: BaseOrQuote) -> Result<Self, OrderError<I, D>> {
+    pub fn new(side: Side, quantity: BaseOrQuote) -> Result<Self, OrderError> {
         if quantity <= BaseOrQuote::zero() {
             return Err(OrderError::OrderQuantityLTEZero);
         }
@@ -78,7 +78,7 @@ where
         side: Side,
         quantity: BaseOrQuote,
         user_order_id: UserOrderId,
-    ) -> Result<Self, OrderError<I, D>> {
+    ) -> Result<Self, OrderError> {
         if quantity <= BaseOrQuote::zero() {
             return Err(OrderError::OrderQuantityLTEZero);
         }

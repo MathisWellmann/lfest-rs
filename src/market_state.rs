@@ -48,7 +48,7 @@ where
         timestamp_ns: TimestampNs,
         market_update: &U,
         price_filter: &PriceFilter<I, D>,
-    ) -> Result<(), I, D>
+    ) -> Result<()>
     where
         U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
         BaseOrQuote: Currency<I, D>,

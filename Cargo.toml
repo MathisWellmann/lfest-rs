@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.79.0"
+version = "0.80.0"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2021"
 license-file = "LICENSE"
@@ -18,10 +18,10 @@ serde = { version = "1", features = ["derive"] }
 thiserror = "1"
 hashbrown = "0.15"
 derive_more = { version = "1", features = ["full"] }
-const-decimal = { version = "0.3", git = "https://github.com/OliverNChalk/const-decimal", rev = "47fe246", features = [
-  "serde",
-] }
-# const-decimal = { path = "../const-decimal", features = ["serde"] }
+# const-decimal = { version = "0.3", git = "https://github.com/OliverNChalk/const-decimal", rev = "47fe246", features = [
+#   "serde",
+# ] }
+const-decimal = { path = "../const-decimal", features = ["serde"] }
 distrs = "0.2"
 num-traits = "0.2"
 getset = "0.1.2"

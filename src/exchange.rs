@@ -173,7 +173,7 @@ where
         &mut self,
         timestamp_ns: TimestampNs,
         market_update: &U,
-    ) -> Result<Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>, I, D>
+    ) -> Result<Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>>
     where
         U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
     {
@@ -234,7 +234,7 @@ where
     pub fn submit_market_order(
         &mut self,
         order: MarketOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>,
-    ) -> Result<MarketOrder<I, D, BaseOrQuote, UserOrderId, Filled<I, D, BaseOrQuote>>, I, D> {
+    ) -> Result<MarketOrder<I, D, BaseOrQuote, UserOrderId, Filled<I, D, BaseOrQuote>>> {
         self.account_tracker.log_market_order_submission();
 
         // Basic checks
@@ -317,7 +317,7 @@ where
     pub fn cancel_order_by_user_id(
         &mut self,
         user_order_id: UserOrderId,
-    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>, I, D> {
+    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
         debug!(
             "cancel_order_by_user_id: user_order_id: {:?}",
             user_order_id
@@ -338,7 +338,7 @@ where
     pub fn submit_limit_order(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>,
-    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>, I, D> {
+    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
         trace!("submit_order: {}", order);
 
         // Basic checks
@@ -377,10 +377,10 @@ where
                 if marketable {
                     return Err(Error::OrderError(
                         OrderError::GoodTillCrossingRejectedOrder {
-                            limit_price: order.limit_price(),
+                            limit_price: order.limit_price().to_string(),
                             away_market_quotation_price: match order.side() {
-                                Side::Buy => self.market_state.ask(),
-                                Side::Sell => self.market_state.bid(),
+                                Side::Buy => self.market_state.ask().to_string(),
+                                Side::Sell => self.market_state.bid().to_string(),
                             },
                         },
                     ));
@@ -404,7 +404,7 @@ where
         &mut self,
         existing_order_id: OrderId,
         mut new_order: LimitOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>,
-    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>, I, D> {
+    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
         let existing_order = self
             .active_limit_orders
             .get(&existing_order_id)
@@ -510,7 +510,7 @@ where
     pub fn cancel_limit_order(
         &mut self,
         order_id: OrderId,
-    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>, I, D> {
+    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
         debug!("cancel_order: {}", order_id);
         let order_margin = self
             .transaction_accounting

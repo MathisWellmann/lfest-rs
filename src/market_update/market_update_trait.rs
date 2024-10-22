@@ -19,7 +19,7 @@ where
     ) -> Option<BaseOrQuote>;
 
     /// Checks if the market update satisfies the `PriceFilter`.
-    fn validate_market_update(&self, price_filter: &PriceFilter<I, D>) -> Result<(), I, D>;
+    fn validate_market_update(&self, price_filter: &PriceFilter<I, D>) -> Result<()>;
 
     /// Update the `MarketState` with new information.
     fn update_market_state(&self, market_state: &mut MarketState<I, D>);

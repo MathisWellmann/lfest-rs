@@ -56,7 +56,7 @@ where
     fn create_margin_transfer(
         &mut self,
         transaction: Transaction<I, D, BaseOrQuote>,
-    ) -> Result<(), I, D> {
+    ) -> Result<()> {
         trace!("create_margin_transfer: {transaction:?}");
         let mut debit_account = self
             .margin_accounts
@@ -79,7 +79,7 @@ where
         Ok(())
     }
 
-    fn margin_balance_of(&self, account: AccountId) -> Result<BaseOrQuote, I, D> {
+    fn margin_balance_of(&self, account: AccountId) -> Result<BaseOrQuote> {
         self.margin_accounts
             .get(account)
             .ok_or(Error::AccountLookupFailure)

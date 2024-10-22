@@ -18,13 +18,11 @@ where
     fn new(user_starting_wallet_balance: BaseOrQuote) -> Self;
 
     /// Transfers a margin balance from one account to another.
-    fn create_margin_transfer(
-        &mut self,
-        transaction: Transaction<I, D, BaseOrQuote>,
-    ) -> Result<(), I, D>;
+    fn create_margin_transfer(&mut self, transaction: Transaction<I, D, BaseOrQuote>)
+        -> Result<()>;
 
     /// Query a balance of an account denoted in the margin currency.
-    fn margin_balance_of(&self, account: AccountId) -> Result<BaseOrQuote, I, D>;
+    fn margin_balance_of(&self, account: AccountId) -> Result<BaseOrQuote>;
 }
 
 /// The identifier of an account in the accounting infrastructure.

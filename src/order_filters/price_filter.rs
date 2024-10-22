@@ -99,7 +99,7 @@ where
         &self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>,
         mark_price: QuoteCurrency<I, D>,
-    ) -> Result<(), OrderError<I, D>>
+    ) -> Result<(), OrderError>
     where
         BaseOrQuote: Currency<I, D>,
         UserOrderId: Clone,
@@ -144,7 +144,7 @@ where
 pub(crate) fn enforce_bid_ask_spread<I, const D: u8>(
     bid: QuoteCurrency<I, D>,
     ask: QuoteCurrency<I, D>,
-) -> Result<(), FilterError<I, D>>
+) -> Result<(), FilterError>
 where
     I: Mon<D>,
 {
@@ -159,7 +159,7 @@ where
 pub(crate) fn enforce_min_price<I, const D: u8>(
     min_price: Option<QuoteCurrency<I, D>>,
     price: QuoteCurrency<I, D>,
-) -> Result<(), FilterError<I, D>>
+) -> Result<(), FilterError>
 where
     I: Mon<D>,
 {
@@ -176,7 +176,7 @@ where
 pub(crate) fn enforce_max_price<I, const D: u8>(
     max_price: Option<QuoteCurrency<I, D>>,
     price: QuoteCurrency<I, D>,
-) -> Result<(), FilterError<I, D>>
+) -> Result<(), FilterError>
 where
     I: Mon<D>,
 {
@@ -192,12 +192,15 @@ where
 pub(crate) fn enforce_step_size<I, const D: u8>(
     step_size: QuoteCurrency<I, D>,
     price: QuoteCurrency<I, D>,
-) -> Result<(), FilterError<I, D>>
+) -> Result<(), FilterError>
 where
     I: Mon<D>,
 {
     if (price % step_size) != QuoteCurrency::zero() {
-        return Err(FilterError::MarketUpdatePriceStepSize { price, step_size });
+        return Err(FilterError::MarketUpdatePriceStepSize {
+            price: price.to_string(),
+            step_size: step_size.to_string(),
+        });
     }
     Ok(())
 }

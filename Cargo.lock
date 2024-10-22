@@ -328,7 +328,6 @@ checksum = "1462739cb27611015575c0c11df5df7601141071f07518d56fcc1be504cbec97"
 [[package]]
 name = "const-decimal"
 version = "0.3.0"
-source = "git+https://github.com/OliverNChalk/const-decimal?rev=47fe246#47fe2469d8702de5c3136c45a60d503124617d58"
 dependencies = [
  "num-traits",
  "paste",
@@ -727,7 +726,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lfest"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "assert2",
  "const-decimal",
