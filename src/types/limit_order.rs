@@ -288,6 +288,7 @@ where
     }
 
     /// Get the order id assigned by the exchange.
+    #[inline]
     pub fn id(&self) -> OrderId {
         self.state().meta().id()
     }
@@ -374,6 +375,18 @@ mod tests {
         assert_eq!(
             std::mem::size_of::<LimitOrder<i32, 2, BaseCurrency<i32, 2>, i32, NewOrder>>(),
             16
+        );
+        assert_eq!(
+            std::mem::size_of::<
+                LimitOrder<
+                    i64,
+                    2,
+                    BaseCurrency<i64, 2>,
+                    i64,
+                    Pending<i64, 2, BaseCurrency<i64, 2>>,
+                >,
+            >(),
+            72
         );
     }
 }

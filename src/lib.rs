@@ -9,6 +9,7 @@ extern crate serde;
 
 pub mod account_tracker;
 mod accounting;
+mod active_limit_orders;
 mod config;
 mod contract_specification;
 mod exchange;
@@ -37,10 +38,11 @@ pub mod prelude {
     pub use crate::{
         account_tracker::{AccountTracker, FullAccountTracker, NoAccountTracker},
         accounting::*,
+        active_limit_orders::ActiveLimitOrders,
         bba,
         config::Config,
         contract_specification::*,
-        exchange::{Account, ActiveLimitOrders, Exchange},
+        exchange::{Account, Exchange},
         leverage,
         market_state::MarketState,
         market_update::*,

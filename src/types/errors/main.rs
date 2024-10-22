@@ -37,4 +37,7 @@ pub enum Error {
 
     #[error("The constant decimal precision is incompatible")]
     WrongDecimalPrecision,
+
+    #[error("The maximum number of active orders is reached")]
+    MaxNumberOfActiveOrders,
 }

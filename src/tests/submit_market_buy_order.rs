@@ -1,5 +1,3 @@
-use hashbrown::HashMap;
-
 use crate::{
     mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, test_fee_taker,
 };
@@ -101,7 +99,10 @@ fn submit_market_buy_order_with_long_position() {
             fee0,
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
+    assert_eq!(
+        exchange.active_limit_orders(),
+        &ActiveLimitOrders::default()
+    );
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
@@ -135,7 +136,10 @@ fn submit_market_buy_order_with_long_position() {
             fees,
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
+    assert_eq!(
+        exchange.active_limit_orders(),
+        &ActiveLimitOrders::default()
+    );
 }
 
 #[test]
@@ -176,7 +180,10 @@ fn submit_market_buy_order_with_short_position() {
             fee0,
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
+    assert_eq!(
+        exchange.active_limit_orders(),
+        &ActiveLimitOrders::default()
+    );
 
     // Now close the position with a buy order
     let order = MarketOrder::new(Side::Buy, BaseCurrency::new(9, 0)).unwrap();

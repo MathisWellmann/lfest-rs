@@ -6,10 +6,10 @@ use num_traits::{One, Zero};
 use tracing::trace;
 
 use crate::{
-    exchange::ActiveLimitOrders,
-    prelude::{Currency, Mon, OrderId, Position},
-    types::{LimitOrder, MarginCurrency, Pending, Side},
+    prelude::{ActiveLimitOrders, Currency, Mon, OrderId, Position},
+    types::{LimitOrder, MarginCurrency, Pending, Side, UserOrderIdT},
     utils::{max, min},
+    Result,
 };
 
 /// An implementation for computing the order margin online, aka with every change to the active orders.
@@ -18,7 +18,7 @@ pub(crate) struct OrderMargin<I, const D: u8, BaseOrQuote, UserOrderId>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: Clone + Default,
+    UserOrderId: UserOrderIdT,
 {
     #[getset(get = "pub(crate)")]
     active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>,
@@ -29,15 +29,15 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: Clone + std::fmt::Debug + std::cmp::PartialEq + Default,
+    UserOrderId: UserOrderIdT,
 {
     pub(crate) fn update(
         &mut self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
-    ) {
+    ) -> Result<()> {
         assert!(order.remaining_quantity() > BaseOrQuote::zero());
         trace!("update_order: order: {order:?}");
-        if let Some(active_order) = self.active_limit_orders.insert(order.id(), order.clone()) {
+        if let Some(active_order) = self.active_limit_orders.insert(order.clone())? {
             assert_ne!(
                 &active_order, order,
                 "An update to an order should not be the same as the existing one"
@@ -49,12 +49,13 @@ where
             let removed_qty = active_order.remaining_quantity() - order.remaining_quantity();
             assert!(removed_qty > BaseOrQuote::zero());
         }
+        Ok(())
     }
 
     /// Remove an order from being tracked for margin purposes.
     pub(crate) fn remove(&mut self, order_id: OrderId) {
         self.active_limit_orders
-            .remove(&order_id)
+            .remove(order_id)
             .expect("Its an internal method call; it must work");
     }
 
@@ -145,7 +146,7 @@ where
         position: &Position<I, D, BaseOrQuote>,
     ) -> BaseOrQuote::PairedCurrency {
         let mut active_orders = self.active_limit_orders.clone();
-        assert!(active_orders.insert(order.id(), order.clone()).is_none());
+        assert!(active_orders.insert(order.clone()).is_ok());
         Self::order_margin_internal(&active_orders, init_margin_req, position)
     }
 }
@@ -250,7 +251,9 @@ mod tests {
                 ExchangeOrderMeta::new((i as u64).into(), Into::<TimestampNs>::into(i as i64));
             order.into_pending(meta)
         }));
-        orders.iter().for_each(|order| order_margin.update(&order));
+        orders
+            .iter()
+            .for_each(|order| order_margin.update(&order).unwrap());
 
         let mult = QuoteCurrency::new(n as _, 0);
         assert_eq!(
@@ -300,7 +303,7 @@ mod tests {
             order.into_pending(meta)
         }));
         buy_orders.iter().for_each(|order| {
-            order_margin.update(&order);
+            order_margin.update(&order).unwrap();
         });
 
         let sell_orders = Vec::from_iter((0..n).map(|i| {
@@ -309,7 +312,7 @@ mod tests {
             order.into_pending(meta)
         }));
         sell_orders.iter().for_each(|order| {
-            order_margin.update(&order);
+            order_margin.update(&order).unwrap();
         });
 
         let mult = QuoteCurrency::new(n as _, 0);
@@ -361,7 +364,7 @@ mod tests {
         let order = LimitOrder::new(side, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
 
         let mut accounting = MockTransactionAccounting::default();
         let pos_entry_price = QuoteCurrency::new(pos_entry_price, 0);
@@ -412,12 +415,12 @@ mod tests {
         let order = LimitOrder::new(side, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let mut order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
 
         // Now partially fill the order
         let filled_qty = qty / BaseCurrency::new(2, 0);
         assert!(order.fill(filled_qty, 0.into()).is_none());
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
 
         let remaining_qty = order.remaining_quantity();
         assert_eq!(remaining_qty, filled_qty);
@@ -444,7 +447,7 @@ mod tests {
         let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(90, 0)
@@ -454,7 +457,7 @@ mod tests {
         let order = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(1.into(), 0.into());
         let order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(100, 0)
@@ -465,7 +468,7 @@ mod tests {
         let order = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(2.into(), 0.into());
         let order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(220, 0)
@@ -502,7 +505,7 @@ mod tests {
         let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(90, 0)
@@ -512,7 +515,7 @@ mod tests {
         let order = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(1.into(), 0.into());
         let order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(90, 0)
@@ -522,7 +525,7 @@ mod tests {
         let order = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(2.into(), 0.into());
         let order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(120, 0)
@@ -532,7 +535,7 @@ mod tests {
         let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(3.into(), 0.into());
         let order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(185, 0)
@@ -568,7 +571,7 @@ mod tests {
         let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::zero()
@@ -578,7 +581,7 @@ mod tests {
         let order = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(1.into(), 0.into());
         let order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(100, 0)
@@ -588,7 +591,7 @@ mod tests {
         let order = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(2.into(), 0.into());
         let order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(220, 0)
@@ -598,7 +601,7 @@ mod tests {
         let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(3.into(), 0.into());
         let order = order.into_pending(meta);
-        order_margin.update(&order);
+        order_margin.update(&order).unwrap();
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(220, 0)

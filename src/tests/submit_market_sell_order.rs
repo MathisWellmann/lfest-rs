@@ -1,5 +1,3 @@
-use hashbrown::HashMap;
-
 use crate::{
     mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, test_fee_taker,
 };
@@ -106,7 +104,10 @@ fn submit_market_sell_order_with_short_position() {
             fee0,
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
+    assert_eq!(
+        exchange.active_limit_orders(),
+        &ActiveLimitOrders::default()
+    );
 
     // Sell again
     let order = MarketOrder::new(Side::Sell, BaseCurrency::new(4, 0)).unwrap();
@@ -130,7 +131,10 @@ fn submit_market_sell_order_with_short_position() {
             fee0 + fee1
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
+    assert_eq!(
+        exchange.active_limit_orders(),
+        &ActiveLimitOrders::default()
+    );
 }
 
 #[test]
@@ -205,7 +209,10 @@ fn submit_market_sell_order_turnaround_long() {
             fee0,
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
+    assert_eq!(
+        exchange.active_limit_orders(),
+        &ActiveLimitOrders::default()
+    );
 
     // Now reverse the position
     let qty = BaseCurrency::new(18, 0);
@@ -231,5 +238,8 @@ fn submit_market_sell_order_turnaround_long() {
             QuoteCurrency::new(0, 0),
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &HashMap::default());
+    assert_eq!(
+        exchange.active_limit_orders(),
+        &ActiveLimitOrders::default()
+    );
 }

@@ -22,7 +22,7 @@ fn cancel_limit_order() {
 
     assert_eq!(exchange.active_limit_orders().len(), 1);
     assert_eq!(
-        exchange.active_limit_orders().get(&order_id).unwrap(),
+        exchange.active_limit_orders().get(order_id).unwrap(),
         &expected_order
     );
     assert_eq!(

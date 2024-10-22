@@ -6,7 +6,7 @@ use crate::{
     market_state::MarketState,
     order_margin::OrderMargin,
     prelude::{Currency, Mon, Position, QuoteCurrency, RiskError},
-    types::{LimitOrder, MarginCurrency, MarketOrder, Pending, Side},
+    types::{LimitOrder, MarginCurrency, MarketOrder, Pending, Side, UserOrderIdT},
 };
 
 #[derive(Debug, Clone)]
@@ -34,7 +34,7 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default,
+    UserOrderId: UserOrderIdT,
 {
     fn check_market_order(
         &self,

@@ -13,9 +13,9 @@ use crate::{
     market_state::MarketState,
     order_margin::OrderMargin,
     prelude::{
-        Currency, MarketUpdate, Mon, OrderError, Position, QuoteCurrency, RePricing, Transaction,
-        EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT,
-        USER_WALLET_ACCOUNT,
+        ActiveLimitOrders, Currency, MarketUpdate, Mon, OrderError, Position, QuoteCurrency,
+        RePricing, Transaction, EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT,
+        USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
     },
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     sample_returns_trigger::SampleReturnsTrigger,
@@ -26,15 +26,6 @@ use crate::{
     },
     utils::assert_user_wallet_balance,
 };
-
-/// The datatype that holds the active limit orders of a user.
-/// Generics:
-/// - `I`: The numeric data type of currencies.
-/// - `D`: The constant decimal precision of the currency.
-/// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
-/// - `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
-pub type ActiveLimitOrders<I, const D: u8, BaseOrQuote, UserOrderId> =
-    HashMap<OrderId, LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>;
 
 /// Relevant information about the traders account.
 ///
@@ -49,7 +40,7 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: Clone,
+    UserOrderId: UserOrderIdT,
 {
     /// tracks the performance of the account
     pub account_tracker: &'a A,
@@ -68,7 +59,7 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default,
+    UserOrderId: UserOrderIdT,
 {
     /// The exchange configuration.
     #[getset(get = "pub")]
@@ -136,7 +127,8 @@ where
             next_order_id: OrderId::default(),
             transaction_accounting,
             position: Position::default(),
-            active_limit_orders: HashMap::default(),
+            // TODO: two such structs, one for buys, the other for sells.
+            active_limit_orders: ActiveLimitOrders::with_capacity(10_000),
             lookup_order_nonce_from_user_order_id: HashMap::default(),
             order_margin: OrderMargin::default(),
             sample_returns_trigger,
@@ -388,7 +380,7 @@ where
             }
         }
 
-        self.append_limit_order(order.clone(), marketable);
+        self.append_limit_order(order.clone(), marketable)?;
         self.account_tracker.log_limit_order_submission();
 
         Ok(order)
@@ -407,7 +399,7 @@ where
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
         let existing_order = self
             .active_limit_orders
-            .get(&existing_order_id)
+            .get(existing_order_id)
             .ok_or_else(|| {
                 if existing_order_id < self.next_order_id {
                     Error::OrderNoLongerActive
@@ -448,7 +440,7 @@ where
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
         marketable: bool,
-    ) {
+    ) -> Result<()> {
         debug!("append_limit_order: order: {order:?}, marketable: {marketable}");
         debug!(
             "active_limit_orders: {:?}, market_state: {:?}, transaction_accounting: {:?}, position: {:?}",
@@ -460,8 +452,8 @@ where
 
         let order_id = order.id();
         let user_order_id = order.user_order_id().clone();
-        self.order_margin.update(&order);
-        self.active_limit_orders.insert(order_id, order);
+        self.order_margin.update(&order)?;
+        self.active_limit_orders.insert(order)?;
         self.lookup_order_nonce_from_user_order_id
             .insert(user_order_id, order_id);
         let new_order_margin = self.order_margin.order_margin(
@@ -484,7 +476,7 @@ where
                 USER_WALLET_ACCOUNT,
                 order_margin - new_order_margin,
             ),
-            Ordering::Equal => return,
+            Ordering::Equal => return Ok(()),
         };
         self.transaction_accounting
             .create_margin_transfer(transaction)
@@ -503,6 +495,8 @@ where
             true
         });
         assert_user_wallet_balance(&self.transaction_accounting);
+
+        Ok(())
     }
 
     /// Cancel an active limit order.
@@ -523,7 +517,7 @@ where
                 &self.position,
             )
         );
-        let removed_order = self.active_limit_orders.remove(&order_id).ok_or_else(|| {
+        let removed_order = self.active_limit_orders.remove(order_id).ok_or_else(|| {
             if order_id < self.next_order_id {
                 Error::OrderNoLongerActive
             } else {
@@ -572,7 +566,7 @@ where
     pub(crate) fn remove_executed_order_from_active(&mut self, order_id: OrderId) {
         let order = self
             .active_limit_orders
-            .remove(&order_id)
+            .remove(order_id)
             .expect("The order must have been active; qed");
         debug_assert_eq!(order.id(), order_id);
         if let Some(order_id) = self
@@ -649,7 +643,9 @@ where
                 } else {
                     assert!(order.remaining_quantity() > BaseOrQuote::zero());
                     order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
-                    self.order_margin.update(order);
+                    self.order_margin
+                        .update(order)
+                        .expect("Can update an existing order");
                     // TODO: we could potentially log partial fills as well...
                 }
 
@@ -691,11 +687,11 @@ where
             .into_iter()
             .for_each(|id| self.remove_executed_order_from_active(id));
 
-        assert_eq!(
+        debug_assert_eq!(
             self.order_margin.active_limit_orders(),
             &self.active_limit_orders
         );
-        assert!(if self.active_limit_orders.is_empty() {
+        debug_assert!(if self.active_limit_orders.is_empty() {
             self.transaction_accounting
                 .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
                 .expect("is a valid account")
@@ -703,7 +699,7 @@ where
         } else {
             true
         });
-        assert_eq!(
+        debug_assert_eq!(
             self.transaction_accounting
                 .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
                 .expect("is valid"),

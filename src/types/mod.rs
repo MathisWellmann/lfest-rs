@@ -42,12 +42,12 @@ pub struct UserBalances<BaseOrQuote> {
 
 /// A custom user order id must satisfy this trait bound.
 pub trait UserOrderIdT:
-    Clone + Eq + PartialEq + std::hash::Hash + std::fmt::Debug + Default
+    Clone + Copy + Eq + PartialEq + std::hash::Hash + std::fmt::Debug + Default
 {
 }
 
 // Blanket impl
 impl<T> UserOrderIdT for T where
-    T: Clone + Eq + PartialEq + std::hash::Hash + std::fmt::Debug + Default
+    T: Clone + Copy + Eq + PartialEq + std::hash::Hash + std::fmt::Debug + Default
 {
 }
