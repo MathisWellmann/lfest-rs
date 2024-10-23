@@ -52,8 +52,9 @@ where
         self.arena.len()
     }
 
+    /// `true` is there are no active orders.
     #[inline]
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.arena.is_empty()
     }
 
@@ -82,7 +83,7 @@ where
     /// Get a `LimitOrder` by the given `OrderId` if any.
     /// Optimized to be fast for small number of active limit orders.
     #[inline]
-    pub(crate) fn get(
+    pub fn get(
         &self,
         order_id: OrderId,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
@@ -116,8 +117,9 @@ where
         Some(self.arena.swap_remove(pos))
     }
 
+    /// Get an iterator over the active limit orders.
     #[inline]
-    pub(crate) fn values(
+    pub fn values(
         &self,
     ) -> impl Iterator<Item = &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>
     {
