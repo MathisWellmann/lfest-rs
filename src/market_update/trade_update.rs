@@ -76,6 +76,7 @@ where
         Ok(())
     }
 
+    #[inline(always)]
     fn update_market_state(&self, _market_state: &mut MarketState<I, D>) {}
 }
 /// Creates the `Trade` struct used as a `MarketUpdate`.

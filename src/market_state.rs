@@ -54,7 +54,8 @@ where
         BaseOrQuote: Currency<I, D>,
         UserOrderId: UserOrderIdT,
     {
-        market_update.validate_market_update(price_filter)?;
+        // Only in debug mode do we care to validate the market update, because usually the update comes from an exchange source.
+        debug_assert!(market_update.validate_market_update(price_filter).is_ok());
         market_update.update_market_state(self);
 
         self.current_ts_ns = timestamp_ns;

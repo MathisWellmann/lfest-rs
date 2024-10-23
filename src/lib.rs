@@ -42,7 +42,7 @@ pub mod prelude {
         bba,
         config::Config,
         contract_specification::*,
-        exchange::{Account, Exchange},
+        exchange::{Account, CancelBy, Exchange},
         leverage,
         market_state::MarketState,
         market_update::*,

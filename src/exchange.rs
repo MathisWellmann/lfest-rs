@@ -27,6 +27,7 @@ use crate::{
 };
 
 /// Whether to cancel a limit order by its `OrderId` or the `UserOrderId`.
+#[allow(missing_docs)]
 #[derive(Debug, Clone, Copy)]
 pub enum CancelBy<UserOrderId: UserOrderIdT> {
     OrderId(OrderId),
@@ -572,7 +573,7 @@ where
 
         for order in self.active_limit_orders.values_mut() {
             if let Some(filled_qty) = market_update.limit_order_filled(order) {
-                debug!(
+                trace!(
                     "filled limit {} order {}: {filled_qty}/{} @ {}",
                     order.side(),
                     order.id(),
@@ -584,18 +585,11 @@ where
                     "The filled_qty must be greater than zero"
                 );
 
-                trace!(
-                    "market_update: {market_update:?}, market_state: {:?}, transaction_accounting: {:?}, position: {:?}",
-                    self.market_state,
-                    self.transaction_accounting,
-                    self.position,
-                );
-
                 let order_margin = self
                     .transaction_accounting
                     .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
                     .expect("is valid");
-                assert_eq!(
+                debug_assert_eq!(
                     order_margin,
                     self.order_margin.order_margin(
                         self.config.contract_spec().init_margin_req(),
@@ -604,8 +598,6 @@ where
                 );
 
                 if let Some(filled_order) = order.fill(filled_qty, ts_ns) {
-                    trace!("fully filled order {}", order.id());
-
                     ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill();
                     self.order_margin.remove(CancelBy::OrderId(order.id()));
@@ -616,7 +608,6 @@ where
                     self.order_margin
                         .update(order)
                         .expect("Can update an existing order");
-                    // TODO: we could potentially log partial fills as well...
                 }
 
                 let value =
@@ -637,7 +628,6 @@ where
                     self.config.contract_spec().init_margin_req(),
                     &self.position,
                 );
-                trace!("order_margin: {order_margin}, new_order_margin: {new_order_margin}");
                 debug_assert!(
                     new_order_margin <= order_margin,
                     "The order margin does not increase with a filled limit order event."

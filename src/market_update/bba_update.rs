@@ -38,6 +38,7 @@ where
     BaseOrQuote: Currency<I, D>,
     UserOrderId: UserOrderIdT,
 {
+    #[inline(always)]
     fn limit_order_filled(
         &self,
         _limit_order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
@@ -56,6 +57,7 @@ where
         Ok(())
     }
 
+    #[inline]
     fn update_market_state(&self, market_state: &mut MarketState<I, D>) {
         market_state.set_bid(self.bid);
         market_state.set_ask(self.ask);
