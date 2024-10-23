@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// An implementation for computing the order margin online, aka with every change to the active orders.
-#[derive(Debug, Clone, Default, CopyGetters, Getters)]
+#[derive(Debug, Clone, CopyGetters, Getters)]
 pub(crate) struct OrderMargin<I, const D: u8, BaseOrQuote, UserOrderId>
 where
     I: Mon<D>,
@@ -31,6 +31,11 @@ where
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderId: UserOrderIdT,
 {
+    pub(crate) fn new(max_active_orders: usize) -> Self {
+        Self {
+            active_limit_orders: ActiveLimitOrders::new(max_active_orders),
+        }
+    }
     pub(crate) fn update(
         &mut self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
@@ -65,7 +70,7 @@ where
         init_margin_req: Decimal<I, D>,
         position: &Position<I, D, BaseOrQuote>,
     ) -> BaseOrQuote::PairedCurrency {
-        Self::order_margin_internal(&self.active_limit_orders, init_margin_req, position)
+        Self::order_margin_internal(&self.active_limit_orders, init_margin_req, position, None)
     }
 
     /// The margin requirement for all the tracked orders.
@@ -73,6 +78,9 @@ where
         active_limit_orders: &ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>,
         init_margin_req: Decimal<I, D>,
         position: &Position<I, D, BaseOrQuote>,
+        opt_new_order: Option<
+            &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        >,
     ) -> BaseOrQuote::PairedCurrency {
         debug_assert!(init_margin_req <= Decimal::one());
         trace!("order_margin_internal: position: {position:?}, active_limit_orders: {active_limit_orders:?}");
@@ -83,7 +91,6 @@ where
                 .filter(|order| matches!(order.side(), Side::Buy))
                 .map(|order| (order.limit_price(), order.remaining_quantity())),
         );
-        buy_orders.sort_by_key(|order| order.0.neg());
 
         let mut sell_orders = Vec::from_iter(
             active_limit_orders
@@ -91,6 +98,17 @@ where
                 .filter(|order| matches!(order.side(), Side::Sell))
                 .map(|order| (order.limit_price(), order.remaining_quantity())),
         );
+        if let Some(new_order) = opt_new_order {
+            match new_order.side() {
+                Side::Buy => {
+                    buy_orders.push((new_order.limit_price(), new_order.remaining_quantity()))
+                }
+                Side::Sell => {
+                    sell_orders.push((new_order.limit_price(), new_order.remaining_quantity()))
+                }
+            }
+        }
+        buy_orders.sort_by_key(|order| order.0.neg());
         sell_orders.sort_by_key(|order| order.0);
 
         match position {
@@ -145,9 +163,12 @@ where
         init_margin_req: Decimal<I, D>,
         position: &Position<I, D, BaseOrQuote>,
     ) -> BaseOrQuote::PairedCurrency {
-        let mut active_orders = self.active_limit_orders.clone();
-        assert!(active_orders.insert(order.clone()).is_ok());
-        Self::order_margin_internal(&active_orders, init_margin_req, position)
+        Self::order_margin_internal(
+            &self.active_limit_orders,
+            init_margin_req,
+            position,
+            Some(order),
+        )
     }
 }
 
@@ -161,7 +182,7 @@ mod tests {
     )]
     #[tracing_test::traced_test]
     fn order_margin_neutral_no_orders(leverage: u8) {
-        let order_margin = OrderMargin::<_, 4, _, ()>::default();
+        let order_margin = OrderMargin::<_, 4, _, ()>::new(10);
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -178,7 +199,7 @@ mod tests {
         [100, 200, 300]
     )]
     fn order_margin_long_no_orders(leverage: u8, position_qty: i32, entry_price: i32) {
-        let order_margin = OrderMargin::<_, 4, _, ()>::default();
+        let order_margin = OrderMargin::<_, 4, _, ()>::new(10);
 
         let mut accounting = MockTransactionAccounting::default();
         let qty = BaseCurrency::new(position_qty, 0);
@@ -204,7 +225,7 @@ mod tests {
         [100, 200, 300]
     )]
     fn order_margin_short_no_orders(leverage: u8, position_qty: i32, entry_price: i32) {
-        let order_margin = OrderMargin::<_, 4, _, ()>::default();
+        let order_margin = OrderMargin::<_, 4, _, ()>::new(10);
 
         let mut accounting = MockTransactionAccounting::default();
         let qty = BaseCurrency::new(position_qty, 0);
@@ -238,7 +259,7 @@ mod tests {
         qty: i32,
         n: usize,
     ) {
-        let mut order_margin = OrderMargin::<_, 4, _, ()>::default();
+        let mut order_margin = OrderMargin::<_, 4, _, ()>::new(10);
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -290,7 +311,7 @@ mod tests {
         qty: i32,
         n: usize,
     ) {
-        let mut order_margin = OrderMargin::<_, 4, _, ()>::default();
+        let mut order_margin = OrderMargin::<_, 4, _, ()>::new(10);
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -354,7 +375,7 @@ mod tests {
         qty: i32,
         pos_entry_price: i32,
     ) {
-        let mut order_margin = OrderMargin::<_, 4, _, ()>::default();
+        let mut order_margin = OrderMargin::<_, 4, _, ()>::new(10);
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -405,7 +426,7 @@ mod tests {
         limit_price: i32,
         qty: i32,
     ) {
-        let mut order_margin = OrderMargin::<_, DECIMALS, _, ()>::default();
+        let mut order_margin = OrderMargin::<_, DECIMALS, _, ()>::new(10);
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -435,7 +456,7 @@ mod tests {
     fn order_margin_no_position() {
         let position = Position::default();
         let init_margin_req = Decimal::one();
-        let mut order_margin = OrderMargin::default();
+        let mut order_margin = OrderMargin::new(10);
 
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
@@ -480,7 +501,7 @@ mod tests {
     fn order_margin_with_long() {
         let mut accounting =
             InMemoryTransactionAccounting::new(QuoteCurrency::<i64, DECIMALS>::new(1000, 0));
-        let mut order_margin = OrderMargin::default();
+        let mut order_margin = OrderMargin::new(10);
         let init_margin_req = Decimal::one();
 
         let qty = BaseCurrency::new(1, 0);
@@ -546,7 +567,7 @@ mod tests {
     #[tracing_test::traced_test]
     fn order_margin_with_short() {
         let mut accounting = InMemoryTransactionAccounting::new(QuoteCurrency::new(1000, 0));
-        let mut order_margin = OrderMargin::default();
+        let mut order_margin = OrderMargin::new(10);
         let init_margin_req = Decimal::one();
 
         let qty = BaseCurrency::<i64, DECIMALS>::one();

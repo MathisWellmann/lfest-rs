@@ -1,4 +1,6 @@
-use crate::types::{Currency, LimitOrder, MarginCurrency, Mon, OrderId, Pending, UserOrderIdT};
+use crate::types::{
+    Currency, Error, LimitOrder, MarginCurrency, Mon, OrderId, Pending, UserOrderIdT,
+};
 
 /// The datatype that holds the active limit orders of a user.
 /// faster than `hashbrown::HashMap` and optimized for small number of active orders.
@@ -20,18 +22,6 @@ where
     arena: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>,
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderId> Default
-    for ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>
-where
-    I: Mon<D>,
-    BaseOrQuote: Currency<I, D>,
-    UserOrderId: UserOrderIdT,
-{
-    fn default() -> Self {
-        Self { arena: Vec::new() }
-    }
-}
-
 impl<I, const D: u8, BaseOrQuote, UserOrderId> ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>
 where
     I: Mon<D>,
@@ -40,9 +30,9 @@ where
     UserOrderId: UserOrderIdT,
 {
     #[inline]
-    pub(crate) fn with_capacity(cap: usize) -> Self {
+    pub(crate) fn new(max_active_orders: usize) -> Self {
         Self {
-            arena: Vec::with_capacity(cap),
+            arena: Vec::with_capacity(max_active_orders),
         }
     }
 
@@ -62,6 +52,7 @@ where
     /// Optimized for small number of active orders.
     /// If we did not have this key present, `Ok(None)` is returned.
     /// If we did have this key present, the value is updated, and the old value is returned.
+    #[inline(always)]
     pub(crate) fn insert(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
@@ -75,6 +66,9 @@ where
             return Ok(Some(out));
         }
 
+        if self.arena.len() >= self.arena.capacity() {
+            return Err(Error::MaxNumberOfActiveOrders);
+        }
         self.arena.push(order);
 
         Ok(None)
@@ -82,7 +76,7 @@ where
 
     /// Get a `LimitOrder` by the given `OrderId` if any.
     /// Optimized to be fast for small number of active limit orders.
-    #[inline]
+    #[inline(always)]
     pub fn get(
         &self,
         order_id: OrderId,
@@ -92,7 +86,7 @@ where
 
     /// Get a `LimitOrder` by the given `OrderId` if any.
     /// Optimized to be fast for small number of active limit orders.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn get_mut(
         &mut self,
         order_id: OrderId,
@@ -102,7 +96,7 @@ where
 
     /// Remove an active `LimitOrder` based on its `OrderId`.
     /// Optimized for small number of active orders.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn remove(
         &mut self,
         order_id: OrderId,
@@ -118,7 +112,7 @@ where
     }
 
     /// Get an iterator over the active limit orders.
-    #[inline]
+    #[inline(always)]
     pub fn values(
         &self,
     ) -> impl Iterator<Item = &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>
@@ -126,7 +120,7 @@ where
         self.arena.iter()
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn values_mut(
         &mut self,
     ) -> impl Iterator<Item = &mut LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>
@@ -148,8 +142,8 @@ mod tests {
     }
 
     #[test]
-    fn active_limit_orders_insert() {
-        let mut alo = ActiveLimitOrders::default();
+    fn active_limit_orders() {
+        let mut alo = ActiveLimitOrders::new(3);
         let order = LimitOrder::new(
             Side::Buy,
             QuoteCurrency::<i64, 5>::new(100, 0),
@@ -157,8 +151,48 @@ mod tests {
         )
         .unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
-        let order = order.into_pending(meta);
-        alo.insert(order).unwrap();
-        todo!()
+        let mut order = order.into_pending(meta);
+        alo.insert(order.clone()).unwrap();
+
+        assert_eq!(alo.len(), 1);
+        assert_eq!(alo.arena[0], order);
+        assert_eq!(alo.get(0.into()), Some(&order));
+        assert_eq!(alo.get_mut(0.into()), Some(&mut order));
+        let removed = alo.remove(0.into()).unwrap();
+        assert_eq!(removed, order);
+        assert!(alo.is_empty());
+
+        let order_1 = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::<i64, 5>::new(200, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(1.into(), 1.into());
+        let mut order_1 = order_1.into_pending(meta);
+        alo.insert(order_1.clone()).unwrap();
+        assert_eq!(alo.len(), 1);
+        assert_eq!(alo.arena[0], order_1);
+        assert!(alo.get(0.into()).is_none());
+        assert!(alo.get_mut(0.into()).is_none());
+        assert_eq!(alo.get(1.into()), Some(&order_1));
+        assert_eq!(alo.get_mut(1.into()), Some(&mut order_1));
+        let removed = alo.remove(1.into()).unwrap();
+        assert_eq!(removed, order_1);
+        assert!(alo.is_empty());
+
+        for i in 2..5 {
+            let order = LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::<i64, 5>::new(200, 0),
+                BaseCurrency::new(1, 0),
+            )
+            .unwrap();
+            let meta = ExchangeOrderMeta::new(i.into(), 3.into());
+            let order = order.into_pending(meta);
+            alo.insert(order.clone()).unwrap();
+        }
+        assert_eq!(alo.len(), 3);
+        assert!(alo.insert(order_1).is_err());
     }
 }

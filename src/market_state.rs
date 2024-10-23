@@ -3,7 +3,7 @@ use getset::{CopyGetters, Getters, Setters};
 
 use crate::{
     prelude::{Currency, MarketUpdate, Mon, PriceFilter, QuoteCurrency},
-    types::{Result, TimestampNs},
+    types::{Result, TimestampNs, UserOrderIdT},
 };
 
 /// Some information regarding the state of the market.
@@ -52,7 +52,7 @@ where
     where
         U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
         BaseOrQuote: Currency<I, D>,
-        UserOrderId: Clone,
+        UserOrderId: UserOrderIdT,
     {
         market_update.validate_market_update(price_filter)?;
         market_update.update_market_state(self);

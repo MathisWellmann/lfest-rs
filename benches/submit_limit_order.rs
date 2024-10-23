@@ -92,17 +92,6 @@ fn criterion_benchmark(c: &mut Criterion) {
             )
         })
     });
-
-    let n: usize = 1000;
-    group.throughput(criterion::Throughput::Elements(n as u64));
-    group.bench_function(&format!("submit_limit_order_{n}"), |b| {
-        b.iter(|| {
-            submit_limit_orders::<Trade<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>>(
-                black_box(&order),
-                n,
-            )
-        })
-    });
 }
 
 criterion_group!(benches, criterion_benchmark);

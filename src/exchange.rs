@@ -91,6 +91,7 @@ where
     active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>,
 
     // Maps the `user_order_id` to the internal order nonce.
+    #[deprecated] // TODO: just do linear search in `ActiveLimitOrders`
     lookup_order_nonce_from_user_order_id: HashMap<UserOrderId, OrderId>,
 
     order_margin: OrderMargin<I, D, BaseOrQuote, UserOrderId>,
@@ -119,6 +120,7 @@ where
         let sample_returns_trigger = SampleReturnsTrigger::new(Into::<TimestampNs>::into(
             config.sample_returns_every_n_seconds() as i64 * 1_000_000_000,
         ));
+        let max_active_orders = config.max_num_open_orders();
         Self {
             config,
             market_state,
@@ -128,9 +130,9 @@ where
             transaction_accounting,
             position: Position::default(),
             // TODO: two such structs, one for buys, the other for sells.
-            active_limit_orders: ActiveLimitOrders::with_capacity(10_000),
+            active_limit_orders: ActiveLimitOrders::new(10_000),
             lookup_order_nonce_from_user_order_id: HashMap::default(),
-            order_margin: OrderMargin::default(),
+            order_margin: OrderMargin::new(max_active_orders),
             sample_returns_trigger,
         }
     }
@@ -587,15 +589,12 @@ where
     where
         U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
     {
-        assert_eq!(
+        debug_assert_eq!(
             self.order_margin.active_limit_orders(),
             &self.active_limit_orders
         );
-        let mut order_updates = Vec::new();
-        let mut ids_to_remove = Vec::new();
-
-        // TODO: remove, its for debugging
-        let alo = self.active_limit_orders.clone();
+        let mut order_updates = Vec::with_capacity(1);
+        let mut ids_to_remove = Vec::with_capacity(1);
 
         for order in self.active_limit_orders.values_mut() {
             if let Some(filled_qty) = market_update.limit_order_filled(order) {
@@ -606,13 +605,13 @@ where
                     order.remaining_quantity(),
                     order.limit_price()
                 );
-                assert!(
+                debug_assert!(
                     filled_qty > BaseOrQuote::zero(),
                     "The filled_qty must be greater than zero"
                 );
 
-                debug!(
-                    "market_update: {market_update:?}, active_limit_orders: {alo:?}, market_state: {:?}, transaction_accounting: {:?}, position: {:?}",
+                trace!(
+                    "market_update: {market_update:?}, market_state: {:?}, transaction_accounting: {:?}, position: {:?}",
                     self.market_state,
                     self.transaction_accounting,
                     self.position,
@@ -631,7 +630,7 @@ where
                 );
 
                 if let Some(filled_order) = order.fill(filled_qty, ts_ns) {
-                    debug!("fully filled order {}", order.id());
+                    trace!("fully filled order {}", order.id());
 
                     ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill();
@@ -641,7 +640,7 @@ where
                         .expect("Can be removed");
                     order_updates.push(LimitOrderUpdate::FullyFilled(filled_order));
                 } else {
-                    assert!(order.remaining_quantity() > BaseOrQuote::zero());
+                    debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
                     order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
                     self.order_margin
                         .update(order)
@@ -667,8 +666,8 @@ where
                     self.config.contract_spec().init_margin_req(),
                     &self.position,
                 );
-                debug!("order_margin: {order_margin}, new_order_margin: {new_order_margin}");
-                assert!(
+                trace!("order_margin: {order_margin}, new_order_margin: {new_order_margin}");
+                debug_assert!(
                     new_order_margin <= order_margin,
                     "The order margin does not increase with a filled limit order event."
                 );

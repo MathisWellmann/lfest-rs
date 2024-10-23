@@ -47,7 +47,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 .expect("is valid market update");
             let order = LimitOrder::new(
                 Side::Buy,
-                QuoteCurrency::new(100, 0),
+                QuoteCurrency::new(99, 0),
                 QuoteCurrency::new(1, 1),
             )
             .unwrap();

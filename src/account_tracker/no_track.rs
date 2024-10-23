@@ -15,8 +15,10 @@ where
     I: Mon<D>,
     BaseOrQuote: MarginCurrency<I, D>,
 {
+    #[inline(always)]
     fn update(&mut self, _market_state: &MarketState<I, D>) {}
 
+    #[inline(always)]
     fn sample_user_balances(
         &mut self,
         _user_balances: &UserBalances<BaseOrQuote>,
@@ -24,16 +26,22 @@ where
     ) {
     }
 
+    #[inline(always)]
     fn log_limit_order_submission(&mut self) {}
 
+    #[inline(always)]
     fn log_limit_order_cancellation(&mut self) {}
 
+    #[inline(always)]
     fn log_limit_order_fill(&mut self) {}
 
+    #[inline(always)]
     fn log_market_order_submission(&mut self) {}
 
+    #[inline(always)]
     fn log_market_order_fill(&mut self) {}
 
+    #[inline(always)]
     fn log_trade(
         &mut self,
         _side: Side,
