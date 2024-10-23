@@ -2,6 +2,7 @@ use super::MarketUpdate;
 use crate::{
     order_filters::{enforce_max_price, enforce_min_price, enforce_step_size},
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side},
+    types::UserOrderIdT,
     utils::min,
     Result,
 };
@@ -42,7 +43,7 @@ impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketUpdate<I, D, BaseOrQuote, U
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: Clone,
+    UserOrderId: UserOrderIdT,
 {
     fn limit_order_filled(
         &self,

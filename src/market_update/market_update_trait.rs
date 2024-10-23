@@ -1,5 +1,6 @@
 use crate::{
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter},
+    types::UserOrderIdT,
     Result,
 };
 
@@ -9,7 +10,7 @@ pub trait MarketUpdate<I, const D: u8, BaseOrQuote, UserOrderId>:
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: Clone,
+    UserOrderId: UserOrderIdT,
 {
     /// Checks if this market update triggered a specific limit order,
     /// and if so, then how much.

@@ -52,14 +52,14 @@ where
     /// Optimized for small number of active orders.
     /// If we did not have this key present, `Ok(None)` is returned.
     /// If we did have this key present, the value is updated, and the old value is returned.
-    #[inline(always)]
+    #[inline]
     pub(crate) fn insert(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
     ) -> crate::Result<Option<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>>
     {
         // check if it exists
-        if let Some(existing_order) = self.get_mut(order.id()) {
+        if let Some(existing_order) = self.get_mut_by_id(order.id()) {
             let out = existing_order.clone();
             // update the value and return the one that existed.
             *existing_order = order;
@@ -76,8 +76,8 @@ where
 
     /// Get a `LimitOrder` by the given `OrderId` if any.
     /// Optimized to be fast for small number of active limit orders.
-    #[inline(always)]
-    pub fn get(
+    #[inline]
+    pub fn get_by_id(
         &self,
         order_id: OrderId,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
@@ -86,8 +86,8 @@ where
 
     /// Get a `LimitOrder` by the given `OrderId` if any.
     /// Optimized to be fast for small number of active limit orders.
-    #[inline(always)]
-    pub(crate) fn get_mut(
+    #[inline]
+    pub(crate) fn get_mut_by_id(
         &mut self,
         order_id: OrderId,
     ) -> Option<&mut LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
@@ -96,8 +96,8 @@ where
 
     /// Remove an active `LimitOrder` based on its `OrderId`.
     /// Optimized for small number of active orders.
-    #[inline(always)]
-    pub(crate) fn remove(
+    #[inline]
+    pub(crate) fn remove_by_order_id(
         &mut self,
         order_id: OrderId,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
@@ -111,8 +111,25 @@ where
         Some(self.arena.swap_remove(pos))
     }
 
+    /// Remove an active `LimitOrder` based on its `UserOrderId`.
+    /// Optimized for small number of active orders.
+    #[inline]
+    pub(crate) fn remove_by_user_order_id(
+        &mut self,
+        user_order_id: UserOrderId,
+    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
+        let Some(pos) = self
+            .arena
+            .iter_mut()
+            .position(|order| order.user_order_id() == user_order_id)
+        else {
+            return None;
+        };
+        Some(self.arena.swap_remove(pos))
+    }
+
     /// Get an iterator over the active limit orders.
-    #[inline(always)]
+    #[inline]
     pub fn values(
         &self,
     ) -> impl Iterator<Item = &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>
@@ -120,7 +137,7 @@ where
         self.arena.iter()
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) fn values_mut(
         &mut self,
     ) -> impl Iterator<Item = &mut LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>
@@ -156,9 +173,9 @@ mod tests {
 
         assert_eq!(alo.len(), 1);
         assert_eq!(alo.arena[0], order);
-        assert_eq!(alo.get(0.into()), Some(&order));
-        assert_eq!(alo.get_mut(0.into()), Some(&mut order));
-        let removed = alo.remove(0.into()).unwrap();
+        assert_eq!(alo.get_by_id(0.into()), Some(&order));
+        assert_eq!(alo.get_mut_by_id(0.into()), Some(&mut order));
+        let removed = alo.remove_by_order_id(0.into()).unwrap();
         assert_eq!(removed, order);
         assert!(alo.is_empty());
 
@@ -173,11 +190,11 @@ mod tests {
         alo.insert(order_1.clone()).unwrap();
         assert_eq!(alo.len(), 1);
         assert_eq!(alo.arena[0], order_1);
-        assert!(alo.get(0.into()).is_none());
-        assert!(alo.get_mut(0.into()).is_none());
-        assert_eq!(alo.get(1.into()), Some(&order_1));
-        assert_eq!(alo.get_mut(1.into()), Some(&mut order_1));
-        let removed = alo.remove(1.into()).unwrap();
+        assert!(alo.get_by_id(0.into()).is_none());
+        assert!(alo.get_mut_by_id(0.into()).is_none());
+        assert_eq!(alo.get_by_id(1.into()), Some(&order_1));
+        assert_eq!(alo.get_mut_by_id(1.into()), Some(&mut order_1));
+        let removed = alo.remove_by_order_id(1.into()).unwrap();
         assert_eq!(removed, order_1);
         assert!(alo.is_empty());
 

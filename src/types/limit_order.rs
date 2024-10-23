@@ -20,11 +20,11 @@ pub struct LimitOrder<I, const D: u8, BaseOrQuote, UserOrderId, OrderStatus>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: Clone,
+    UserOrderId: UserOrderIdT,
     OrderStatus: Clone,
 {
     /// Order Id provided by the user, can be any type really.
-    #[getset(get = "pub")]
+    #[getset(get_copy = "pub")]
     user_order_id: UserOrderId,
 
     /// Whether its a buy or sell order.
@@ -107,7 +107,7 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: Clone + Default,
+    UserOrderId: UserOrderIdT,
 {
     /// Create a new limit order
     ///
@@ -182,7 +182,7 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: Clone,
+    UserOrderId: UserOrderIdT,
 {
     /// Used when an order gets some `quantity` filled at a `price`.
     ///
@@ -300,7 +300,7 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: Clone,
+    UserOrderId: UserOrderIdT,
 {
     /// Get the total quantity that this order is for.
     pub fn total_quantity(&self) -> BaseOrQuote {

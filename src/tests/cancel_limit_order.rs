@@ -1,4 +1,4 @@
-use crate::{bba, mock_exchange_linear, prelude::*};
+use crate::{bba, exchange::CancelBy, mock_exchange_linear, prelude::*};
 
 #[test]
 fn cancel_limit_order() {
@@ -22,7 +22,7 @@ fn cancel_limit_order() {
 
     assert_eq!(exchange.active_limit_orders().len(), 1);
     assert_eq!(
-        exchange.active_limit_orders().get(order_id).unwrap(),
+        exchange.active_limit_orders().get_by_id(order_id).unwrap(),
         &expected_order
     );
     assert_eq!(
@@ -38,7 +38,9 @@ fn cancel_limit_order() {
         QuoteCurrency::zero()
     );
 
-    exchange.cancel_limit_order(order_id).unwrap();
+    exchange
+        .cancel_limit_order(CancelBy::OrderId(order_id))
+        .unwrap();
     assert!(exchange.active_limit_orders().is_empty());
     assert_eq!(
         exchange.user_balances(),

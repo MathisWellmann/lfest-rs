@@ -6,7 +6,8 @@ use num_traits::{One, Zero};
 use tracing::trace;
 
 use crate::{
-    prelude::{ActiveLimitOrders, Currency, Mon, OrderId, Position},
+    exchange::CancelBy,
+    prelude::{ActiveLimitOrders, Currency, Mon, Position},
     types::{LimitOrder, MarginCurrency, Pending, Side, UserOrderIdT},
     utils::{max, min},
     Result,
@@ -58,10 +59,19 @@ where
     }
 
     /// Remove an order from being tracked for margin purposes.
-    pub(crate) fn remove(&mut self, order_id: OrderId) {
-        self.active_limit_orders
-            .remove(order_id)
-            .expect("Its an internal method call; it must work");
+    pub(crate) fn remove(&mut self, by: CancelBy<UserOrderId>) {
+        match by {
+            CancelBy::OrderId(order_id) => {
+                self.active_limit_orders
+                    .remove_by_order_id(order_id)
+                    .expect("Its an internal method call; it must work");
+            }
+            CancelBy::UserOrderId(user_order_id) => {
+                self.active_limit_orders
+                    .remove_by_user_order_id(user_order_id)
+                    .expect("Its an internal method call; it must work");
+            }
+        }
     }
 
     /// The margin requirement for all the tracked orders.
@@ -287,7 +297,7 @@ mod tests {
 
         orders
             .iter()
-            .for_each(|order| order_margin.remove(order.id()));
+            .for_each(|order| order_margin.remove(CancelBy::OrderId(order.id())));
         assert_eq!(
             order_margin.order_margin(
                 init_margin_req,
@@ -347,10 +357,10 @@ mod tests {
 
         buy_orders
             .iter()
-            .for_each(|order| order_margin.remove(order.id()));
+            .for_each(|order| order_margin.remove(CancelBy::OrderId(order.id())));
         sell_orders
             .iter()
-            .for_each(|order| order_margin.remove(order.id()));
+            .for_each(|order| order_margin.remove(CancelBy::OrderId(order.id())));
         assert_eq!(
             order_margin.order_margin(
                 init_margin_req,

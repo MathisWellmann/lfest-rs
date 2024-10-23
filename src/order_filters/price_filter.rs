@@ -4,7 +4,7 @@ use num_traits::{One, Zero};
 
 use crate::{
     prelude::{ConfigError, Currency, FilterError, Mon, OrderError, QuoteCurrency},
-    types::{LimitOrder, NewOrder},
+    types::{LimitOrder, NewOrder, UserOrderIdT},
 };
 
 /// The `PriceFilter` defines the price rules for a symbol
@@ -102,7 +102,7 @@ where
     ) -> Result<(), OrderError>
     where
         BaseOrQuote: Currency<I, D>,
-        UserOrderId: Clone,
+        UserOrderId: UserOrderIdT,
     {
         if order.limit_price() <= QuoteCurrency::zero() {
             return Err(OrderError::LimitPriceBelowMin);

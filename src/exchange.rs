@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 
 use assert2::assert;
 use getset::Getters;
-use hashbrown::HashMap;
 use num_traits::Zero;
 use tracing::{debug, info, trace, warn};
 
@@ -26,6 +25,13 @@ use crate::{
     },
     utils::assert_user_wallet_balance,
 };
+
+/// Whether to cancel a limit order by its `OrderId` or the `UserOrderId`.
+#[derive(Debug, Clone, Copy)]
+pub enum CancelBy<UserOrderId: UserOrderIdT> {
+    OrderId(OrderId),
+    UserOrderId(UserOrderId),
+}
 
 /// Relevant information about the traders account.
 ///
@@ -90,10 +96,6 @@ where
     #[getset(get = "pub")]
     active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>,
 
-    // Maps the `user_order_id` to the internal order nonce.
-    #[deprecated] // TODO: just do linear search in `ActiveLimitOrders`
-    lookup_order_nonce_from_user_order_id: HashMap<UserOrderId, OrderId>,
-
     order_margin: OrderMargin<I, D, BaseOrQuote, UserOrderId>,
 
     sample_returns_trigger: SampleReturnsTrigger,
@@ -131,7 +133,6 @@ where
             position: Position::default(),
             // TODO: two such structs, one for buys, the other for sells.
             active_limit_orders: ActiveLimitOrders::new(10_000),
-            lookup_order_nonce_from_user_order_id: HashMap::default(),
             order_margin: OrderMargin::new(max_active_orders),
             sample_returns_trigger,
         }
@@ -299,30 +300,6 @@ where
         oid
     }
 
-    /// Cancel an active limit order based on the `user_order_id`.
-    ///
-    /// # Arguments:
-    /// `user_order_id`: The order id from the user.
-    /// `account_tracker`: Something to track this action.
-    ///
-    /// # Returns:
-    /// the cancelled order if successfull, error when the `user_order_id` is
-    /// not found
-    pub fn cancel_order_by_user_id(
-        &mut self,
-        user_order_id: UserOrderId,
-    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
-        debug!(
-            "cancel_order_by_user_id: user_order_id: {:?}",
-            user_order_id
-        );
-        let id = self
-            .lookup_order_nonce_from_user_order_id
-            .remove(&user_order_id)
-            .ok_or(Error::UserOrderIdNotFound)?;
-        self.cancel_limit_order(id)
-    }
-
     /// # Arguments:
     /// `order`: The order that is being submitted.
     ///
@@ -401,7 +378,7 @@ where
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
         let existing_order = self
             .active_limit_orders
-            .get(existing_order_id)
+            .get_by_id(existing_order_id)
             .ok_or_else(|| {
                 if existing_order_id < self.next_order_id {
                     Error::OrderNoLongerActive
@@ -423,14 +400,14 @@ where
         trace!("qty_delta: {qty_delta}");
         let new_leaves_qty = existing_order.remaining_quantity() + qty_delta;
         if new_leaves_qty <= BaseOrQuote::zero() {
-            self.cancel_limit_order(existing_order_id)
+            self.cancel_limit_order(CancelBy::OrderId(existing_order_id))
                 .expect("Can cancel this order");
             return Err(Error::AmendQtyAlreadyFilled);
         }
 
         new_order.set_remaining_quantity(new_leaves_qty);
 
-        self.cancel_limit_order(existing_order_id)?;
+        self.cancel_limit_order(CancelBy::OrderId(existing_order_id))?;
         self.submit_limit_order(new_order)
     }
 
@@ -452,12 +429,8 @@ where
             self.position,
         );
 
-        let order_id = order.id();
-        let user_order_id = order.user_order_id().clone();
         self.order_margin.update(&order)?;
         self.active_limit_orders.insert(order)?;
-        self.lookup_order_nonce_from_user_order_id
-            .insert(user_order_id, order_id);
         let new_order_margin = self.order_margin.order_margin(
             self.config.contract_spec().init_margin_req(),
             &self.position,
@@ -505,9 +478,9 @@ where
     /// returns Some order if successful with given order_id
     pub fn cancel_limit_order(
         &mut self,
-        order_id: OrderId,
+        cancel_by: CancelBy<UserOrderId>,
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
-        debug!("cancel_order: {}", order_id);
+        trace!("cancel_order: by {:?}", cancel_by);
         let order_margin = self
             .transaction_accounting
             .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
@@ -519,17 +492,24 @@ where
                 &self.position,
             )
         );
-        let removed_order = self.active_limit_orders.remove(order_id).ok_or_else(|| {
-            if order_id < self.next_order_id {
-                Error::OrderNoLongerActive
-            } else {
-                Error::OrderIdNotFound { order_id }
-            }
-        })?;
-        self.order_margin.remove(order_id);
-        self.lookup_order_nonce_from_user_order_id
-            .remove(removed_order.user_order_id())
-            .expect("Can be removed");
+        let removed_order = match cancel_by {
+            CancelBy::OrderId(order_id) => self
+                .active_limit_orders
+                .remove_by_order_id(order_id)
+                .ok_or_else(|| {
+                    if order_id < self.next_order_id {
+                        Error::OrderNoLongerActive
+                    } else {
+                        Error::OrderIdNotFound { order_id }
+                    }
+                })?,
+            CancelBy::UserOrderId(user_order_id) => self
+                .active_limit_orders
+                .remove_by_user_order_id(user_order_id)
+                .ok_or(Error::UserOrderIdNotFound)?,
+        };
+        self.order_margin.remove(cancel_by);
+
         let new_order_margin = self.order_margin.order_margin(
             self.config.contract_spec().init_margin_req(),
             &self.position,
@@ -568,15 +548,9 @@ where
     pub(crate) fn remove_executed_order_from_active(&mut self, order_id: OrderId) {
         let order = self
             .active_limit_orders
-            .remove(order_id)
+            .remove_by_order_id(order_id)
             .expect("The order must have been active; qed");
         debug_assert_eq!(order.id(), order_id);
-        if let Some(order_id) = self
-            .lookup_order_nonce_from_user_order_id
-            .remove(order.user_order_id())
-        {
-            debug_assert_eq!(order_id, order.id());
-        }
     }
 
     /// Checks for the execution of active limit orders in the account.
@@ -634,10 +608,7 @@ where
 
                     ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill();
-                    self.order_margin.remove(order.id());
-                    self.lookup_order_nonce_from_user_order_id
-                        .remove(filled_order.user_order_id())
-                        .expect("Can be removed");
+                    self.order_margin.remove(CancelBy::OrderId(order.id()));
                     order_updates.push(LimitOrderUpdate::FullyFilled(filled_order));
                 } else {
                     debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
