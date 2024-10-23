@@ -100,6 +100,10 @@ where
     order_margin: OrderMargin<I, D, BaseOrQuote, UserOrderId>,
 
     sample_returns_trigger: SampleReturnsTrigger,
+
+    // To avoid allocations in hot-paths
+    order_updates: Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>,
+    ids_to_remove: Vec<OrderId>,
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderId, TransactionAccountingT, A>
@@ -136,6 +140,8 @@ where
             active_limit_orders: ActiveLimitOrders::new(10_000),
             order_margin: OrderMargin::new(max_active_orders),
             sample_returns_trigger,
+            order_updates: Vec::with_capacity(max_active_orders),
+            ids_to_remove: Vec::with_capacity(max_active_orders),
         }
     }
 
@@ -546,9 +552,12 @@ where
 
     /// Removes an executed limit order from the list of active ones.
     /// order margin updates are handled separately.
-    pub(crate) fn remove_executed_order_from_active(&mut self, order_id: OrderId) {
-        let order = self
-            .active_limit_orders
+    #[inline]
+    pub(crate) fn remove_executed_order_from_active(
+        order_id: OrderId,
+        active_limit_orders: &mut ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>,
+    ) {
+        let order = active_limit_orders
             .remove_by_order_id(order_id)
             .expect("The order must have been active; qed");
         debug_assert_eq!(order.id(), order_id);
@@ -556,6 +565,7 @@ where
 
     /// Checks for the execution of active limit orders in the account.
     /// NOTE: only public for benchmarking purposes.
+    #[must_use]
     pub fn check_active_orders<U>(
         &mut self,
         market_update: &U,
@@ -568,9 +578,6 @@ where
             self.order_margin.active_limit_orders(),
             &self.active_limit_orders
         );
-        let mut order_updates = Vec::with_capacity(1);
-        let mut ids_to_remove = Vec::with_capacity(1);
-
         for order in self.active_limit_orders.values_mut() {
             if let Some(filled_qty) = market_update.limit_order_filled(order) {
                 trace!(
@@ -598,13 +605,15 @@ where
                 );
 
                 if let Some(filled_order) = order.fill(filled_qty, ts_ns) {
-                    ids_to_remove.push(order.state().meta().id());
+                    self.ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill();
                     self.order_margin.remove(CancelBy::OrderId(order.id()));
-                    order_updates.push(LimitOrderUpdate::FullyFilled(filled_order));
+                    self.order_updates
+                        .push(LimitOrderUpdate::FullyFilled(filled_order));
                 } else {
                     debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
-                    order_updates.push(LimitOrderUpdate::PartiallyFilled(order.clone()));
+                    self.order_updates
+                        .push(LimitOrderUpdate::PartiallyFilled(order.clone()));
                     self.order_margin
                         .update(order)
                         .expect("Can update an existing order");
@@ -643,9 +652,14 @@ where
                 }
             }
         }
-        ids_to_remove
-            .into_iter()
-            .for_each(|id| self.remove_executed_order_from_active(id));
+        self.ids_to_remove.iter().for_each(|id| {
+            Self::remove_executed_order_from_active(*id, &mut self.active_limit_orders)
+        });
+        self.ids_to_remove.clear();
+        debug_assert_eq!(
+            self.ids_to_remove.capacity(),
+            self.config.max_num_open_orders()
+        );
 
         debug_assert_eq!(
             self.order_margin.active_limit_orders(),
@@ -670,7 +684,14 @@ where
         );
         assert_user_wallet_balance(&self.transaction_accounting);
 
-        order_updates
+        let out = self.order_updates.clone();
+        self.order_updates.clear();
+        debug_assert_eq!(
+            self.order_updates.capacity(),
+            self.config.max_num_open_orders()
+        );
+
+        out
     }
 
     /// Get the balances of the user account.

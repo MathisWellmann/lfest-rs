@@ -55,7 +55,9 @@ fn criterion_benchmark(c: &mut Criterion) {
                 exchange.submit_limit_order(order.clone()).unwrap();
             }
             b.iter(|| {
-                exchange.check_active_orders(black_box(&market_update), black_box(ts_ns));
+                let _ = black_box(
+                    exchange.check_active_orders(black_box(&market_update), black_box(ts_ns)),
+                );
             })
         });
     }
