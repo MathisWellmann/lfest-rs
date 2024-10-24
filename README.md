@@ -11,18 +11,17 @@ The exchange can be configured using `Config` and `ContractSpecification`.
 
 ### Features:
 - :currency_exchange: Fixed point arithmetic using [`const-decimal`](https://github.com/OliverNChalk/const-decimal) crate, for super fast and precise numeric calculations.
-- :brain: Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct types at function boundaries.   
-Examples include:   
+- :brain: Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct types at function boundaries, e.g:
 [`BaseCurrency`](https://docs.rs/lfest/latest/lfest/prelude/struct.BaseCurrency.html),   
 [`QuoteCurrency`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuoteCurrency.html),   
 [`Fee`](https://docs.rs/lfest/latest/lfest/prelude/struct.Fee.html),    
 [`Leverage`](https://docs.rs/lfest/latest/lfest/prelude/struct.Leverage.html).      
 This makes it impossible to mistakenly input for example a `USD` denoted value into a function that expects a `BTC` denoted value.    
-- :satellite: Flexible market data integration through the [`MarketUpdate`](https://docs.rs/lfest/latest/lfest/prelude/enum.MarketUpdate.html) type.
+- :satellite: Flexible market data integration through the [`MarketUpdate`](https://docs.rs/lfest/latest/lfest/prelude/enum.MarketUpdate.html) trait.
 - :chart: Integrated performance tracking.    
 Use the existing [`FullAccountTracker`](https://docs.rs/lfest/latest/lfest/account_tracker/struct.FullAccountTracker.html)  
 or implement your own using the [`AccountTracker`](https://docs.rs/lfest/latest/lfest/account_tracker/trait.AccountTracker.html) trait.
-- :heavy_check_mark: good test coverage and heavy use of assertions, to get to ensure correctness.
+- :heavy_check_mark: good test coverage and heavy use of assertions, to ensure correctness.
 - :mag: Auditable due to its small and consice codebase.
 - :page_with_curl: Supports both `linear` and `inverse` futures contracts, 
 by simply setting the margin currency to either `QuoteCurrency` (linear) or `BaseCurrency` (inverse)
@@ -75,11 +74,7 @@ For an example see [examples](examples/basic.rs)
 ### TODOs:
 - Orderbook support (with `MatchingEngine`) and thus accounting for slippage of `MarkerOrder`
 - Funding rate (support `settle_funding_period` in `ClearingHouse`)
-- Multiple accounts (low priority)
-- Multiple markets (low priority)
-- Portfolio `RiskEngine` for multiple markets akin to `SPAN`
-- Support for updating leverage of a position while its open.
-- Support auto-deleveraging
+- Support for updating leverage of a position while it is open.
 
 ### Contributions
 Would love to see you use and contribute to this project. Even just adding more tests is welcome.
