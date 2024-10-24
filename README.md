@@ -1,12 +1,13 @@
 # Leveraged Futures Exchange for Simulated Trading (LFEST)
 :radioactive: This is a personal project, use a your own risk.   
 
-lfest-rs is a simulated perpetual futures exchange capable of leveraged positions.    
-You fed it external market data through the [`MarketUpdate`](https://docs.rs/lfest/latest/lfest/prelude/enum.MarketUpdate.html) enum to update the `MarketState`.
-Where you either provide bid and ask price or information derived from a [candle](https://github.com/MathisWellmann/trade_aggregation-rs).   
-Macros ([`bba`](https://docs.rs/lfest/latest/lfest/macro.bba.html), [`candle`](https://docs.rs/lfest/latest/lfest/macro.candle.html)) make it easy to construct the concrete variant.   
-For simplicity's sake (and performance) the exchange does not use an order book.   
-The exchange can be configured using [`Config`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.Config.html) and `ContractSpecification`
+`lfest-rs` is a simulated perpetual futures exchange capable of leveraged positions.
+Its optimized for speed and can simulate more than 100 million trade and quote events per second along with plenty of order submissions.
+You feed in external market data using `Bba` or `Trade` to update the `MarketState`, 
+which triggers order executions when appropriate.
+For simplicity's sake (and performance) the exchange does not use an order book, nor does it account for slippage of `MarkerOrder`.
+It is advised to use `LimitOrder` most of the time which supports partial executions.
+The exchange can be configured using `Config` and `ContractSpecification`.
 
 ### Features:
 - :currency_exchange: Fixed point arithmetic using [`const-decimal`](https://github.com/OliverNChalk/const-decimal) crate, for super fast and precise numeric calculations.
