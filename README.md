@@ -1,5 +1,4 @@
 # Leveraged Futures Exchange for Simulated Trading (LFEST)
-:radioactive: This is a personal project, use a your own risk.   
 
 `lfest-rs` is a simulated perpetual futures exchange capable of leveraged positions.
 Its optimized for speed and can simulate more than 100 million trade and quote events per second along with plenty of order submissions.
@@ -8,6 +7,8 @@ which triggers order executions when appropriate.
 For simplicity's sake (and performance) the exchange does not use an order book, nor does it account for slippage of `MarkerOrder`.
 It is advised to use `LimitOrder` most of the time which supports partial executions.
 The exchange can be configured using `Config` and `ContractSpecification`.
+
+:radioactive: This is a personal project, use a your own risk. :bangbang:
 
 ### Features:
 - :currency_exchange: Fixed point arithmetic using [`const-decimal`](https://github.com/OliverNChalk/const-decimal) crate, for super fast and precise numeric calculations.
