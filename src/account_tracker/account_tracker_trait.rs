@@ -19,7 +19,7 @@ where
     /// Process information about the user balances.
     fn sample_user_balances(
         &mut self,
-        user_balances: &UserBalances<BaseOrQuote>,
+        user_balances: &UserBalances<I, D, BaseOrQuote>,
         mid_price: QuoteCurrency<I, D>,
     );
 

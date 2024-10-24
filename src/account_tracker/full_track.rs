@@ -12,7 +12,6 @@ use crate::{
     account_tracker::AccountTracker,
     prelude::{MarketState, Mon, QuoteCurrency, Side, UserBalances},
     types::{Currency, MarginCurrency, TimestampNs},
-    utils::balance_sum,
 };
 
 const DAILY_NS: i64 = 86_400_000_000_000;
@@ -288,10 +287,10 @@ where
 
     fn sample_user_balances(
         &mut self,
-        user_balances: &UserBalances<BaseOrQuote>,
+        user_balances: &UserBalances<I, D, BaseOrQuote>,
         #[allow(unused)] mid_price: QuoteCurrency<I, D>,
     ) {
-        let balance_sum = balance_sum(user_balances);
+        let balance_sum = user_balances.sum();
         self.last_balance_sum = balance_sum;
 
         let balance_sum = Into::<f64>::into(balance_sum) as f32;
@@ -426,6 +425,7 @@ mod tests {
             available_wallet_balance: QuoteCurrency::new(100, 0),
             position_margin: QuoteCurrency::zero(),
             order_margin: QuoteCurrency::zero(),
+            _q: std::marker::PhantomData,
         };
         at.sample_user_balances(&balances, QuoteCurrency::new(100, 0));
 
@@ -433,6 +433,7 @@ mod tests {
             available_wallet_balance: QuoteCurrency::new(101, 0),
             position_margin: QuoteCurrency::zero(),
             order_margin: QuoteCurrency::zero(),
+            _q: std::marker::PhantomData,
         };
         at.sample_user_balances(&balances, QuoteCurrency::new(100, 0));
         assert_eq!(at.user_balances_ln_return.last().unwrap(), 0.009950321);
@@ -446,6 +447,7 @@ mod tests {
             available_wallet_balance: QuoteCurrency::new(102, 0),
             position_margin: QuoteCurrency::zero(),
             order_margin: QuoteCurrency::zero(),
+            _q: std::marker::PhantomData,
         };
         at.sample_user_balances(&balances, QuoteCurrency::new(100, 0));
         assert_eq!(at.user_balances_ln_return.last().unwrap(), 0.009852353);

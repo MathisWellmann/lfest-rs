@@ -21,7 +21,7 @@ where
     #[inline(always)]
     fn sample_user_balances(
         &mut self,
-        _user_balances: &UserBalances<BaseOrQuote>,
+        _user_balances: &UserBalances<I, D, BaseOrQuote>,
         _mid_price: QuoteCurrency<I, D>,
     ) {
     }

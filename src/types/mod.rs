@@ -31,13 +31,30 @@ pub struct LnReturns<'a, T: num_traits::Float>(pub &'a [T]);
 
 /// The user balances denoted in the margin currency.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct UserBalances<BaseOrQuote> {
+pub struct UserBalances<I, const D: u8, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+{
     /// The available wallet balance that is used to provide margin for positions and orders.
     pub available_wallet_balance: BaseOrQuote,
     /// The margin reserved for the position.
     pub position_margin: BaseOrQuote,
     /// The margin reserved for the open limit orders.
     pub order_margin: BaseOrQuote,
+    /// Just a marker type.
+    pub _q: std::marker::PhantomData<QuoteCurrency<I, D>>,
+}
+
+impl<I, const D: u8, BaseOrQuote> UserBalances<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+{
+    /// Sum of all balances.
+    pub fn sum(&self) -> BaseOrQuote {
+        self.available_wallet_balance + self.position_margin + self.order_margin
+    }
 }
 
 /// A custom user order id must satisfy this trait bound.

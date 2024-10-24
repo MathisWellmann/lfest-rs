@@ -28,7 +28,8 @@ fn submit_limit_buy_order_no_position() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(510, 0),
             position_margin: QuoteCurrency::new(0, 0),
-            order_margin: QuoteCurrency::new(490, 0)
+            order_margin: QuoteCurrency::new(490, 0),
+            _q: std::marker::PhantomData
         }
     );
 
@@ -77,6 +78,7 @@ fn submit_limit_buy_order_no_position() {
             available_wallet_balance: QuoteCurrency::new(510, 0),
             position_margin: QuoteCurrency::new(490, 0),
             order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(
@@ -216,7 +218,8 @@ fn submit_limit_buy_order_with_long() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(100, 0),
             position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(
@@ -312,7 +315,8 @@ fn submit_limit_buy_order_with_short() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(100, 0),
             position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(

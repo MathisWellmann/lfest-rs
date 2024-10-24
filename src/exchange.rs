@@ -56,7 +56,7 @@ where
     /// The current position of the account.
     pub position: &'a Position<I, D, BaseOrQuote>,
     /// The TAccount balances of the account.
-    pub balances: UserBalances<BaseOrQuote::PairedCurrency>,
+    pub balances: UserBalances<I, D, BaseOrQuote::PairedCurrency>,
 }
 
 /// The main leveraged futures exchange for simulated trading
@@ -695,7 +695,7 @@ where
     }
 
     /// Get the balances of the user account.
-    pub fn user_balances(&self) -> UserBalances<BaseOrQuote::PairedCurrency> {
+    pub fn user_balances(&self) -> UserBalances<I, D, BaseOrQuote::PairedCurrency> {
         UserBalances {
             available_wallet_balance: self
                 .transaction_accounting
@@ -709,6 +709,7 @@ where
                 .transaction_accounting
                 .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)
                 .expect("is a valid account"),
+            _q: std::marker::PhantomData,
         }
     }
 }

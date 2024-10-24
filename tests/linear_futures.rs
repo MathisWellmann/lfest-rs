@@ -81,7 +81,8 @@ fn lin_long_market_win_full() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(500, 0),
             position_margin: QuoteCurrency::new(500, 0),
-            order_margin: QuoteCurrency::zero()
+            order_margin: QuoteCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
 
@@ -113,6 +114,7 @@ fn lin_long_market_win_full() {
             available_wallet_balance: QuoteCurrency::new(14991, 1),
             position_margin: QuoteCurrency::zero(),
             order_margin: QuoteCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 0);

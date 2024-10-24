@@ -68,7 +68,8 @@ fn submit_limit_sell_order_no_position() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(100, 0),
             position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(
@@ -110,7 +111,8 @@ fn submit_limit_sell_order_no_position() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(1000, 0) - fee - fee,
             position_margin: QuoteCurrency::new(0, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
 }

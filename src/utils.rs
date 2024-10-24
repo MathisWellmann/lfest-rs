@@ -42,19 +42,6 @@ pub(crate) fn assert_user_wallet_balance<I, const D: u8, Acc, BaseOrQuote>(
     assert!(wallet_balance >= BaseOrQuote::zero());
 }
 
-/// Sum of all balances in users `TAccount`s.
-pub(crate) fn balance_sum<I, const D: u8, BaseOrQuote>(
-    user_balances: &UserBalances<BaseOrQuote>,
-) -> BaseOrQuote
-where
-    I: Mon<D>,
-    BaseOrQuote: MarginCurrency<I, D>,
-{
-    user_balances.available_wallet_balance
-        + user_balances.position_margin
-        + user_balances.order_margin
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use const_decimal::Decimal;

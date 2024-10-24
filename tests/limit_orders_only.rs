@@ -30,6 +30,7 @@ fn limit_orders_only() {
             available_wallet_balance: QuoteCurrency::new(10, 0),
             position_margin: QuoteCurrency::zero(),
             order_margin: QuoteCurrency::new(990, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(
@@ -93,7 +94,8 @@ fn limit_orders_only() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(10, 0),
             position_margin: QuoteCurrency::new(990, 0),
-            order_margin: QuoteCurrency::zero()
+            order_margin: QuoteCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.position().outstanding_fees(), fee0);
@@ -135,7 +137,8 @@ fn limit_orders_only() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(10495, 1) - fee0 - fee1,
             position_margin: QuoteCurrency::zero(),
-            order_margin: QuoteCurrency::zero()
+            order_margin: QuoteCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     let order_updates = exchange
@@ -154,7 +157,8 @@ fn limit_orders_only() {
                 - QuoteCurrency::new(198, 3)
                 - QuoteCurrency::new(2079, 4),
             position_margin: QuoteCurrency::zero(),
-            order_margin: QuoteCurrency::zero()
+            order_margin: QuoteCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 2);

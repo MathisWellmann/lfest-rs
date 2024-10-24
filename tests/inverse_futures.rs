@@ -52,7 +52,8 @@ fn inv_long_market_win_full() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(2, 1),
             position_margin: BaseCurrency::new(8, 1),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.position().outstanding_fees(), fee_1);
@@ -87,7 +88,8 @@ fn inv_long_market_win_full() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(14, 1) - fee_1 - fee_base2,
             position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
 }
@@ -130,7 +132,8 @@ fn inv_long_market_loss_full() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(2, 1),
             position_margin: BaseCurrency::new(8, 1),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.position().outstanding_fees(), fees);
@@ -168,7 +171,8 @@ fn inv_long_market_loss_full() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(8, 1) - fee_combined,
             position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
 }
@@ -208,7 +212,8 @@ fn inv_short_market_win_full() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(2, 1),
             position_margin: BaseCurrency::new(8, 1),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.position().outstanding_fees(), fee0);
@@ -255,7 +260,8 @@ fn inv_short_market_win_full() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(12, 1) - fee_combined,
             position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
 }
@@ -308,7 +314,8 @@ fn inv_short_market_loss_full() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(6, 1),
             position_margin: BaseCurrency::new(4, 1),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.position().outstanding_fees(), fees);
@@ -327,7 +334,8 @@ fn inv_short_market_loss_full() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(79964, 5),
             position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
 }
@@ -376,7 +384,8 @@ fn inv_long_market_win_partial() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(2, 1),
             position_margin: BaseCurrency::new(8, 1),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.position().outstanding_fees(), fee_0);
@@ -423,7 +432,8 @@ fn inv_long_market_win_partial() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(8, 1) - fee_0 - fee_1,
             position_margin: BaseCurrency::new(4, 1),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
 }
@@ -500,7 +510,8 @@ fn inv_long_market_loss_partial() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(5, 1) - fee_0 - fee_1,
             position_margin: BaseCurrency::new(4, 1),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
 }
@@ -544,7 +555,8 @@ fn inv_short_market_win_partial() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(2, 1),
             position_margin: BaseCurrency::new(8, 1),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.position().outstanding_fees(), fee_0);
@@ -592,7 +604,8 @@ fn inv_short_market_win_partial() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(7, 1) - fee_0 - fee_1,
             position_margin: BaseCurrency::new(4, 1),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.position().outstanding_fees(), BaseCurrency::zero());
@@ -645,7 +658,8 @@ fn inv_short_market_loss_partial() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(2, 1),
             position_margin: BaseCurrency::new(8, 1),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.position().outstanding_fees(), fee_0);
@@ -662,7 +676,8 @@ fn inv_short_market_loss_partial() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(59928, 5),
             position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
 }
@@ -702,7 +717,8 @@ fn inv_test_market_roundtrip() {
         UserBalances {
             available_wallet_balance: BaseCurrency::one() - BaseCurrency::new(2, 0) * fee0,
             position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
 }
@@ -727,7 +743,8 @@ fn inv_execute_limit() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(5, 1),
             position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::new(5, 1)
+            order_margin: BaseCurrency::new(5, 1),
+            _q: std::marker::PhantomData
         }
     );
 
@@ -766,7 +783,8 @@ fn inv_execute_limit() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(5, 1),
             position_margin: BaseCurrency::new(5, 1),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.position().outstanding_fees(), fee_0);
@@ -800,7 +818,8 @@ fn inv_execute_limit() {
         UserBalances {
             available_wallet_balance: BaseCurrency::new(105, 2) - fee_0 - fee_1,
             position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
 
@@ -844,7 +863,8 @@ fn inv_execute_limit() {
                 - fee_1
                 - BaseCurrency::convert_from(qty, limit_price),
             position_margin: BaseCurrency::new(5, 1),
-            order_margin: BaseCurrency::zero()
+            order_margin: BaseCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
 }

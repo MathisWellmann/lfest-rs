@@ -25,7 +25,7 @@ where
     #[getset(get_copy = "pub")]
     quantity: BaseOrQuote,
 
-    /// The total cost paid for the position (not margin though).
+    /// The total cost paid for the position (not margin thhough).
     #[getset(get_copy = "pub")]
     total_cost: BaseOrQuote::PairedCurrency,
 

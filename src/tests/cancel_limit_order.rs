@@ -30,7 +30,8 @@ fn cancel_limit_order() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(900, 0),
             position_margin: QuoteCurrency::zero(),
-            order_margin: QuoteCurrency::new(100, 0)
+            order_margin: QuoteCurrency::new(100, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(
@@ -47,7 +48,8 @@ fn cancel_limit_order() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(1000, 0),
             position_margin: QuoteCurrency::zero(),
-            order_margin: QuoteCurrency::zero()
+            order_margin: QuoteCurrency::zero(),
+            _q: std::marker::PhantomData
         }
     );
 }

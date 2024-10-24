@@ -58,7 +58,8 @@ fn submit_market_buy_order_no_position() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(495, 0),
             position_margin: QuoteCurrency::new(505, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(
@@ -105,7 +106,8 @@ fn submit_market_buy_order_with_long_position() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(500, 0),
             position_margin: QuoteCurrency::new(500, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(exchange.position().outstanding_fees(), fee0);
@@ -119,7 +121,8 @@ fn submit_market_buy_order_with_long_position() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(100, 0),
             position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     let fees = fee0 + fee1;
@@ -161,7 +164,8 @@ fn submit_market_buy_order_with_short_position() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(100, 0),
             position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(
@@ -188,7 +192,8 @@ fn submit_market_buy_order_with_short_position() {
                 - QuoteCurrency::new(5454, 4)
                 - QuoteCurrency::new(9, 0),
             position_margin: QuoteCurrency::new(0, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
 }
@@ -230,7 +235,8 @@ fn submit_market_buy_order_turnaround_short() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(109, 0),
             position_margin: QuoteCurrency::new(891, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(
@@ -257,13 +263,13 @@ fn submit_market_buy_order_turnaround_short() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            // - fee - fee - spread loss
             available_wallet_balance: QuoteCurrency::new(100, 0)
                 - QuoteCurrency::new(5346, 4)
                 - QuoteCurrency::new(108, 2)
                 - QuoteCurrency::new(9, 0),
             position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
 }

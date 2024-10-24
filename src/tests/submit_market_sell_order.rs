@@ -58,7 +58,8 @@ fn submit_market_sell_order() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(500, 0),
             position_margin: QuoteCurrency::new(500, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(
@@ -90,7 +91,8 @@ fn submit_market_sell_order_with_short_position() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(500, 0),
             position_margin: QuoteCurrency::new(500, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     let fee0 = QuoteCurrency::new(3, 1);
@@ -115,7 +117,8 @@ fn submit_market_sell_order_with_short_position() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(100, 0),
             position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(
@@ -155,13 +158,13 @@ fn submit_market_sell_order_with_long_position() {
     assert_eq!(
         exchange.user_balances(),
         UserBalances {
-            // - fee - fee - spread loss
             available_wallet_balance: QuoteCurrency::new(1000, 0)
                 - QuoteCurrency::new(54, 2)
                 - QuoteCurrency::new(5346, 4)
                 - QuoteCurrency::new(9, 0),
             position_margin: QuoteCurrency::new(0, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
 }
@@ -190,7 +193,8 @@ fn submit_market_sell_order_turnaround_long() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(100, 0),
             position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(
@@ -216,7 +220,8 @@ fn submit_market_sell_order_turnaround_long() {
         UserBalances {
             available_wallet_balance: QuoteCurrency::new(100, 0) - fee0 - fee1,
             position_margin: QuoteCurrency::new(891, 0),
-            order_margin: QuoteCurrency::new(0, 0)
+            order_margin: QuoteCurrency::new(0, 0),
+            _q: std::marker::PhantomData
         }
     );
     assert_eq!(
