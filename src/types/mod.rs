@@ -34,7 +34,7 @@ pub struct LnReturns<'a, T: num_traits::Float>(pub &'a [T]);
 pub struct UserBalances<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     /// The available wallet balance that is used to provide margin for positions and orders.
     pub available_wallet_balance: BaseOrQuote,
@@ -49,7 +49,7 @@ where
 impl<I, const D: u8, BaseOrQuote> UserBalances<I, D, BaseOrQuote>
 where
     I: Mon<D>,
-    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote: MarginCurrency<I, D>,
 {
     /// Sum of all balances.
     pub fn sum(&self) -> BaseOrQuote {

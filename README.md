@@ -9,7 +9,7 @@ For simplicity's sake (and performance) the exchange does not use an order book.
 The exchange can be configured using [`Config`](https://docs.rs/lfest/0.31.0/lfest/prelude/struct.Config.html) and `ContractSpecification`
 
 ### Features:
-- :currency_exchange: Fixed point arithmetic using [`fpdec`](https://github.com/mamrhein/fpdec.rs) crate, for super fast and precise numeric calculations.
+- :currency_exchange: Fixed point arithmetic using [`const-decimal`](https://github.com/OliverNChalk/const-decimal) crate, for super fast and precise numeric calculations.
 - :brain: Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct types at function boundaries.   
 Examples include:   
 [`BaseCurrency`](https://docs.rs/lfest/latest/lfest/prelude/struct.BaseCurrency.html),   
@@ -17,13 +17,14 @@ Examples include:
 [`Fee`](https://docs.rs/lfest/latest/lfest/prelude/struct.Fee.html),    
 [`Leverage`](https://docs.rs/lfest/latest/lfest/prelude/struct.Leverage.html).      
 This makes it impossible to mistakenly input for example a `USD` denoted value into a function that expects a `BTC` denoted value.    
-- :satellite: Flexible market data integration through the [`MarketUpdate`](https://docs.rs/lfest/latest/lfest/prelude/enum.MarketUpdate.html) type and associated macros.   
+- :satellite: Flexible market data integration through the [`MarketUpdate`](https://docs.rs/lfest/latest/lfest/prelude/enum.MarketUpdate.html) type.
 - :chart: Integrated performance tracking.    
 Use the existing [`FullAccountTracker`](https://docs.rs/lfest/latest/lfest/account_tracker/struct.FullAccountTracker.html)  
 or implement your own using the [`AccountTracker`](https://docs.rs/lfest/latest/lfest/account_tracker/trait.AccountTracker.html) trait.
 - :heavy_check_mark: good test coverage and heavy use of assertions, to get to ensure correctness.
 - :mag: Auditable due to its small and consice codebase.
-- :page_with_curl: Supports both `linear` and `inverse` futures contracts.
+- :page_with_curl: Supports both `linear` and `inverse` futures contracts, 
+by simply setting the margin currency to either `QuoteCurrency` (linear) or `BaseCurrency` (inverse)
 - :no_entry: Order filtering to make sure the price and quantity follow certain rules. See:    
 [`PriceFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.PriceFilter.html)     
 [`QuantityFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuantityFilter.html)    
@@ -32,8 +33,8 @@ or implement your own using the [`AccountTracker`](https://docs.rs/lfest/latest/
 
 ### Order Types
 The supported order types are:
-- `Market`: aggressively execute against the best bid / ask
-- `Limit`: passively place an order into the orderbook
+- `LimitOrder`: passively place an order into the orderbook, with support for partial executions.
+- `MarketOrder`: aggressively execute against the best bid / ask. Not accounting for available volume or full order book for now.
 
 ### Performance Metrics:
 The following performance metrics are available when using the `FullTrack` `AccountTracker`,   
@@ -64,24 +65,20 @@ Some of these metric may behave differently from what you would expect, so make 
 To use this crate in your project, add the following to your Cargo.toml:
 ```ignore
 [dependencies]
-lfest = "*" # or lookup newest version on `crates.io`
+lfest = { git = https://github.com/MathisWellmann/lfest-rs, rev = "DESIRED-REVISION", version = "0.83"} # Probably pin the revision because main is changing quickly
 ```
 
 Then proceed to use it in your code.
 For an example see [examples](examples/basic.rs)
 
 ### TODOs:
-- proper liquidations (see `update_state` in `Exchange`)
-- Orderbook support (with `MatchingEngine`)
+- Orderbook support (with `MatchingEngine`) and thus accounting for slippage of `MarkerOrder`
 - Funding rate (support `settle_funding_period` in `ClearingHouse`)
 - Multiple accounts (low priority)
 - Multiple markets (low priority)
 - Portfolio `RiskEngine` for multiple markets akin to `SPAN`
-- Support for updating leverage of a position.
+- Support for updating leverage of a position while its open.
 - Support auto-deleveraging
-- Benchmarking
-- more unit tests.
-- fuzz testing?
 
 ### Contributions
 Would love to see you use and contribute to this project. Even just adding more tests is welcome.
