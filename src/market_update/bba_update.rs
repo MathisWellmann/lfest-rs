@@ -1,3 +1,5 @@
+use const_decimal::Decimal;
+
 use super::MarketUpdate;
 use crate::{
     order_filters::{
@@ -20,6 +22,14 @@ where
     pub bid: QuoteCurrency<I, D>,
     /// The new best ask
     pub ask: QuoteCurrency<I, D>,
+}
+
+impl<I: Mon<D>, const D: u8> Bba<I, D> {
+    /// The mid price between the bid and ask.
+    #[inline]
+    pub fn mid_price(&self) -> QuoteCurrency<I, D> {
+        (self.bid + self.ask) / Decimal::TWO
+    }
 }
 
 impl<I, const D: u8> std::fmt::Display for Bba<I, D>
