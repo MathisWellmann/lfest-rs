@@ -327,7 +327,7 @@ where
         self.config
             .contract_spec()
             .price_filter()
-            .validate_limit_order(&order, self.market_state.mid_price())?;
+            .validate_limit_price(order.limit_price(), self.market_state.mid_price())?;
 
         let meta = ExchangeOrderMeta::new(
             self.next_order_id(),
