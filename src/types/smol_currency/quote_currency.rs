@@ -79,14 +79,14 @@ where
     /// let d = QuoteCurrency::<i64, 5>::new(1165, 2);
     /// // Allow only increments of 0.5
     /// let quantum = QuoteCurrency::<i64, 5>::new(5, 1);
-    /// let q = d.quantize_toward_zero(quantum);
+    /// let q = d.quantize_round_to_zero(quantum);
     /// // 11.5 rounded down to the nearest `quantum`.
     /// assert_eq!(q, QuoteCurrency::new(115, 1));
     /// ```
     #[inline]
     #[must_use]
-    pub fn quantize_toward_zero(&self, quantum: Self) -> Self {
-        Self(self.0.quantize_toward_zero(*quantum.as_ref()))
+    pub fn quantize_round_to_zero(&self, quantum: Self) -> Self {
+        Self(self.0.quantize_round_to_zero(*quantum.as_ref()))
     }
 }
 
