@@ -30,7 +30,7 @@ where
     fn log_limit_order_cancellation(&mut self);
 
     /// Log a `LimitOrder` fill event.
-    fn log_limit_order_fill(&mut self);
+    fn log_limit_order_fill(&mut self, fully_filled: bool);
 
     /// Log a `MarketOrder` submission event.
     fn log_market_order_submission(&mut self);

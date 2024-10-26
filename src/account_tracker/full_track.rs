@@ -33,6 +33,9 @@ where
     /// The number of cancelled limit orders.
     #[getset(get_copy = "pub")]
     num_cancelled_limit_orders: usize,
+    /// The number of filled limit order events. Can be larger than the number of submitted limit orders.
+    #[getset(get_copy = "pub")]
+    num_filled_limit_order_events: usize,
     /// The number of fully filled limit orders. Partial fills not included.
     #[getset(get_copy = "pub")]
     num_fully_filled_limit_orders: usize,
@@ -103,6 +106,7 @@ where
             num_fully_filled_limit_orders: 0,
             num_submitted_market_orders: 0,
             num_filled_market_orders: 0,
+            num_filled_limit_order_events: 0,
 
             buy_volume: BaseOrQuote::zero(),
             sell_volume: BaseOrQuote::zero(),
@@ -316,18 +320,25 @@ where
         }
     }
 
+    #[inline(always)]
     fn log_limit_order_submission(&mut self) {
         self.num_submitted_limit_orders += 1;
     }
 
+    #[inline(always)]
     fn log_limit_order_cancellation(&mut self) {
         self.num_cancelled_limit_orders += 1;
     }
 
-    fn log_limit_order_fill(&mut self) {
-        self.num_fully_filled_limit_orders += 1;
+    #[inline(always)]
+    fn log_limit_order_fill(&mut self, fully_filled: bool) {
+        self.num_filled_limit_order_events += 1;
+        if fully_filled {
+            self.num_fully_filled_limit_orders += 1;
+        }
     }
 
+    #[inline(always)]
     fn log_market_order_fill(&mut self) {
         self.num_filled_market_orders += 1;
     }
@@ -347,6 +358,7 @@ where
         }
     }
 
+    #[inline(always)]
     fn log_market_order_submission(&mut self) {
         self.num_submitted_market_orders += 1;
     }

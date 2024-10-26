@@ -606,12 +606,13 @@ where
 
                 if let Some(filled_order) = order.fill(filled_qty, ts_ns) {
                     self.ids_to_remove.push(order.state().meta().id());
-                    self.account_tracker.log_limit_order_fill();
+                    self.account_tracker.log_limit_order_fill(true);
                     self.order_margin.remove(CancelBy::OrderId(order.id()));
                     self.order_updates
                         .push(LimitOrderUpdate::FullyFilled(filled_order));
                 } else {
                     debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
+                    self.account_tracker.log_limit_order_fill(false);
                     self.order_updates
                         .push(LimitOrderUpdate::PartiallyFilled(order.clone()));
                     self.order_margin
