@@ -128,7 +128,7 @@ where
         available_wallet_balance: BaseOrQuote::PairedCurrency,
     ) -> Result<(), RiskError>
     where
-        UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
+        UserOrderId: UserOrderIdT,
     {
         assert!(matches!(order.side(), Side::Buy));
 
@@ -177,7 +177,7 @@ where
         available_wallet_balance: BaseOrQuote::PairedCurrency,
     ) -> Result<(), RiskError>
     where
-        UserOrderId: Clone + std::fmt::Debug + Eq + PartialEq + std::hash::Hash,
+        UserOrderId: UserOrderIdT,
     {
         assert!(matches!(order.side(), Side::Sell));
 

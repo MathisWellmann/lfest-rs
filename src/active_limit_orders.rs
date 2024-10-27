@@ -22,6 +22,22 @@ where
     arena: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>,
 }
 
+impl<I, const D: u8, BaseOrQuote, UserOrderId> std::fmt::Display
+    for ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    UserOrderId: UserOrderIdT,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ActiveLimitOrders:\n")?;
+        for order in self.arena.iter() {
+            write!(f, "{order}")?;
+        }
+        Ok(())
+    }
+}
+
 impl<I, const D: u8, BaseOrQuote, UserOrderId> ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>
 where
     I: Mon<D>,

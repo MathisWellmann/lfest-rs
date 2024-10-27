@@ -2,7 +2,7 @@ use getset::{CopyGetters, Getters};
 
 use super::{
     order_status::NewOrder, Currency, ExchangeOrderMeta, Filled, Mon, OrderError, Pending,
-    QuoteCurrency, Side, TimestampNs,
+    QuoteCurrency, Side, TimestampNs, UserOrderIdT,
 };
 
 /// Defines an market order aka taker order.
@@ -17,6 +17,7 @@ pub struct MarketOrder<I, const D: u8, BaseOrQuote, UserOrderId, OrderStatus>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
+    UserOrderId: UserOrderIdT,
     OrderStatus: Clone,
 {
     /// Order Id provided by the user, can be any type really.
@@ -38,11 +39,28 @@ where
     _quote: std::marker::PhantomData<QuoteCurrency<I, D>>,
 }
 
+impl<I, const D: u8, BaseOrQuote, UserOrderId, State> std::fmt::Display
+    for MarketOrder<I, D, BaseOrQuote, UserOrderId, State>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    UserOrderId: UserOrderIdT,
+    State: Clone + std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "user_order_id: {:?}, side: {}, quantity: {}, state: {}",
+            self.user_order_id, self.side, self.quantity, self.state
+        )
+    }
+}
+
 impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: Default,
+    UserOrderId: UserOrderIdT,
 {
     /// Create a new market order without a `user_order_id`.
     ///
@@ -111,7 +129,7 @@ impl<I, const D: u8, BaseOrQuote, UserOrderId>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: Clone,
+    UserOrderId: UserOrderIdT,
 {
     /// Mark the order as filled, by modifying its state.
     pub(crate) fn into_filled(

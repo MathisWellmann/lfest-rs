@@ -46,6 +46,20 @@ where
     pub _q: std::marker::PhantomData<QuoteCurrency<I, D>>,
 }
 
+impl<I, const D: u8, BaseOrQuote> std::fmt::Display for UserBalances<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrency<I, D>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "available_balance: {}, position_margin: {}, order_margin: {}",
+            self.available_wallet_balance, self.position_margin, self.order_margin
+        )
+    }
+}
+
 impl<I, const D: u8, BaseOrQuote> UserBalances<I, D, BaseOrQuote>
 where
     I: Mon<D>,
@@ -58,13 +72,7 @@ where
 }
 
 /// A custom user order id must satisfy this trait bound.
-pub trait UserOrderIdT:
-    Clone + Copy + Eq + PartialEq + std::hash::Hash + std::fmt::Debug + Default
-{
-}
+pub trait UserOrderIdT: Clone + Copy + Eq + PartialEq + std::fmt::Debug + Default {}
 
 // Blanket impl
-impl<T> UserOrderIdT for T where
-    T: Clone + Copy + Eq + PartialEq + std::hash::Hash + std::fmt::Debug + Default
-{
-}
+impl<T> UserOrderIdT for T where T: Clone + Copy + Eq + PartialEq + std::fmt::Debug + Default {}
