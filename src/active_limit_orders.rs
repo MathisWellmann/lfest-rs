@@ -32,7 +32,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ActiveLimitOrders:\n")?;
         for order in self.arena.iter() {
-            write!(f, "{order}")?;
+            write!(f, "{order}\n")?;
         }
         Ok(())
     }

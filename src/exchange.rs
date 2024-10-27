@@ -427,13 +427,10 @@ where
         order: LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
         marketable: bool,
     ) -> Result<()> {
-        debug!("append_limit_order: order: {order:?}, marketable: {marketable}");
+        debug!("append_limit_order: order: {order}, marketable: {marketable}");
         debug!(
-            "active_limit_orders: {:?}, market_state: {:?}, transaction_accounting: {:?}, position: {:?}",
-            self.active_limit_orders,
-            self.market_state,
-            self.transaction_accounting,
-            self.position,
+            "active_limit_orders: {}, market_state: {}, position: {}",
+            self.active_limit_orders, self.market_state, self.position,
         );
 
         self.order_margin.update(&order)?;

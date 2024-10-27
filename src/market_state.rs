@@ -32,6 +32,16 @@ where
     step: u64,
 }
 
+impl<I: Mon<D>, const D: u8> std::fmt::Display for MarketState<I, D> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "bid: {}, ask: {}, ts_ns: {}, step: {}",
+            self.bid, self.ask, self.current_ts_ns, self.step
+        )
+    }
+}
+
 impl<I, const D: u8> MarketState<I, D>
 where
     I: Mon<D>,
