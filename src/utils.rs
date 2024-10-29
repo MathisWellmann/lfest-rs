@@ -29,6 +29,7 @@ where
 }
 
 /// Asserts that the users wallet balance is greater than zero.
+#[inline]
 pub(crate) fn assert_user_wallet_balance<I, const D: u8, Acc, BaseOrQuote>(
     transaction_accounting: &Acc,
 ) where
