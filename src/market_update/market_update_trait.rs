@@ -12,6 +12,9 @@ where
     BaseOrQuote: Currency<I, D>,
     UserOrderId: UserOrderIdT,
 {
+    /// performance optimization to speed up hot-path, when we don't need to check limit order fills for `Bba` updates.
+    const CAN_FILL_LIMIT_ORDERS: bool;
+
     /// Checks if this market update triggered a specific limit order,
     /// and if so, then how much.
     fn limit_order_filled(

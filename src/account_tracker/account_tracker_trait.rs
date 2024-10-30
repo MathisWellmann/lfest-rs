@@ -8,7 +8,7 @@ use crate::{
 /// # Generics:
 /// - `I` is the numeric type,
 /// - `D` is the constant decimal precision of the currencies
-pub trait AccountTracker<I, const D: u8, BaseOrQuote>
+pub trait AccountTracker<I, const D: u8, BaseOrQuote>: std::fmt::Debug
 where
     I: Mon<D>,
     BaseOrQuote: MarginCurrency<I, D>,

@@ -112,7 +112,7 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    A: AccountTracker<I, D, BaseOrQuote::PairedCurrency> + std::fmt::Debug,
+    A: AccountTracker<I, D, BaseOrQuote::PairedCurrency>,
     UserOrderId: UserOrderIdT,
     TransactionAccountingT:
         TransactionAccounting<I, D, BaseOrQuote::PairedCurrency> + std::fmt::Debug,
@@ -571,6 +571,11 @@ where
     where
         U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
     {
+        if !U::CAN_FILL_LIMIT_ORDERS {
+            // TODO: can this allocation be avoided?
+            return Vec::new();
+        }
+
         debug_assert_eq!(
             self.order_margin.active_limit_orders(),
             &self.active_limit_orders

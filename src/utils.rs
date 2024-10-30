@@ -3,7 +3,7 @@ use assert2::assert;
 use crate::prelude::*;
 
 /// Return the minimum of two values
-#[inline]
+#[inline(always)]
 pub(crate) fn min<T>(v0: T, v1: T) -> T
 where
     T: PartialOrd,
@@ -16,7 +16,7 @@ where
 }
 
 /// Return the maximum of two values
-#[inline]
+#[inline(always)]
 pub(crate) fn max<T>(v0: T, v1: T) -> T
 where
     T: PartialOrd,

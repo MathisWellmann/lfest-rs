@@ -48,12 +48,14 @@ where
     BaseOrQuote: Currency<I, D>,
     UserOrderId: UserOrderIdT,
 {
+    const CAN_FILL_LIMIT_ORDERS: bool = false;
+
     #[inline(always)]
     fn limit_order_filled(
         &self,
         _limit_order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
     ) -> Option<BaseOrQuote> {
-        None
+        unreachable!("This should never be called, because a best bid and ask update can never fill a limit order.");
     }
 
     fn validate_market_update(&self, price_filter: &PriceFilter<I, D>) -> Result<()> {

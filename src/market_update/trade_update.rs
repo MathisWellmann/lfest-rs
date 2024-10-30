@@ -45,15 +45,18 @@ where
     BaseOrQuote: Currency<I, D>,
     UserOrderId: UserOrderIdT,
 {
+    const CAN_FILL_LIMIT_ORDERS: bool = true;
+
+    #[inline]
     fn limit_order_filled(
         &self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
     ) -> Option<BaseOrQuote> {
-        assert!(
+        debug_assert!(
             self.quantity > BaseOrQuote::zero(),
             "The trade quantity must be greater than zero."
         );
-        assert!(order.remaining_quantity() > BaseOrQuote::zero());
+        debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
 
         // Notice that the limit order price must be strictly lower or higher than the limit order price,
         // because we assume the limit order has the worst possible queue position in the book.

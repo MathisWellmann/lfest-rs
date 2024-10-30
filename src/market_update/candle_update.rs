@@ -46,11 +46,14 @@ where
     BaseOrQuote: Currency<I, D>,
     UserOrderId: UserOrderIdT,
 {
+    const CAN_FILL_LIMIT_ORDERS: bool = true;
+
+    #[inline]
     fn limit_order_filled(
         &self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
     ) -> Option<BaseOrQuote> {
-        assert!(order.remaining_quantity() > BaseOrQuote::zero());
+        debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
 
         // As a simplifying assumption, the order always get executed fully when using candles if the price is right.
         if match order.side() {
@@ -85,6 +88,7 @@ where
         Ok(())
     }
 
+    #[inline]
     fn update_market_state(&self, market_state: &mut MarketState<I, D>) {
         market_state.set_bid(self.bid);
         market_state.set_ask(self.ask);
