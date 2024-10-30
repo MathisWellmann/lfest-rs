@@ -12,7 +12,7 @@ fn submit_market_sell_order_reject() {
                 &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
             )
             .unwrap(),
-        Vec::new()
+        &Vec::new()
     );
 
     let order = MarketOrder::new(Side::Sell, BaseCurrency::new(10, 0)).unwrap();
@@ -34,7 +34,7 @@ fn submit_market_sell_order() {
                 &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
             )
             .unwrap(),
-        Vec::new()
+        &Vec::new()
     );
 
     let qty = BaseCurrency::new(5, 0);
@@ -80,7 +80,7 @@ fn submit_market_sell_order_with_short_position() {
                 &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
             )
             .unwrap(),
-        Vec::new()
+        &Vec::new()
     );
 
     // First enter a short position
@@ -144,7 +144,7 @@ fn submit_market_sell_order_with_long_position() {
                 &bba!(QuoteCurrency::new(99, 0), QuoteCurrency::new(100, 0))
             )
             .unwrap(),
-        Vec::new()
+        &Vec::new()
     );
 
     // First enter a long position

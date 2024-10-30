@@ -102,7 +102,7 @@ where
     sample_returns_trigger: SampleReturnsTrigger,
 
     // To avoid allocations in hot-paths
-    order_updates: Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>,
+    limit_order_updates: Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>,
     ids_to_remove: Vec<OrderId>,
 }
 
@@ -140,7 +140,7 @@ where
             active_limit_orders: ActiveLimitOrders::new(10_000),
             order_margin: OrderMargin::new(max_active_orders),
             sample_returns_trigger,
-            order_updates: Vec::with_capacity(max_active_orders),
+            limit_order_updates: Vec::with_capacity(max_active_orders),
             ids_to_remove: Vec::with_capacity(max_active_orders),
         }
     }
@@ -163,6 +163,7 @@ where
     }
 
     /// Update the exchange state with new information
+    /// Returns a reference to order updates vector for performance reasons.
     ///
     /// ### Parameters:
     /// `timestamp_ns`: Is used in the AccountTracker `A`
@@ -175,7 +176,7 @@ where
         &mut self,
         timestamp_ns: TimestampNs,
         market_update: &U,
-    ) -> Result<Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>>
+    ) -> Result<&Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>>
     where
         U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
     {
@@ -205,7 +206,8 @@ where
             return Err(e.into());
         };
 
-        Ok(self.check_active_orders(market_update, timestamp_ns))
+        self.check_active_orders(market_update, timestamp_ns);
+        Ok(&self.limit_order_updates)
     }
 
     // Liquidate the position by closing it with a market order.
@@ -562,24 +564,22 @@ where
 
     /// Checks for the execution of active limit orders in the account.
     /// NOTE: only public for benchmarking purposes.
-    #[must_use]
-    pub fn check_active_orders<U>(
-        &mut self,
-        market_update: &U,
-        ts_ns: TimestampNs,
-    ) -> Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>
+    pub fn check_active_orders<U>(&mut self, market_update: &U, ts_ns: TimestampNs)
     where
         U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
     {
+        // Clear any potential order updates from the previous iteration.
+        self.limit_order_updates.clear();
+
         if !U::CAN_FILL_LIMIT_ORDERS {
-            // TODO: can this allocation be avoided?
-            return Vec::new();
+            return;
         }
 
         debug_assert_eq!(
             self.order_margin.active_limit_orders(),
             &self.active_limit_orders
         );
+
         for order in self.active_limit_orders.values_mut() {
             if let Some(filled_qty) = market_update.limit_order_filled(order) {
                 trace!(
@@ -610,12 +610,12 @@ where
                     self.ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill(true);
                     self.order_margin.remove(CancelBy::OrderId(order.id()));
-                    self.order_updates
+                    self.limit_order_updates
                         .push(LimitOrderUpdate::FullyFilled(filled_order));
                 } else {
                     debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
                     self.account_tracker.log_limit_order_fill(false);
-                    self.order_updates
+                    self.limit_order_updates
                         .push(LimitOrderUpdate::PartiallyFilled(order.clone()));
                     self.order_margin
                         .update(order)
@@ -686,18 +686,10 @@ where
             )
         );
         assert_user_wallet_balance(&self.transaction_accounting);
-
-        let out = self.order_updates.clone();
-        self.order_updates.clear();
-        debug_assert_eq!(
-            self.order_updates.capacity(),
-            self.config.max_num_open_orders()
-        );
-
-        out
     }
 
     /// Get the balances of the user account.
+    #[inline]
     pub fn user_balances(&self) -> UserBalances<I, D, BaseOrQuote::PairedCurrency> {
         UserBalances {
             available_wallet_balance: self

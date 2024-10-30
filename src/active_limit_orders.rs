@@ -10,7 +10,6 @@ use crate::types::{
 /// - `D`: The constant decimal precision of the currency.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 /// - `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
-// TODO: benchmark vs `hashbrown::HashMap`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActiveLimitOrders<I, const D: u8, BaseOrQuote, UserOrderId>
 where

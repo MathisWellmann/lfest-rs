@@ -42,7 +42,7 @@ fn submit_limit_sell_order_no_position() {
                 )
             )
             .unwrap(),
-        vec![expected_order_update]
+        &vec![expected_order_update]
     );
     exchange
         .update_state(
@@ -103,7 +103,7 @@ fn submit_limit_sell_order_no_position() {
                 )
             )
             .unwrap(),
-        vec![expected_order_update]
+        &vec![expected_order_update]
     );
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
@@ -189,7 +189,7 @@ fn submit_limit_sell_order_below_bid() {
                 &bba!(QuoteCurrency::new(99, 0), QuoteCurrency::new(100, 0))
             )
             .unwrap(),
-        Vec::new()
+        &Vec::new()
     );
     let order = LimitOrder::new(
         Side::Sell,

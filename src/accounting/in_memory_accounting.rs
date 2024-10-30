@@ -79,6 +79,7 @@ where
         Ok(())
     }
 
+    #[inline]
     fn margin_balance_of(&self, account: AccountId) -> Result<BaseOrQuote> {
         self.margin_accounts
             .get(account)

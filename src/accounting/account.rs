@@ -24,14 +24,17 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
 {
+    #[inline(always)]
     pub(crate) fn post_debit(&mut self, amount: BaseOrQuote) {
         self.debits_posted += amount;
     }
 
+    #[inline(always)]
     pub(crate) fn post_credit(&mut self, amount: BaseOrQuote) {
         self.credits_posted += amount;
     }
 
+    #[inline(always)]
     pub(crate) fn net_balance(&self) -> BaseOrQuote {
         self.debits_posted - self.credits_posted
     }

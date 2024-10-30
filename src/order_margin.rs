@@ -37,6 +37,7 @@ where
             active_limit_orders: ActiveLimitOrders::new(max_active_orders),
         }
     }
+
     pub(crate) fn update(
         &mut self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,

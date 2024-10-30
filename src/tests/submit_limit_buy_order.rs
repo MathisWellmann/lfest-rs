@@ -52,7 +52,7 @@ fn submit_limit_buy_order_no_position() {
                 )
             )
             .unwrap(),
-        vec![expected_order_update]
+        &vec![expected_order_update]
     );
     let bid = QuoteCurrency::new(96, 0);
     let ask = QuoteCurrency::new(99, 0);
@@ -120,7 +120,7 @@ fn submit_limit_buy_order_no_position() {
                 )
             )
             .unwrap(),
-        vec![expected_order_update]
+        &vec![expected_order_update]
     );
     assert_eq!(exchange.position(), &Position::Neutral);
 }
@@ -234,7 +234,7 @@ fn submit_limit_buy_order_with_long() {
                 &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
             )
             .unwrap(),
-        Vec::new()
+        &Vec::new()
     );
 
     // Another buy limit order should not work
@@ -276,7 +276,7 @@ fn submit_limit_buy_order_with_long() {
                 )
             )
             .unwrap(),
-        vec![expected_order_update]
+        &vec![expected_order_update]
     );
 
     assert_eq!(exchange.position(), &Position::Neutral);
@@ -363,7 +363,7 @@ fn submit_limit_buy_order_with_short() {
                 )
             )
             .unwrap(),
-        vec![expected_order_update]
+        &vec![expected_order_update]
     );
 
     assert_eq!(exchange.position(), &Position::Neutral);
@@ -380,7 +380,7 @@ fn submit_limit_buy_order_above_ask() {
                 &bba!(QuoteCurrency::new(99, 0), QuoteCurrency::new(100, 0))
             )
             .unwrap(),
-        Vec::new()
+        &Vec::new()
     );
     let order = LimitOrder::new(
         Side::Buy,

@@ -221,7 +221,8 @@ fn limit_orders_2() {
                 Side::Sell
             ),
         )
-        .unwrap();
+        .unwrap()
+        .clone();
     let _ = exchange
         .update_state(
             1.into(),
