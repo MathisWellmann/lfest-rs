@@ -51,10 +51,11 @@ fn criterion_benchmark(c: &mut Criterion) {
     let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
     let mut exchange = Exchange::new(acc_tracker, config);
     exchange
-        .update_state(
-            0.into(),
-            &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0)),
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 0.into(),
+        })
         .expect("is valid market update");
 
     let order = MarketOrder::new(Side::Buy, QuoteCurrency::new(1, 2)).unwrap();

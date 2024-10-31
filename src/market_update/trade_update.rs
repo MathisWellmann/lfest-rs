@@ -2,7 +2,7 @@ use super::MarketUpdate;
 use crate::{
     order_filters::{enforce_max_price, enforce_min_price, enforce_step_size},
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side},
-    types::UserOrderIdT,
+    types::{TimestampNs, UserOrderIdT},
     utils::min,
     Result,
 };
@@ -14,6 +14,8 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
 {
+    /// The nanosecond timestamp at which this trade occurred at the exchange.
+    pub timestamp_exchange_ns: TimestampNs,
     /// The price at which the trade executed at.
     pub price: QuoteCurrency<I, D>,
     /// The executed quantity.
@@ -81,17 +83,11 @@ where
 
     #[inline(always)]
     fn update_market_state(&self, _market_state: &mut MarketState<I, D>) {}
-}
-/// Creates the `Trade` struct used as a `MarketUpdate`.
-#[macro_export]
-macro_rules! trade {
-    ( $price:expr, $quantity:expr, $side:expr ) => {{
-        $crate::prelude::Trade {
-            price: $price,
-            quantity: $quantity,
-            side: $side,
-        }
-    }};
+
+    #[inline(always)]
+    fn timestamp_exchange_ns(&self) -> TimestampNs {
+        self.timestamp_exchange_ns
+    }
 }
 
 #[cfg(test)]
@@ -111,6 +107,7 @@ mod tests {
             price,
             quantity,
             side,
+            timestamp_exchange_ns: 0.into(),
         };
 
         let offset = match side {
@@ -135,6 +132,7 @@ mod tests {
             price,
             quantity,
             side,
+            timestamp_exchange_ns: 0.into(),
         };
         let offset = match side {
             Side::Buy => QuoteCurrency::new(-1, 0),
@@ -158,11 +156,11 @@ mod tests {
     fn size_of_trade() {
         assert_eq!(
             std::mem::size_of::<Trade<i32, 2, BaseCurrency<i32, 2>>>(),
-            12
+            24
         );
         assert_eq!(
             std::mem::size_of::<Trade<i64, 2, BaseCurrency<i64, 2>>>(),
-            24
+            32
         );
     }
 }

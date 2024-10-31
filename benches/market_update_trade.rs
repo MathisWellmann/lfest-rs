@@ -6,6 +6,10 @@ use lfest::prelude::*;
 
 const DECIMALS: u8 = 5;
 
+const TIMESTAMP_COL: usize = 0;
+const PRICE_COL: usize = 1;
+const SIZE_COL: usize = 2;
+
 /// Load trades from csv file
 ///
 /// # Arguments:
@@ -18,14 +22,21 @@ fn load_trades_from_csv(filename: &str) -> Vec<Trade<i64, DECIMALS, QuoteCurrenc
 
     let mut r = csv::Reader::from_reader(f);
 
-    let mut out: Vec<Trade<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>> = Vec::new();
+    // Make sure that the header matches what we are trying to parse.
+    let head = r.headers().expect("CSV file has a header.");
+    assert_eq!(&head[TIMESTAMP_COL], "timestamp");
+    assert_eq!(&head[PRICE_COL], "price");
+    assert_eq!(&head[SIZE_COL], "size");
+
+    let mut out = Vec::with_capacity(1_000_000);
     for record in r.records() {
         let row = record.expect("Can read record.");
 
-        let price = row[1]
+        let ts_ms: i64 = row[TIMESTAMP_COL].parse().expect("Can parse timestamp");
+        let price = row[PRICE_COL]
             .parse::<Decimal<i64, DECIMALS>>()
             .expect("Can parse price");
-        let quantity = row[2]
+        let quantity = row[SIZE_COL]
             .parse::<Decimal<i64, DECIMALS>>()
             .expect("Can parse size");
         assert_ne!(quantity, Decimal::zero());
@@ -40,6 +51,7 @@ fn load_trades_from_csv(filename: &str) -> Vec<Trade<i64, DECIMALS, QuoteCurrenc
             price: QuoteCurrency::from(price),
             quantity: QuoteCurrency::from(quantity),
             side,
+            timestamp_exchange_ns: (ts_ms * 1_000_000).into(),
         };
         out.push(trade);
     }
@@ -50,9 +62,10 @@ fn load_trades_from_csv(filename: &str) -> Vec<Trade<i64, DECIMALS, QuoteCurrenc
 fn generate_quotes_from_trades(
     trades: &[Trade<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>],
 ) -> Vec<Bba<i64, DECIMALS>> {
-    Vec::from_iter(trades.iter().map(|v| Bba {
-        bid: v.price - QuoteCurrency::one(),
-        ask: v.price + QuoteCurrency::one(),
+    Vec::from_iter(trades.iter().map(|trade| Bba {
+        bid: trade.price - QuoteCurrency::one(),
+        ask: trade.price + QuoteCurrency::one(),
+        timestamp_exchange_ns: trade.timestamp_exchange_ns,
     }))
 }
 
@@ -72,11 +85,8 @@ fn update_state<I, const D: u8, BaseOrQuote, U>(
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     U: MarketUpdate<I, D, BaseOrQuote, ()>,
 {
-    for (i, trade) in trades.into_iter().enumerate() {
-        let ts_ns: TimestampNs = (i as i64).into();
-        exchange
-            .update_state(ts_ns, trade)
-            .expect("is a valid update");
+    for trade in trades.into_iter() {
+        exchange.update_state(trade).expect("is a valid update");
     }
 }
 

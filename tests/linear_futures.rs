@@ -10,13 +10,11 @@ fn lin_long_market_win_full() {
     let mut accounting = InMemoryTransactionAccounting::new(starting_balance);
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
-        .update_state(
-            0.into(),
-            &Bba {
-                bid: QuoteCurrency::new(99, 0),
-                ask: QuoteCurrency::new(100, 0),
-            },
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(99, 0),
+            ask: QuoteCurrency::new(100, 0),
+            timestamp_exchange_ns: 0.into(),
+        })
         .unwrap();
     assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 0);
     assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
@@ -42,7 +40,13 @@ fn lin_long_market_win_full() {
         .unwrap();
     let bid = QuoteCurrency::new(100, 0);
     let ask = QuoteCurrency::new(101, 0);
-    let order_updates = exchange.update_state(0.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 1.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 0);
     assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
@@ -88,7 +92,13 @@ fn lin_long_market_win_full() {
 
     let bid = QuoteCurrency::new(200, 0);
     let ask = QuoteCurrency::new(201, 0);
-    let order_updates = exchange.update_state(0.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 2.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange

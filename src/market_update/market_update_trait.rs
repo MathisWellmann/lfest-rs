@@ -1,6 +1,6 @@
 use crate::{
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter},
-    types::UserOrderIdT,
+    types::{TimestampNs, UserOrderIdT},
     Result,
 };
 
@@ -27,4 +27,7 @@ where
 
     /// Update the `MarketState` with new information.
     fn update_market_state(&self, market_state: &mut MarketState<I, D>);
+
+    /// The nanosecond timestamp when the market update occurred at the exchange.
+    fn timestamp_exchange_ns(&self) -> TimestampNs;
 }

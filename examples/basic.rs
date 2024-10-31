@@ -53,10 +53,11 @@ fn main() {
     for (i, p) in prices.into_iter().enumerate() {
         let spread = Decimal::try_from_scaled(1, 1).unwrap();
         let exec_orders = exchange
-            .update_state(
-                (i as i64).into(),
-                &bba!(QuoteCurrency::from(p), QuoteCurrency::from(p + spread)),
-            )
+            .update_state(&Bba {
+                bid: QuoteCurrency::from(p),
+                ask: QuoteCurrency::from(p + spread),
+                timestamp_exchange_ns: (i as i64).into(),
+            })
             .expect("Got REKT. Try again next time :D");
         if !exec_orders.is_empty() {
             println!("executed orders: {:?}", exec_orders);

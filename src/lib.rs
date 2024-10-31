@@ -39,7 +39,6 @@ pub mod prelude {
         account_tracker::{AccountTracker, FullAccountTracker, NoAccountTracker},
         accounting::*,
         active_limit_orders::ActiveLimitOrders,
-        bba,
         config::Config,
         contract_specification::*,
         exchange::{Account, CancelBy, Exchange},

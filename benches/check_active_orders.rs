@@ -40,10 +40,13 @@ fn criterion_benchmark(c: &mut Criterion) {
                 InMemoryTransactionAccounting<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
                 NoAccountTracker,
             >::new(acc_tracker.clone(), config.clone());
-            let ts_ns: TimestampNs = 0.into();
-            let market_update = bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0));
+            let market_update = Bba {
+                bid: QuoteCurrency::new(100, 0),
+                ask: QuoteCurrency::new(101, 0),
+                timestamp_exchange_ns: 0.into(),
+            };
             exchange
-                .update_state(ts_ns, &market_update)
+                .update_state(&market_update)
                 .expect("is valid market update");
             let order = LimitOrder::new(
                 Side::Buy,
@@ -55,9 +58,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 exchange.submit_limit_order(order.clone()).unwrap();
             }
             b.iter(|| {
-                let _ = black_box(
-                    exchange.check_active_orders(black_box(&market_update), black_box(ts_ns)),
-                );
+                let _ = black_box(exchange.check_active_orders(black_box(&market_update)));
             })
         });
     }

@@ -2,7 +2,7 @@ use const_decimal::Decimal;
 
 use crate::{
     mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, test_fee_maker,
-    test_fee_taker, trade,
+    test_fee_taker,
 };
 
 #[test]
@@ -10,10 +10,11 @@ use crate::{
 fn submit_limit_buy_order_no_position() {
     let mut exchange = mock_exchange_linear();
     assert!(exchange
-        .update_state(
-            0.into(),
-            &bba!(QuoteCurrency::new(99, 0), QuoteCurrency::new(100, 0))
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(99, 0),
+            ask: QuoteCurrency::new(100, 0),
+            timestamp_exchange_ns: 0.into()
+        })
         .unwrap()
         .is_empty());
 
@@ -43,21 +44,23 @@ fn submit_limit_buy_order_no_position() {
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(
-                0.into(),
-                &trade!(
-                    QuoteCurrency::new(97, 0),
-                    BaseCurrency::new(5, 0),
-                    Side::Sell
-                )
-            )
+            .update_state(&Trade {
+                price: QuoteCurrency::new(97, 0),
+                quantity: BaseCurrency::new(5, 0),
+                side: Side::Sell,
+                timestamp_exchange_ns: 0.into()
+            })
             .unwrap(),
         &vec![expected_order_update]
     );
     let bid = QuoteCurrency::new(96, 0);
     let ask = QuoteCurrency::new(99, 0);
     assert!(exchange
-        .update_state(0.into(), &bba!(bid, ask))
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 1.into()
+        })
         .unwrap()
         .is_empty());
     let mut accounting = InMemoryTransactionAccounting::new(QuoteCurrency::new(1000, 0));
@@ -96,29 +99,29 @@ fn submit_limit_buy_order_no_position() {
     exchange.submit_limit_order(order.clone()).unwrap();
 
     assert!(exchange
-        .update_state(
-            0.into(),
-            &bba!(QuoteCurrency::new(96, 0), QuoteCurrency::new(97, 0))
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(96, 0),
+            ask: QuoteCurrency::new(97, 0),
+            timestamp_exchange_ns: 2.into()
+        })
         .unwrap()
         .is_empty());
 
-    let meta = ExchangeOrderMeta::new(1.into(), 0.into());
+    let ts: TimestampNs = 1.into();
+    let meta = ExchangeOrderMeta::new(1.into(), ts);
     let mut order = order.into_pending(meta);
     let filled_order = order
-        .fill(order.remaining_quantity(), ts.into())
+        .fill(order.remaining_quantity(), 3.into())
         .expect("order is filled with this.");
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(
-                0.into(),
-                &trade!(
-                    QuoteCurrency::new(99, 0),
-                    BaseCurrency::new(5, 0),
-                    Side::Buy
-                )
-            )
+            .update_state(&Trade {
+                price: QuoteCurrency::new(99, 0),
+                quantity: BaseCurrency::new(5, 0),
+                side: Side::Buy,
+                timestamp_exchange_ns: 3.into()
+            })
             .unwrap(),
         &vec![expected_order_update]
     );
@@ -131,10 +134,11 @@ fn submit_limit_buy_order_no_position() {
 fn submit_limit_buy_order_no_position_max() {
     let mut exchange = mock_exchange_linear();
     assert!(exchange
-        .update_state(
-            0.into(),
-            &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 0.into()
+        })
         .unwrap()
         .is_empty());
 
@@ -195,7 +199,11 @@ fn submit_limit_buy_order_with_long() {
     let bid = QuoteCurrency::new(99, 0);
     let ask = QuoteCurrency::new(100, 0);
     assert!(exchange
-        .update_state(0.into(), &bba!(bid, ask))
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 0.into()
+        })
         .unwrap()
         .is_empty());
     let qty = BaseCurrency::new(9, 0);
@@ -229,10 +237,11 @@ fn submit_limit_buy_order_with_long() {
 
     assert_eq!(
         exchange
-            .update_state(
-                0.into(),
-                &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
-            )
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(100, 0),
+                ask: QuoteCurrency::new(101, 0),
+                timestamp_exchange_ns: 1.into()
+            })
             .unwrap(),
         &Vec::new()
     );
@@ -258,23 +267,20 @@ fn submit_limit_buy_order_with_long() {
     .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
-    let ts = 0;
-    let meta = ExchangeOrderMeta::new(2.into(), ts.into());
+    let meta = ExchangeOrderMeta::new(2.into(), 1.into());
     let mut order = order.into_pending(meta);
     let filled_order = order
-        .fill(order.remaining_quantity(), ts.into())
+        .fill(order.remaining_quantity(), 2.into())
         .expect("order is fully filled");
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(
-                0.into(),
-                &trade!(
-                    QuoteCurrency::new(102, 0),
-                    BaseCurrency::new(9, 0),
-                    Side::Buy
-                )
-            )
+            .update_state(&Trade {
+                price: QuoteCurrency::new(102, 0),
+                quantity: BaseCurrency::new(9, 0),
+                side: Side::Buy,
+                timestamp_exchange_ns: 2.into()
+            })
             .unwrap(),
         &vec![expected_order_update]
     );
@@ -288,10 +294,11 @@ fn submit_limit_buy_order_with_short() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
-        .update_state(
-            0.into(),
-            &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 0.into()
+        })
         .unwrap()
         .is_empty());
     let order = MarketOrder::new(Side::Sell, BaseCurrency::new(9, 0)).unwrap();
@@ -345,23 +352,20 @@ fn submit_limit_buy_order_with_short() {
     .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
-    let ts = 0;
-    let meta = ExchangeOrderMeta::new(2.into(), ts.into());
+    let meta = ExchangeOrderMeta::new(2.into(), 0.into());
     let mut order = order.into_pending(meta);
     let filled_order = order
-        .fill(order.remaining_quantity(), ts.into())
+        .fill(order.remaining_quantity(), 1.into())
         .expect("Order is filled with this.");
     let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
     assert_eq!(
         exchange
-            .update_state(
-                0.into(),
-                &trade!(
-                    QuoteCurrency::new(99, 0),
-                    BaseCurrency::new(9, 0),
-                    Side::Sell
-                )
-            )
+            .update_state(&Trade {
+                price: QuoteCurrency::new(99, 0),
+                quantity: BaseCurrency::new(9, 0),
+                side: Side::Sell,
+                timestamp_exchange_ns: 1.into(),
+            })
             .unwrap(),
         &vec![expected_order_update]
     );
@@ -375,10 +379,11 @@ fn submit_limit_buy_order_above_ask() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
-            .update_state(
-                0.into(),
-                &bba!(QuoteCurrency::new(99, 0), QuoteCurrency::new(100, 0))
-            )
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(99, 0),
+                ask: QuoteCurrency::new(100, 0),
+                timestamp_exchange_ns: 0.into()
+            })
             .unwrap(),
         &Vec::new()
     );

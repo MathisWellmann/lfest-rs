@@ -1,8 +1,7 @@
 //! Test file for the inverse futures mode of the exchange
 
 use lfest::{
-    mock_exchange_inverse, prelude::*, test_fee_maker, test_fee_taker, trade,
-    MockTransactionAccounting,
+    mock_exchange_inverse, prelude::*, test_fee_maker, test_fee_taker, MockTransactionAccounting,
 };
 use num_traits::{One, Zero};
 
@@ -13,10 +12,11 @@ fn inv_long_market_win_full() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
-        .update_state(
-            0.into(),
-            &bba!(QuoteCurrency::new(999, 0), QuoteCurrency::new(1000, 0)),
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(999, 0),
+            ask: QuoteCurrency::new(1000, 0),
+            timestamp_exchange_ns: 0.into(),
+        })
         .unwrap();
 
     let value = exchange.user_balances().available_wallet_balance * BaseCurrency::new(8, 1);
@@ -26,7 +26,13 @@ fn inv_long_market_win_full() {
 
     let bid = QuoteCurrency::new(1000, 0);
     let ask = QuoteCurrency::new(1001, 0);
-    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 1.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
 
     let fee_quote = size * *exchange.config().contract_spec().fee_taker().as_ref();
@@ -60,7 +66,13 @@ fn inv_long_market_win_full() {
 
     let bid = QuoteCurrency::new(2000, 0);
     let ask = QuoteCurrency::new(2001, 0);
-    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 1.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange
@@ -102,7 +114,13 @@ fn inv_long_market_loss_full() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(999, 0);
     let ask = QuoteCurrency::new(1000, 0);
-    let order_updates = exchange.update_state(0.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 0.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
 
     let o = MarketOrder::new(Side::Buy, QuoteCurrency::new(800, 0)).unwrap();
@@ -140,7 +158,13 @@ fn inv_long_market_loss_full() {
 
     let bid = QuoteCurrency::new(800, 0);
     let ask = QuoteCurrency::new(801, 0);
-    let order_updates = exchange.update_state(2.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 2.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange
@@ -186,7 +210,11 @@ fn inv_short_market_win_full() {
     let fee_taker = exchange.config().contract_spec().fee_taker();
     let bid = QuoteCurrency::new(1000, 0);
     assert!(exchange
-        .update_state(0.into(), &bba!(bid, QuoteCurrency::new(1001, 0)))
+        .update_state(&Bba {
+            bid,
+            ask: QuoteCurrency::new(1001, 0),
+            timestamp_exchange_ns: 0.into()
+        })
         .unwrap()
         .is_empty());
 
@@ -219,10 +247,11 @@ fn inv_short_market_win_full() {
     assert_eq!(exchange.position().outstanding_fees(), fee0);
 
     assert!(exchange
-        .update_state(
-            1.into(),
-            &bba!(QuoteCurrency::new(799, 0), QuoteCurrency::new(800, 0))
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(799, 0),
+            ask: QuoteCurrency::new(800, 0),
+            timestamp_exchange_ns: 1.into()
+        })
         .unwrap()
         .is_empty());
     assert_eq!(
@@ -239,7 +268,13 @@ fn inv_short_market_win_full() {
 
     let bid = QuoteCurrency::new(799, 0);
     let ask = QuoteCurrency::new(800, 0);
-    let order_updates = exchange.update_state(2.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 2.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
 
     let fee_quote0 = size * *exchange.config().contract_spec().fee_taker().as_ref();
@@ -273,10 +308,11 @@ fn inv_short_market_loss_full() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
-        .update_state(
-            0.into(),
-            &bba!(QuoteCurrency::new(1000, 0), QuoteCurrency::new(1001, 0))
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(1000, 0),
+            ask: QuoteCurrency::new(1001, 0),
+            timestamp_exchange_ns: 0.into()
+        })
         .unwrap()
         .is_empty());
 
@@ -288,7 +324,11 @@ fn inv_short_market_loss_full() {
     let bid = QuoteCurrency::new(999, 0);
     let ask = QuoteCurrency::new(1000, 0);
     assert!(exchange
-        .update_state(1.into(), &bba!(bid, ask))
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 1.into()
+        })
         .unwrap()
         .is_empty());
 
@@ -321,10 +361,11 @@ fn inv_short_market_loss_full() {
     assert_eq!(exchange.position().outstanding_fees(), fees);
 
     assert_eq!(
-        exchange.update_state(
-            2.into(),
-            &bba!(QuoteCurrency::new(1999, 0), QuoteCurrency::new(2000, 0))
-        ),
+        exchange.update_state(&Bba {
+            bid: QuoteCurrency::new(1999, 0),
+            ask: QuoteCurrency::new(2000, 0),
+            timestamp_exchange_ns: 2.into()
+        }),
         Err(Error::RiskError(RiskError::Liquidate))
     );
 
@@ -347,10 +388,11 @@ fn inv_long_market_win_partial() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let order_updates = exchange
-        .update_state(
-            0.into(),
-            &bba!(QuoteCurrency::new(999, 0), QuoteCurrency::new(1000, 0)),
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(999, 0),
+            ask: QuoteCurrency::new(1000, 0),
+            timestamp_exchange_ns: 0.into(),
+        })
         .unwrap();
     assert!(order_updates.is_empty());
 
@@ -361,7 +403,13 @@ fn inv_long_market_win_partial() {
 
     let bid = QuoteCurrency::new(1000, 0);
     let ask = QuoteCurrency::new(1001, 0);
-    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 1.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
 
     let fee_0 = BaseCurrency::convert_from(size, bid) * *test_fee_taker().as_ref();
@@ -391,10 +439,11 @@ fn inv_long_market_win_partial() {
     assert_eq!(exchange.position().outstanding_fees(), fee_0);
 
     assert!(exchange
-        .update_state(
-            1.into(),
-            &bba!(QuoteCurrency::new(2000, 0), QuoteCurrency::new(2001, 0))
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(2000, 0),
+            ask: QuoteCurrency::new(2001, 0),
+            timestamp_exchange_ns: 1.into()
+        })
         .unwrap()
         .is_empty());
 
@@ -414,7 +463,13 @@ fn inv_long_market_win_partial() {
 
     let bid = QuoteCurrency::new(2000, 0);
     let ask = QuoteCurrency::new(2001, 0);
-    let order_updates = exchange.update_state(2.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 2.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
 
     assert_eq!(exchange.position().quantity(), QuoteCurrency::new(400, 0));
@@ -446,7 +501,13 @@ fn inv_long_market_loss_partial() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(999, 0);
     let ask = QuoteCurrency::new(1000, 0);
-    let order_updates = exchange.update_state(0.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 0.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
 
     let qty = QuoteCurrency::new(800, 0);
@@ -454,7 +515,11 @@ fn inv_long_market_loss_partial() {
     let o = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(o).unwrap();
     assert!(exchange
-        .update_state(1.into(), &bba!(bid, QuoteCurrency::new(1000, 0)))
+        .update_state(&Bba {
+            bid,
+            ask: QuoteCurrency::new(1000, 0),
+            timestamp_exchange_ns: 1.into()
+        })
         .unwrap()
         .is_empty());
     let entry_price = QuoteCurrency::new(1000, 0);
@@ -472,7 +537,11 @@ fn inv_long_market_loss_partial() {
 
     let bid = QuoteCurrency::new(800, 0);
     let order_updates = exchange
-        .update_state(1.into(), &bba!(bid, QuoteCurrency::new(801, 0)))
+        .update_state(&Bba {
+            bid,
+            ask: QuoteCurrency::new(801, 0),
+            timestamp_exchange_ns: 2.into(),
+        })
         .unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
@@ -489,7 +558,13 @@ fn inv_long_market_loss_partial() {
 
     let bid = QuoteCurrency::new(800, 0);
     let ask = QuoteCurrency::new(801, 0);
-    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 3.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
 
     assert_eq!(exchange.position().quantity(), QuoteCurrency::new(400, 0));
@@ -524,7 +599,11 @@ fn inv_short_market_win_partial() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(1000, 0);
     let _ = exchange
-        .update_state(0.into(), &bba!(bid, QuoteCurrency::new(1001, 0)))
+        .update_state(&Bba {
+            bid,
+            ask: QuoteCurrency::new(1001, 0),
+            timestamp_exchange_ns: 0.into(),
+        })
         .unwrap();
 
     let qty = QuoteCurrency::new(800, 0);
@@ -533,7 +612,13 @@ fn inv_short_market_win_partial() {
     exchange.submit_market_order(o).unwrap();
     let bid = QuoteCurrency::new(999, 0);
     let ask = QuoteCurrency::new(1000, 0);
-    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 1.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
 
     assert_eq!(
@@ -563,7 +648,11 @@ fn inv_short_market_win_partial() {
 
     let ask = QuoteCurrency::new(800, 0);
     let order_updates = exchange
-        .update_state(2.into(), &bba!(QuoteCurrency::new(799, 0), ask))
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(799, 0),
+            ask,
+            timestamp_exchange_ns: 2.into(),
+        })
         .unwrap();
     assert!(order_updates.is_empty());
 
@@ -580,7 +669,13 @@ fn inv_short_market_win_partial() {
     exchange.submit_market_order(o).unwrap();
     let bid = QuoteCurrency::new(799, 0);
     let ask = QuoteCurrency::new(800, 0);
-    let order_updates = exchange.update_state(3.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 3.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
 
     assert_eq!(
@@ -618,10 +713,11 @@ fn inv_short_market_loss_partial() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let order_updates = exchange
-        .update_state(
-            0.into(),
-            &bba!(QuoteCurrency::new(1000, 0), QuoteCurrency::new(1001, 0)),
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(1000, 0),
+            ask: QuoteCurrency::new(1001, 0),
+            timestamp_exchange_ns: 0.into(),
+        })
         .unwrap();
     assert!(order_updates.is_empty());
 
@@ -633,7 +729,13 @@ fn inv_short_market_loss_partial() {
 
     let bid = QuoteCurrency::new(999, 0);
     let ask = QuoteCurrency::new(1000, 0);
-    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 1.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
 
     let fee_quote1 = size * *exchange.config().contract_spec().fee_taker().as_ref();
@@ -667,7 +769,11 @@ fn inv_short_market_loss_partial() {
     let bid = QuoteCurrency::new(1999, 0);
     let ask = QuoteCurrency::new(2000, 0);
     assert_eq!(
-        exchange.update_state(1.into(), &bba!(bid, ask)),
+        exchange.update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 2.into()
+        }),
         Err(Error::RiskError(RiskError::Liquidate))
     );
     assert_eq!(exchange.position(), &Position::Neutral);
@@ -689,7 +795,11 @@ fn inv_test_market_roundtrip() {
     let fee_taker = exchange.config().contract_spec().fee_taker();
     let ask = QuoteCurrency::new(1000, 0);
     assert!(exchange
-        .update_state(0.into(), &bba!(QuoteCurrency::new(999, 0), ask))
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(999, 0),
+            ask,
+            timestamp_exchange_ns: 0.into()
+        })
         .unwrap()
         .is_empty());
 
@@ -700,7 +810,11 @@ fn inv_test_market_roundtrip() {
     let bid = QuoteCurrency::new(1000, 0);
     let ask = QuoteCurrency::new(1001, 0);
     assert!(exchange
-        .update_state(1.into(), &bba!(bid, ask))
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 1.into()
+        })
         .unwrap()
         .is_empty());
 
@@ -731,7 +845,13 @@ fn inv_execute_limit() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(1000, 0);
     let ask = QuoteCurrency::new(1001, 0);
-    let _ = exchange.update_state(0.into(), &bba!(bid, ask)).unwrap();
+    let _ = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 0.into(),
+        })
+        .unwrap();
 
     let limit_price = QuoteCurrency::new(900, 0);
     let qty = QuoteCurrency::new(450, 0);
@@ -749,19 +869,23 @@ fn inv_execute_limit() {
     );
 
     let order_updates = exchange
-        .update_state(
-            1.into(),
-            &trade!(
-                QuoteCurrency::new(899, 0),
-                QuoteCurrency::new(450, 0),
-                Side::Sell
-            ),
-        )
+        .update_state(&Trade {
+            price: QuoteCurrency::new(899, 0),
+            quantity: QuoteCurrency::new(450, 0),
+            side: Side::Sell,
+            timestamp_exchange_ns: 1.into(),
+        })
         .unwrap();
     assert_eq!(order_updates.len(), 1);
     let bid = QuoteCurrency::new(750, 0);
     let ask = QuoteCurrency::new(751, 0);
-    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 2.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
 
     assert_eq!(exchange.market_state().bid(), QuoteCurrency::new(750, 0));
@@ -796,19 +920,23 @@ fn inv_execute_limit() {
     assert_eq!(exchange.active_limit_orders().len(), 1);
 
     let order_updates = exchange
-        .update_state(
-            1.into(),
-            &trade!(
-                QuoteCurrency::new(1001, 0),
-                QuoteCurrency::new(450, 0),
-                Side::Buy
-            ),
-        )
+        .update_state(&Trade {
+            price: QuoteCurrency::new(1001, 0),
+            quantity: QuoteCurrency::new(450, 0),
+            side: Side::Buy,
+            timestamp_exchange_ns: 3.into(),
+        })
         .unwrap();
     assert_eq!(order_updates.len(), 1);
     let bid = QuoteCurrency::new(1199, 0);
     let ask = QuoteCurrency::new(1200, 0);
-    let order_updates = exchange.update_state(1.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 4.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
 
     assert_eq!(exchange.active_limit_orders().len(), 0);
@@ -831,19 +959,23 @@ fn inv_execute_limit() {
     assert_eq!(exchange.active_limit_orders().len(), 1);
 
     let order_updates = exchange
-        .update_state(
-            2.into(),
-            &trade!(
-                QuoteCurrency::new(1201, 0),
-                QuoteCurrency::new(600, 0),
-                Side::Buy
-            ),
-        )
+        .update_state(&Trade {
+            price: QuoteCurrency::new(1201, 0),
+            quantity: QuoteCurrency::new(600, 0),
+            side: Side::Buy,
+            timestamp_exchange_ns: 5.into(),
+        })
         .unwrap();
     assert_eq!(order_updates.len(), 1);
     let bid = QuoteCurrency::new(1201, 0);
     let ask = QuoteCurrency::new(1202, 0);
-    let order_updates = exchange.update_state(2.into(), &bba!(bid, ask)).unwrap();
+    let order_updates = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 2.into(),
+        })
+        .unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange.position().clone(),

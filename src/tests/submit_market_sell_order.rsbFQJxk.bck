@@ -7,11 +7,10 @@ fn submit_market_sell_order_reject() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
-            .update_state(&Bba {
-                bid: QuoteCurrency::new(100, 0),
-                ask: QuoteCurrency::new(101, 0),
-                timestamp_exchange_ns: 0.into()
-            })
+            .update_state(
+                0.into(),
+                &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
+            )
             .unwrap(),
         &Vec::new()
     );
@@ -30,11 +29,10 @@ fn submit_market_sell_order() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
-            .update_state(&Bba {
-                bid: QuoteCurrency::new(100, 0),
-                ask: QuoteCurrency::new(101, 0),
-                timestamp_exchange_ns: 0.into()
-            })
+            .update_state(
+                0.into(),
+                &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
+            )
             .unwrap(),
         &Vec::new()
     );
@@ -77,11 +75,10 @@ fn submit_market_sell_order_with_short_position() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
-            .update_state(&Bba {
-                bid: QuoteCurrency::new(100, 0),
-                ask: QuoteCurrency::new(101, 0),
-                timestamp_exchange_ns: 0.into()
-            })
+            .update_state(
+                0.into(),
+                &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0))
+            )
             .unwrap(),
         &Vec::new()
     );
@@ -142,11 +139,10 @@ fn submit_market_sell_order_with_long_position() {
     let mut exchange = mock_exchange_linear();
     assert_eq!(
         exchange
-            .update_state(&Bba {
-                bid: QuoteCurrency::new(99, 0),
-                ask: QuoteCurrency::new(100, 0),
-                timestamp_exchange_ns: 0.into()
-            })
+            .update_state(
+                0.into(),
+                &bba!(QuoteCurrency::new(99, 0), QuoteCurrency::new(100, 0))
+            )
             .unwrap(),
         &Vec::new()
     );
@@ -179,11 +175,10 @@ fn submit_market_sell_order_turnaround_long() {
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(99, 0),
-            ask: QuoteCurrency::new(100, 0),
-            timestamp_exchange_ns: 0.into()
-        })
+        .update_state(
+            0.into(),
+            &bba!(QuoteCurrency::new(99, 0), QuoteCurrency::new(100, 0))
+        )
         .unwrap()
         .is_empty());
 

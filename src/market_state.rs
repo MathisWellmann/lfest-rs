@@ -55,7 +55,6 @@ where
     ///
     pub(crate) fn update_state<U, BaseOrQuote, UserOrderId>(
         &mut self,
-        timestamp_ns: TimestampNs,
         market_update: &U,
         price_filter: &PriceFilter<I, D>,
     ) -> Result<()>
@@ -68,20 +67,20 @@ where
         debug_assert!(market_update.validate_market_update(price_filter).is_ok());
         market_update.update_market_state(self);
 
-        self.current_ts_ns = timestamp_ns;
+        self.current_ts_ns = market_update.timestamp_exchange_ns();
         self.step += 1;
 
         Ok(())
     }
 
     /// Get the mid price
-    #[inline]
+    #[inline(always)]
     pub fn mid_price(&self) -> QuoteCurrency<I, D> {
-        (self.bid + self.ask) / Decimal::try_from_scaled(I::from(2).unwrap(), 0).unwrap()
+        (self.bid + self.ask) / Decimal::TWO
     }
 
     /// Get the last observed timestamp in nanoseconts
-    #[inline]
+    #[inline(always)]
     pub fn current_timestamp_ns(&self) -> TimestampNs {
         self.current_ts_ns
     }

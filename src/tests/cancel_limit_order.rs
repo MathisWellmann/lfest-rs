@@ -1,13 +1,14 @@
-use crate::{bba, exchange::CancelBy, mock_exchange_linear, prelude::*};
+use crate::{exchange::CancelBy, mock_exchange_linear, prelude::*};
 
 #[test]
 fn cancel_limit_order() {
     let mut exchange = mock_exchange_linear();
     exchange
-        .update_state(
-            0.into(),
-            &bba!(QuoteCurrency::new(100, 0), QuoteCurrency::new(101, 0)),
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 0.into(),
+        })
         .unwrap();
 
     let limit_price = QuoteCurrency::new(100, 0);

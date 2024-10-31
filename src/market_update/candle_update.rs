@@ -4,7 +4,7 @@ use crate::{
         enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
     },
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side},
-    types::UserOrderIdT,
+    types::{TimestampNs, UserOrderIdT},
     Result,
 };
 
@@ -24,6 +24,8 @@ where
     pub low: QuoteCurrency<I, D>,
     /// The high price of the candle
     pub high: QuoteCurrency<I, D>,
+    /// The nanosecond timestamp at which this event occurred at the exchange.
+    pub timestamp_exchange_ns: TimestampNs,
 }
 
 impl<I, const D: u8> std::fmt::Display for Candle<I, D>
@@ -92,6 +94,11 @@ where
     fn update_market_state(&self, market_state: &mut MarketState<I, D>) {
         market_state.set_bid(self.bid);
         market_state.set_ask(self.ask);
+    }
+
+    #[inline(always)]
+    fn timestamp_exchange_ns(&self) -> TimestampNs {
+        self.timestamp_exchange_ns
     }
 }
 

@@ -174,7 +174,6 @@ where
     /// If Ok, returns updates regarding limit orders, wether partially filled or fully.
     pub fn update_state<U>(
         &mut self,
-        timestamp_ns: TimestampNs,
         market_update: &U,
     ) -> Result<&Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>>
     where
@@ -182,14 +181,14 @@ where
     {
         trace!("update_state: market_update: {market_update}");
 
-        self.market_state.update_state(
-            timestamp_ns,
-            market_update,
-            self.config.contract_spec().price_filter(),
-        )?;
+        self.market_state
+            .update_state(market_update, self.config.contract_spec().price_filter())?;
 
         self.account_tracker.update(&self.market_state);
-        if self.sample_returns_trigger.should_trigger(timestamp_ns) {
+        if self
+            .sample_returns_trigger
+            .should_trigger(market_update.timestamp_exchange_ns())
+        {
             self.account_tracker
                 .sample_user_balances(&self.user_balances(), self.market_state.mid_price());
         }
@@ -206,7 +205,7 @@ where
             return Err(e.into());
         };
 
-        self.check_active_orders(market_update, timestamp_ns);
+        self.check_active_orders(market_update);
         Ok(&self.limit_order_updates)
     }
 
@@ -564,7 +563,7 @@ where
 
     /// Checks for the execution of active limit orders in the account.
     /// NOTE: only public for benchmarking purposes.
-    pub fn check_active_orders<U>(&mut self, market_update: &U, ts_ns: TimestampNs)
+    pub fn check_active_orders<U>(&mut self, market_update: &U)
     where
         U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
     {
@@ -606,7 +605,9 @@ where
                     )
                 );
 
-                if let Some(filled_order) = order.fill(filled_qty, ts_ns) {
+                if let Some(filled_order) =
+                    order.fill(filled_qty, market_update.timestamp_exchange_ns())
+                {
                     self.ids_to_remove.push(order.state().meta().id());
                     self.account_tracker.log_limit_order_fill(true);
                     self.order_margin.remove(CancelBy::OrderId(order.id()));

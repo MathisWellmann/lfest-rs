@@ -1,7 +1,7 @@
 //! Test if a pure limit order strategy works correctly
 
 use lfest::{
-    mock_exchange_linear, mock_exchange_linear_with_account_tracker, prelude::*, trade,
+    mock_exchange_linear, mock_exchange_linear_with_account_tracker, prelude::*,
     MockTransactionAccounting,
 };
 use num_traits::Zero;
@@ -17,7 +17,13 @@ fn limit_orders_only() {
 
     let bid = QuoteCurrency::new(100, 0);
     let ask = QuoteCurrency::new(101, 0);
-    let exec_orders = exchange.update_state(0.into(), &bba!(bid, ask)).unwrap();
+    let exec_orders = exchange
+        .update_state(&Bba {
+            bid,
+            ask,
+            timestamp_exchange_ns: 0.into(),
+        })
+        .unwrap();
     assert_eq!(exec_orders.len(), 0);
 
     let qty = BaseCurrency::new(99, 1);
@@ -56,21 +62,20 @@ fn limit_orders_only() {
     assert_eq!(exchange.fees_paid(), QuoteCurrency::zero());
 
     let order_updates = exchange
-        .update_state(
-            1.into(),
-            &trade!(
-                QuoteCurrency::new(99, 0),
-                BaseCurrency::new(10, 0),
-                Side::Sell
-            ),
-        )
+        .update_state(&Trade {
+            price: QuoteCurrency::new(99, 0),
+            quantity: BaseCurrency::new(10, 0),
+            side: Side::Sell,
+            timestamp_exchange_ns: 1.into(),
+        })
         .unwrap();
     assert_eq!(order_updates.len(), 1);
     let order_updates = exchange
-        .update_state(
-            1.into(),
-            &bba!(QuoteCurrency::new(98, 0), QuoteCurrency::new(99, 0)),
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(98, 0),
+            ask: QuoteCurrency::new(99, 0),
+            timestamp_exchange_ns: 2.into(),
+        })
         .unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
@@ -122,14 +127,12 @@ fn limit_orders_only() {
     exchange.submit_limit_order(o).unwrap();
 
     let order_updates = exchange
-        .update_state(
-            2.into(),
-            &trade!(
-                QuoteCurrency::new(106, 0),
-                BaseCurrency::new(10, 0),
-                Side::Buy
-            ),
-        )
+        .update_state(&Trade {
+            price: QuoteCurrency::new(106, 0),
+            quantity: BaseCurrency::new(10, 0),
+            side: Side::Buy,
+            timestamp_exchange_ns: 3.into(),
+        })
         .unwrap();
     assert!(!order_updates.is_empty());
     assert_eq!(
@@ -142,10 +145,11 @@ fn limit_orders_only() {
         }
     );
     let order_updates = exchange
-        .update_state(
-            2.into(),
-            &bba!(QuoteCurrency::new(106, 0), QuoteCurrency::new(107, 0)),
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(106, 0),
+            ask: QuoteCurrency::new(107, 0),
+            timestamp_exchange_ns: 4.into(),
+        })
         .unwrap();
     assert!(order_updates.is_empty());
 
@@ -186,13 +190,11 @@ fn limit_orders_2() {
     let mut exchange = mock_exchange_linear();
 
     let exec_orders = exchange
-        .update_state(
-            0.into(),
-            &Bba {
-                bid: QuoteCurrency::new(100, 0),
-                ask: QuoteCurrency::new(101, 0),
-            },
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 0.into(),
+        })
         .unwrap();
     assert!(exec_orders.is_empty());
 
@@ -213,21 +215,20 @@ fn limit_orders_2() {
     exchange.submit_limit_order(o).unwrap();
 
     let exec_orders = exchange
-        .update_state(
-            1.into(),
-            &trade!(
-                QuoteCurrency::new(98, 0),
-                BaseCurrency::new(2, 0),
-                Side::Sell
-            ),
-        )
+        .update_state(&Trade {
+            price: QuoteCurrency::new(98, 0),
+            quantity: BaseCurrency::new(2, 0),
+            side: Side::Sell,
+            timestamp_exchange_ns: 1.into(),
+        })
         .unwrap()
         .clone();
     let _ = exchange
-        .update_state(
-            1.into(),
-            &bba!(QuoteCurrency::new(98, 0), QuoteCurrency::new(99, 0)),
-        )
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(98, 0),
+            ask: QuoteCurrency::new(99, 0),
+            timestamp_exchange_ns: 2.into(),
+        })
         .unwrap();
     assert_eq!(exec_orders.len(), 1);
 }
