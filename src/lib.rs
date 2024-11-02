@@ -24,6 +24,8 @@ mod risk_engine;
 mod sample_returns_trigger;
 #[cfg(test)]
 mod tests;
+#[cfg(feature = "trade_aggregation")]
+mod trade_aggregation;
 mod types;
 mod utils;
 

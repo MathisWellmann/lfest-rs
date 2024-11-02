@@ -9,6 +9,7 @@ use crate::{
 
 /// The constant decimal precision.
 pub const DECIMALS: u8 = 5;
+
 /// The maker fee used in tests.
 pub fn test_fee_maker() -> Fee<i64, DECIMALS, Maker> {
     Fee::from(Decimal::try_from_scaled(2, 4).unwrap())

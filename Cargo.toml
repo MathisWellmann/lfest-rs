@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.87.0"
+version = "0.87.1"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2021"
 license-file = "LICENSE"
@@ -32,6 +32,8 @@ quantogram = { version = "0.4", optional = true }
 assert2 = "0.3"
 num = "0.4"
 
+trade_aggregation = { version = "12", optional = true }
+
 [dev-dependencies]
 csv = "1"
 rand = "0.8"
@@ -49,6 +51,7 @@ fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs"
 [features]
 # Functionality that requires estimation of ln return quantiles, e.g `var` or `d_ratio`.
 quantiles = ["dep:quantogram"]
+trade_aggregation = ["dep:trade_aggregation"]
 
 [[bench]]
 name = "market_update_trade"

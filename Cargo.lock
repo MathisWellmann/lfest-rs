@@ -727,7 +727,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lfest"
-version = "0.87.0"
+version = "0.87.1"
 dependencies = [
  "assert2",
  "const-decimal",
@@ -751,6 +751,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tracing-test",
+ "trade_aggregation",
 ]
 
 [[package]]
@@ -1564,6 +1565,27 @@ checksum = "04659ddb06c87d233c566112c1c9c5b9e98256d9af50ec3bc9c8327f873a7568"
 dependencies = [
  "quote",
  "syn 2.0.79",
+]
+
+[[package]]
+name = "trade_aggregation"
+version = "12.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12de0d75fb8c9fa5e62e51e202315d27ea999850a8b7697f2d05cb1ee8f5379d"
+dependencies = [
+ "csv",
+ "thiserror",
+ "trade_aggregation_derive",
+]
+
+[[package]]
+name = "trade_aggregation_derive"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3baef2cac2126ddb2105aed8533e8dedfcedb86a013924e4e3a2401878bad6f"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
