@@ -2,6 +2,7 @@ use super::{Bba, MarketUpdate, Trade};
 use crate::{
     prelude::PriceFilter,
     types::{Currency, Mon, QuoteCurrency, Side, TimestampNs, UserOrderIdT},
+    utils::min,
 };
 
 /// A datastructure for aggregated trades with the ability to approximate realistic taker fill flow.
@@ -107,7 +108,13 @@ where
     BaseOrQuote: Currency<I, D>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(
+            f,
+            "SmartCandle with {} buy volume levels and {} sell volume levels. last_timestamp_exchange_ns: {}",
+            self.aggregate_buy_volume.len(),
+            self.aggregate_sell_volume.len(),
+            self.last_timestamp_exchange_ns
+        )
     }
 }
 
@@ -129,8 +136,18 @@ where
         >,
     ) -> Option<BaseOrQuote> {
         match limit_order.side() {
-            Side::Buy => todo!(),
-            Side::Sell => todo!(),
+            Side::Buy => self
+                .aggregate_sell_volume
+                .iter()
+                .rev()
+                .find(|v| v.0 < limit_order.limit_price())
+                .map(|v| min(v.1, limit_order.remaining_quantity())),
+            Side::Sell => self
+                .aggregate_buy_volume
+                .iter()
+                .rev()
+                .find(|v| v.0 > limit_order.limit_price())
+                .map(|v| min(v.1, limit_order.remaining_quantity())),
         }
     }
 
@@ -161,7 +178,7 @@ mod tests {
     use const_decimal::Decimal;
 
     use super::*;
-    use crate::types::BaseCurrency;
+    use crate::types::{BaseCurrency, ExchangeOrderMeta, LimitOrder};
 
     #[test]
     fn smart_candle_no_buys() {
@@ -387,5 +404,130 @@ mod tests {
                 last_timestamp_exchange_ns: 3.into()
             }
         )
+    }
+
+    #[test]
+    fn smart_candle_execute_limit_order() {
+        let trades = &[
+            Trade {
+                timestamp_exchange_ns: 0.into(),
+                price: QuoteCurrency::<i64, 5>::new(100, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Buy,
+            },
+            Trade {
+                timestamp_exchange_ns: 1.into(),
+                price: QuoteCurrency::<i64, 5>::new(100, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Buy,
+            },
+            Trade {
+                timestamp_exchange_ns: 2.into(),
+                price: QuoteCurrency::<i64, 5>::new(99, 0),
+                quantity: BaseCurrency::new(3, 0),
+                side: Side::Buy,
+            },
+            Trade {
+                timestamp_exchange_ns: 3.into(),
+                price: QuoteCurrency::<i64, 5>::new(101, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Buy,
+            },
+            Trade {
+                timestamp_exchange_ns: 3.into(),
+                price: QuoteCurrency::<i64, 5>::new(102, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Buy,
+            },
+            Trade {
+                timestamp_exchange_ns: 4.into(),
+                price: QuoteCurrency::<i64, 5>::new(100, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Sell,
+            },
+            Trade {
+                timestamp_exchange_ns: 5.into(),
+                price: QuoteCurrency::<i64, 5>::new(100, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Sell,
+            },
+            Trade {
+                timestamp_exchange_ns: 6.into(),
+                price: QuoteCurrency::<i64, 5>::new(99, 0),
+                quantity: BaseCurrency::new(3, 0),
+                side: Side::Sell,
+            },
+            Trade {
+                timestamp_exchange_ns: 7.into(),
+                price: QuoteCurrency::<i64, 5>::new(98, 0),
+                quantity: BaseCurrency::new(2, 0),
+                side: Side::Sell,
+            },
+            Trade {
+                timestamp_exchange_ns: 8.into(),
+                price: QuoteCurrency::<i64, 5>::new(101, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Sell,
+            },
+        ];
+        let bba = Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 0.into(),
+        };
+        let pf = PriceFilter::new(
+            None,
+            None,
+            QuoteCurrency::new(1, 0),
+            Decimal::TWO,
+            Decimal::try_from_scaled(5, 1).unwrap(),
+        )
+        .unwrap();
+        let smart_candle = SmartCandle::new(trades, bba, &pf);
+
+        assert_eq!(
+            smart_candle,
+            SmartCandle {
+                aggregate_buy_volume: vec![
+                    (QuoteCurrency::new(102, 0), BaseCurrency::new(1, 0)),
+                    (QuoteCurrency::new(101, 0), BaseCurrency::new(2, 0)),
+                    (QuoteCurrency::new(100, 0), BaseCurrency::new(4, 0)),
+                    (QuoteCurrency::new(99, 0), BaseCurrency::new(7, 0)),
+                ],
+                aggregate_sell_volume: vec![
+                    (QuoteCurrency::new(98, 0), BaseCurrency::new(2, 0)),
+                    (QuoteCurrency::new(99, 0), BaseCurrency::new(5, 0)),
+                    (QuoteCurrency::new(100, 0), BaseCurrency::new(7, 0)),
+                    (QuoteCurrency::new(101, 0), BaseCurrency::new(8, 0)),
+                ],
+                bba,
+                last_timestamp_exchange_ns: 8.into()
+            }
+        );
+        let limit_buy = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(15, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let limit_order = limit_buy.into_pending(meta);
+        assert_eq!(
+            smart_candle.limit_order_filled(&limit_order),
+            Some(BaseCurrency::new(5, 0))
+        );
+
+        let limit_sell = LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(15, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let limit_order = limit_sell.into_pending(meta);
+        assert_eq!(
+            smart_candle.limit_order_filled(&limit_order),
+            Some(BaseCurrency::new(2, 0))
+        );
     }
 }
