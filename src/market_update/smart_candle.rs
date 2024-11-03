@@ -12,7 +12,9 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
 {
+    /// Each price level contains the cumulative buy quantities of all higher price levels and the current one.
     aggregate_buy_volume: Vec<(QuoteCurrency<I, D>, BaseOrQuote)>,
+    // Each price level contains the cumulative sell quanties of all lower price levels and the current one.
     aggregate_sell_volume: Vec<(QuoteCurrency<I, D>, BaseOrQuote)>,
     bba: Bba<I, D>,
     last_timestamp_exchange_ns: TimestampNs,
@@ -230,7 +232,7 @@ mod tests {
     }
 
     #[test]
-    fn smart_candle() {
+    fn smart_candle_simple() {
         let trades = &[
             Trade {
                 timestamp_exchange_ns: 0.into(),
@@ -267,6 +269,122 @@ mod tests {
                 aggregate_sell_volume: vec![(QuoteCurrency::new(100, 0), BaseCurrency::new(1, 0))],
                 bba,
                 last_timestamp_exchange_ns: 0.into()
+            }
+        )
+    }
+
+    #[test]
+    fn smart_candle_sell_side() {
+        let trades = &[
+            Trade {
+                timestamp_exchange_ns: 0.into(),
+                price: QuoteCurrency::<i64, 5>::new(100, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Sell,
+            },
+            Trade {
+                timestamp_exchange_ns: 1.into(),
+                price: QuoteCurrency::<i64, 5>::new(100, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Sell,
+            },
+            Trade {
+                timestamp_exchange_ns: 2.into(),
+                price: QuoteCurrency::<i64, 5>::new(99, 0),
+                quantity: BaseCurrency::new(3, 0),
+                side: Side::Sell,
+            },
+            Trade {
+                timestamp_exchange_ns: 3.into(),
+                price: QuoteCurrency::<i64, 5>::new(101, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Sell,
+            },
+        ];
+        let bba = Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 0.into(),
+        };
+        let pf = PriceFilter::new(
+            None,
+            None,
+            QuoteCurrency::new(1, 0),
+            Decimal::TWO,
+            Decimal::try_from_scaled(5, 1).unwrap(),
+        )
+        .unwrap();
+        let smart_candle = SmartCandle::new(trades, bba, &pf);
+
+        assert_eq!(
+            smart_candle,
+            SmartCandle {
+                aggregate_buy_volume: Vec::new(),
+                aggregate_sell_volume: vec![
+                    (QuoteCurrency::new(99, 0), BaseCurrency::new(3, 0)),
+                    (QuoteCurrency::new(100, 0), BaseCurrency::new(5, 0)),
+                    (QuoteCurrency::new(101, 0), BaseCurrency::new(6, 0)),
+                ],
+                bba,
+                last_timestamp_exchange_ns: 3.into()
+            }
+        )
+    }
+
+    #[test]
+    fn smart_candle_buy_side() {
+        let trades = &[
+            Trade {
+                timestamp_exchange_ns: 0.into(),
+                price: QuoteCurrency::<i64, 5>::new(100, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Buy,
+            },
+            Trade {
+                timestamp_exchange_ns: 1.into(),
+                price: QuoteCurrency::<i64, 5>::new(100, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Buy,
+            },
+            Trade {
+                timestamp_exchange_ns: 2.into(),
+                price: QuoteCurrency::<i64, 5>::new(99, 0),
+                quantity: BaseCurrency::new(3, 0),
+                side: Side::Buy,
+            },
+            Trade {
+                timestamp_exchange_ns: 3.into(),
+                price: QuoteCurrency::<i64, 5>::new(101, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Buy,
+            },
+        ];
+        let bba = Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 0.into(),
+        };
+        let pf = PriceFilter::new(
+            None,
+            None,
+            QuoteCurrency::new(1, 0),
+            Decimal::TWO,
+            Decimal::try_from_scaled(5, 1).unwrap(),
+        )
+        .unwrap();
+        let smart_candle = SmartCandle::new(trades, bba, &pf);
+
+        assert_eq!(
+            smart_candle,
+            SmartCandle {
+                aggregate_buy_volume: vec![
+                    (QuoteCurrency::new(101, 0), BaseCurrency::new(1, 0)),
+                    (QuoteCurrency::new(100, 0), BaseCurrency::new(3, 0)),
+                    (QuoteCurrency::new(99, 0), BaseCurrency::new(6, 0)),
+                ],
+                aggregate_sell_volume: Vec::new(),
+                bba,
+                last_timestamp_exchange_ns: 3.into()
             }
         )
     }
