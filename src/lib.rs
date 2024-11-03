@@ -51,5 +51,6 @@ pub mod prelude {
         position::Position,
         position_inner::PositionInner,
         types::*,
+        utils::decimal_from_f64,
     };
 }
