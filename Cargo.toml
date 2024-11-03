@@ -31,6 +31,7 @@ sliding_features = "5"
 quantogram = { version = "0.4", optional = true }
 assert2 = "0.3"
 num = "0.4"
+glidesort = "0.1"
 
 trade_aggregation = { version = "12", optional = true }
 
