@@ -5,19 +5,17 @@ use crate::{
 };
 
 /// The interface of what a market update must be able to do.
-pub trait MarketUpdate<I, const D: u8, BaseOrQuote, UserOrderId>:
-    std::fmt::Debug + std::fmt::Display
+pub trait MarketUpdate<I, const D: u8, BaseOrQuote>: std::fmt::Debug + std::fmt::Display
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: UserOrderIdT,
 {
     /// performance optimization to speed up hot-path, when we don't need to check limit order fills for `Bba` updates.
     const CAN_FILL_LIMIT_ORDERS: bool;
 
     /// Checks if this market update triggered a specific limit order,
     /// and if so, then how much.
-    fn limit_order_filled(
+    fn limit_order_filled<UserOrderId: UserOrderIdT>(
         &self,
         limit_order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
     ) -> Option<BaseOrQuote>;

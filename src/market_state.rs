@@ -3,7 +3,7 @@ use getset::{CopyGetters, Getters, Setters};
 
 use crate::{
     prelude::{Currency, MarketUpdate, Mon, PriceFilter, QuoteCurrency},
-    types::{Result, TimestampNs, UserOrderIdT},
+    types::{Result, TimestampNs},
 };
 
 /// Some information regarding the state of the market.
@@ -53,15 +53,14 @@ where
     ///     and if setting order timestamps is enabled in the config.
     /// `market_update`: Newest market information
     ///
-    pub(crate) fn update_state<U, BaseOrQuote, UserOrderId>(
+    pub(crate) fn update_state<U, BaseOrQuote>(
         &mut self,
         market_update: &U,
         price_filter: &PriceFilter<I, D>,
     ) -> Result<()>
     where
-        U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
+        U: MarketUpdate<I, D, BaseOrQuote>,
         BaseOrQuote: Currency<I, D>,
-        UserOrderId: UserOrderIdT,
     {
         // Only in debug mode do we care to validate the market update, because usually the update comes from an exchange source.
         debug_assert!(market_update.validate_market_update(price_filter).is_ok());

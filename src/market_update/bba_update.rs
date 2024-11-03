@@ -43,17 +43,15 @@ where
     }
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderId> MarketUpdate<I, D, BaseOrQuote, UserOrderId>
-    for Bba<I, D>
+impl<I, const D: u8, BaseOrQuote> MarketUpdate<I, D, BaseOrQuote> for Bba<I, D>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: UserOrderIdT,
 {
     const CAN_FILL_LIMIT_ORDERS: bool = false;
 
     #[inline(always)]
-    fn limit_order_filled(
+    fn limit_order_filled<UserOrderId: UserOrderIdT>(
         &self,
         _limit_order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
     ) -> Option<BaseOrQuote> {

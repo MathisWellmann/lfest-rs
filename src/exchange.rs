@@ -177,7 +177,7 @@ where
         market_update: &U,
     ) -> Result<&Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>>
     where
-        U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
+        U: MarketUpdate<I, D, BaseOrQuote>,
     {
         trace!("update_state: market_update: {market_update}");
 
@@ -565,7 +565,7 @@ where
     /// NOTE: only public for benchmarking purposes.
     pub fn check_active_orders<U>(&mut self, market_update: &U)
     where
-        U: MarketUpdate<I, D, BaseOrQuote, UserOrderId>,
+        U: MarketUpdate<I, D, BaseOrQuote>,
     {
         // Clear any potential order updates from the previous iteration.
         self.limit_order_updates.clear();
