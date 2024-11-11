@@ -2,7 +2,7 @@ use getset::{CopyGetters, Getters};
 
 use crate::{
     contract_specification::ContractSpecification,
-    prelude::{ConfigError, MarginCurrency, Mon},
+    prelude::{ConfigError, MarginCurrency, Mon, Position},
 };
 
 #[derive(Debug, Clone, Getters, CopyGetters)]
@@ -25,6 +25,10 @@ where
     /// then its an inverse futures contract.
     #[getset(get_copy = "pub")]
     starting_wallet_balance: BaseOrQuote,
+
+    /// The position to start out with.
+    #[getset(get = "pub")]
+    starting_position: Position<I, D, BaseOrQuote::PairedCurrency>,
 
     /// The maximum number of open orders the user can have at any given time
     #[getset(get_copy = "pub")]
@@ -60,6 +64,7 @@ where
     /// Either a valid `Config` or an Error
     pub fn new(
         starting_balance: BaseOrQuote,
+        starting_position: Position<I, D, BaseOrQuote::PairedCurrency>,
         max_num_open_orders: usize,
         contract_specification: ContractSpecification<I, D, BaseOrQuote::PairedCurrency>,
         sample_returns_every_n_seconds: u64,
@@ -73,6 +78,7 @@ where
 
         Ok(Config {
             starting_wallet_balance: starting_balance,
+            starting_position,
             max_num_open_orders,
             contract_spec: contract_specification,
             sample_returns_every_n_seconds,

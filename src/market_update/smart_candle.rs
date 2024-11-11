@@ -125,6 +125,8 @@ where
 {
     const CAN_FILL_LIMIT_ORDERS: bool = true;
 
+    // TODO: benchmark and optimize this.
+    #[inline]
     fn limit_order_filled<UserOrderId: UserOrderIdT>(
         &self,
         limit_order: &crate::prelude::LimitOrder<

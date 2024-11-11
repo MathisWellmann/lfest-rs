@@ -41,7 +41,14 @@ pub fn mock_exchange_linear() -> Exchange<
         test_fee_taker(),
     )
     .expect("works");
-    let config = Config::new(QuoteCurrency::new(1000, 0), 10, contract_spec, 3600).unwrap();
+    let config = Config::new(
+        QuoteCurrency::new(1000, 0),
+        Position::default(),
+        10,
+        contract_spec,
+        3600,
+    )
+    .unwrap();
     Exchange::new(acc_tracker, config)
 }
 
@@ -68,7 +75,14 @@ pub fn mock_exchange_linear_with_account_tracker(
         test_fee_taker(),
     )
     .expect("works");
-    let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
+    let config = Config::new(
+        starting_balance,
+        Position::default(),
+        200,
+        contract_spec,
+        3600,
+    )
+    .unwrap();
     Exchange::new(acc_tracker, config)
 }
 
@@ -93,7 +107,14 @@ pub fn mock_exchange_inverse(
         test_fee_taker(),
     )
     .expect("works");
-    let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
+    let config = Config::new(
+        starting_balance,
+        Position::default(),
+        200,
+        contract_spec,
+        3600,
+    )
+    .unwrap();
     Exchange::new(acc_tracker, config)
 }
 
