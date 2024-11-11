@@ -1,4 +1,4 @@
-use getset::Getters;
+use getset::{CopyGetters, Getters};
 
 use super::{Bba, MarketUpdate, Trade};
 use crate::{
@@ -9,7 +9,7 @@ use crate::{
 
 /// A datastructure for aggregated trades with the ability to approximate realistic taker fill flow.
 /// Basically a `Candle` buy one that does not blindly fill active limit orders with taker flow that does not exist.
-#[derive(Debug, Clone, Eq, PartialEq, Getters)]
+#[derive(Debug, Clone, Eq, PartialEq, Getters, CopyGetters)]
 pub struct SmartCandle<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
@@ -19,8 +19,10 @@ where
     aggregate_buy_volume: Vec<(QuoteCurrency<I, D>, BaseOrQuote)>,
     // Each price level contains the cumulative sell quanties of all lower price levels and the current one.
     aggregate_sell_volume: Vec<(QuoteCurrency<I, D>, BaseOrQuote)>,
+    /// The best bid and ask information
     #[getset(get_copy = "pub")]
     bba: Bba<I, D>,
+    /// The last timestamp in nanoseconds
     #[getset(get_copy = "pub")]
     last_timestamp_exchange_ns: TimestampNs,
 }
