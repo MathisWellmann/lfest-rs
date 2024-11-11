@@ -128,7 +128,6 @@ where
             config.sample_returns_every_n_seconds() as i64 * 1_000_000_000,
         ));
         let max_active_orders = config.max_num_open_orders();
-        let position = config.starting_position().clone();
         Self {
             config,
             market_state,
@@ -136,7 +135,7 @@ where
             account_tracker,
             next_order_id: OrderId::default(),
             transaction_accounting,
-            position,
+            position: Position::default(),
             // TODO: two such structs, one for buys, the other for sells.
             active_limit_orders: ActiveLimitOrders::new(10_000),
             order_margin: OrderMargin::new(max_active_orders),

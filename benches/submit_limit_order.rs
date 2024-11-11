@@ -29,14 +29,7 @@ fn submit_limit_orders<U>(
         Fee::from(Decimal::try_from_scaled(6, 4).unwrap()),
     )
     .expect("works");
-    let config = Config::new(
-        starting_balance,
-        Position::default(),
-        200,
-        contract_spec,
-        3600,
-    )
-    .unwrap();
+    let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
     let mut exchange = Exchange::<
         i64,
         5,
