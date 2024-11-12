@@ -23,7 +23,6 @@ This makes it impossible to mistakenly input for example a `USD` denoted value i
 Use the existing [`FullAccountTracker`](https://docs.rs/lfest/latest/lfest/account_tracker/struct.FullAccountTracker.html)  
 or implement your own using the [`AccountTracker`](https://docs.rs/lfest/latest/lfest/account_tracker/trait.AccountTracker.html) trait.
 - :heavy_check_mark: good test coverage and heavy use of assertions, to ensure correctness.
-- :mag: Auditable due to its small and consice codebase.
 - :page_with_curl: Supports both `linear` and `inverse` futures contracts, 
 by simply setting the margin currency to either `QuoteCurrency` (linear) or `BaseCurrency` (inverse)
 - :no_entry: Order filtering to make sure the price and quantity follow certain rules. See:    
