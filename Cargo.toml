@@ -15,7 +15,7 @@ exclude = ["/img", "/data", "/.idea", "/vendor", "/.direnv"]
 tracing = { version = "0.1", features = ["release_max_level_info"] }
 tracing-subscriber = "0.3"
 serde = { version = "1", features = ["derive"] }
-thiserror = "1"
+thiserror = "2"
 hashbrown = "0.15"
 derive_more = { version = "1", features = ["full"] }
 # const-decimal = { version = "0.3", git = "https://github.com/OliverNChalk/const-decimal", rev = "47fe246", features = [
