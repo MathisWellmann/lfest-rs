@@ -37,7 +37,6 @@ fn update_state<I, const D: u8, BaseOrQuote, U>(
     }
 }
 
-// TODO: benchmark for different types other than `Decimal`
 fn criterion_benchmark(c: &mut Criterion) {
     let starting_balance = BaseCurrency::new(1, 0);
     let acc_tracker = NoAccountTracker::default();

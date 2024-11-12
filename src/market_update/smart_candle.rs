@@ -15,6 +15,10 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
 {
+    /// The highest price seen during the candle.
+    high: QuoteCurrency<I, D>,
+    /// The lowest price seen during the candle.
+    low: QuoteCurrency<I, D>,
     /// Each price level contains the cumulative buy quantities of all higher price levels and the current one.
     aggregate_buy_volume: Vec<(QuoteCurrency<I, D>, BaseOrQuote)>,
     // Each price level contains the cumulative sell quanties of all lower price levels and the current one.
@@ -54,6 +58,8 @@ where
         // split buy and sell flow.
         let mut buys = Vec::with_capacity(taker_trades.len());
         let mut sells = Vec::with_capacity(taker_trades.len());
+        let mut high = taker_trades[0].price;
+        let mut low = taker_trades[0].price;
 
         for trade in taker_trades {
             // only retain the most important stuff.
@@ -61,6 +67,12 @@ where
             match trade.side {
                 Side::Buy => buys.push((trade.price, trade.quantity)),
                 Side::Sell => sells.push((trade.price, trade.quantity)),
+            }
+            if trade.price < low {
+                low = trade.price;
+            }
+            if trade.price > high {
+                high = trade.price;
             }
         }
 
@@ -100,6 +112,8 @@ where
         }
 
         Self {
+            high,
+            low,
             aggregate_buy_volume,
             aggregate_sell_volume,
             last_timestamp_exchange_ns: taker_trades[taker_trades.len() - 1].timestamp_exchange_ns,
@@ -144,18 +158,26 @@ where
         >,
     ) -> Option<BaseOrQuote> {
         match limit_order.side() {
-            Side::Buy => self
-                .aggregate_sell_volume
-                .iter()
-                .rev()
-                .find(|v| v.0 < limit_order.limit_price())
-                .map(|v| min(v.1, limit_order.remaining_quantity())),
-            Side::Sell => self
-                .aggregate_buy_volume
-                .iter()
-                .rev()
-                .find(|v| v.0 > limit_order.limit_price())
-                .map(|v| min(v.1, limit_order.remaining_quantity())),
+            Side::Buy => {
+                if self.low >= limit_order.limit_price() {
+                    return None;
+                }
+                self.aggregate_sell_volume
+                    .iter()
+                    .rev()
+                    .find(|v| v.0 < limit_order.limit_price())
+                    .map(|v| min(v.1, limit_order.remaining_quantity()))
+            }
+            Side::Sell => {
+                if self.high <= limit_order.limit_price() {
+                    return None;
+                }
+                self.aggregate_buy_volume
+                    .iter()
+                    .rev()
+                    .find(|v| v.0 > limit_order.limit_price())
+                    .map(|v| min(v.1, limit_order.remaining_quantity()))
+            }
         }
     }
 
@@ -217,7 +239,9 @@ mod tests {
                 aggregate_buy_volume: Vec::new(),
                 aggregate_sell_volume: vec![(QuoteCurrency::new(100, 0), BaseCurrency::new(1, 0))],
                 bba,
-                last_timestamp_exchange_ns: 0.into()
+                last_timestamp_exchange_ns: 0.into(),
+                high: QuoteCurrency::new(100, 0),
+                low: QuoteCurrency::new(100, 0)
             }
         )
     }
@@ -251,7 +275,9 @@ mod tests {
                 aggregate_buy_volume: vec![(QuoteCurrency::new(100, 0), BaseCurrency::new(2, 0))],
                 aggregate_sell_volume: Vec::new(),
                 bba,
-                last_timestamp_exchange_ns: 0.into()
+                last_timestamp_exchange_ns: 0.into(),
+                high: QuoteCurrency::new(100, 0),
+                low: QuoteCurrency::new(100, 0),
             }
         )
     }
@@ -293,7 +319,9 @@ mod tests {
                 aggregate_buy_volume: vec![(QuoteCurrency::new(100, 0), BaseCurrency::new(2, 0))],
                 aggregate_sell_volume: vec![(QuoteCurrency::new(100, 0), BaseCurrency::new(1, 0))],
                 bba,
-                last_timestamp_exchange_ns: 0.into()
+                last_timestamp_exchange_ns: 0.into(),
+                high: QuoteCurrency::new(100, 0),
+                low: QuoteCurrency::new(100, 0),
             }
         )
     }
@@ -351,7 +379,9 @@ mod tests {
                     (QuoteCurrency::new(101, 0), BaseCurrency::new(6, 0)),
                 ],
                 bba,
-                last_timestamp_exchange_ns: 3.into()
+                last_timestamp_exchange_ns: 3.into(),
+                high: QuoteCurrency::new(101, 0),
+                low: QuoteCurrency::new(99, 0),
             }
         )
     }
@@ -409,7 +439,9 @@ mod tests {
                 ],
                 aggregate_sell_volume: Vec::new(),
                 bba,
-                last_timestamp_exchange_ns: 3.into()
+                last_timestamp_exchange_ns: 3.into(),
+                high: QuoteCurrency::new(101, 0),
+                low: QuoteCurrency::new(99, 0),
             }
         )
     }
@@ -509,7 +541,9 @@ mod tests {
                     (QuoteCurrency::new(101, 0), BaseCurrency::new(8, 0)),
                 ],
                 bba,
-                last_timestamp_exchange_ns: 8.into()
+                last_timestamp_exchange_ns: 8.into(),
+                high: QuoteCurrency::new(102, 0),
+                low: QuoteCurrency::new(98, 0),
             }
         );
         let limit_buy = LimitOrder::new(

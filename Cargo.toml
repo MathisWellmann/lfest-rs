@@ -48,6 +48,7 @@ fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs"
   "serde-as-str",
   "num-traits",
 ] }
+trade_aggregation = "12"
 
 [features]
 # Functionality that requires estimation of ln return quantiles, e.g `var` or `d_ratio`.
@@ -72,4 +73,8 @@ harness = false
 
 [[bench]]
 name = "check_active_orders"
+harness = false
+
+[[bench]]
+name = "smart_candle"
 harness = false
