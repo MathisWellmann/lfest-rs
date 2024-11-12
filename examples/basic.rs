@@ -1,13 +1,10 @@
 //! Example usage of Exchange using external trade data.
 //! A randomly acting agent places market buy / sell orders every 100 candles
 
-mod load_trades;
-
 use std::time::Instant;
 
 use const_decimal::Decimal;
-use lfest::{account_tracker::FullAccountTracker, prelude::*};
-use load_trades::load_prices_from_csv;
+use lfest::{account_tracker::FullAccountTracker, load_trades_from_csv, prelude::*};
 use rand::{thread_rng, Rng};
 use tracing::error;
 
@@ -45,7 +42,11 @@ fn main() {
     >::new(acc_tracker, config);
 
     // load trades from csv file
-    let prices = load_prices_from_csv::<i64, DECIMALS>("./data/Bitmex_XBTUSD_1M.csv").unwrap();
+    let prices = Vec::from_iter(
+        load_trades_from_csv::<i64, DECIMALS>("./data/Bitmex_XBTUSD_1M.csv")
+            .iter()
+            .map(|t| t.price),
+    );
 
     // use random action every 100 trades to buy or sell
     let mut rng = thread_rng();
@@ -54,8 +55,8 @@ fn main() {
         let spread = Decimal::try_from_scaled(1, 1).unwrap();
         let exec_orders = exchange
             .update_state(&Bba {
-                bid: QuoteCurrency::from(p),
-                ask: QuoteCurrency::from(p + spread),
+                bid: p,
+                ask: p + spread.into(),
                 timestamp_exchange_ns: (i as i64).into(),
             })
             .expect("Got REKT. Try again next time :D");

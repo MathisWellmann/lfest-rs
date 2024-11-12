@@ -2,62 +2,9 @@ use std::hint::black_box;
 
 use const_decimal::Decimal;
 use criterion::{criterion_group, criterion_main, Criterion};
-use lfest::prelude::*;
+use lfest::{load_trades_from_csv, prelude::*};
 
 const DECIMALS: u8 = 5;
-
-const TIMESTAMP_COL: usize = 0;
-const PRICE_COL: usize = 1;
-const SIZE_COL: usize = 2;
-
-/// Load trades from csv file
-///
-/// # Arguments:
-/// filename: The path to the csv file
-///
-/// # Returns
-/// If Ok, A vector of the trades inside the file
-fn load_trades_from_csv(filename: &str) -> Vec<Trade<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>> {
-    let f = std::fs::File::open(filename).expect("Can open file");
-
-    let mut r = csv::Reader::from_reader(f);
-
-    // Make sure that the header matches what we are trying to parse.
-    let head = r.headers().expect("CSV file has a header.");
-    assert_eq!(&head[TIMESTAMP_COL], "timestamp");
-    assert_eq!(&head[PRICE_COL], "price");
-    assert_eq!(&head[SIZE_COL], "size");
-
-    let mut out = Vec::with_capacity(1_000_000);
-    for record in r.records() {
-        let row = record.expect("Can read record.");
-
-        let ts_ms: i64 = row[TIMESTAMP_COL].parse().expect("Can parse timestamp");
-        let price = row[PRICE_COL]
-            .parse::<Decimal<i64, DECIMALS>>()
-            .expect("Can parse price");
-        let quantity = row[SIZE_COL]
-            .parse::<Decimal<i64, DECIMALS>>()
-            .expect("Can parse size");
-        assert_ne!(quantity, Decimal::zero());
-        let side = if quantity < Decimal::ZERO {
-            Side::Sell
-        } else {
-            Side::Buy
-        };
-
-        // convert to Trade
-        let trade = Trade {
-            price: QuoteCurrency::from(price),
-            quantity: QuoteCurrency::from(quantity),
-            side,
-            timestamp_exchange_ns: (ts_ms * 1_000_000).into(),
-        };
-        out.push(trade);
-    }
-
-    out
-}
 
 fn generate_quotes_from_trades(
     trades: &[Trade<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>],

@@ -32,11 +32,11 @@ quantogram = { version = "0.4", optional = true }
 assert2 = "0.3"
 num = "0.4"
 glidesort = "0.1"
+csv = "1"
 
 trade_aggregation = { version = "12", optional = true }
 
 [dev-dependencies]
-csv = "1"
 rand = "0.8"
 rand_distr = "0.4"
 test-case = "3"

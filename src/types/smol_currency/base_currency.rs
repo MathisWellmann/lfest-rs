@@ -61,10 +61,10 @@ where
     /// // 11.65
     /// let d = BaseCurrency::<i64, 5>::new(1165, 2);
     /// // Allow only increments of 0.5
-    /// let quantum = QuoteCurrency::<i64, 5>::new(5, 1);
+    /// let quantum = BaseCurrency::<i64, 5>::new(5, 1);
     /// let q = d.quantize_round_to_zero(quantum);
     /// // 11.5 rounded down to the nearest `quantum`.
-    /// assert_eq!(q, QuoteCurrency::new(115, 1));
+    /// assert_eq!(q, BaseCurrency::new(115, 1));
     /// ```
     #[inline]
     #[must_use]

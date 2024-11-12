@@ -13,6 +13,7 @@ mod active_limit_orders;
 mod config;
 mod contract_specification;
 mod exchange;
+mod load_trades_from_csv;
 mod market_state;
 mod market_update;
 mod mock_exchange;
@@ -29,6 +30,7 @@ mod trade_aggregation;
 mod types;
 mod utils;
 
+pub use load_trades_from_csv::load_trades_from_csv;
 pub use mock_exchange::*;
 pub use types::Result;
 
