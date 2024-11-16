@@ -40,4 +40,10 @@ pub enum Error {
 
     #[error("The maximum number of active orders is reached")]
     MaxNumberOfActiveOrders,
+
+    #[error("Could not convert the in")]
+    IntegerConversion,
+
+    #[error("Unable to create `Decimal`")]
+    UnableToCreateDecimal,
 }

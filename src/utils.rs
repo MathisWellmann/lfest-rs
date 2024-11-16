@@ -46,11 +46,13 @@ pub(crate) fn assert_user_wallet_balance<I, const D: u8, Acc, BaseOrQuote>(
 
 /// Create a `Decimal` from an `f64` value.
 // TODO: maybe upstream this impl to `const_decimal`
-pub fn decimal_from_f64<I: Mon<D>, const D: u8>(val: f64) -> Decimal<I, D> {
+pub fn decimal_from_f64<I: Mon<D>, const D: u8>(val: f64) -> Result<Decimal<I, D>> {
     let scaling_factor = 10_f64.powi(D as i32);
     let scaled: f64 = (val * scaling_factor).round();
-    Decimal::try_from_scaled(I::from(scaled as i64).expect("Can parse scaled integer"), D)
-        .expect("Can create `Decimal` from scaled integer")
+    Ok(
+        Decimal::try_from_scaled(I::from(scaled as i64).ok_or(Error::IntegerConversion)?, D)
+            .ok_or(Error::UnableToCreateDecimal)?,
+    )
 }
 
 #[cfg(test)]
