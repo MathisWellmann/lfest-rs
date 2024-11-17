@@ -36,7 +36,7 @@ fn main() {
         i64,
         DECIMALS,
         QuoteCurrency<i64, DECIMALS>,
-        (),
+        NoUserOrderId,
         InMemoryTransactionAccounting<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
         FullAccountTracker<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
     >::new(acc_tracker, config);

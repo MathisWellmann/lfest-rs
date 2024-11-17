@@ -5,6 +5,7 @@ use const_decimal::Decimal;
 use crate::{
     account_tracker::{FullAccountTracker, NoAccountTracker},
     prelude::*,
+    utils::NoUserOrderId,
 };
 
 /// The constant decimal precision.
@@ -27,7 +28,7 @@ pub fn mock_exchange_linear() -> Exchange<
     i64,
     DECIMALS,
     BaseCurrency<i64, DECIMALS>,
-    (),
+    NoUserOrderId,
     InMemoryTransactionAccounting<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>,
     NoAccountTracker,
 > {
@@ -54,7 +55,7 @@ pub fn mock_exchange_linear_with_account_tracker(
     i64,
     DECIMALS,
     BaseCurrency<i64, DECIMALS>,
-    (),
+    NoUserOrderId,
     InMemoryTransactionAccounting<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>,
     FullAccountTracker<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>,
 > {
@@ -79,7 +80,7 @@ pub fn mock_exchange_inverse(
     i64,
     DECIMALS,
     QuoteCurrency<i64, DECIMALS>,
-    (),
+    NoUserOrderId,
     InMemoryTransactionAccounting<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
     NoAccountTracker,
 > {

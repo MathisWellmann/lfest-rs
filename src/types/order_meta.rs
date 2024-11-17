@@ -24,3 +24,13 @@ impl ExchangeOrderMeta {
         }
     }
 }
+
+impl std::fmt::Display for ExchangeOrderMeta {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ExchangeOrderMeta( id: {}, ts_ns_exchange_received: {})",
+            self.id, self.ts_ns_exchange_received
+        )
+    }
+}

@@ -7,7 +7,7 @@ use lfest::prelude::*;
 const DECIMALS: u8 = 5;
 
 fn submit_limit_orders<U>(
-    order: &LimitOrder<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>, (), NewOrder>,
+    order: &LimitOrder<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>, NoUserOrderId, NewOrder>,
     n: usize,
 ) {
     // Technically the setup code should not be benchmarked.
@@ -34,7 +34,7 @@ fn submit_limit_orders<U>(
         i64,
         5,
         QuoteCurrency<i64, 5>,
-        (),
+        NoUserOrderId,
         InMemoryTransactionAccounting<i64, 5, BaseCurrency<i64, 5>>,
         NoAccountTracker,
     >::new(acc_tracker, config);

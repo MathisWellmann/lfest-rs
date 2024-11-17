@@ -3,6 +3,16 @@ use const_decimal::Decimal;
 
 use crate::prelude::*;
 
+/// When no user specified order id is required.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NoUserOrderId;
+
+impl std::fmt::Display for NoUserOrderId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "")
+    }
+}
+
 /// Return the minimum of two values
 #[inline(always)]
 pub(crate) fn min<T>(v0: T, v1: T) -> T

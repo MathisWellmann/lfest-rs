@@ -164,7 +164,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::ActiveLimitOrders;
-    use crate::types::{BaseCurrency, ExchangeOrderMeta, LimitOrder, QuoteCurrency, Side};
+    use crate::{
+        types::{BaseCurrency, ExchangeOrderMeta, LimitOrder, QuoteCurrency, Side},
+        utils::NoUserOrderId,
+    };
 
     #[test]
     fn size_of_optional_reference() {
@@ -175,7 +178,7 @@ mod tests {
 
     #[test]
     fn active_limit_orders() {
-        let mut alo = ActiveLimitOrders::new(3);
+        let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::new(3);
         let order = LimitOrder::new(
             Side::Buy,
             QuoteCurrency::<i64, 5>::new(100, 0),

@@ -5,7 +5,10 @@ use super::{
     order_meta::ExchangeOrderMeta, order_status::NewOrder, Currency, Filled, FilledQuantity,
     MarginCurrency, Mon, OrderId, Pending, QuoteCurrency, RePricing, TimestampNs, UserOrderIdT,
 };
-use crate::types::{OrderError, Side};
+use crate::{
+    types::{OrderError, Side},
+    utils::NoUserOrderId,
+};
 
 /// Defines a limit order.
 ///
@@ -65,7 +68,7 @@ where
     }
 }
 
-impl<I, const D: u8, BaseOrQuote> LimitOrder<I, D, BaseOrQuote, (), NewOrder>
+impl<I, const D: u8, BaseOrQuote> LimitOrder<I, D, BaseOrQuote, NoUserOrderId, NewOrder>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
@@ -92,7 +95,7 @@ where
             return Err(OrderError::OrderQuantityLTEZero);
         }
         Ok(Self {
-            user_order_id: (),
+            user_order_id: NoUserOrderId,
             state: NewOrder,
             limit_price,
             remaining_quantity: quantity,

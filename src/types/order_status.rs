@@ -4,7 +4,7 @@ use super::{order_meta::ExchangeOrderMeta, Currency, Mon, QuoteCurrency, Timesta
 
 /// A new order has not been received by the exchange and has thus some pieces of information not available.
 /// This also means the various filters (e.g `PriceFilter` and `QuantityFilter`) have not been checked.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, derive_more::Display)]
 pub struct NewOrder;
 
 /// The order is pending execution, but it already has additional information filled in by the exchange.
@@ -40,6 +40,20 @@ where
     }
 }
 
+impl<I, const D: u8, BaseOrQuote> std::fmt::Display for Pending<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Pending ( meta: {}, filled_quantity: {})",
+            self.meta, self.filled_quantity
+        )
+    }
+}
+
 /// Contains the filled order quantity along with the average fill price.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FilledQuantity<I, const D: u8, BaseOrQuote>
@@ -57,6 +71,26 @@ where
         /// The average price it was filled at.
         avg_price: QuoteCurrency<I, D>,
     },
+}
+
+impl<I, const D: u8, BaseOrQuote> std::fmt::Display for FilledQuantity<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FilledQuantity::Unfilled => write!(f, "Unfilled"),
+            FilledQuantity::Filled {
+                cumulative_qty,
+                avg_price,
+            } => write!(
+                f,
+                "Filled( cumulative_qty: {}, avg_price: {})",
+                cumulative_qty, avg_price
+            ),
+        }
+    }
 }
 
 /// The order has been fully filled.
@@ -103,5 +137,19 @@ where
             avg_fill_price,
             filled_qty,
         }
+    }
+}
+
+impl<I, const D: u8, BaseOrQuote> std::fmt::Display for Filled<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Filled( meta: {}, ts_ns_executed: {}, avg_fill_price: {}, filled_qty: {})",
+            self.meta, self.ts_ns_executed, self.avg_fill_price, self.filled_qty
+        )
     }
 }

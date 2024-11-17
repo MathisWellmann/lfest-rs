@@ -193,7 +193,7 @@ mod tests {
     )]
     #[tracing_test::traced_test]
     fn order_margin_neutral_no_orders(leverage: u8) {
-        let order_margin = OrderMargin::<_, 4, _, ()>::new(10);
+        let order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -210,7 +210,7 @@ mod tests {
         [100, 200, 300]
     )]
     fn order_margin_long_no_orders(leverage: u8, position_qty: i32, entry_price: i32) {
-        let order_margin = OrderMargin::<_, 4, _, ()>::new(10);
+        let order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
 
         let mut accounting = MockTransactionAccounting::default();
         let qty = BaseCurrency::new(position_qty, 0);
@@ -236,7 +236,7 @@ mod tests {
         [100, 200, 300]
     )]
     fn order_margin_short_no_orders(leverage: u8, position_qty: i32, entry_price: i32) {
-        let order_margin = OrderMargin::<_, 4, _, ()>::new(10);
+        let order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
 
         let mut accounting = MockTransactionAccounting::default();
         let qty = BaseCurrency::new(position_qty, 0);
@@ -270,7 +270,7 @@ mod tests {
         qty: i32,
         n: usize,
     ) {
-        let mut order_margin = OrderMargin::<_, 4, _, ()>::new(10);
+        let mut order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -322,7 +322,7 @@ mod tests {
         qty: i32,
         n: usize,
     ) {
-        let mut order_margin = OrderMargin::<_, 4, _, ()>::new(10);
+        let mut order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -386,7 +386,7 @@ mod tests {
         qty: i32,
         pos_entry_price: i32,
     ) {
-        let mut order_margin = OrderMargin::<_, 4, _, ()>::new(10);
+        let mut order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -437,7 +437,7 @@ mod tests {
         limit_price: i32,
         qty: i32,
     ) {
-        let mut order_margin = OrderMargin::<_, DECIMALS, _, ()>::new(10);
+        let mut order_margin = OrderMargin::<_, DECIMALS, _, NoUserOrderId>::new(10);
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -578,7 +578,7 @@ mod tests {
     #[tracing_test::traced_test]
     fn order_margin_with_short() {
         let mut accounting = InMemoryTransactionAccounting::new(QuoteCurrency::new(1000, 0));
-        let mut order_margin = OrderMargin::new(10);
+        let mut order_margin = OrderMargin::<i64, 5, _, NoUserOrderId>::new(10);
         let init_margin_req = Decimal::one();
 
         let qty = BaseCurrency::<i64, DECIMALS>::one();

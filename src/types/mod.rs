@@ -72,7 +72,13 @@ where
 }
 
 /// A custom user order id must satisfy this trait bound.
-pub trait UserOrderIdT: Clone + Copy + Eq + PartialEq + std::fmt::Debug + Default {}
+pub trait UserOrderIdT:
+    Clone + Copy + Eq + PartialEq + std::fmt::Debug + std::fmt::Display + Default
+{
+}
 
 // Blanket impl
-impl<T> UserOrderIdT for T where T: Clone + Copy + Eq + PartialEq + std::fmt::Debug + Default {}
+impl<T> UserOrderIdT for T where
+    T: Clone + Copy + Eq + PartialEq + std::fmt::Debug + std::fmt::Display + Default
+{
+}

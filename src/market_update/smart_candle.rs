@@ -208,7 +208,10 @@ mod tests {
     use const_decimal::Decimal;
 
     use super::*;
-    use crate::types::{BaseCurrency, ExchangeOrderMeta, LimitOrder};
+    use crate::{
+        types::{BaseCurrency, ExchangeOrderMeta, LimitOrder},
+        utils::NoUserOrderId,
+    };
 
     #[test]
     fn smart_candle_no_buys() {
@@ -546,7 +549,7 @@ mod tests {
                 low: QuoteCurrency::new(98, 0),
             }
         );
-        let limit_buy = LimitOrder::new(
+        let limit_buy = LimitOrder::<i64, 5, _, NoUserOrderId, _>::new(
             Side::Buy,
             QuoteCurrency::<i64, 5>::new(100, 0),
             BaseCurrency::new(15, 0),
@@ -559,7 +562,7 @@ mod tests {
             Some(BaseCurrency::new(5, 0))
         );
 
-        let limit_sell = LimitOrder::new(
+        let limit_sell = LimitOrder::<i64, 5, _, NoUserOrderId, _>::new(
             Side::Sell,
             QuoteCurrency::<i64, 5>::new(100, 0),
             BaseCurrency::new(15, 0),

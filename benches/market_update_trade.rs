@@ -21,7 +21,7 @@ fn update_state<I, const D: u8, BaseOrQuote, U>(
         I,
         D,
         BaseOrQuote,
-        (),
+        NoUserOrderId,
         InMemoryTransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
         NoAccountTracker,
     >,

@@ -36,7 +36,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 i64,
                 DECIMALS,
                 QuoteCurrency<i64, DECIMALS>,
-                (),
+                NoUserOrderId,
                 InMemoryTransactionAccounting<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
                 NoAccountTracker,
             >::new(acc_tracker.clone(), config.clone());

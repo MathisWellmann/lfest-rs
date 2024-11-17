@@ -30,7 +30,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         DecimalT,
         DECIMALS,
         QuoteCurrency<DecimalT, DECIMALS>,
-        (),
+        NoUserOrderId,
         InMemoryTransactionAccounting<DecimalT, DECIMALS, BaseCurrency<DecimalT, DECIMALS>>,
         NoAccountTracker,
     >::new(acc_tracker, config);

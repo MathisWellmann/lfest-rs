@@ -11,11 +11,11 @@ fn submit_market_orders<I, const D: u8, BaseOrQuote, U>(
         I,
         D,
         BaseOrQuote,
-        (),
+        NoUserOrderId,
         InMemoryTransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
         NoAccountTracker,
     >,
-    order: &MarketOrder<I, D, BaseOrQuote, (), NewOrder>,
+    order: &MarketOrder<I, D, BaseOrQuote, NoUserOrderId, NewOrder>,
     n: usize,
 ) where
     I: Mon<D>,
