@@ -2,7 +2,6 @@ use std::{cmp::Ordering, ops::Neg};
 
 use const_decimal::Decimal;
 use num_traits::Zero;
-use tracing::debug;
 
 use crate::{
     position_inner::PositionInner,
@@ -82,6 +81,7 @@ where
     }
 
     /// Change a position while doing proper accounting and balance transfers.
+    #[tracing::instrument(level = "trace")]
     pub(crate) fn change_position<Acc>(
         &mut self,
         filled_qty: BaseOrQuote,
@@ -97,7 +97,6 @@ where
             filled_qty > BaseOrQuote::zero(),
             "The filled_qty must be greater than zero"
         );
-        debug!("old position: {}", self);
         match self {
             Position::Neutral => {
                 assert_eq!(
@@ -258,8 +257,6 @@ where
                 }
             },
         };
-        // crate::utils::assert_user_wallet_balance(transaction_accounting);
-        debug!("new position: {}", self);
     }
 }
 
@@ -279,5 +276,32 @@ where
                 write!(f, "Short {} @ {}", inner.quantity(), inner.entry_price())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{prelude::*, MockTransactionAccounting};
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn position_change_position() {
+        let mut pos = Position::Short(PositionInner::from_parts(
+            BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(317, 3).unwrap()),
+            QuoteCurrency::from(Decimal::try_from_scaled(958423665, 5).unwrap()),
+            QuoteCurrency::zero(),
+        ));
+        let mut acc = MockTransactionAccounting::default();
+        let init_margin_req = Decimal::ONE;
+        let fees = QuoteCurrency::zero();
+        pos.change_position(
+            BaseCurrency::new(317, 3),
+            QuoteCurrency::new(3020427, 2),
+            Side::Buy,
+            &mut acc,
+            init_margin_req,
+            fees,
+        );
     }
 }

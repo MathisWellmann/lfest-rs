@@ -99,7 +99,7 @@ pub fn mock_exchange_inverse(
 }
 
 /// Mocks `TransactionAccounting` for testing purposes.
-#[derive(Default, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct MockTransactionAccounting;
 
 impl<I, const D: u8, BaseOrQuote> TransactionAccounting<I, D, BaseOrQuote>

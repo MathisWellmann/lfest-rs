@@ -9,7 +9,7 @@ pub use transaction::Transaction;
 use crate::prelude::*;
 
 /// The trait for settling transactions.
-pub trait TransactionAccounting<I, const D: u8, BaseOrQuote>
+pub trait TransactionAccounting<I, const D: u8, BaseOrQuote>: std::fmt::Debug
 where
     I: Mon<D>,
     BaseOrQuote: MarginCurrency<I, D>,

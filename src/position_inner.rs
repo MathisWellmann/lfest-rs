@@ -34,12 +34,38 @@ where
     outstanding_fees: BaseOrQuote::PairedCurrency,
 }
 
+impl<I, const D: u8, BaseOrQuote> std::fmt::Display for PositionInner<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "PositionInner( quantity: {}, total_cost: {}, outstanding_fees: {})",
+            self.quantity, self.total_cost, self.outstanding_fees
+        )
+    }
+}
+
 impl<I, const D: u8, BaseOrQuote> PositionInner<I, D, BaseOrQuote>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
+    #[cfg(test)]
+    pub(crate) fn from_parts(
+        quantity: BaseOrQuote,
+        total_cost: BaseOrQuote::PairedCurrency,
+        outstanding_fees: BaseOrQuote::PairedCurrency,
+    ) -> Self {
+        Self {
+            quantity,
+            total_cost,
+            outstanding_fees,
+        }
+    }
     /// Create a new instance.
     ///
     /// # Panics:
@@ -100,7 +126,7 @@ where
         Acc: TransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
     {
         debug!(
-            "increase_contracts: qty: {qty} @ {entry_price}; self: {:?}",
+            "increase_contracts: qty: {qty} @ {entry_price}; self: {}",
             self
         );
         assert!(qty > BaseOrQuote::zero());
@@ -133,7 +159,7 @@ where
         Acc: TransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
     {
         debug!(
-            "decrease_contracts: qty: {qty} @ {liquidation_price}; self: {:?}",
+            "decrease_contracts: qty: {qty} @ {liquidation_price}; self: {}",
             self
         );
         assert!(qty > BaseOrQuote::zero());
