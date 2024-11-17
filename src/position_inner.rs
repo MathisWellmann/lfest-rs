@@ -25,9 +25,9 @@ where
     #[getset(get_copy = "pub")]
     quantity: BaseOrQuote,
 
-    /// The total cost paid for the position (not margin though).
+    /// The average price at which this position was entered at.
     #[getset(get_copy = "pub")]
-    total_cost: BaseOrQuote::PairedCurrency,
+    entry_price: QuoteCurrency<I, D>,
 
     /// The outstanding fees of the position that will be payed when reducing the position.
     #[getset(get_copy = "pub")]
@@ -42,8 +42,8 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "PositionInner( quantity: {}, total_cost: {}, outstanding_fees: {})",
-            self.quantity, self.total_cost, self.outstanding_fees
+            "PositionInner( quantity: {}, outstanding_fees: {})",
+            self.quantity, self.outstanding_fees
         )
     }
 }
@@ -57,15 +57,16 @@ where
     #[cfg(test)]
     pub(crate) fn from_parts(
         quantity: BaseOrQuote,
-        total_cost: BaseOrQuote::PairedCurrency,
+        entry_price: QuoteCurrency<I, D>,
         outstanding_fees: BaseOrQuote::PairedCurrency,
     ) -> Self {
         Self {
             quantity,
-            total_cost,
+            entry_price,
             outstanding_fees,
         }
     }
+
     /// Create a new instance.
     ///
     /// # Panics:
@@ -94,14 +95,15 @@ where
 
         Self {
             quantity,
-            total_cost: BaseOrQuote::PairedCurrency::convert_from(quantity, entry_price),
+            entry_price,
             outstanding_fees: fees,
         }
     }
 
-    /// The average price at which this position was entered into.
-    pub fn entry_price(&self) -> QuoteCurrency<I, D> {
-        BaseOrQuote::PairedCurrency::price_paid_for_qty(self.total_cost, self.quantity)
+    /// The cost of the position.
+    #[inline]
+    pub fn total_cost(&self) -> BaseOrQuote::PairedCurrency {
+        BaseOrQuote::PairedCurrency::convert_from(self.quantity, self.entry_price)
     }
 
     /// Return the positions unrealized profit and loss
@@ -129,14 +131,20 @@ where
             "increase_contracts: qty: {qty} @ {entry_price}; self: {}",
             self
         );
-        assert!(qty > BaseOrQuote::zero());
-        assert!(entry_price > QuoteCurrency::zero());
+        assert2::assert!(qty > BaseOrQuote::zero());
+        assert2::assert!(entry_price > QuoteCurrency::zero());
 
         let value = BaseOrQuote::PairedCurrency::convert_from(qty, entry_price);
+        let new_entry_price = QuoteCurrency::new_weighted_price(
+            self.entry_price,
+            *self.quantity.as_ref(),
+            entry_price,
+            *qty.as_ref(),
+        );
 
         self.quantity += qty;
+        self.entry_price = new_entry_price;
         self.outstanding_fees += fees;
-        self.total_cost += value;
 
         let margin = value * init_margin_req;
         let transaction =
@@ -162,20 +170,16 @@ where
             "decrease_contracts: qty: {qty} @ {liquidation_price}; self: {}",
             self
         );
-        assert!(qty > BaseOrQuote::zero());
-        assert!(qty <= self.quantity);
+        assert2::assert!(qty > BaseOrQuote::zero());
+        assert2::assert!(qty <= self.quantity);
         debug_assert!(direction_multiplier == 1 || direction_multiplier == -1);
 
         let entry_price = self.entry_price();
 
         self.quantity -= qty;
         self.outstanding_fees += fees;
-        self.total_cost -= BaseOrQuote::PairedCurrency::convert_from(qty, entry_price);
 
         debug_assert!(self.quantity >= BaseOrQuote::zero());
-        if self.quantity.is_zero() {
-            assert_eq!(self.total_cost, BaseOrQuote::PairedCurrency::zero());
-        }
 
         let pnl = BaseOrQuote::PairedCurrency::pnl(
             entry_price,
@@ -200,6 +204,7 @@ where
         }
         let margin_to_free =
             BaseOrQuote::PairedCurrency::convert_from(qty, entry_price) * init_margin_req;
+        debug_assert!(margin_to_free > BaseOrQuote::PairedCurrency::zero());
         let transaction = Transaction::new(
             USER_WALLET_ACCOUNT,
             USER_POSITION_MARGIN_ACCOUNT,
@@ -209,15 +214,17 @@ where
             .create_margin_transfer(transaction)
             .expect("margin transfer must work");
 
-        let transaction = Transaction::new(
-            EXCHANGE_FEE_ACCOUNT,
-            USER_WALLET_ACCOUNT,
-            self.outstanding_fees,
-        );
-        accounting
-            .create_margin_transfer(transaction)
-            .expect("margin transfer must work");
-        self.outstanding_fees = BaseOrQuote::PairedCurrency::zero();
+        if self.outstanding_fees > BaseOrQuote::PairedCurrency::zero() {
+            let transaction = Transaction::new(
+                EXCHANGE_FEE_ACCOUNT,
+                USER_WALLET_ACCOUNT,
+                self.outstanding_fees,
+            );
+            accounting
+                .create_margin_transfer(transaction)
+                .expect("margin transfer must work");
+            self.outstanding_fees = BaseOrQuote::PairedCurrency::zero();
+        }
     }
 }
 
@@ -242,7 +249,7 @@ mod tests {
             pos,
             PositionInner {
                 quantity: qty,
-                total_cost: QuoteCurrency::new(50, 0),
+                entry_price,
                 outstanding_fees: fees,
             }
         );
@@ -273,7 +280,7 @@ mod tests {
             pos,
             PositionInner {
                 quantity: BaseCurrency::one(),
-                total_cost: QuoteCurrency::new(125, 0),
+                entry_price: QuoteCurrency::new(125, 0),
                 outstanding_fees: fee_0 + fee_1
             }
         );
@@ -308,7 +315,7 @@ mod tests {
             pos,
             PositionInner {
                 quantity: BaseCurrency::new(25, 1),
-                total_cost: QuoteCurrency::new(250, 0),
+                entry_price: QuoteCurrency::new(100, 0),
                 outstanding_fees: QuoteCurrency::new(0, 0),
             }
         );
@@ -335,11 +342,11 @@ mod tests {
             pos,
             PositionInner {
                 quantity: BaseCurrency::new(0, 0),
-                total_cost: QuoteCurrency::new(0, 0),
+                entry_price: QuoteCurrency::new(100, 0),
                 outstanding_fees: QuoteCurrency::new(0, 0),
             }
         );
-        assert_eq!(pos.entry_price(), QuoteCurrency::new(0, 0));
+        assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
         assert_eq!(
             ta.margin_balance_of(USER_POSITION_MARGIN_ACCOUNT).unwrap(),
             QuoteCurrency::new(0, 0)

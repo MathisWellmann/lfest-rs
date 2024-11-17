@@ -93,7 +93,7 @@ where
     ) where
         Acc: TransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
     {
-        debug_assert!(
+        assert2::debug_assert!(
             filled_qty > BaseOrQuote::zero(),
             "The filled_qty must be greater than zero"
         );

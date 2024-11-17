@@ -55,12 +55,13 @@ where
     I: Mon<D>,
     BaseOrQuote: MarginCurrency<I, D>,
 {
+    #[tracing::instrument(level = "trace")]
     pub(crate) fn new(
         debit_account_id: AccountId,
         credit_account_id: AccountId,
         amount: BaseOrQuote,
     ) -> Self {
-        assert!(
+        assert2::assert!(
             amount > BaseOrQuote::zero(),
             "The amount of a transaction must be greater than zero"
         );
