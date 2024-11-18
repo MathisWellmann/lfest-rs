@@ -52,6 +52,31 @@ where
     }
 }
 
+impl<I, const D: u8> std::fmt::Display for PriceFilter<I, D>
+where
+    I: Mon<D>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let min_price = match self.min_price {
+            Some(p) => p.to_string(),
+            None => "None".to_string(),
+        };
+        let max_price = match self.max_price {
+            Some(p) => p.to_string(),
+            None => "None".to_string(),
+        };
+        write!(
+            f, 
+            "PriceFilter( min_price: {}, max_price: {}, tick_size: {}, multiplier_up: {}, multiplier_down: {} )", 
+            min_price, 
+            max_price, 
+            self.tick_size, 
+            self.multiplier_up, 
+            self.multiplier_down,
+        )
+    }
+}
+
 impl<I, const D: u8> PriceFilter<I, D>
 where
     I: Mon<D>,
