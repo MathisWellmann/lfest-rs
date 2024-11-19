@@ -81,7 +81,7 @@ where
     }
 
     /// Change a position while doing proper accounting and balance transfers.
-    #[tracing::instrument(level = "trace")]
+    #[tracing::instrument(level = "debug")]
     pub(crate) fn change_position<Acc>(
         &mut self,
         filled_qty: BaseOrQuote,
@@ -99,7 +99,7 @@ where
         );
         match self {
             Position::Neutral => {
-                assert_eq!(
+                debug_assert_eq!(
                     transaction_accounting
                         .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
                         .expect("Is valid account"),
@@ -157,7 +157,7 @@ where
                             fees,
                         );
                         *self = Position::Neutral;
-                        assert_eq!(
+                        debug_assert_eq!(
                             transaction_accounting
                                 .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
                                 .expect("Is valid account"),
@@ -213,7 +213,7 @@ where
                             fees,
                         );
                         *self = Position::Neutral;
-                        assert_eq!(
+                        debug_assert_eq!(
                             transaction_accounting
                                 .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
                                 .expect("Is valid account"),
@@ -299,6 +299,56 @@ mod tests {
             BaseCurrency::new(317, 3),
             QuoteCurrency::new(3020427, 2),
             Side::Buy,
+            &mut acc,
+            init_margin_req,
+            fees,
+        );
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn position_change_position_2() {
+        use crate::accounting::TAccount;
+
+        let mut pos = Position::Long(PositionInner::from_parts(
+            BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(16800, 5).unwrap()),
+            QuoteCurrency::from(Decimal::try_from_scaled(5949354994, 5).unwrap()),
+            QuoteCurrency::from(Decimal::try_from_scaled(600056, 5).unwrap()),
+        ));
+        let filled_qty = BaseCurrency::new(16800, 5);
+        let fill_price = QuoteCurrency::new(6001260000, 5);
+        let mut acc = InMemoryTransactionAccounting::from_accounts([
+            TAccount::from_parts(
+                QuoteCurrency::from(Decimal::try_from_scaled(1499293480, 5).unwrap()),
+                QuoteCurrency::from(Decimal::try_from_scaled(1498785120, 5).unwrap()),
+            ),
+            TAccount::from_parts(
+                QuoteCurrency::from(Decimal::try_from_scaled(499293480, 5).unwrap()),
+                QuoteCurrency::from(Decimal::try_from_scaled(499293480, 5).unwrap()),
+            ),
+            TAccount::from_parts(
+                QuoteCurrency::from(Decimal::try_from_scaled(999491640, 5).unwrap()),
+                QuoteCurrency::from(Decimal::try_from_scaled(0, 0).unwrap()),
+            ),
+            TAccount::from_parts(
+                QuoteCurrency::from(Decimal::try_from_scaled(0, 5).unwrap()),
+                QuoteCurrency::from(Decimal::try_from_scaled(0, 0).unwrap()),
+            ),
+            TAccount::from_parts(
+                QuoteCurrency::from(Decimal::try_from_scaled(0, 5).unwrap()),
+                QuoteCurrency::from(Decimal::try_from_scaled(0, 0).unwrap()),
+            ),
+            TAccount::from_parts(
+                QuoteCurrency::from(Decimal::try_from_scaled(0, 5).unwrap()),
+                QuoteCurrency::from(Decimal::try_from_scaled(1000000000, 5).unwrap()),
+            ),
+        ]);
+        let init_margin_req = Decimal::ONE;
+        let fees = QuoteCurrency::zero();
+        pos.change_position(
+            filled_qty,
+            fill_price,
+            Side::Sell,
             &mut acc,
             init_margin_req,
             fees,

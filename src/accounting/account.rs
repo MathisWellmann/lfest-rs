@@ -24,6 +24,15 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
 {
+    #[cfg(test)]
+    pub(crate) fn from_parts(debits_posted: BaseOrQuote, credits_posted: BaseOrQuote) -> Self {
+        Self {
+            debits_posted,
+            credits_posted,
+            _quote: PhantomData,
+        }
+    }
+
     #[inline(always)]
     pub(crate) fn post_debit(&mut self, amount: BaseOrQuote) {
         self.debits_posted += amount;

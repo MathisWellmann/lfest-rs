@@ -36,6 +36,19 @@ where
     // TODO: keep track of transaction log or emit `Transactions` to users.
 }
 
+impl<I, const D: u8, BaseOrQuote> InMemoryTransactionAccounting<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrency<I, D>,
+{
+    #[cfg(test)]
+    pub(crate) fn from_accounts(
+        margin_accounts: [TAccount<I, D, BaseOrQuote>; N_ACCOUNTS],
+    ) -> Self {
+        Self { margin_accounts }
+    }
+}
+
 impl<I, const D: u8, BaseOrQuote> TransactionAccounting<I, D, BaseOrQuote>
     for InMemoryTransactionAccounting<I, D, BaseOrQuote>
 where
