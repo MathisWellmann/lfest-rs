@@ -112,7 +112,7 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    A: AccountTracker<I, D, BaseOrQuote::PairedCurrency>,
+    A: AccountTracker<I, D, BaseOrQuote::PairedCurrency, UserOrderId>,
     UserOrderId: UserOrderIdT,
     TransactionAccountingT:
         TransactionAccounting<I, D, BaseOrQuote::PairedCurrency> + std::fmt::Debug,
@@ -238,7 +238,7 @@ where
         &mut self,
         order: MarketOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>,
     ) -> Result<MarketOrder<I, D, BaseOrQuote, UserOrderId, Filled<I, D, BaseOrQuote>>> {
-        self.account_tracker.log_market_order_submission();
+        self.account_tracker.log_market_order_submission(&order);
 
         // Basic checks
         self.config
@@ -319,6 +319,7 @@ where
         order: LimitOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>,
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
         trace!("submit_order: {}", order);
+        self.account_tracker.log_limit_order_submission(&order);
 
         // Basic checks
         self.config
@@ -368,7 +369,6 @@ where
         }
 
         self.append_limit_order(order.clone(), marketable)?;
-        self.account_tracker.log_limit_order_submission();
 
         Ok(order)
     }
@@ -609,13 +609,13 @@ where
                     order.fill(filled_qty, market_update.timestamp_exchange_ns())
                 {
                     self.ids_to_remove.push(order.state().meta().id());
-                    self.account_tracker.log_limit_order_fill(true);
+                    self.account_tracker.log_limit_order_fill(true, filled_qty);
                     self.order_margin.remove(CancelBy::OrderId(order.id()));
                     self.limit_order_updates
                         .push(LimitOrderUpdate::FullyFilled(filled_order));
                 } else {
                     debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
-                    self.account_tracker.log_limit_order_fill(false);
+                    self.account_tracker.log_limit_order_fill(false, filled_qty);
                     self.limit_order_updates
                         .push(LimitOrderUpdate::PartiallyFilled(order.clone()));
                     self.order_margin

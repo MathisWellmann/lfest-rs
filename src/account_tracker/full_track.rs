@@ -11,7 +11,9 @@ use sliding_features::{
 use crate::{
     account_tracker::AccountTracker,
     prelude::{MarketState, Mon, QuoteCurrency, Side, UserBalances},
-    types::{Currency, MarginCurrency, TimestampNs},
+    types::{
+        Currency, LimitOrder, MarginCurrency, MarketOrder, NewOrder, TimestampNs, UserOrderIdT,
+    },
 };
 
 const DAILY_NS: i64 = 86_400_000_000_000;
@@ -268,11 +270,12 @@ where
     }
 }
 
-impl<I, const D: u8, BaseOrQuote> AccountTracker<I, D, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote, UserOrderId> AccountTracker<I, D, BaseOrQuote, UserOrderId>
     for FullAccountTracker<I, D, BaseOrQuote>
 where
     I: Mon<D>,
     BaseOrQuote: MarginCurrency<I, D>,
+    UserOrderId: UserOrderIdT,
 {
     fn update(&mut self, market_state: &MarketState<I, D>) {
         if self.ts_first == 0.into() {
@@ -321,7 +324,10 @@ where
     }
 
     #[inline(always)]
-    fn log_limit_order_submission(&mut self) {
+    fn log_limit_order_submission(
+        &mut self,
+        _limit_order: &LimitOrder<I, D, BaseOrQuote::PairedCurrency, UserOrderId, NewOrder>,
+    ) {
         self.num_submitted_limit_orders += 1;
     }
 
@@ -331,7 +337,11 @@ where
     }
 
     #[inline(always)]
-    fn log_limit_order_fill(&mut self, fully_filled: bool) {
+    fn log_limit_order_fill(
+        &mut self,
+        fully_filled: bool,
+        _filled_qty: BaseOrQuote::PairedCurrency,
+    ) {
         self.num_filled_limit_order_events += 1;
         if fully_filled {
             self.num_fully_filled_limit_orders += 1;
@@ -359,7 +369,10 @@ where
     }
 
     #[inline(always)]
-    fn log_market_order_submission(&mut self) {
+    fn log_market_order_submission(
+        &mut self,
+        _market_order: &MarketOrder<I, D, BaseOrQuote::PairedCurrency, UserOrderId, NewOrder>,
+    ) {
         self.num_submitted_market_orders += 1;
     }
 }
@@ -416,7 +429,10 @@ mod tests {
             1_000_000.into(),
             0,
         );
-        at.update(&market_state);
+        <FullAccountTracker<_, 4, _> as AccountTracker<_, 4, _, NoUserOrderId>>::update(
+            &mut at,
+            &market_state,
+        );
         assert_eq!(at.num_submitted_limit_orders(), 0);
         assert_eq!(at.num_cancelled_limit_orders(), 0);
         assert_eq!(at.num_fully_filled_limit_orders(), 0);
@@ -439,7 +455,7 @@ mod tests {
             order_margin: QuoteCurrency::zero(),
             _q: std::marker::PhantomData,
         };
-        at.sample_user_balances(&balances, QuoteCurrency::new(100, 0));
+        <FullAccountTracker<_, 4, _> as AccountTracker<_, 4, _, NoUserOrderId>>::sample_user_balances(&mut at, &balances, QuoteCurrency::new(100, 0));
 
         let balances = UserBalances {
             available_wallet_balance: QuoteCurrency::new(101, 0),
@@ -447,7 +463,7 @@ mod tests {
             order_margin: QuoteCurrency::zero(),
             _q: std::marker::PhantomData,
         };
-        at.sample_user_balances(&balances, QuoteCurrency::new(100, 0));
+        <FullAccountTracker<_, 4, _> as AccountTracker<_, 4, _, NoUserOrderId>>::sample_user_balances(&mut at, &balances, QuoteCurrency::new(100, 0));
         assert_eq!(at.user_balances_ln_return.last().unwrap(), 0.009950321);
         assert_eq!(at.drawdown_user_balances(), 0.0);
         assert_eq!(at.user_balances_ln_return_stats.last().unwrap(), 0.0);
@@ -461,7 +477,7 @@ mod tests {
             order_margin: QuoteCurrency::zero(),
             _q: std::marker::PhantomData,
         };
-        at.sample_user_balances(&balances, QuoteCurrency::new(100, 0));
+        <FullAccountTracker<_, 4, _> as AccountTracker<_, 4, _, NoUserOrderId>>::sample_user_balances(&mut at, &balances, QuoteCurrency::new(100, 0));
         assert_eq!(at.user_balances_ln_return.last().unwrap(), 0.009852353);
         assert_eq!(at.user_balances_ln_return_stats.mean(), 0.009901337);
         assert_eq!(at.user_balances_ln_return_stats.variance(), 2.3994853e-9);
