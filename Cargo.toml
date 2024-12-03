@@ -18,7 +18,7 @@ serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 hashbrown = "0.15"
 derive_more = { version = "1", features = ["full"] }
-# const-decimal = { version = "0.3", git = "https://github.com/OliverNChalk/const-decimal", rev = "47fe246", features = [
+# const-decimal = { path = "../const-decimal", features = [
 #   "serde",
 # ] }
 const-decimal = { git = "https://github.com/OliverNChalk/const-decimal", features = [

@@ -42,18 +42,13 @@ where
         bba: Bba<I, D>,
         price_filter: &PriceFilter<I, D>,
     ) -> Self {
-        assert2::assert!(!taker_trades.is_empty());
+        assert!(!taker_trades.is_empty());
 
         debug_assert!(taker_trades
             .iter()
             .any(|t| t.validate_market_update(price_filter).is_ok()));
-        debug_assert!(
-            <Bba<I, D> as MarketUpdate<I, D, BaseOrQuote>>::validate_market_update(
-                &bba,
-                price_filter
-            )
-            .is_ok()
-        );
+        <Bba<I, D> as MarketUpdate<I, D, BaseOrQuote>>::validate_market_update(&bba, price_filter)
+            .expect("The `Bba` is correct");
 
         // split buy and sell flow.
         let mut buys = Vec::with_capacity(taker_trades.len());
