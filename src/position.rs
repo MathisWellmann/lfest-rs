@@ -175,7 +175,7 @@ where
                             fees,
                         );
                         assert_eq!(inner.quantity(), BaseOrQuote::zero());
-                        assert_eq!(
+                        debug_assert_eq!(
                             transaction_accounting
                                 .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
                                 .expect("Is valid account"),
@@ -231,7 +231,7 @@ where
                             fees,
                         );
                         assert_eq!(inner.quantity(), BaseOrQuote::zero());
-                        assert_eq!(
+                        debug_assert_eq!(
                             transaction_accounting
                                 .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
                                 .expect("Is valid account"),
