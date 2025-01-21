@@ -264,7 +264,14 @@ where
         let user_balance_mean_return = self.quantogram_user_balances_ln_returns.mean()?;
 
         let rtv_algo = user_balance_mean_return / user_balances_quantile.abs();
+        if !rtv_algo.is_finite() {
+            return None;
+        }
+
         let rtv_bnh = market_mean_return / market_quantile.abs();
+        if !rtv_bnh.is_finite() {
+            return None;
+        }
 
         Some(1.0 + (rtv_algo - rtv_bnh) / (rtv_bnh).abs())
     }

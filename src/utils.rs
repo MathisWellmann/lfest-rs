@@ -56,6 +56,7 @@ pub(crate) fn assert_user_wallet_balance<I, const D: u8, Acc, BaseOrQuote>(
 
 /// Create a `Decimal` from an `f64` value.
 // TODO: maybe upstream this impl to `const_decimal`
+#[inline(always)]
 pub fn decimal_from_f64<I: Mon<D>, const D: u8>(val: f64) -> Result<Decimal<I, D>> {
     let scaling_factor = 10_f64.powi(D as i32);
     let scaled: f64 = (val * scaling_factor).round();
@@ -68,6 +69,8 @@ pub fn decimal_from_f64<I: Mon<D>, const D: u8>(val: f64) -> Result<Decimal<I, D
 #[cfg(test)]
 pub(crate) mod tests {
     use const_decimal::Decimal;
+
+    use crate::utils::decimal_from_f64;
 
     /// round a value to a given precision of decimal places
     /// used in tests
@@ -82,6 +85,34 @@ pub(crate) mod tests {
                 .expect("can convert")
                 .0,
             1
+        );
+    }
+
+    #[test]
+    fn test_decimal_from_f64() {
+        assert_eq!(
+            decimal_from_f64(3.0).unwrap(),
+            Decimal::<i64, 5>::try_from_scaled(3, 0).unwrap()
+        );
+        assert_eq!(
+            decimal_from_f64(3.1).unwrap(),
+            Decimal::<i64, 5>::try_from_scaled(31, 1).unwrap()
+        );
+        assert_eq!(
+            decimal_from_f64(3.14).unwrap(),
+            Decimal::<i64, 5>::try_from_scaled(314, 2).unwrap()
+        );
+        assert_eq!(
+            decimal_from_f64(3.141).unwrap(),
+            Decimal::<i64, 5>::try_from_scaled(3141, 3).unwrap()
+        );
+        assert_eq!(
+            decimal_from_f64(3.1415).unwrap(),
+            Decimal::<i64, 5>::try_from_scaled(31415, 4).unwrap()
+        );
+        assert_eq!(
+            decimal_from_f64(3.14159).unwrap(),
+            Decimal::<i64, 5>::try_from_scaled(314159, 5).unwrap()
         );
     }
 }

@@ -570,4 +570,16 @@ mod tests {
             Some(BaseCurrency::new(2, 0))
         );
     }
+
+    #[test]
+    fn size_of_smart_candle() {
+        assert_eq!(
+            std::mem::size_of::<SmartCandle<i64, 4, BaseCurrency<i64, 4>>>(),
+            96
+        );
+        assert_eq!(
+            std::mem::size_of::<SmartCandle<i32, 4, BaseCurrency<i32, 4>>>(),
+            80
+        );
+    }
 }

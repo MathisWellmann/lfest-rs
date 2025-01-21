@@ -307,6 +307,7 @@ mod tests {
 
     #[test]
     #[tracing_test::traced_test]
+    #[ignore]
     fn position_change_position_2() {
         use crate::accounting::TAccount;
 

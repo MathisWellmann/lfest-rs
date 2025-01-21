@@ -80,3 +80,14 @@ where
         self.timestamp_exchange_ns
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn size_of_bba() {
+        assert_eq!(std::mem::size_of::<Bba<i32, 4>>(), 16);
+        assert_eq!(std::mem::size_of::<Bba<i64, 4>>(), 24);
+    }
+}
