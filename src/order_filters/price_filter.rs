@@ -66,12 +66,12 @@ where
             None => "None".to_string(),
         };
         write!(
-            f, 
+            f,
             "PriceFilter( min_price: {}, max_price: {}, tick_size: {}, multiplier_up: {}, multiplier_down: {} )", 
-            min_price, 
-            max_price, 
-            self.tick_size, 
-            self.multiplier_up, 
+            min_price,
+            max_price,
+            self.tick_size,
+            self.multiplier_up,
             self.multiplier_down,
         )
     }
