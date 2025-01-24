@@ -27,7 +27,7 @@ const-decimal = { git = "https://github.com/OliverNChalk/const-decimal", feature
 distrs = "0.2"
 num-traits = "0.2"
 getset = "0.1.2"
-sliding_features = "5"
+sliding_features = "6"
 quantogram = { version = "0.4", optional = true }
 assert2 = "0.3"
 num = "0.4"
