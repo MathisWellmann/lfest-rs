@@ -11,7 +11,9 @@ where
     UserOrderId: UserOrderIdT + Display,
 {
     /// The limit order was partially filled.
+    // TODO: add the filled quantity
     PartiallyFilled(LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>),
     /// The limit order was fully filled.
+    // TODO: add the filled quantity
     FullyFilled(LimitOrder<I, D, BaseOrQuote, UserOrderId, Filled<I, D, BaseOrQuote>>),
 }

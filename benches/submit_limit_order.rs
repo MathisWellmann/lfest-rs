@@ -12,7 +12,6 @@ fn submit_limit_orders<U>(
 ) {
     // Technically the setup code should not be benchmarked.
     let starting_balance = BaseCurrency::new(100000, 0);
-    let acc_tracker = NoAccountTracker::default();
     let contract_spec = ContractSpecification::new(
         leverage!(1),
         Decimal::try_from_scaled(5, 1).unwrap(),
@@ -29,15 +28,14 @@ fn submit_limit_orders<U>(
         Fee::from(Decimal::try_from_scaled(6, 4).unwrap()),
     )
     .expect("works");
-    let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
+    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
     let mut exchange = Exchange::<
         i64,
         5,
         QuoteCurrency<i64, 5>,
         NoUserOrderId,
         InMemoryTransactionAccounting<i64, 5, BaseCurrency<i64, 5>>,
-        NoAccountTracker,
-    >::new(acc_tracker, config);
+    >::new(config);
     exchange
         .update_state(&Bba {
             bid: QuoteCurrency::new(100, 0),

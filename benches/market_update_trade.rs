@@ -23,7 +23,6 @@ fn update_state<I, const D: u8, BaseOrQuote, U>(
         BaseOrQuote,
         NoUserOrderId,
         InMemoryTransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
-        NoAccountTracker,
     >,
     trades: &[U],
 ) where
@@ -39,7 +38,6 @@ fn update_state<I, const D: u8, BaseOrQuote, U>(
 
 fn criterion_benchmark(c: &mut Criterion) {
     let starting_balance = BaseCurrency::new(1, 0);
-    let acc_tracker = NoAccountTracker::default();
     let contract_spec = ContractSpecification::new(
         leverage!(1),
         Decimal::try_from_scaled(5, 1).unwrap(),
@@ -56,8 +54,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         Fee::from(Decimal::try_from_scaled(6, 0).unwrap()),
     )
     .expect("works");
-    let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
-    let mut exchange = Exchange::new(acc_tracker, config);
+    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
+    let mut exchange = Exchange::new(config);
 
     let trades = load_trades_from_csv("./data/Bitmex_XBTUSD_1M.csv");
     const COUNT: usize = 1_000_000;

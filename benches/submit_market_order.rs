@@ -13,7 +13,6 @@ fn submit_market_orders<I, const D: u8, BaseOrQuote, U>(
         BaseOrQuote,
         NoUserOrderId,
         InMemoryTransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
-        NoAccountTracker,
     >,
     order: &MarketOrder<I, D, BaseOrQuote, NoUserOrderId, NewOrder>,
     n: usize,
@@ -31,7 +30,6 @@ fn submit_market_orders<I, const D: u8, BaseOrQuote, U>(
 
 fn criterion_benchmark(c: &mut Criterion) {
     let starting_balance = BaseCurrency::new(100000, 0);
-    let acc_tracker = NoAccountTracker::default();
     let contract_spec = ContractSpecification::new(
         leverage!(1),
         Decimal::try_from_scaled(5, 1).unwrap(),
@@ -48,8 +46,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         Fee::from(Decimal::try_from_scaled(6, 1).unwrap()),
     )
     .expect("works");
-    let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
-    let mut exchange = Exchange::new(acc_tracker, config);
+    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
+    let mut exchange = Exchange::new(config);
     exchange
         .update_state(&Bba {
             bid: QuoteCurrency::new(100, 0),

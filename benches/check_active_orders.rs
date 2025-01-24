@@ -9,7 +9,6 @@ const DECIMALS: u8 = 5;
 fn criterion_benchmark(c: &mut Criterion) {
     // Technically the setup code should not be benchmarked.
     let starting_balance = BaseCurrency::new(100000, 0);
-    let acc_tracker = NoAccountTracker::default();
     let contract_spec = ContractSpecification::new(
         leverage!(1),
         Decimal::try_from_scaled(5, 1).unwrap(),
@@ -26,7 +25,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         Fee::from(Decimal::try_from_scaled(6, 4).unwrap()),
     )
     .expect("works");
-    let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
+    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
 
     let mut group = c.benchmark_group("check_active_orders");
 
@@ -38,8 +37,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 QuoteCurrency<i64, DECIMALS>,
                 NoUserOrderId,
                 InMemoryTransactionAccounting<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
-                NoAccountTracker,
-            >::new(acc_tracker.clone(), config.clone());
+            >::new(config.clone());
             let market_update = Bba {
                 bid: QuoteCurrency::new(100, 0),
                 ask: QuoteCurrency::new(101, 0),

@@ -16,22 +16,6 @@ fn lin_long_market_win_full() {
             timestamp_exchange_ns: 0.into(),
         })
         .unwrap();
-    assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 0);
-    assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
-    assert_eq!(
-        exchange.account_tracker().num_fully_filled_limit_orders(),
-        0
-    );
-    assert_eq!(exchange.account_tracker().num_submitted_market_orders(), 0);
-    assert_eq!(exchange.account_tracker().num_filled_market_orders(), 0);
-    assert_eq!(
-        exchange.account_tracker().buy_volume(),
-        QuoteCurrency::zero()
-    );
-    assert_eq!(
-        exchange.account_tracker().sell_volume(),
-        QuoteCurrency::zero()
-    );
     assert_eq!(exchange.fees_paid(), QuoteCurrency::zero());
 
     let qty = BaseCurrency::new(5, 0);
@@ -48,22 +32,6 @@ fn lin_long_market_win_full() {
         })
         .unwrap();
     assert!(order_updates.is_empty());
-    assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 0);
-    assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
-    assert_eq!(
-        exchange.account_tracker().num_fully_filled_limit_orders(),
-        0
-    );
-    assert_eq!(exchange.account_tracker().num_submitted_market_orders(), 1);
-    assert_eq!(exchange.account_tracker().num_filled_market_orders(), 1);
-    assert_eq!(
-        exchange.account_tracker().buy_volume(),
-        QuoteCurrency::new(500, 0)
-    );
-    assert_eq!(
-        exchange.account_tracker().sell_volume(),
-        QuoteCurrency::zero()
-    );
 
     let fees = QuoteCurrency::convert_from(qty, bid) * *test_fee_taker().as_ref();
     assert_eq!(
@@ -126,22 +94,6 @@ fn lin_long_market_win_full() {
             order_margin: QuoteCurrency::zero(),
             _q: std::marker::PhantomData
         }
-    );
-    assert_eq!(exchange.account_tracker().num_submitted_limit_orders(), 0);
-    assert_eq!(exchange.account_tracker().num_cancelled_limit_orders(), 0);
-    assert_eq!(
-        exchange.account_tracker().num_fully_filled_limit_orders(),
-        0
-    );
-    assert_eq!(exchange.account_tracker().num_submitted_market_orders(), 2);
-    assert_eq!(exchange.account_tracker().num_filled_market_orders(), 2);
-    assert_eq!(
-        exchange.account_tracker().buy_volume(),
-        QuoteCurrency::new(500, 0)
-    );
-    assert_eq!(
-        exchange.account_tracker().sell_volume(),
-        QuoteCurrency::new(1000, 0)
     );
     assert_eq!(exchange.fees_paid(), QuoteCurrency::new(9, 1));
 }

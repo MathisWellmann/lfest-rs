@@ -4,7 +4,7 @@
 use std::time::Instant;
 
 use const_decimal::Decimal;
-use lfest::{account_tracker::FullAccountTracker, load_trades_from_csv, prelude::*};
+use lfest::{load_trades_from_csv, prelude::*};
 use rand::{thread_rng, Rng};
 use tracing::error;
 
@@ -14,7 +14,6 @@ fn main() {
     let t0 = Instant::now();
 
     let starting_balance = BaseCurrency::new(10, 0);
-    let acc_tracker = FullAccountTracker::new(starting_balance);
     let contract_spec = ContractSpecification::new(
         leverage!(1),
         Decimal::try_from_scaled(5, 1).unwrap(),
@@ -31,15 +30,14 @@ fn main() {
         Fee::from(Decimal::try_from_scaled(6, 4).unwrap()),
     )
     .expect("is valid");
-    let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
+    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
     let mut exchange = Exchange::<
         i64,
         DECIMALS,
         QuoteCurrency<i64, DECIMALS>,
         NoUserOrderId,
         InMemoryTransactionAccounting<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
-        FullAccountTracker<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
-    >::new(acc_tracker, config);
+    >::new(config);
 
     // load trades from csv file
     let prices = Vec::from_iter(
@@ -87,5 +85,4 @@ fn main() {
         "time to simulate 1 million historical trades: {}micros",
         t0.elapsed().as_micros()
     );
-    println!("account_tracker: {}", exchange.account_tracker());
 }

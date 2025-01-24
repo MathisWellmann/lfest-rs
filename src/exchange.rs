@@ -6,7 +6,6 @@ use num_traits::Zero;
 use tracing::{debug, info, trace, warn};
 
 use crate::{
-    account_tracker::AccountTracker,
     accounting::TransactionAccounting,
     config::Config,
     market_state::MarketState,
@@ -17,11 +16,9 @@ use crate::{
         USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
     },
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
-    sample_returns_trigger::SampleReturnsTrigger,
     types::{
         Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderUpdate, MarginCurrency,
-        MarketOrder, NewOrder, OrderId, Pending, Result, Side, TimestampNs, UserBalances,
-        UserOrderIdT,
+        MarketOrder, NewOrder, OrderId, Pending, Result, Side, UserBalances, UserOrderIdT,
     },
     utils::assert_user_wallet_balance,
 };
@@ -41,16 +38,13 @@ pub enum CancelBy<UserOrderId: UserOrderIdT> {
 /// - `D`: The constant decimal precision of the currencies.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 /// - `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
-/// - `A`: An `AccountTracker`
-pub struct Account<'a, I, const D: u8, BaseOrQuote, UserOrderId, A>
+pub struct Account<'a, I, const D: u8, BaseOrQuote, UserOrderId>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderId: UserOrderIdT,
 {
-    /// tracks the performance of the account
-    pub account_tracker: &'a A,
     /// The active limit orders of the account.
     pub active_limit_orders: &'a ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>,
     /// The current position of the account.
@@ -61,7 +55,7 @@ where
 
 /// The main leveraged futures exchange for simulated trading
 #[derive(Debug, Clone, Getters)]
-pub struct Exchange<I, const D: u8, BaseOrQuote, UserOrderId, TransactionAccountingT, A>
+pub struct Exchange<I, const D: u8, BaseOrQuote, UserOrderId, TransactionAccountingT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
@@ -75,10 +69,6 @@ where
     /// The current state of the simulated market.
     #[getset(get = "pub")]
     market_state: MarketState<I, D>,
-
-    /// A performance tracker for the user account.
-    #[getset(get = "pub")]
-    account_tracker: A,
 
     risk_engine: IsolatedMarginRiskEngine<I, D, BaseOrQuote>,
 
@@ -99,56 +89,47 @@ where
 
     order_margin: OrderMargin<I, D, BaseOrQuote, UserOrderId>,
 
-    sample_returns_trigger: SampleReturnsTrigger,
-
     // To avoid allocations in hot-paths
     limit_order_updates: Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>,
     ids_to_remove: Vec<OrderId>,
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderId, TransactionAccountingT, A>
-    Exchange<I, D, BaseOrQuote, UserOrderId, TransactionAccountingT, A>
+impl<I, const D: u8, BaseOrQuote, UserOrderId, TransactionAccountingT>
+    Exchange<I, D, BaseOrQuote, UserOrderId, TransactionAccountingT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    A: AccountTracker<I, D, BaseOrQuote::PairedCurrency, UserOrderId>,
     UserOrderId: UserOrderIdT,
     TransactionAccountingT:
         TransactionAccounting<I, D, BaseOrQuote::PairedCurrency> + std::fmt::Debug,
 {
     /// Create a new Exchange with the desired config and whether to use candles
     /// as infomation source
-    pub fn new(account_tracker: A, config: Config<I, D, BaseOrQuote::PairedCurrency>) -> Self {
+    pub fn new(config: Config<I, D, BaseOrQuote::PairedCurrency>) -> Self {
         let market_state = MarketState::default();
         let risk_engine = IsolatedMarginRiskEngine::new(config.contract_spec().clone());
 
         let transaction_accounting = TransactionAccountingT::new(config.starting_wallet_balance());
-        let sample_returns_trigger = SampleReturnsTrigger::new(Into::<TimestampNs>::into(
-            config.sample_returns_every_n_seconds() as i64 * 1_000_000_000,
-        ));
         let max_active_orders = config.max_num_open_orders();
         Self {
             config,
             market_state,
             risk_engine,
-            account_tracker,
             next_order_id: OrderId::default(),
             transaction_accounting,
             position: Position::default(),
             // TODO: two such structs, one for buys, the other for sells.
             active_limit_orders: ActiveLimitOrders::new(10_000),
             order_margin: OrderMargin::new(max_active_orders),
-            sample_returns_trigger,
             limit_order_updates: Vec::with_capacity(max_active_orders),
             ids_to_remove: Vec::with_capacity(max_active_orders),
         }
     }
 
     /// Get information about the `Account`
-    pub fn account(&self) -> Account<I, D, BaseOrQuote, UserOrderId, A> {
+    pub fn account(&self) -> Account<I, D, BaseOrQuote, UserOrderId> {
         Account {
-            account_tracker: &self.account_tracker,
             active_limit_orders: &self.active_limit_orders,
             position: &self.position,
             balances: self.user_balances(),
@@ -183,15 +164,6 @@ where
 
         self.market_state
             .update_state(market_update, self.config.contract_spec().price_filter())?;
-
-        self.account_tracker.update(&self.market_state);
-        if self
-            .sample_returns_trigger
-            .should_trigger(market_update.timestamp_exchange_ns())
-        {
-            self.account_tracker
-                .sample_user_balances(&self.user_balances(), self.market_state.mid_price());
-        }
 
         if let Err(e) = <IsolatedMarginRiskEngine<I, D, BaseOrQuote> as RiskEngine<
             I,
@@ -238,8 +210,6 @@ where
         &mut self,
         order: MarketOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>,
     ) -> Result<MarketOrder<I, D, BaseOrQuote, UserOrderId, Filled<I, D, BaseOrQuote>>> {
-        self.account_tracker.log_market_order_submission(&order);
-
         // Basic checks
         self.config
             .contract_spec()
@@ -296,9 +266,6 @@ where
             self.config.contract_spec().init_margin_req(),
             fees,
         );
-        self.account_tracker.log_market_order_fill();
-        self.account_tracker
-            .log_trade(order.side(), fill_price, filled_qty);
     }
 
     #[inline]
@@ -319,7 +286,6 @@ where
         order: LimitOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>,
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
         trace!("submit_order: {}", order);
-        self.account_tracker.log_limit_order_submission(&order);
 
         // Basic checks
         self.config
@@ -530,8 +496,6 @@ where
                 .expect("margin transfer works.");
         }
 
-        self.account_tracker.log_limit_order_cancellation();
-
         assert_eq!(
             self.order_margin.active_limit_orders(),
             &self.active_limit_orders
@@ -609,13 +573,11 @@ where
                     order.fill(filled_qty, market_update.timestamp_exchange_ns())
                 {
                     self.ids_to_remove.push(order.state().meta().id());
-                    self.account_tracker.log_limit_order_fill(true, filled_qty);
                     self.order_margin.remove(CancelBy::OrderId(order.id()));
                     self.limit_order_updates
                         .push(LimitOrderUpdate::FullyFilled(filled_order));
                 } else {
                     debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
-                    self.account_tracker.log_limit_order_fill(false, filled_qty);
                     self.limit_order_updates
                         .push(LimitOrderUpdate::PartiallyFilled(order.clone()));
                     self.order_margin
@@ -634,8 +596,6 @@ where
                     self.config.contract_spec().init_margin_req(),
                     fees,
                 );
-                self.account_tracker
-                    .log_trade(order.side(), order.limit_price(), filled_qty);
 
                 let new_order_margin = self.order_margin.order_margin(
                     self.config.contract_spec().init_margin_req(),

@@ -7,7 +7,6 @@ const DECIMALS: u8 = 1;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let starting_balance = BaseCurrency::<DecimalT, DECIMALS>::new(1, 0);
-    let acc_tracker = NoAccountTracker::default();
     let price_filter = PriceFilter::new(
         None,
         None,
@@ -25,15 +24,14 @@ fn criterion_benchmark(c: &mut Criterion) {
         Fee::from(Decimal::try_from_scaled(6, 0).unwrap()),
     )
     .expect("works");
-    let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
+    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
     let mut exchange = Exchange::<
         DecimalT,
         DECIMALS,
         QuoteCurrency<DecimalT, DECIMALS>,
         NoUserOrderId,
         InMemoryTransactionAccounting<DecimalT, DECIMALS, BaseCurrency<DecimalT, DECIMALS>>,
-        NoAccountTracker,
-    >::new(acc_tracker, config);
+    >::new(config);
 
     let trades = load_trades_from_csv("./data/Bitmex_XBTUSD_1M.csv");
     const COUNT: usize = 1_000_000;

@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.94.0"
+version = "0.95.0"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2021"
 license-file = "LICENSE"
@@ -28,7 +28,6 @@ distrs = "0.2"
 num-traits = "0.2"
 getset = "0.1.2"
 sliding_features = "6"
-quantogram = { version = "0.4", optional = true }
 assert2 = "0.3"
 num = "0.4"
 glidesort = "0.1"
@@ -51,8 +50,6 @@ fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs"
 trade_aggregation = "12"
 
 [features]
-# Functionality that requires estimation of ln return quantiles, e.g `var` or `d_ratio`.
-quantiles = ["dep:quantogram"]
 trade_aggregation = ["dep:trade_aggregation"]
 
 [[bench]]

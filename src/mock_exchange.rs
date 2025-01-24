@@ -2,11 +2,7 @@
 
 use const_decimal::Decimal;
 
-use crate::{
-    account_tracker::{FullAccountTracker, NoAccountTracker},
-    prelude::*,
-    utils::NoUserOrderId,
-};
+use crate::{prelude::*, utils::NoUserOrderId};
 
 /// The constant decimal precision.
 pub const DECIMALS: u8 = 5;
@@ -30,9 +26,7 @@ pub fn mock_exchange_linear() -> Exchange<
     BaseCurrency<i64, DECIMALS>,
     NoUserOrderId,
     InMemoryTransactionAccounting<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>,
-    NoAccountTracker,
 > {
-    let acc_tracker = NoAccountTracker;
     let contract_spec = ContractSpecification::new(
         leverage!(1),
         Decimal::try_from_scaled(5, 1).unwrap(),
@@ -42,8 +36,8 @@ pub fn mock_exchange_linear() -> Exchange<
         test_fee_taker(),
     )
     .expect("works");
-    let config = Config::new(QuoteCurrency::new(1000, 0), 10, contract_spec, 3600).unwrap();
-    Exchange::new(acc_tracker, config)
+    let config = Config::new(QuoteCurrency::new(1000, 0), 10, contract_spec).unwrap();
+    Exchange::new(config)
 }
 
 /// Constructs a mock exchange (for linear futures) for testing.
@@ -57,9 +51,7 @@ pub fn mock_exchange_linear_with_account_tracker(
     BaseCurrency<i64, DECIMALS>,
     NoUserOrderId,
     InMemoryTransactionAccounting<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>,
-    FullAccountTracker<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>,
 > {
-    let acc_tracker = FullAccountTracker::new(starting_balance);
     let contract_spec = ContractSpecification::new(
         leverage!(1),
         Decimal::try_from_scaled(5, 1).unwrap(),
@@ -69,8 +61,8 @@ pub fn mock_exchange_linear_with_account_tracker(
         test_fee_taker(),
     )
     .expect("works");
-    let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
-    Exchange::new(acc_tracker, config)
+    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
+    Exchange::new(config)
 }
 
 /// Constructs a mock exchange (for inverse futures) for testing.
@@ -82,9 +74,7 @@ pub fn mock_exchange_inverse(
     QuoteCurrency<i64, DECIMALS>,
     NoUserOrderId,
     InMemoryTransactionAccounting<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
-    NoAccountTracker,
 > {
-    let acc_tracker = NoAccountTracker;
     let contract_spec = ContractSpecification::new(
         leverage!(1),
         Decimal::try_from_scaled(5, 1).expect("works"),
@@ -94,8 +84,8 @@ pub fn mock_exchange_inverse(
         test_fee_taker(),
     )
     .expect("works");
-    let config = Config::new(starting_balance, 200, contract_spec, 3600).unwrap();
-    Exchange::new(acc_tracker, config)
+    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
+    Exchange::new(config)
 }
 
 /// Mocks `TransactionAccounting` for testing purposes.
