@@ -143,6 +143,8 @@ where
 
     /// Would be the return of buy and hold strategy
     pub fn buy_and_hold_return(&self) -> BaseOrQuote {
+        debug_assert!(self.price_first > QuoteCurrency::zero());
+        debug_assert!(self.price_last > QuoteCurrency::zero());
         let qty =
             BaseOrQuote::PairedCurrency::convert_from(self.wallet_balance_start, self.price_first);
         BaseOrQuote::pnl(self.price_first, self.price_last, qty)
@@ -206,7 +208,7 @@ where
             return None;
         }
 
-        Some(Into::<f64>::into(self.buy_volume / total_volume) as f32)
+        Some((Into::<f64>::into(self.buy_volume) / Into::<f64>::into(total_volume)) as f32)
     }
 
     /// Return the raw sharpe ratio that has been derived from the sampled returns of the users balances.
