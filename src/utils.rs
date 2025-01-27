@@ -72,12 +72,6 @@ pub(crate) mod tests {
 
     use crate::utils::decimal_from_f64;
 
-    /// round a value to a given precision of decimal places
-    /// used in tests
-    pub(crate) fn round(val: f64, prec: i32) -> f64 {
-        ((val * 10.0_f64.powi(prec)).round()) / 10.0_f64.powi(prec)
-    }
-
     #[test]
     fn test_convert_decimals() {
         assert_eq!(

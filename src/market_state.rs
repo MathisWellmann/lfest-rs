@@ -23,6 +23,10 @@ where
     #[getset(get_copy = "pub", set = "pub(crate)")]
     ask: QuoteCurrency<I, D>,
 
+    /// The last trade price.
+    #[getset(get_copy = "pub", set = "pub(crate)")]
+    last_trade_price: QuoteCurrency<I, D>,
+
     /// The current timestamp in nanoseconds
     #[getset(get_copy = "pub")]
     current_ts_ns: TimestampNs,
@@ -49,9 +53,8 @@ where
     /// Update the exchange state with new information
     ///
     /// ### Parameters:
-    /// `timestamp_ns`: Is used in the AccountTracker `A`
-    ///     and if setting order timestamps is enabled in the config.
     /// `market_update`: Newest market information
+    /// `price_filter`: The pricing rules.
     ///
     pub(crate) fn update_state<U, BaseOrQuote>(
         &mut self,
@@ -88,12 +91,14 @@ where
     pub fn from_components(
         bid: QuoteCurrency<I, D>,
         ask: QuoteCurrency<I, D>,
+        last_trade_price: QuoteCurrency<I, D>,
         current_ts_ns: TimestampNs,
         step: u64,
     ) -> Self {
         Self {
             bid,
             ask,
+            last_trade_price,
             current_ts_ns,
             step,
         }

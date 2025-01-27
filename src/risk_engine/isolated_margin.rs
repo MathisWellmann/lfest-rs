@@ -244,6 +244,7 @@ mod tests {
         let market_state = MarketState::from_components(
             QuoteCurrency::new(100, 0),
             QuoteCurrency::new(101, 0),
+            QuoteCurrency::new(101, 0),
             0.into(),
             0,
         );
@@ -285,6 +286,7 @@ mod tests {
         let market_state = MarketState::from_components(
             QuoteCurrency::new(200, 0),
             QuoteCurrency::new(201, 0),
+            QuoteCurrency::new(201, 0),
             0.into(),
             0,
         );
@@ -297,7 +299,7 @@ mod tests {
 
         let ask = QuoteCurrency::new(expected_liq_price, 0);
         let bid = ask - QuoteCurrency::one();
-        let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
+        let market_state = MarketState::from_components(bid, ask, ask, 0.into(), 0);
         assert_eq!(
             RiskEngine::<_, DECIMALS, _, NoUserOrderId>::check_maintenance_margin(
                 &re,
@@ -308,7 +310,7 @@ mod tests {
         );
         let ask = QuoteCurrency::new(expected_liq_price, 0) + QuoteCurrency::one();
         let bid = ask - QuoteCurrency::one();
-        let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
+        let market_state = MarketState::from_components(bid, ask, ask, 0.into(), 0);
         RiskEngine::<_, DECIMALS, _, NoUserOrderId>::check_maintenance_margin(
             &re,
             &market_state,
@@ -336,6 +338,7 @@ mod tests {
         let market_state = MarketState::from_components(
             QuoteCurrency::new(100, 0),
             QuoteCurrency::new(101, 0),
+            QuoteCurrency::new(101, 0),
             0.into(),
             0,
         );
@@ -360,7 +363,7 @@ mod tests {
 
         let ask = QuoteCurrency::new(expected_liq_price, 0);
         let bid = ask - QuoteCurrency::one();
-        let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
+        let market_state = MarketState::from_components(bid, ask, ask, 0.into(), 0);
         assert_eq!(
             RiskEngine::<i64, DECIMALS, _, NoUserOrderId>::check_maintenance_margin(
                 &re,
@@ -371,7 +374,7 @@ mod tests {
         );
         let ask = QuoteCurrency::new(expected_liq_price, 0) - QuoteCurrency::one();
         let bid = ask - QuoteCurrency::one();
-        let market_state = MarketState::from_components(bid, ask, 0.into(), 0);
+        let market_state = MarketState::from_components(bid, ask, ask, 0.into(), 0);
         RiskEngine::<_, DECIMALS, _, NoUserOrderId>::check_maintenance_margin(
             &re,
             &market_state,

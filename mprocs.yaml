@@ -1,14 +1,10 @@
 procs:
   cargo-check:
     shell: "cargo check"
-  cargo-check-quantiles:
-    shell: "cargo check --features quantiles"
   cargo-check-trade_aggregation:
     shell: "cargo check --features trade_aggregation"
   cargo-test:
     shell: "cargo test"
-  cargo-test-quantiles:
-    shell: "cargo test --features quantiles"
   cargo-test-trade_aggregation:
     shell: "cargo test --features trade_aggregation"
   cargo-bench:

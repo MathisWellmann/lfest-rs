@@ -80,7 +80,9 @@ where
     }
 
     #[inline(always)]
-    fn update_market_state(&self, _market_state: &mut MarketState<I, D>) {}
+    fn update_market_state(&self, market_state: &mut MarketState<I, D>) {
+        market_state.set_last_trade_price(self.price);
+    }
 
     #[inline(always)]
     fn timestamp_exchange_ns(&self) -> TimestampNs {
