@@ -24,7 +24,7 @@ where
     ask: QuoteCurrency<I, D>,
 
     /// The last trade price.
-    #[getset(get_copy = "pub", set = "pub(crate)")]
+    #[getset(get_copy = "pub", set = "pub")]
     last_trade_price: QuoteCurrency<I, D>,
 
     /// The current timestamp in nanoseconds

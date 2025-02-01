@@ -8,29 +8,29 @@ use tracing::trace;
 use crate::{
     exchange::CancelBy,
     prelude::{ActiveLimitOrders, Currency, Mon, Position},
-    types::{LimitOrder, MarginCurrency, Pending, Side, UserOrderIdT},
+    types::{LimitOrder, MarginCurrency, Pending, Side, UserOrderId},
     utils::{max, min},
     Result,
 };
 
 /// An implementation for computing the order margin online, aka with every change to the active orders.
 #[derive(Debug, Clone, CopyGetters, Getters)]
-pub(crate) struct OrderMargin<I, const D: u8, BaseOrQuote, UserOrderId>
+pub(crate) struct OrderMargin<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
 {
     #[getset(get = "pub(crate)")]
-    active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>,
+    active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderId> OrderMargin<I, D, BaseOrQuote, UserOrderId>
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> OrderMargin<I, D, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
 {
     pub(crate) fn new(max_active_orders: usize) -> Self {
         Self {
@@ -40,7 +40,7 @@ where
 
     pub(crate) fn update(
         &mut self,
-        order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Result<()> {
         assert!(order.remaining_quantity() > BaseOrQuote::zero());
         trace!("update_order: order: {order:?}");
@@ -60,7 +60,7 @@ where
     }
 
     /// Remove an order from being tracked for margin purposes.
-    pub(crate) fn remove(&mut self, by: CancelBy<UserOrderId>) {
+    pub(crate) fn remove(&mut self, by: CancelBy<UserOrderIdT>) {
         match by {
             CancelBy::OrderId(order_id) => {
                 self.active_limit_orders
@@ -86,11 +86,11 @@ where
 
     /// The margin requirement for all the tracked orders.
     fn order_margin_internal(
-        active_limit_orders: &ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>,
+        active_limit_orders: &ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
         init_margin_req: Decimal<I, D>,
         position: &Position<I, D, BaseOrQuote>,
         opt_new_order: Option<
-            &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+            &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         >,
     ) -> BaseOrQuote::PairedCurrency {
         debug_assert!(init_margin_req <= Decimal::one());
@@ -170,7 +170,7 @@ where
     /// Get the order margin if a new order were to be added.
     pub(crate) fn order_margin_with_order(
         &self,
-        order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         init_margin_req: Decimal<I, D>,
         position: &Position<I, D, BaseOrQuote>,
     ) -> BaseOrQuote::PairedCurrency {

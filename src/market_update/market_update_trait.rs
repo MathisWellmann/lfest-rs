@@ -1,6 +1,6 @@
 use crate::{
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter},
-    types::{TimestampNs, UserOrderIdT},
+    types::{TimestampNs, UserOrderId},
     Result,
 };
 
@@ -15,9 +15,9 @@ where
 
     /// Checks if this market update triggered a specific limit order,
     /// and if so, then how much.
-    fn limit_order_filled<UserOrderId: UserOrderIdT>(
+    fn limit_order_filled<UserOrderIdT: UserOrderId>(
         &self,
-        limit_order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        limit_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Option<BaseOrQuote>;
 
     /// Checks if the market update satisfies the `PriceFilter`.

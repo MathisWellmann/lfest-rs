@@ -1,5 +1,5 @@
 use crate::types::{
-    Currency, Error, LimitOrder, MarginCurrency, Mon, OrderId, Pending, UserOrderIdT,
+    Currency, Error, LimitOrder, MarginCurrency, Mon, OrderId, Pending, UserOrderId,
 };
 
 /// The datatype that holds the active limit orders of a user.
@@ -11,22 +11,22 @@ use crate::types::{
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 /// - `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ActiveLimitOrders<I, const D: u8, BaseOrQuote, UserOrderId>
+pub struct ActiveLimitOrders<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
 {
     // Stores all the active orders.
-    arena: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>,
+    arena: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderId> std::fmt::Display
-    for ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> std::fmt::Display
+    for ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ActiveLimitOrders:\n")?;
@@ -37,12 +37,12 @@ where
     }
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderId> ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
 {
     #[inline]
     pub(crate) fn new(max_active_orders: usize) -> Self {
@@ -70,9 +70,10 @@ where
     #[inline]
     pub(crate) fn insert(
         &mut self,
-        order: LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
-    ) -> crate::Result<Option<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>>
-    {
+        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+    ) -> crate::Result<
+        Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
+    > {
         // check if it exists
         if let Some(existing_order) = self.get_mut_by_id(order.id()) {
             let out = existing_order.clone();
@@ -95,7 +96,7 @@ where
     pub fn get_by_id(
         &self,
         order_id: OrderId,
-    ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
+    ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         self.arena.iter().find(|order| order.id() == order_id)
     }
 
@@ -105,7 +106,7 @@ where
     pub(crate) fn get_mut_by_id(
         &mut self,
         order_id: OrderId,
-    ) -> Option<&mut LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
+    ) -> Option<&mut LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         self.arena.iter_mut().find(|order| order.id() == order_id)
     }
 
@@ -115,7 +116,7 @@ where
     pub(crate) fn remove_by_order_id(
         &mut self,
         order_id: OrderId,
-    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
+    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         let Some(pos) = self
             .arena
             .iter_mut()
@@ -131,8 +132,8 @@ where
     #[inline]
     pub(crate) fn remove_by_user_order_id(
         &mut self,
-        user_order_id: UserOrderId,
-    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
+        user_order_id: UserOrderIdT,
+    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         let Some(pos) = self
             .arena
             .iter_mut()
@@ -147,7 +148,7 @@ where
     #[inline]
     pub fn values(
         &self,
-    ) -> impl Iterator<Item = &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>
+    ) -> impl Iterator<Item = &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>
     {
         self.arena.iter()
     }
@@ -155,7 +156,7 @@ where
     #[inline]
     pub(crate) fn values_mut(
         &mut self,
-    ) -> impl Iterator<Item = &mut LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>>
+    ) -> impl Iterator<Item = &mut LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>
     {
         self.arena.iter_mut()
     }

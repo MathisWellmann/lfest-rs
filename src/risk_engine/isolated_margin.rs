@@ -6,7 +6,7 @@ use crate::{
     market_state::MarketState,
     order_margin::OrderMargin,
     prelude::{Currency, Mon, Position, QuoteCurrency, RiskError},
-    types::{LimitOrder, MarginCurrency, MarketOrder, Pending, Side, UserOrderIdT},
+    types::{LimitOrder, MarginCurrency, MarketOrder, Pending, Side, UserOrderId},
 };
 
 #[derive(Debug, Clone)]
@@ -28,19 +28,19 @@ where
     }
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderId> RiskEngine<I, D, BaseOrQuote, UserOrderId>
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> RiskEngine<I, D, BaseOrQuote, UserOrderIdT>
     for IsolatedMarginRiskEngine<I, D, BaseOrQuote>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
 {
     fn check_market_order(
         &self,
         position: &Position<I, D, BaseOrQuote>,
         position_margin: BaseOrQuote::PairedCurrency,
-        order: &MarketOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
         available_wallet_balance: BaseOrQuote::PairedCurrency,
     ) -> Result<(), RiskError> {
@@ -65,9 +65,9 @@ where
     fn check_limit_order(
         &self,
         position: &Position<I, D, BaseOrQuote>,
-        order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         available_wallet_balance: BaseOrQuote::PairedCurrency,
-        order_margin_online: &OrderMargin<I, D, BaseOrQuote, UserOrderId>,
+        order_margin_online: &OrderMargin<I, D, BaseOrQuote, UserOrderIdT>,
     ) -> Result<(), RiskError> {
         let order_margin =
             order_margin_online.order_margin(self.contract_spec.init_margin_req(), position);
@@ -119,16 +119,16 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
 {
-    fn check_market_buy_order<UserOrderId>(
+    fn check_market_buy_order<UserOrderIdT>(
         &self,
         position: &Position<I, D, BaseOrQuote>,
         position_margin: BaseOrQuote::PairedCurrency,
-        order: &MarketOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
         available_wallet_balance: BaseOrQuote::PairedCurrency,
     ) -> Result<(), RiskError>
     where
-        UserOrderId: UserOrderIdT,
+        UserOrderIdT: UserOrderId,
     {
         assert!(matches!(order.side(), Side::Buy));
 
@@ -168,16 +168,16 @@ where
         Ok(())
     }
 
-    fn check_market_sell_order<UserOrderId>(
+    fn check_market_sell_order<UserOrderIdT>(
         &self,
         position: &Position<I, D, BaseOrQuote>,
         position_margin: BaseOrQuote::PairedCurrency,
-        order: &MarketOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
         available_wallet_balance: BaseOrQuote::PairedCurrency,
     ) -> Result<(), RiskError>
     where
-        UserOrderId: UserOrderIdT,
+        UserOrderIdT: UserOrderId,
     {
         assert!(matches!(order.side(), Side::Sell));
 

@@ -3,7 +3,7 @@ use num_traits::Zero;
 
 use super::{
     order_meta::ExchangeOrderMeta, order_status::NewOrder, Currency, Filled, FilledQuantity,
-    MarginCurrency, Mon, OrderId, Pending, QuoteCurrency, RePricing, TimestampNs, UserOrderIdT,
+    MarginCurrency, Mon, OrderId, Pending, QuoteCurrency, RePricing, TimestampNs, UserOrderId,
 };
 use crate::{
     types::{OrderError, Side},
@@ -19,16 +19,16 @@ use crate::{
 /// - `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
 /// - `OrderStatus`: The status of the order for each stage, contains different information based on the stage.
 #[derive(Debug, Clone, PartialEq, Eq, Getters, CopyGetters, Setters)]
-pub struct LimitOrder<I, const D: u8, BaseOrQuote, UserOrderId, OrderStatus>
+pub struct LimitOrder<I, const D: u8, BaseOrQuote, UserOrderIdT, OrderStatus>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
     OrderStatus: Clone,
 {
     /// Order Id provided by the user, can be any type really.
     #[getset(get_copy = "pub")]
-    user_order_id: UserOrderId,
+    user_order_id: UserOrderIdT,
 
     /// Whether its a buy or sell order.
     #[getset(get_copy = "pub")]
@@ -51,12 +51,12 @@ where
     state: OrderStatus,
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderId, OrderStatus> std::fmt::Display
-    for LimitOrder<I, D, BaseOrQuote, UserOrderId, OrderStatus>
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT, OrderStatus> std::fmt::Display
+    for LimitOrder<I, D, BaseOrQuote, UserOrderIdT, OrderStatus>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
     OrderStatus: Clone + std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -105,12 +105,13 @@ where
     }
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderId> LimitOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT>
+    LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
 {
     /// Create a new limit order
     ///
@@ -126,7 +127,7 @@ where
         side: Side,
         limit_price: QuoteCurrency<I, D>,
         quantity: BaseOrQuote,
-        user_order_id: UserOrderId,
+        user_order_id: UserOrderIdT,
     ) -> Result<Self, OrderError> {
         if limit_price <= QuoteCurrency::zero() {
             return Err(OrderError::LimitPriceLTEZero);
@@ -146,7 +147,7 @@ where
 
     /// Set the `UserOrderId`.
     #[inline]
-    pub fn set_user_order_id(&mut self, user_order_id: UserOrderId) {
+    pub fn set_user_order_id(&mut self, user_order_id: UserOrderIdT) {
         self.user_order_id = user_order_id;
     }
 
@@ -160,7 +161,7 @@ where
     pub fn into_pending(
         self,
         meta: ExchangeOrderMeta,
-    ) -> LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>> {
+    ) -> LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>> {
         LimitOrder {
             user_order_id: self.user_order_id,
             side: self.side,
@@ -179,13 +180,13 @@ where
     }
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderId>
-    LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT>
+    LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
 {
     /// Used when an order gets some `quantity` filled at a `price`.
     ///
@@ -195,7 +196,7 @@ where
         &mut self,
         filled_quantity: BaseOrQuote,
         ts_ns: TimestampNs,
-    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderId, Filled<I, D, BaseOrQuote>>> {
+    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> {
         assert!(
             filled_quantity <= self.remaining_quantity,
             "The filled quantity can not be greater than the limit order quantity"
@@ -297,13 +298,13 @@ where
     }
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderId>
-    LimitOrder<I, D, BaseOrQuote, UserOrderId, Filled<I, D, BaseOrQuote>>
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT>
+    LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
 {
     /// Get the total quantity that this order is for.
     pub fn total_quantity(&self) -> BaseOrQuote {

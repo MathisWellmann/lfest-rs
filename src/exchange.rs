@@ -18,7 +18,7 @@ use crate::{
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     types::{
         Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderUpdate, MarginCurrency,
-        MarketOrder, NewOrder, OrderId, Pending, Result, Side, UserBalances, UserOrderIdT,
+        MarketOrder, NewOrder, OrderId, Pending, Result, Side, UserBalances, UserOrderId,
     },
     utils::assert_user_wallet_balance,
 };
@@ -26,9 +26,9 @@ use crate::{
 /// Whether to cancel a limit order by its `OrderId` or the `UserOrderId`.
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Copy)]
-pub enum CancelBy<UserOrderId: UserOrderIdT> {
+pub enum CancelBy<UserOrderIdT: UserOrderId> {
     OrderId(OrderId),
-    UserOrderId(UserOrderId),
+    UserOrderId(UserOrderIdT),
 }
 
 /// Relevant information about the traders account.
@@ -38,15 +38,15 @@ pub enum CancelBy<UserOrderId: UserOrderIdT> {
 /// - `D`: The constant decimal precision of the currencies.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 /// - `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
-pub struct Account<'a, I, const D: u8, BaseOrQuote, UserOrderId>
+pub struct Account<'a, I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
 {
     /// The active limit orders of the account.
-    pub active_limit_orders: &'a ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>,
+    pub active_limit_orders: &'a ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
     /// The current position of the account.
     pub position: &'a Position<I, D, BaseOrQuote>,
     /// The TAccount balances of the account.
@@ -55,12 +55,12 @@ where
 
 /// The main leveraged futures exchange for simulated trading
 #[derive(Debug, Clone, Getters)]
-pub struct Exchange<I, const D: u8, BaseOrQuote, UserOrderId, TransactionAccountingT>
+pub struct Exchange<I, const D: u8, BaseOrQuote, UserOrderIdT, TransactionAccountingT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
 {
     /// The exchange configuration.
     #[getset(get = "pub")]
@@ -85,22 +85,22 @@ where
     /// Active limit orders of the user.
     /// Maps the order `id` to the actual `Order`.
     #[getset(get = "pub")]
-    active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>,
+    active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
 
-    order_margin: OrderMargin<I, D, BaseOrQuote, UserOrderId>,
+    order_margin: OrderMargin<I, D, BaseOrQuote, UserOrderIdT>,
 
     // To avoid allocations in hot-paths
-    limit_order_updates: Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>,
+    limit_order_updates: Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderIdT>>,
     ids_to_remove: Vec<OrderId>,
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderId, TransactionAccountingT>
-    Exchange<I, D, BaseOrQuote, UserOrderId, TransactionAccountingT>
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT, TransactionAccountingT>
+    Exchange<I, D, BaseOrQuote, UserOrderIdT, TransactionAccountingT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderId: UserOrderIdT,
+    UserOrderIdT: UserOrderId,
     TransactionAccountingT:
         TransactionAccounting<I, D, BaseOrQuote::PairedCurrency> + std::fmt::Debug,
 {
@@ -128,7 +128,7 @@ where
     }
 
     /// Get information about the `Account`
-    pub fn account(&self) -> Account<I, D, BaseOrQuote, UserOrderId> {
+    pub fn account(&self) -> Account<I, D, BaseOrQuote, UserOrderIdT> {
         Account {
             active_limit_orders: &self.active_limit_orders,
             position: &self.position,
@@ -156,7 +156,7 @@ where
     pub fn update_state<U>(
         &mut self,
         market_update: &U,
-    ) -> Result<&Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderId>>>
+    ) -> Result<&Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderIdT>>>
     where
         U: MarketUpdate<I, D, BaseOrQuote>,
     {
@@ -169,7 +169,7 @@ where
             I,
             D,
             BaseOrQuote,
-            UserOrderId,
+            UserOrderIdT,
         >>::check_maintenance_margin(
             &self.risk_engine, &self.market_state, &self.position
         ) {
@@ -179,6 +179,14 @@ where
 
         self.check_active_orders(market_update);
         Ok(&self.limit_order_updates)
+    }
+
+    /// Set the best bid and ask, alternatively a `Bba` `MarketUpdate` can be passed into `update_state`
+    #[inline]
+    pub fn set_best_bid_and_ask(&mut self, bid: QuoteCurrency<I, D>, ask: QuoteCurrency<I, D>) {
+        debug_assert!(bid < ask);
+        self.market_state.set_bid(bid);
+        self.market_state.set_ask(ask);
     }
 
     // Liquidate the position by closing it with a market order.
@@ -208,8 +216,8 @@ where
     /// Else its an error.
     pub fn submit_market_order(
         &mut self,
-        order: MarketOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>,
-    ) -> Result<MarketOrder<I, D, BaseOrQuote, UserOrderId, Filled<I, D, BaseOrQuote>>> {
+        order: MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Result<MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> {
         // Basic checks
         self.config
             .contract_spec()
@@ -248,7 +256,7 @@ where
 
     fn settle_filled_market_order(
         &mut self,
-        order: MarketOrder<I, D, BaseOrQuote, UserOrderId, Filled<I, D, BaseOrQuote>>,
+        order: MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>,
     ) {
         let filled_qty = order.quantity();
         assert!(filled_qty > BaseOrQuote::zero());
@@ -283,8 +291,8 @@ where
     /// Else its an error.
     pub fn submit_limit_order(
         &mut self,
-        order: LimitOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>,
-    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
+        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         trace!("submit_order: {}", order);
 
         // Basic checks
@@ -348,8 +356,8 @@ where
     pub fn amend_limit_order(
         &mut self,
         existing_order_id: OrderId,
-        mut new_order: LimitOrder<I, D, BaseOrQuote, UserOrderId, NewOrder>,
-    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
+        mut new_order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         let existing_order = self
             .active_limit_orders
             .get_by_id(existing_order_id)
@@ -391,7 +399,7 @@ where
     /// will be placed into the book as a passive order.
     fn append_limit_order(
         &mut self,
-        order: LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         marketable: bool,
     ) -> Result<()> {
         debug!("append_limit_order: order: {order}, marketable: {marketable}");
@@ -449,8 +457,8 @@ where
     /// returns Some order if successful with given order_id
     pub fn cancel_limit_order(
         &mut self,
-        cancel_by: CancelBy<UserOrderId>,
-    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>> {
+        cancel_by: CancelBy<UserOrderIdT>,
+    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         trace!("cancel_order: by {:?}", cancel_by);
         let order_margin = self
             .transaction_accounting
@@ -517,7 +525,7 @@ where
     #[inline]
     pub(crate) fn remove_executed_order_from_active(
         order_id: OrderId,
-        active_limit_orders: &mut ActiveLimitOrders<I, D, BaseOrQuote, UserOrderId>,
+        active_limit_orders: &mut ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
     ) {
         let order = active_limit_orders
             .remove_by_order_id(order_id)

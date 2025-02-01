@@ -3,7 +3,7 @@ use getset::{CopyGetters, Getters};
 use super::{Bba, MarketUpdate, Trade};
 use crate::{
     prelude::PriceFilter,
-    types::{Currency, Mon, QuoteCurrency, Side, TimestampNs, UserOrderIdT},
+    types::{Currency, Mon, QuoteCurrency, Side, TimestampNs, UserOrderId},
     utils::min,
 };
 
@@ -142,13 +142,13 @@ where
 
     // TODO: benchmark and optimize this.
     #[inline]
-    fn limit_order_filled<UserOrderId: UserOrderIdT>(
+    fn limit_order_filled<UserOrderIdT: UserOrderId>(
         &self,
         limit_order: &crate::prelude::LimitOrder<
             I,
             D,
             BaseOrQuote,
-            UserOrderId,
+            UserOrderIdT,
             crate::prelude::Pending<I, D, BaseOrQuote>,
         >,
     ) -> Option<BaseOrQuote> {

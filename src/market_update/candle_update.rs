@@ -4,7 +4,7 @@ use crate::{
         enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
     },
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side},
-    types::{TimestampNs, UserOrderIdT},
+    types::{TimestampNs, UserOrderId},
     Result,
 };
 
@@ -49,9 +49,9 @@ where
     const CAN_FILL_LIMIT_ORDERS: bool = true;
 
     #[inline]
-    fn limit_order_filled<UserOrderId: UserOrderIdT>(
+    fn limit_order_filled<UserOrderIdT: UserOrderId>(
         &self,
-        order: &LimitOrder<I, D, BaseOrQuote, UserOrderId, Pending<I, D, BaseOrQuote>>,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Option<BaseOrQuote> {
         debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
 
