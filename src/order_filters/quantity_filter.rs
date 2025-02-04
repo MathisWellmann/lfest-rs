@@ -160,4 +160,12 @@ mod tests {
             Err(OrderError::InvalidQuantityStepSize)
         );
     }
+
+    #[test]
+    fn size_of_quantity_filter() {
+        assert_eq!(
+            std::mem::size_of::<QuantityFilter<i64, 5, BaseCurrency<i64, 5>>>(),
+            40
+        );
+    }
 }

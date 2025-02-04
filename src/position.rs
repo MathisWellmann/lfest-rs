@@ -355,4 +355,12 @@ mod tests {
             fees,
         );
     }
+
+    #[test]
+    fn size_of_position() {
+        assert_eq!(
+            std::mem::size_of::<Position<i64, 5, BaseCurrency<_, 5>>>(),
+            32
+        );
+    }
 }
