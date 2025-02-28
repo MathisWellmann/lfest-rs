@@ -142,7 +142,10 @@ where
         };
 
         if ((limit_price - min_price) % self.tick_size) != QuoteCurrency::zero() {
-            return Err(OrderError::InvalidOrderPriceStepSize);
+            return Err(OrderError::InvalidOrderPriceStepSize {
+                limit_price: limit_price.to_string(),
+                step_size: self.tick_size.to_string(),
+            });
         }
         if limit_price > mark_price * self.multiplier_up && self.multiplier_up != Decimal::zero() {
             return Err(OrderError::LimitPriceAboveMultiple);
@@ -277,7 +280,10 @@ mod tests {
         let price = QuoteCurrency::new(10005, 2);
         assert_eq!(
             filter.validate_limit_price(price, mark_price),
-            Err(OrderError::InvalidOrderPriceStepSize)
+            Err(OrderError::InvalidOrderPriceStepSize {
+                limit_price: "100.05 Quote".to_string(),
+                step_size: "0.10 Quote".to_string(),
+            })
         );
     }
 

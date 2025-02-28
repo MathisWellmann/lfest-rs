@@ -24,7 +24,10 @@ pub enum OrderError {
     },
 
     #[error("The order price does not conform to the step size.")]
-    InvalidOrderPriceStepSize,
+    InvalidOrderPriceStepSize {
+        limit_price: String,
+        step_size: String,
+    },
 
     #[error("order size is less than or equal zero.")]
     OrderQuantityLTEZero,
