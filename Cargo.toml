@@ -1,8 +1,8 @@
 [package]
 name = "lfest"
-version = "0.98.0"
+version = "0.99.0"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
-edition = "2021"
+edition = "2024"
 license-file = "LICENSE"
 description = "A leveraged perpetual futures exchange for simulated trading and backtesting"
 repository = "https://github.com/MathisWellmann/lfest-rs"

@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use const_decimal::Decimal;
 use lfest::{load_trades_from_csv, prelude::*};
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use tracing::error;
 
 const DECIMALS: u8 = 4;
@@ -47,7 +47,7 @@ fn main() {
     );
 
     // use random action every 100 trades to buy or sell
-    let mut rng = thread_rng();
+    let mut rng = rng();
 
     for (i, p) in prices.into_iter().enumerate() {
         let spread = Decimal::try_from_scaled(1, 1).unwrap();
@@ -68,7 +68,7 @@ fn main() {
                 * Decimal::try_from_scaled(1, 1).unwrap();
             let order_size =
                 QuoteCurrency::convert_from(order_value, exchange.market_state().bid());
-            let order = if rng.gen() {
+            let order = if rng.random() {
                 MarketOrder::new(Side::Sell, order_size).unwrap() // Sell using
                                                                   // market order
             } else {
