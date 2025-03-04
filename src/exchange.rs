@@ -10,6 +10,7 @@ use crate::{
     config::Config,
     market_state::MarketState,
     order_margin::OrderMargin,
+    order_rate_limiter::OrderRateLimiter,
     prelude::{
         ActiveLimitOrders, Currency, MarketUpdate, Mon, OrderError, Position, QuoteCurrency,
         RePricing, Transaction, EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT,
@@ -92,6 +93,8 @@ where
     // To avoid allocations in hot-paths
     limit_order_updates: Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderIdT>>,
     ids_to_remove: Vec<OrderId>,
+
+    order_rate_limiter: OrderRateLimiter,
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT, TransactionAccountingT>
@@ -112,6 +115,8 @@ where
 
         let transaction_accounting = TransactionAccountingT::new(config.starting_wallet_balance());
         let max_active_orders = config.max_num_open_orders();
+        let order_rate_limiter =
+            OrderRateLimiter::new(config.order_rate_limits().orders_per_second());
         Self {
             config,
             market_state,
@@ -124,6 +129,7 @@ where
             order_margin: OrderMargin::new(max_active_orders),
             limit_order_updates: Vec::with_capacity(max_active_orders),
             ids_to_remove: Vec::with_capacity(max_active_orders),
+            order_rate_limiter,
         }
     }
 
@@ -218,6 +224,8 @@ where
         &mut self,
         order: MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
     ) -> Result<MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> {
+        self.order_rate_limiter
+            .aquire(self.market_state.current_ts_ns())?;
         // Basic checks
         self.config
             .contract_spec()
@@ -295,6 +303,8 @@ where
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         trace!("submit_order: {}", order);
 
+        self.order_rate_limiter
+            .aquire(self.market_state.current_ts_ns())?;
         // Basic checks
         self.config
             .contract_spec()
@@ -358,6 +368,8 @@ where
         existing_order_id: OrderId,
         mut new_order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+        self.order_rate_limiter
+            .aquire(self.market_state.current_ts_ns())?;
         let existing_order = self
             .active_limit_orders
             .get_by_id(existing_order_id)
@@ -460,6 +472,8 @@ where
         cancel_by: CancelBy<UserOrderIdT>,
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         trace!("cancel_order: by {:?}", cancel_by);
+        self.order_rate_limiter
+            .aquire(self.market_state.current_ts_ns())?;
         let order_margin = self
             .transaction_accounting
             .margin_balance_of(USER_ORDER_MARGIN_ACCOUNT)

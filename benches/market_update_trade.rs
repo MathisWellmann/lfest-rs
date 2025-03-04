@@ -54,7 +54,13 @@ fn criterion_benchmark(c: &mut Criterion) {
         Fee::from(Decimal::try_from_scaled(6, 0).unwrap()),
     )
     .expect("works");
-    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
+    let config = Config::new(
+        starting_balance,
+        200,
+        contract_spec,
+        OrderRateLimits::default(),
+    )
+    .unwrap();
     let mut exchange = Exchange::new(config);
 
     let trades = load_trades_from_csv("./data/Bitmex_XBTUSD_1M.csv");

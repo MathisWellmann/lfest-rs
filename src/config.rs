@@ -3,15 +3,16 @@ use getset::{CopyGetters, Getters};
 use crate::{
     contract_specification::ContractSpecification,
     prelude::{ConfigError, MarginCurrency, Mon},
+    types::OrderRateLimits,
 };
 
-#[derive(Debug, Clone, Getters, CopyGetters)]
 /// Define the Exchange configuration.
 ///
 /// Generics:
 /// - `I`: The numeric data type of currencies.
 /// - `D`: The constant decimal precision of the currencies.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
+#[derive(Debug, Clone, Getters, CopyGetters)]
 pub struct Config<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
@@ -33,6 +34,10 @@ where
     /// The contract specification.
     #[getset(get = "pub")]
     contract_spec: ContractSpecification<I, D, BaseOrQuote::PairedCurrency>,
+
+    /// The submission rate limits for orders.
+    #[getset(get = "pub")]
+    order_rate_limits: OrderRateLimits,
 }
 
 impl<I, const D: u8, BaseOrQuote> Config<I, D, BaseOrQuote>
@@ -40,6 +45,7 @@ where
     I: Mon<D>,
     BaseOrQuote: MarginCurrency<I, D>,
 {
+    // TODO: use `typed-builder`
     /// Create a new Config.
     ///
     /// # Arguments:
@@ -55,6 +61,7 @@ where
         starting_balance: BaseOrQuote,
         max_num_open_orders: usize,
         contract_specification: ContractSpecification<I, D, BaseOrQuote::PairedCurrency>,
+        order_rate_limits: OrderRateLimits,
     ) -> Result<Self, ConfigError> {
         if max_num_open_orders == 0 {
             return Err(ConfigError::InvalidMaxNumOpenOrders);
@@ -67,6 +74,7 @@ where
             starting_wallet_balance: starting_balance,
             max_num_open_orders,
             contract_spec: contract_specification,
+            order_rate_limits,
         })
     }
 }

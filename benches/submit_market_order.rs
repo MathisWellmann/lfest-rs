@@ -46,7 +46,13 @@ fn criterion_benchmark(c: &mut Criterion) {
         Fee::from(Decimal::try_from_scaled(6, 1).unwrap()),
     )
     .expect("works");
-    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
+    let config = Config::new(
+        starting_balance,
+        200,
+        contract_spec,
+        OrderRateLimits::default(),
+    )
+    .unwrap();
     let mut exchange = Exchange::new(config);
     exchange
         .update_state(&Bba {

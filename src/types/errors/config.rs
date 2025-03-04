@@ -28,4 +28,7 @@ pub enum ConfigError {
 
     #[error("The maintenance margin fraction is invalid")]
     InvalidMaintenanceMarginFraction,
+
+    #[error("Invalid order limits")]
+    InvalidOrderLimits,
 }

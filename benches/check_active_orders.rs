@@ -25,10 +25,17 @@ fn criterion_benchmark(c: &mut Criterion) {
         Fee::from(Decimal::try_from_scaled(6, 4).unwrap()),
     )
     .expect("works");
-    let config = Config::new(starting_balance, 200, contract_spec).unwrap();
+    let config = Config::new(
+        starting_balance,
+        200,
+        contract_spec,
+        OrderRateLimits::new(1_000).unwrap(),
+    )
+    .unwrap();
 
     let mut group = c.benchmark_group("check_active_orders");
 
+    let mut ts_s = 0;
     for n in [1, 2, 3, 5, 10, 100] {
         group.bench_function(&format!("{n}"), |b| {
             let mut exchange = Exchange::<
@@ -41,8 +48,9 @@ fn criterion_benchmark(c: &mut Criterion) {
             let market_update = Bba {
                 bid: QuoteCurrency::new(100, 0),
                 ask: QuoteCurrency::new(101, 0),
-                timestamp_exchange_ns: 0.into(),
+                timestamp_exchange_ns: ts_s.into(),
             };
+            ts_s += 1;
             exchange
                 .update_state(&market_update)
                 .expect("is valid market update");

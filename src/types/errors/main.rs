@@ -46,4 +46,7 @@ pub enum Error {
 
     #[error("Unable to create `Decimal`")]
     UnableToCreateDecimal,
+
+    #[error("The order rate limit was reached for this period.")]
+    RateLimitReached,
 }

@@ -30,6 +30,7 @@ by simply setting the margin currency to either `QuoteCurrency` (linear) or `Bas
 [`QuantityFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuantityFilter.html)    
 - `IsolatedMarginRiskEngine`
 - Double-Entry Bookkeeping is used to ensure the accounting-equation always holds.
+- Rate limiting for order submissions, cancellations.
 
 ### Order Types
 The supported order types are:
