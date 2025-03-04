@@ -87,6 +87,7 @@ where
         self.current_ts_ns
     }
 
+    #[allow(missing_docs)]
     #[cfg(test)]
     pub fn from_components(
         bid: QuoteCurrency<I, D>,
