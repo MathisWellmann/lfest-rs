@@ -1,0 +1,21 @@
+--- src/position_inner.rs
++++ replace PositionInner<I, D, BaseOrQuote>::unrealized_pnl -> BaseOrQuote::PairedCurrency with Default::default()
+@@ -108,17 +108,17 @@
+ 
+     /// Return the positions unrealized profit and loss
+     /// denoted in QUOTE when using linear futures,
+     /// denoted in BASE when using inverse futures
+     pub fn unrealized_pnl(
+         &self,
+         mark_to_market_price: QuoteCurrency<I, D>,
+     ) -> BaseOrQuote::PairedCurrency {
+-        BaseOrQuote::PairedCurrency::pnl(self.entry_price(), mark_to_market_price, self.quantity)
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Add contracts to the position.
+     pub(crate) fn increase_contracts<Acc>(
+         &mut self,
+         qty: BaseOrQuote,
+         entry_price: QuoteCurrency<I, D>,
+         accounting: &mut Acc,

@@ -768,7 +768,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lfest"
-version = "0.100.0"
+version = "0.101.0"
 dependencies = [
  "assert2",
  "const-decimal",
@@ -793,6 +793,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-test",
  "trade_aggregation",
+ "typed-builder",
 ]
 
 [[package]]
@@ -1668,6 +1669,26 @@ checksum = "e3baef2cac2126ddb2105aed8533e8dedfcedb86a013924e4e3a2401878bad6f"
 dependencies = [
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "typed-builder"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e14ed59dc8b7b26cacb2a92bad2e8b1f098806063898ab42a3bd121d7d45e75"
+dependencies = [
+ "typed-builder-macro",
+]
+
+[[package]]
+name = "typed-builder-macro"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "560b82d656506509d43abe30e0ba64c56b1953ab3d4fe7ba5902747a7a3cedd5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.99",
 ]
 
 [[package]]

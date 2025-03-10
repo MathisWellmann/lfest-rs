@@ -1,0 +1,21 @@
+--- src/accounting/account.rs
++++ replace += with *= in TAccount<I, D, BaseOrQuote>::post_debit
+@@ -30,17 +30,17 @@
+             debits_posted,
+             credits_posted,
+             _quote: PhantomData,
+         }
+     }
+ 
+     #[inline(always)]
+     pub(crate) fn post_debit(&mut self, amount: BaseOrQuote) {
+-        self.debits_posted += amount;
++        self.debits_posted *= /* ~ changed by cargo-mutants ~ */ amount;
+     }
+ 
+     #[inline(always)]
+     pub(crate) fn post_credit(&mut self, amount: BaseOrQuote) {
+         self.credits_posted += amount;
+     }
+ 
+     #[inline(always)]

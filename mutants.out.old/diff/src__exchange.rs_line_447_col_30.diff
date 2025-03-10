@@ -1,0 +1,21 @@
+--- src/exchange.rs
++++ replace - with + in Exchange<I, D, BaseOrQuote, UserOrderIdT, TransactionAccountingT>::append_limit_order
+@@ -439,17 +439,17 @@
+             Ordering::Greater => Transaction::new(
+                 USER_ORDER_MARGIN_ACCOUNT,
+                 USER_WALLET_ACCOUNT,
+                 new_order_margin - order_margin,
+             ),
+             Ordering::Less => Transaction::new(
+                 USER_ORDER_MARGIN_ACCOUNT,
+                 USER_WALLET_ACCOUNT,
+-                order_margin - new_order_margin,
++                order_margin + /* ~ changed by cargo-mutants ~ */ new_order_margin,
+             ),
+             Ordering::Equal => return Ok(()),
+         };
+         self.transaction_accounting
+             .create_margin_transfer(transaction)
+             .expect("margin transfer works");
+ 
+         assert_eq!(

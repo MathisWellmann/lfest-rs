@@ -1,0 +1,7 @@
+src/risk_engine/isolated_margin.rs:167:41: replace > with == in IsolatedMarginRiskEngine<I, D, BaseOrQuote>::check_market_buy_order
+src/order_filters/quantity_filter.rs:98:23: replace - with + in QuantityFilter<I, D, BaseOrQuote>::validate_order_quantity
+src/order_margin.rs:152:23: replace += with *= in OrderMargin<I, D, BaseOrQuote, UserOrderIdT>::order_margin_internal
+src/order_filters/price_filter.rs:203:18: replace > with == in enforce_max_price
+src/market_update/smart_candle.rs:126:9: replace <impl std::fmt::Display for SmartCandle<I, D, BaseOrQuote>>::fmt -> std::fmt::Result with Ok(Default::default())
+src/exchange.rs:447:30: replace - with + in Exchange<I, D, BaseOrQuote, UserOrderIdT, TransactionAccountingT>::append_limit_order
+src/market_update/candle_update.rs:73:37: replace > with == in <impl MarketUpdate<I, D, BaseOrQuote> for Candle<I, D>>::limit_order_filled

@@ -1,0 +1,37 @@
+--- src/mock_exchange.rs
++++ replace mock_exchange_linear -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId, InMemoryTransactionAccounting<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>, > with Default::default()
+@@ -22,33 +22,17 @@
+ /// and the margin currency is `QuoteCurency`
+ pub fn mock_exchange_linear() -> Exchange<
+     i64,
+     DECIMALS,
+     BaseCurrency<i64, DECIMALS>,
+     NoUserOrderId,
+     InMemoryTransactionAccounting<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>,
+ > {
+-    let contract_spec = ContractSpecification::new(
+-        leverage!(1),
+-        Decimal::try_from_scaled(5, 1).unwrap(),
+-        PriceFilter::default(),
+-        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).unwrap(),
+-        test_fee_maker(),
+-        test_fee_taker(),
+-    )
+-    .expect("works");
+-    let config = Config::new(
+-        QuoteCurrency::new(1000, 0),
+-        10,
+-        contract_spec,
+-        OrderRateLimits::default(),
+-    )
+-    .unwrap();
+-    Exchange::new(config)
++    Default::default() /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ /// Constructs a mock exchange (for linear futures) for testing.
+ /// The size is denoted in `BaseCurrency`
+ /// and the margin currency is `QuoteCurency`
+ pub fn mock_exchange_linear_with_account_tracker(
+     starting_balance: QuoteCurrency<i64, DECIMALS>,
+ ) -> Exchange<

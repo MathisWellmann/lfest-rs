@@ -1,0 +1,27 @@
+--- src/types/market_order.rs
++++ replace MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>::into_pending -> MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>> with Default::default()
+@@ -110,23 +110,17 @@
+         })
+     }
+ 
+     /// Take in the order metadata provided by the exchange and coverts the order to the `Pending` state.
+     pub fn into_pending(
+         self,
+         meta: ExchangeOrderMeta,
+     ) -> MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>> {
+-        MarketOrder {
+-            user_order_id: self.user_order_id,
+-            side: self.side,
+-            quantity: self.quantity,
+-            state: Pending::new(meta),
+-            _quote: std::marker::PhantomData,
+-        }
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ impl<I, const D: u8, BaseOrQuote, UserOrderIdT>
+     MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>
+ where
+     I: Mon<D>,
+     BaseOrQuote: Currency<I, D>,

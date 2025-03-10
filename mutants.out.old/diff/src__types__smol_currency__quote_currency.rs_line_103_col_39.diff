@@ -1,0 +1,21 @@
+--- src/types/smol_currency/quote_currency.rs
++++ replace * with / in <impl Currency<I, D> for QuoteCurrency<I, D>>::convert_from
+@@ -95,17 +95,17 @@
+ /// - `D`: The constant decimal precision of the `QuoteCurrency`.
+ impl<I, const D: u8> Currency<I, D> for QuoteCurrency<I, D>
+ where
+     I: Mon<D>,
+ {
+     type PairedCurrency = BaseCurrency<I, D>;
+ 
+     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self {
+-        QuoteCurrency(*units.as_ref() * *price_per_unit.as_ref())
++        QuoteCurrency(*units.as_ref() / /* ~ changed by cargo-mutants ~ */ *price_per_unit.as_ref())
+     }
+ }
+ 
+ /// Linear futures where the `Quote` currency is used as margin currency.
+ ///
+ /// # Generics:
+ /// - `I`: The numeric data type of `Decimal`.
+ /// - `D`: The constant decimal precision.

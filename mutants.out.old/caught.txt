@@ -1,0 +1,12 @@
+src/types/smol_currency/base_currency.rs:87:9: replace <impl Currency<I, D> for BaseCurrency<I, D>>::convert_from -> Self with Default::default()
+src/order_margin.rs:159:23: replace += with -= in OrderMargin<I, D, BaseOrQuote, UserOrderIdT>::order_margin_internal
+src/position.rs:49:9: replace Position<I, D, BaseOrQuote>::quantity -> BaseOrQuote with Default::default()
+src/types/smol_currency/quote_currency.rs:159:9: replace <impl One for QuoteCurrency<I, D>>::one -> Self with Default::default()
+src/position_inner.rs:116:9: replace PositionInner<I, D, BaseOrQuote>::unrealized_pnl -> BaseOrQuote::PairedCurrency with Default::default()
+src/exchange.rs:639:46: replace - with + in Exchange<I, D, BaseOrQuote, UserOrderIdT, TransactionAccountingT>::check_active_orders
+src/types/smol_currency/base_currency.rs:87:38: replace / with % in <impl Currency<I, D> for BaseCurrency<I, D>>::convert_from
+src/types/smol_currency/quote_currency.rs:103:39: replace * with / in <impl Currency<I, D> for QuoteCurrency<I, D>>::convert_from
+src/order_filters/quantity_filter.rs:98:52: replace != with == in QuantityFilter<I, D, BaseOrQuote>::validate_order_quantity
+src/types/smol_currency/base_currency.rs:236:21: replace % with / in <impl std::ops::Rem for BaseCurrency<I, D>>::rem
+src/risk_engine/isolated_margin.rs:187:9: replace IsolatedMarginRiskEngine<I, D, BaseOrQuote>::check_market_sell_order -> Result<(), RiskError> with Ok(())
+src/market_state.rs:87:9: replace MarketState<I, D>::current_timestamp_ns -> TimestampNs with Default::default()

@@ -1,0 +1,21 @@
+--- src/types/smol_currency/base_currency.rs
++++ replace <impl Currency<I, D> for BaseCurrency<I, D>>::convert_from -> Self with Default::default()
+@@ -79,17 +79,17 @@
+ impl<I, const D: u8> Currency<I, D> for BaseCurrency<I, D>
+ where
+     I: Mon<D>,
+ {
+     // Generic over the decimal points in paired currency.
+     type PairedCurrency = QuoteCurrency<I, D>;
+ 
+     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self {
+-        BaseCurrency(*units.as_ref() / *price_per_unit.as_ref())
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Inverse futures where the `Base` currency is used as margin currency.
+ ///
+ /// # Generics:
+ /// - `I`: The numeric data type of `Decimal`.
+ /// - `D`: The constant decimal precision of the `BaseCurrency`.

@@ -12,8 +12,8 @@ use crate::{
     order_margin::OrderMargin,
     order_rate_limiter::OrderRateLimiter,
     prelude::{
-        ActiveLimitOrders, Currency, EXCHANGE_FEE_ACCOUNT, MarketUpdate, Mon, OrderError, Position,
-        QuoteCurrency, RePricing, Transaction, USER_ORDER_MARGIN_ACCOUNT,
+        ActiveLimitOrders, Currency, MarketUpdate, Mon, OrderError, Position, QuoteCurrency,
+        RePricing, Transaction, EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT,
         USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
     },
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},

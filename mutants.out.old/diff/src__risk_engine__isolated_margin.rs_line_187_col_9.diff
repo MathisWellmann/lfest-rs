@@ -1,0 +1,58 @@
+--- src/risk_engine/isolated_margin.rs
++++ replace IsolatedMarginRiskEngine<I, D, BaseOrQuote>::check_market_sell_order -> Result<(), RiskError> with Ok(())
+@@ -179,54 +179,17 @@
+         position_margin: BaseOrQuote::PairedCurrency,
+         order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+         fill_price: QuoteCurrency<I, D>,
+         available_wallet_balance: BaseOrQuote::PairedCurrency,
+     ) -> Result<(), RiskError>
+     where
+         UserOrderIdT: UserOrderId,
+     {
+-        assert!(matches!(order.side(), Side::Sell));
+-
+-        match position {
+-            Position::Neutral | Position::Short(_) => {
+-                let notional_value =
+-                    BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
+-                let margin_req = notional_value * self.contract_spec.init_margin_req();
+-                let fee = notional_value * *self.contract_spec.fee_taker().as_ref();
+-
+-                if margin_req + fee > available_wallet_balance {
+-                    return Err(RiskError::NotEnoughAvailableBalance);
+-                }
+-            }
+-            Position::Long(pos_inner) => {
+-                // Else its a long position which needs to be reduced
+-                if order.quantity() <= pos_inner.quantity() {
+-                    // The order strictly reduces the position, so no additional margin is required.
+-                    return Ok(());
+-                }
+-                // The order reduces the long position and opens a short.
+-                let released_from_old_pos = position_margin;
+-
+-                let new_short_size = Self::quantity_minus_position(order.quantity(), pos_inner);
+-                assert2::debug_assert!(new_short_size > BaseOrQuote::zero());
+-                let new_notional_value =
+-                    BaseOrQuote::PairedCurrency::convert_from(new_short_size, fill_price);
+-                assert2::debug_assert!(new_notional_value > BaseOrQuote::PairedCurrency::zero());
+-                let new_margin_req = new_notional_value * self.contract_spec.init_margin_req();
+-                assert2::debug_assert!(new_margin_req > BaseOrQuote::PairedCurrency::zero());
+-
+-                let fee = new_notional_value * *self.contract_spec.fee_taker().as_ref();
+-
+-                if new_margin_req + fee > available_wallet_balance + released_from_old_pos {
+-                    return Err(RiskError::NotEnoughAvailableBalance);
+-                }
+-            }
+-        }
+-        Ok(())
++        Ok(()) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     #[inline(always)]
+     fn quantity_minus_position(
+         quantity: BaseOrQuote,
+         position_inner: &PositionInner<I, D, BaseOrQuote>,
+     ) -> BaseOrQuote {
+         quantity - position_inner.quantity()

@@ -1,3 +1,6 @@
+use getset::CopyGetters;
+use typed_builder::TypedBuilder;
+
 use super::MarketUpdate;
 use crate::{
     order_filters::{
@@ -8,25 +11,33 @@ use crate::{
     Result,
 };
 
-// TODO: use `typed-builder` and `getset` for construction and getters.
 /// A new candle has been created.
 /// Here we can use the `high` and `low` prices to see if our simulated resting orders
 /// have been executed over the last period as a proxy in absence of actual `Trade` flow.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, TypedBuilder, CopyGetters)]
 pub struct Candle<I, const D: u8>
 where
     I: Mon<D>,
 {
     /// The best bid at the time of candle creation
-    pub bid: QuoteCurrency<I, D>,
+    #[getset(get_copy = "pub")]
+    bid: QuoteCurrency<I, D>,
+
     /// The best ask at the time of candle creation
-    pub ask: QuoteCurrency<I, D>,
+    #[getset(get_copy = "pub")]
+    ask: QuoteCurrency<I, D>,
+
     /// The low price of the candle
-    pub low: QuoteCurrency<I, D>,
+    #[getset(get_copy = "pub")]
+    low: QuoteCurrency<I, D>,
+
     /// The high price of the candle
-    pub high: QuoteCurrency<I, D>,
+    #[getset(get_copy = "pub")]
+    high: QuoteCurrency<I, D>,
+
     /// The nanosecond timestamp at which this event occurred at the exchange.
-    pub timestamp_exchange_ns: TimestampNs,
+    #[getset(get_copy = "pub")]
+    timestamp_exchange_ns: TimestampNs,
 }
 
 impl<I, const D: u8> std::fmt::Display for Candle<I, D>
@@ -117,6 +128,7 @@ macro_rules! candle {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::types::{BaseCurrency, ExchangeOrderMeta};
 
     #[test]
     fn candle_update() {
@@ -127,6 +139,22 @@ mod test {
             high: QuoteCurrency::new(105, 0),
             timestamp_exchange_ns: 1.into(),
         };
-        todo!();
+        let new_order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(94, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 1.into());
+        let order = new_order.into_pending(meta);
+
+        let price_filter = PriceFilter::default();
+        <Candle<_, 5> as MarketUpdate<_, 5, BaseCurrency<_, 5>>>::validate_market_update(
+            &candle,
+            &price_filter,
+        )
+        .unwrap();
+        assert_eq!(candle.limit_order_filled(&order), None);
+        assert_eq!(candle.timestamp_exchange_ns(), 1.into());
     }
 }

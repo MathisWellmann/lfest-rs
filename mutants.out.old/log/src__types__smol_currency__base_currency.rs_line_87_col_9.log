@@ -1,0 +1,1117 @@
+
+*** src/types/smol_currency/base_currency.rs:87:9: replace <impl Currency<I, D> for BaseCurrency<I, D>>::convert_from -> Self with Default::default()
+
+*** mutation diff:
+--- src/types/smol_currency/base_currency.rs
++++ replace <impl Currency<I, D> for BaseCurrency<I, D>>::convert_from -> Self with Default::default()
+@@ -79,17 +79,17 @@
+ impl<I, const D: u8> Currency<I, D> for BaseCurrency<I, D>
+ where
+     I: Mon<D>,
+ {
+     // Generic over the decimal points in paired currency.
+     type PairedCurrency = QuoteCurrency<I, D>;
+ 
+     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self {
+-        BaseCurrency(*units.as_ref() / *price_per_unit.as_ref())
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Inverse futures where the `Base` currency is used as margin currency.
+ ///
+ /// # Generics:
+ /// - `I`: The numeric data type of `Decimal`.
+ /// - `D`: The constant decimal precision of the `BaseCurrency`.
+
+
+*** /nix/store/v2d7zb1wrsn94pv0hdl4v5nj96msh0lf-cargo-1.85.0-x86_64-unknown-linux-gnu/bin/cargo test --no-run --verbose --package=lfest@0.101.0
+       Fresh unicode-ident v1.0.18
+       Fresh proc-macro2 v1.0.94
+       Fresh quote v1.0.39
+       Fresh syn v2.0.99
+       Fresh cfg-if v1.0.0
+       Fresh autocfg v1.4.0
+       Fresh libm v0.2.11
+       Fresh serde_derive v1.0.218
+       Fresh num-traits v0.2.19
+       Fresh once_cell v1.20.3
+       Fresh memchr v2.7.4
+       Fresh ryu v1.0.20
+       Fresh regex-syntax v0.8.5
+       Fresh itoa v1.0.15
+       Fresh zerocopy-derive v0.7.35
+       Fresh byteorder v1.5.0
+       Fresh regex-syntax v0.6.29
+       Fresh thiserror-impl v1.0.69
+       Fresh tracing-attributes v0.1.28
+       Fresh proc-macro-error-attr2 v2.0.0
+       Fresh unicode-segmentation v1.12.0
+       Fresh overload v0.1.1
+       Fresh either v1.14.0
+       Fresh pin-project-lite v0.2.16
+       Fresh log v0.4.26
+       Fresh lazy_static v1.5.0
+       Fresh half v2.4.1
+       Fresh ruint-macro v1.2.1
+       Fresh smallvec v1.14.0
+       Fresh anstyle v1.0.10
+       Fresh clap_lex v0.7.4
+       Fresh ciborium-io v0.2.2
+       Fresh plotters-backend v0.3.7
+       Fresh unicode-xid v0.2.6
+       Fresh test-case-core v3.3.1
+       Fresh typed-builder-macro v0.20.0
+       Fresh thiserror-impl v2.0.12
+       Fresh cast v0.3.0
+       Fresh allocator-api2 v0.2.21
+       Fresh same-file v1.0.6
+       Fresh yansi v1.0.1
+       Fresh equivalent v1.0.2
+       Fresh fpdec-core v0.8.0 (https://github.com/MathisWellmann/fpdec.rs?rev=40cf802#40cf8025)
+       Fresh foldhash v0.1.4
+       Fresh diff v0.1.13
+       Fresh tracing-test-macro v0.2.5
+       Fresh glidesort v0.1.2
+       Fresh anes v0.1.6
+       Fresh distrs v0.2.2
+       Fresh serde v1.0.218
+       Fresh libc v0.2.170
+       Fresh semver v1.0.26
+       Fresh num-integer v0.1.46
+       Fresh tracing-core v0.1.33
+       Fresh regex-automata v0.4.9
+       Fresh zerocopy v0.7.35
+       Fresh regex-automata v0.1.10
+       Fresh num-complex v0.4.6
+       Fresh convert_case v0.7.1
+       Fresh sharded-slab v0.1.7
+       Fresh nu-ansi-term v0.46.0
+       Fresh csv-core v0.1.12
+       Fresh proc-macro-error2 v2.0.1
+       Fresh thread_local v1.1.8
+       Fresh ruint v1.13.1
+       Fresh plotters-svg v0.3.7
+       Fresh ciborium-ll v0.2.2
+       Fresh itertools v0.10.5
+       Fresh clap_builder v4.5.31
+       Fresh test-case-macros v3.3.1
+       Fresh hashbrown v0.15.2
+       Fresh typed-builder v0.20.0
+       Fresh fpdec-macros v0.8.0 (https://github.com/MathisWellmann/fpdec.rs?rev=40cf802#40cf8025)
+       Fresh walkdir v2.5.0
+       Fresh base64 v0.21.7
+       Fresh oorandom v11.1.4
+       Fresh rustc_version v0.4.1
+       Fresh crossbeam-utils v0.8.21
+       Fresh num-bigint v0.4.6
+       Fresh regex v1.11.1
+       Fresh getrandom v0.3.1
+       Fresh ppv-lite86 v0.2.20
+       Fresh tracing-log v0.2.0
+       Fresh thiserror v1.0.69
+       Fresh tracing v0.1.41
+       Fresh is-terminal v0.4.15
+       Fresh num-iter v0.1.45
+       Fresh matchers v0.1.0
+       Fresh serde_json v1.0.140
+       Fresh getset v0.1.5
+       Fresh syn v1.0.109
+       Fresh paste v1.0.15
+       Fresh csv v1.3.1
+       Fresh zerocopy v0.8.21
+       Fresh derive_more-impl v2.0.1
+       Fresh plotters v0.3.7
+       Fresh ciborium v0.2.2
+       Fresh criterion-plot v0.5.0
+       Fresh bitflags v2.9.0
+       Fresh clap v4.5.31
+       Fresh thiserror v2.0.12
+       Fresh test-case v3.3.1
+       Fresh fpdec v0.10.3 (https://github.com/MathisWellmann/fpdec.rs?rev=40cf802#40cf8025)
+       Fresh crossbeam-epoch v0.9.18
+       Fresh rand_core v0.9.3
+       Fresh num-rational v0.4.2
+       Fresh tracing-subscriber v0.3.19
+       Fresh derive_more v2.0.1
+       Fresh const-decimal v0.3.0 (https://github.com/OliverNChalk/const-decimal#7bf77bf3)
+       Fresh tinytemplate v1.2.1
+       Fresh trade_aggregation_derive v0.4.1
+       Fresh ron v0.8.1
+       Fresh crossbeam-deque v0.8.6
+       Fresh num v0.4.3
+       Fresh rand_chacha v0.9.0
+       Fresh tracing-test v0.2.5
+       Fresh trade_aggregation v12.0.3
+       Fresh assert2-macros v0.3.15
+       Fresh rayon-core v1.12.1
+       Fresh rand v0.9.0
+       Fresh sliding_features v6.0.0
+       Fresh rayon v1.10.0
+       Fresh assert2 v0.3.15
+       Fresh rand_distr v0.5.1
+       Fresh criterion v0.5.1
+       Dirty lfest v0.101.0 (/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp): the file `src/types/smol_currency/base_currency.rs` has changed (1741633909.202676834s, 7s after last build at 1741633902.425699470s)
+   Compiling lfest v0.101.0 (/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp)
+     Running `rustc --crate-name lfest --edition=2024 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("trade_aggregation"))' -C metadata=e38c20648c8acf1a -C extra-filename=-6c98b9dad13cebfc --out-dir /tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps -C incremental=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/incremental -L dependency=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps --extern assert2=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libassert2-a7bd1c0d8f717890.rlib --extern const_decimal=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libconst_decimal-b153bca3f2fcb585.rlib --extern criterion=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libcriterion-eec0979d205b9cc9.rlib --extern csv=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libcsv-a40249ca683bf805.rlib --extern derive_more=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libderive_more-d76303e21eab48a4.rlib --extern distrs=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libdistrs-8771fe8f881fe8c1.rlib --extern fpdec=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libfpdec-9d463e9e5511bd95.rlib --extern getset=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libgetset-5a480600d0309d86.so --extern glidesort=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libglidesort-989a09811d2f10b2.rlib --extern hashbrown=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libhashbrown-1d413cc121139f6c.rlib --extern num=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libnum-c60a9b679bcfa6bb.rlib --extern num_traits=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libnum_traits-7e302e7a7d80539f.rlib --extern rand=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/librand-9db6aec50dbd5ab8.rlib --extern rand_distr=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/librand_distr-06e089842759846e.rlib --extern ron=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libron-cf7ab77f1cd332e4.rlib --extern serde=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libserde-4f2b30cd8c281e5c.rlib --extern sliding_features=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libsliding_features-d0bd92c47917e003.rlib --extern test_case=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtest_case-f45e9dc1fc82aa7c.rlib --extern thiserror=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libthiserror-4ec24f5246b6b2d6.rlib --extern tracing=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing-b303b594fc287ce4.rlib --extern tracing_subscriber=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing_subscriber-2dcbd82461397adf.rlib --extern tracing_test=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing_test-356597c5cf4fbd5e.rlib --extern trade_aggregation=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtrade_aggregation-5d6c2a4b8e491a04.rlib --extern typed_builder=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtyped_builder-51b8e60a6e40978c.rlib`
+     Running `rustc --crate-name lfest --edition=2024 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("trade_aggregation"))' -C metadata=42acac75bcd4402d -C extra-filename=-8d41768972dbddc8 --out-dir /tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps -C incremental=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/incremental -L dependency=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps --extern assert2=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libassert2-a7bd1c0d8f717890.rmeta --extern const_decimal=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libconst_decimal-b153bca3f2fcb585.rmeta --extern csv=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libcsv-a40249ca683bf805.rmeta --extern derive_more=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libderive_more-d76303e21eab48a4.rmeta --extern distrs=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libdistrs-8771fe8f881fe8c1.rmeta --extern getset=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libgetset-5a480600d0309d86.so --extern glidesort=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libglidesort-989a09811d2f10b2.rmeta --extern hashbrown=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libhashbrown-1d413cc121139f6c.rmeta --extern num=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libnum-c60a9b679bcfa6bb.rmeta --extern num_traits=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libnum_traits-7e302e7a7d80539f.rmeta --extern serde=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libserde-4f2b30cd8c281e5c.rmeta --extern sliding_features=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libsliding_features-d0bd92c47917e003.rmeta --extern thiserror=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libthiserror-4ec24f5246b6b2d6.rmeta --extern tracing=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing-b303b594fc287ce4.rmeta --extern tracing_subscriber=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing_subscriber-2dcbd82461397adf.rmeta --extern typed_builder=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtyped_builder-51b8e60a6e40978c.rmeta`
+warning: unused variable: `units`
+  --> src/types/smol_currency/base_currency.rs:86:21
+   |
+86 |     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self {
+   |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_units`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `price_per_unit`
+  --> src/types/smol_currency/base_currency.rs:86:50
+   |
+86 |     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self {
+   |                                                  ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_price_per_unit`
+
+warning: `lfest` (lib) generated 2 warnings
+     Running `rustc --crate-name basic --edition=2024 examples/basic.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("trade_aggregation"))' -C metadata=52fb7e4642438df9 -C extra-filename=-d3682d3003820b95 --out-dir /tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/examples -C incremental=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/incremental -L dependency=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps --extern assert2=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libassert2-a7bd1c0d8f717890.rlib --extern const_decimal=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libconst_decimal-b153bca3f2fcb585.rlib --extern criterion=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libcriterion-eec0979d205b9cc9.rlib --extern csv=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libcsv-a40249ca683bf805.rlib --extern derive_more=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libderive_more-d76303e21eab48a4.rlib --extern distrs=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libdistrs-8771fe8f881fe8c1.rlib --extern fpdec=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libfpdec-9d463e9e5511bd95.rlib --extern getset=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libgetset-5a480600d0309d86.so --extern glidesort=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libglidesort-989a09811d2f10b2.rlib --extern hashbrown=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libhashbrown-1d413cc121139f6c.rlib --extern lfest=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/liblfest-8d41768972dbddc8.rlib --extern num=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libnum-c60a9b679bcfa6bb.rlib --extern num_traits=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libnum_traits-7e302e7a7d80539f.rlib --extern rand=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/librand-9db6aec50dbd5ab8.rlib --extern rand_distr=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/librand_distr-06e089842759846e.rlib --extern ron=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libron-cf7ab77f1cd332e4.rlib --extern serde=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libserde-4f2b30cd8c281e5c.rlib --extern sliding_features=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libsliding_features-d0bd92c47917e003.rlib --extern test_case=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtest_case-f45e9dc1fc82aa7c.rlib --extern thiserror=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libthiserror-4ec24f5246b6b2d6.rlib --extern tracing=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing-b303b594fc287ce4.rlib --extern tracing_subscriber=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing_subscriber-2dcbd82461397adf.rlib --extern tracing_test=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing_test-356597c5cf4fbd5e.rlib --extern trade_aggregation=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtrade_aggregation-5d6c2a4b8e491a04.rlib --extern typed_builder=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtyped_builder-51b8e60a6e40978c.rlib`
+     Running `rustc --crate-name linear_futures --edition=2024 tests/linear_futures.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("trade_aggregation"))' -C metadata=d9b24d852be96abf -C extra-filename=-e52de928d03eefdc --out-dir /tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps -C incremental=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/incremental -L dependency=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps --extern assert2=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libassert2-a7bd1c0d8f717890.rlib --extern const_decimal=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libconst_decimal-b153bca3f2fcb585.rlib --extern criterion=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libcriterion-eec0979d205b9cc9.rlib --extern csv=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libcsv-a40249ca683bf805.rlib --extern derive_more=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libderive_more-d76303e21eab48a4.rlib --extern distrs=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libdistrs-8771fe8f881fe8c1.rlib --extern fpdec=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libfpdec-9d463e9e5511bd95.rlib --extern getset=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libgetset-5a480600d0309d86.so --extern glidesort=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libglidesort-989a09811d2f10b2.rlib --extern hashbrown=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libhashbrown-1d413cc121139f6c.rlib --extern lfest=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/liblfest-8d41768972dbddc8.rlib --extern num=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libnum-c60a9b679bcfa6bb.rlib --extern num_traits=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libnum_traits-7e302e7a7d80539f.rlib --extern rand=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/librand-9db6aec50dbd5ab8.rlib --extern rand_distr=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/librand_distr-06e089842759846e.rlib --extern ron=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libron-cf7ab77f1cd332e4.rlib --extern serde=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libserde-4f2b30cd8c281e5c.rlib --extern sliding_features=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libsliding_features-d0bd92c47917e003.rlib --extern test_case=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtest_case-f45e9dc1fc82aa7c.rlib --extern thiserror=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libthiserror-4ec24f5246b6b2d6.rlib --extern tracing=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing-b303b594fc287ce4.rlib --extern tracing_subscriber=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing_subscriber-2dcbd82461397adf.rlib --extern tracing_test=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing_test-356597c5cf4fbd5e.rlib --extern trade_aggregation=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtrade_aggregation-5d6c2a4b8e491a04.rlib --extern typed_builder=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtyped_builder-51b8e60a6e40978c.rlib`
+     Running `rustc --crate-name limit_orders_only --edition=2024 tests/limit_orders_only.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("trade_aggregation"))' -C metadata=c92fd88983cdfcdc -C extra-filename=-f59f525f5df1c0dc --out-dir /tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps -C incremental=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/incremental -L dependency=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps --extern assert2=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libassert2-a7bd1c0d8f717890.rlib --extern const_decimal=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libconst_decimal-b153bca3f2fcb585.rlib --extern criterion=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libcriterion-eec0979d205b9cc9.rlib --extern csv=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libcsv-a40249ca683bf805.rlib --extern derive_more=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libderive_more-d76303e21eab48a4.rlib --extern distrs=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libdistrs-8771fe8f881fe8c1.rlib --extern fpdec=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libfpdec-9d463e9e5511bd95.rlib --extern getset=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libgetset-5a480600d0309d86.so --extern glidesort=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libglidesort-989a09811d2f10b2.rlib --extern hashbrown=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libhashbrown-1d413cc121139f6c.rlib --extern lfest=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/liblfest-8d41768972dbddc8.rlib --extern num=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libnum-c60a9b679bcfa6bb.rlib --extern num_traits=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libnum_traits-7e302e7a7d80539f.rlib --extern rand=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/librand-9db6aec50dbd5ab8.rlib --extern rand_distr=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/librand_distr-06e089842759846e.rlib --extern ron=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libron-cf7ab77f1cd332e4.rlib --extern serde=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libserde-4f2b30cd8c281e5c.rlib --extern sliding_features=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libsliding_features-d0bd92c47917e003.rlib --extern test_case=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtest_case-f45e9dc1fc82aa7c.rlib --extern thiserror=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libthiserror-4ec24f5246b6b2d6.rlib --extern tracing=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing-b303b594fc287ce4.rlib --extern tracing_subscriber=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing_subscriber-2dcbd82461397adf.rlib --extern tracing_test=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing_test-356597c5cf4fbd5e.rlib --extern trade_aggregation=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtrade_aggregation-5d6c2a4b8e491a04.rlib --extern typed_builder=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtyped_builder-51b8e60a6e40978c.rlib`
+     Running `rustc --crate-name inverse_futures --edition=2024 tests/inverse_futures.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("trade_aggregation"))' -C metadata=627ceed5ef226dc6 -C extra-filename=-6ef206ebf42eea73 --out-dir /tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps -C incremental=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/incremental -L dependency=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps --extern assert2=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libassert2-a7bd1c0d8f717890.rlib --extern const_decimal=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libconst_decimal-b153bca3f2fcb585.rlib --extern criterion=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libcriterion-eec0979d205b9cc9.rlib --extern csv=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libcsv-a40249ca683bf805.rlib --extern derive_more=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libderive_more-d76303e21eab48a4.rlib --extern distrs=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libdistrs-8771fe8f881fe8c1.rlib --extern fpdec=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libfpdec-9d463e9e5511bd95.rlib --extern getset=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libgetset-5a480600d0309d86.so --extern glidesort=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libglidesort-989a09811d2f10b2.rlib --extern hashbrown=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libhashbrown-1d413cc121139f6c.rlib --extern lfest=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/liblfest-8d41768972dbddc8.rlib --extern num=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libnum-c60a9b679bcfa6bb.rlib --extern num_traits=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libnum_traits-7e302e7a7d80539f.rlib --extern rand=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/librand-9db6aec50dbd5ab8.rlib --extern rand_distr=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/librand_distr-06e089842759846e.rlib --extern ron=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libron-cf7ab77f1cd332e4.rlib --extern serde=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libserde-4f2b30cd8c281e5c.rlib --extern sliding_features=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libsliding_features-d0bd92c47917e003.rlib --extern test_case=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtest_case-f45e9dc1fc82aa7c.rlib --extern thiserror=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libthiserror-4ec24f5246b6b2d6.rlib --extern tracing=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing-b303b594fc287ce4.rlib --extern tracing_subscriber=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing_subscriber-2dcbd82461397adf.rlib --extern tracing_test=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtracing_test-356597c5cf4fbd5e.rlib --extern trade_aggregation=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtrade_aggregation-5d6c2a4b8e491a04.rlib --extern typed_builder=/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/libtyped_builder-51b8e60a6e40978c.rlib`
+warning: `lfest` (lib test) generated 2 warnings (2 duplicates)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.12s
+  Executable `/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/lfest-6c98b9dad13cebfc`
+  Executable `/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/inverse_futures-6ef206ebf42eea73`
+  Executable `/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/limit_orders_only-f59f525f5df1c0dc`
+  Executable `/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/linear_futures-e52de928d03eefdc`
+
+*** result: Success
+
+*** /nix/store/v2d7zb1wrsn94pv0hdl4v5nj96msh0lf-cargo-1.85.0-x86_64-unknown-linux-gnu/bin/cargo test --verbose --package=lfest@0.101.0
+       Fresh unicode-ident v1.0.18
+       Fresh proc-macro2 v1.0.94
+       Fresh quote v1.0.39
+       Fresh syn v2.0.99
+       Fresh autocfg v1.4.0
+       Fresh cfg-if v1.0.0
+       Fresh serde_derive v1.0.218
+       Fresh once_cell v1.20.3
+       Fresh memchr v2.7.4
+       Fresh itoa v1.0.15
+       Fresh regex-syntax v0.8.5
+       Fresh ryu v1.0.20
+       Fresh zerocopy-derive v0.7.35
+       Fresh regex-syntax v0.6.29
+       Fresh byteorder v1.5.0
+       Fresh thiserror-impl v1.0.69
+       Fresh tracing-attributes v0.1.28
+       Fresh proc-macro-error-attr2 v2.0.0
+       Fresh regex-automata v0.4.9
+       Fresh tracing-core v0.1.33
+       Fresh regex-automata v0.1.10
+       Fresh zerocopy v0.7.35
+       Fresh pin-project-lite v0.2.16
+       Fresh lazy_static v1.5.0
+       Fresh log v0.4.26
+       Fresh either v1.14.0
+       Fresh overload v0.1.1
+       Fresh unicode-segmentation v1.12.0
+       Fresh csv-core v0.1.12
+       Fresh thread_local v1.1.8
+       Fresh proc-macro-error2 v2.0.1
+       Fresh half v2.4.1
+       Fresh plotters-backend v0.3.7
+       Fresh anstyle v1.0.10
+       Fresh ruint-macro v1.2.1
+       Fresh ciborium-io v0.2.2
+       Fresh unicode-xid v0.2.6
+       Fresh clap_lex v0.7.4
+       Fresh smallvec v1.14.0
+       Fresh test-case-core v3.3.1
+       Fresh typed-builder-macro v0.20.0
+       Fresh thiserror-impl v2.0.12
+       Fresh fpdec-core v0.8.0 (https://github.com/MathisWellmann/fpdec.rs?rev=40cf802#40cf8025)
+       Fresh equivalent v1.0.2
+       Fresh same-file v1.0.6
+       Fresh yansi v1.0.1
+       Fresh diff v0.1.13
+       Fresh cast v0.3.0
+       Fresh allocator-api2 v0.2.21
+       Fresh foldhash v0.1.4
+       Fresh tracing-test-macro v0.2.5
+       Fresh glidesort v0.1.2
+       Fresh anes v0.1.6
+       Fresh oorandom v11.1.4
+       Fresh distrs v0.2.2
+       Fresh base64 v0.21.7
+       Fresh libm v0.2.11
+       Fresh serde v1.0.218
+       Fresh libc v0.2.170
+       Fresh semver v1.0.26
+       Fresh crossbeam-utils v0.8.21
+       Fresh regex v1.11.1
+       Fresh convert_case v0.7.1
+       Fresh tracing v0.1.41
+       Fresh nu-ansi-term v0.46.0
+       Fresh thiserror v1.0.69
+       Fresh matchers v0.1.0
+       Fresh tracing-log v0.2.0
+       Fresh sharded-slab v0.1.7
+       Fresh ppv-lite86 v0.2.20
+       Fresh itertools v0.10.5
+       Fresh ciborium-ll v0.2.2
+       Fresh getset v0.1.5
+       Fresh ruint v1.13.1
+       Fresh plotters-svg v0.3.7
+       Fresh clap_builder v4.5.31
+       Fresh typed-builder v0.20.0
+       Fresh fpdec-macros v0.8.0 (https://github.com/MathisWellmann/fpdec.rs?rev=40cf802#40cf8025)
+       Fresh test-case-macros v3.3.1
+       Fresh hashbrown v0.15.2
+       Fresh walkdir v2.5.0
+       Fresh num-traits v0.2.19
+       Fresh rustc_version v0.4.1
+       Fresh getrandom v0.3.1
+       Fresh crossbeam-epoch v0.9.18
+       Fresh is-terminal v0.4.15
+       Fresh csv v1.3.1
+       Fresh syn v1.0.109
+       Fresh paste v1.0.15
+       Fresh serde_json v1.0.140
+       Fresh derive_more-impl v2.0.1
+       Fresh zerocopy v0.8.21
+       Fresh tracing-subscriber v0.3.19
+       Fresh criterion-plot v0.5.0
+       Fresh ciborium v0.2.2
+       Fresh bitflags v2.9.0
+       Fresh thiserror v2.0.12
+       Fresh clap v4.5.31
+       Fresh test-case v3.3.1
+       Fresh num-integer v0.1.46
+       Fresh num-complex v0.4.6
+       Fresh crossbeam-deque v0.8.6
+       Fresh rand_core v0.9.3
+       Fresh plotters v0.3.7
+       Fresh const-decimal v0.3.0 (https://github.com/OliverNChalk/const-decimal#7bf77bf3)
+       Fresh trade_aggregation_derive v0.4.1
+       Fresh tinytemplate v1.2.1
+       Fresh derive_more v2.0.1
+       Fresh tracing-test v0.2.5
+       Fresh fpdec v0.10.3 (https://github.com/MathisWellmann/fpdec.rs?rev=40cf802#40cf8025)
+       Fresh ron v0.8.1
+       Fresh num-bigint v0.4.6
+       Fresh num-iter v0.1.45
+       Fresh rayon-core v1.12.1
+       Fresh rand_chacha v0.9.0
+       Fresh trade_aggregation v12.0.3
+       Fresh num-rational v0.4.2
+       Fresh assert2-macros v0.3.15
+       Fresh rayon v1.10.0
+       Fresh rand v0.9.0
+       Fresh num v0.4.3
+       Fresh assert2 v0.3.15
+       Fresh criterion v0.5.1
+       Fresh rand_distr v0.5.1
+       Fresh sliding_features v6.0.0
+warning: unused variable: `units`
+  --> src/types/smol_currency/base_currency.rs:86:21
+   |
+86 |     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self {
+   |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_units`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `price_per_unit`
+  --> src/types/smol_currency/base_currency.rs:86:50
+   |
+86 |     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self {
+   |                                                  ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_price_per_unit`
+
+warning: `lfest` (lib) generated 2 warnings
+warning: `lfest` (lib test) generated 2 warnings (2 duplicates)
+       Fresh lfest v0.101.0 (/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running `/tmp/nix-shell.lQc7sB/cargo-mutants-lfest-rs-p4kTZr.tmp/target/debug/deps/lfest-6c98b9dad13cebfc`
+
+running 697 tests
+test active_limit_orders::tests::active_limit_orders ... ok
+test market_update::bba_update::tests::size_of_bba ... ok
+test active_limit_orders::tests::size_of_optional_reference ... ok
+test market_update::candle_update::test::candle_update ... ok
+test market_update::smart_candle::tests::size_of_smart_candle ... ok
+test market_update::smart_candle::tests::smart_candle_no_buys ... ok
+test market_update::smart_candle::tests::smart_candle_execute_limit_order ... ok
+test market_update::smart_candle::tests::smart_candle_sell_side ... ok
+test market_update::smart_candle::tests::smart_candle_no_sells ... ok
+test market_update::smart_candle::tests::smart_candle_buy_side ... ok
+test market_update::trade_update::tests::size_of_trade ... ok
+test market_update::smart_candle::tests::smart_candle_simple ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_100_1_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_100_1_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_100_2_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_100_2_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_100_3_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_100_3_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_110_1_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_110_2_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_110_1_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_110_2_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_110_3_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_110_3_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_120_1_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_120_1_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_120_2_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_120_2_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_120_3_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_none::_120_3_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_100_1_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_100_1_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_100_2_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_100_2_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_100_3_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_100_3_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_110_1_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_110_1_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_110_2_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_110_2_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_110_3_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_110_3_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_120_1_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_120_1_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_120_2_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_120_2_side_sell_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_120_3_side_buy_expects ... ok
+test market_update::trade_update::tests::trade_limit_order_filled_some::_120_3_side_sell_expects ... ok
+test order_filters::price_filter::tests::size_of_price_filter ... ok
+test order_filters::price_filter::tests::price_filter ... ok
+test order_filters::quantity_filter::tests::quantity_filter ... ok
+test order_filters::quantity_filter::tests::quantity_filter_2 ... ok
+test order_filters::quantity_filter::tests::size_of_quantity_filter ... ok
+test order_margin::tests::order_margin_long_no_orders::_1_1_100_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_1_1_200_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_1_1_300_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_1_2_100_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_1_2_200_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_1_5_100_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_1_2_300_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_1_5_300_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_2_1_100_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_1_5_200_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_2_1_200_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_2_1_300_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_2_2_200_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_2_2_100_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_2_2_300_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_2_5_100_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_2_5_200_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_2_5_300_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_5_1_200_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_5_1_100_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_5_1_300_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_5_2_100_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_5_2_200_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_5_2_300_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_5_5_100_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_5_5_200_expects ... ok
+test order_margin::tests::order_margin_long_no_orders::_5_5_300_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_110_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_110_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_110_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_110_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_110_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_110_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_110_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_110_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_110_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_70_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_70_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_70_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_70_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_70_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_70_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_70_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_70_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_70_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_90_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_90_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_90_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_90_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_90_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_90_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_90_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_90_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_buy_90_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_110_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_110_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_110_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_110_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_110_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_110_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_110_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_110_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_110_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_70_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_70_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_70_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_70_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_70_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_70_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_70_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_70_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_90_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_90_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_90_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_70_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_90_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_90_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_90_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_90_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_90_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_110_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_110_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_110_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_70_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_110_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_1_side_sell_90_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_70_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_70_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_70_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_70_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_70_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_70_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_90_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_90_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_90_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_90_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_90_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_90_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_110_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_110_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_110_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_110_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_70_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_70_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_70_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_90_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_70_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_70_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_70_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_70_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_70_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_90_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_110_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_90_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_90_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_110_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_70_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_110_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_110_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_110_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_110_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_70_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_70_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_70_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_70_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_70_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_110_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_110_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_70_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_70_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_70_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_70_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_110_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_90_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_70_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_90_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_110_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_90_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_90_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_90_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_90_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_70_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_90_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_90_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_90_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_90_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_110_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_90_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_110_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_110_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_110_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_90_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_110_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_110_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_110_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_110_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_110_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_90_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_90_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_90_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_90_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_90_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_buy_90_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_90_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_90_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_90_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_90_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_110_1_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_90_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_90_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_110_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_90_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_110_1_100_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_100_2_2_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_110_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_110_1_125_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_100_2_3_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_70_1_100_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_100_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_100_3_2_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_110_2_125_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_100_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_150_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_150_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_150_1_3_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_70_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_110_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_70_2_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_70_2_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_70_1_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_70_2_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_70_3_100_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_buy_110_1_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_70_3_125_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_70_3_85_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_100_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_100_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_100_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_100_2_1_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_5_side_sell_110_3_85_expects ... ok
+test order_margin::tests::order_margin_long_orders_of_same_qty::_2_side_sell_90_3_85_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_150_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_150_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_200_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_150_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_200_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_200_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_200_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_150_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_150_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_200_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_200_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_200_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_150_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_200_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_100_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_100_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_100_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_1_side_buy_200_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_100_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_100_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_100_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_150_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_150_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_100_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_100_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_150_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_150_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_100_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_150_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_150_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_150_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_150_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_150_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_200_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_200_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_200_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_200_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_200_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_200_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_100_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_200_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_100_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_200_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_100_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_100_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_100_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_2_side_buy_200_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_100_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_100_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_100_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_100_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_150_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_150_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_150_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_150_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_200_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_200_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_150_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_200_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_200_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_200_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_150_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_150_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_200_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_200_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_150_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_100_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_100_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_100_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_150_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_100_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_100_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_100_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_100_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_200_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_100_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_opposite_side::_5_side_buy_200_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_100_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_100_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_100_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_150_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_150_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_100_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_150_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_150_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_150_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_150_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_150_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_150_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_150_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_150_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_200_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_150_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_200_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_200_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_200_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_200_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_150_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_150_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_200_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_200_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_150_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_200_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_no_orders::_5_expects ... ok
+test order_margin::tests::order_margin_neutral_no_orders::_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_200_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_150_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_200_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_100_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_100_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_100_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_100_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_200_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_200_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_no_orders::_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_100_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_100_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_150_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_200_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_200_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_200_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_200_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_200_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_100_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_200_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_100_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_100_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_100_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_200_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_200_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_100_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_200_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_100_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_100_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_100_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_100_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_buy_150_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_100_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_100_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_100_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_150_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_100_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_100_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_150_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_100_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_150_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_100_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_150_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_150_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_150_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_100_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_150_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_150_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_150_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_200_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_150_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_150_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_200_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_150_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_200_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_200_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_150_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_150_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_150_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_200_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_200_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_150_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_150_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_150_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_200_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_200_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_100_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_150_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_100_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_200_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_200_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_200_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_200_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_200_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_200_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_200_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_200_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_100_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_100_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_100_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_100_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_100_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_100_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_100_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_100_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_100_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_150_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_150_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_150_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_150_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_150_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_150_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_150_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_150_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_150_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_200_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_200_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_200_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_1_side_sell_100_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_200_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_100_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_buy_200_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_100_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_100_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_200_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_150_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_150_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_150_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_sell_200_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_150_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_150_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_150_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_100_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_150_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_100_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_2_side_buy_200_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_200_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_200_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_200_2_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_200_3_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_100_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_200_3_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_buy_110_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_buy_110_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_200_3_3_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_150_1_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_150_1_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_200_2_1_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_100_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_buy_70_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_200_2_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_buy_110_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_buy_90_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_buy_90_2_expects ... ok
+test order_margin::tests::order_margin_neutral_orders_of_same_side::_5_side_sell_200_1_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_sell_110_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_buy_90_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_buy_70_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_sell_110_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_sell_110_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_sell_70_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_sell_90_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_sell_70_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_buy_70_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_buy_110_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_buy_110_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_sell_90_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_sell_90_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_buy_70_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_buy_70_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_buy_70_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_1_side_sell_70_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_buy_110_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_buy_90_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_buy_90_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_buy_90_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_sell_110_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_sell_110_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_sell_110_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_sell_70_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_sell_70_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_sell_70_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_sell_90_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_sell_90_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_2_side_sell_90_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_buy_110_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_buy_110_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_buy_110_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_buy_70_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_buy_70_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_buy_70_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_buy_90_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_buy_90_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_sell_110_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_sell_110_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_sell_70_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_sell_70_2_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_sell_110_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_sell_90_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_sell_70_1_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_buy_90_3_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_sell_90_2_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_1_1_200_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_1_1_300_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_1_1_100_expects ... ok
+test order_margin::tests::order_margin_neutral_update_partial_fills::_5_side_sell_90_3_expects ... ok
+test order_margin::tests::order_margin_no_position ... ok
+test order_margin::tests::order_margin_short_no_orders::_1_2_200_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_1_2_100_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_1_2_300_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_1_5_100_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_1_5_200_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_2_1_100_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_1_5_300_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_2_1_200_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_2_1_300_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_2_2_100_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_2_2_200_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_2_2_300_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_2_5_100_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_2_5_200_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_2_5_300_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_5_1_100_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_5_1_200_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_5_1_300_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_5_2_200_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_5_2_100_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_5_2_300_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_5_5_100_expects ... ok
+test order_margin::tests::order_margin_short_no_orders::_5_5_200_expects ... ok
+test order_rate_limiter::tests::order_rate_limiter ... ok
+test position::tests::position_change_position_2 ... ignored
+test position::tests::size_of_position ... ok
+test position::tests::position_change_position ... ok
+test order_margin::tests::order_margin_short_no_orders::_5_5_300_expects ... ok
+test order_margin::tests::order_margin_with_long ... ok
+test order_margin::tests::order_margin_with_short ... ok
+test position_inner::tests::position_inner_decrease_contracts_2::_1_side_buy_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_2::_5_side_buy_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_2::_2_side_buy_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_2::_2_side_sell_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_2::_1_side_sell_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_inverse::_1_expects ... ignored
+test position_inner::tests::position_inner_decrease_contracts_inverse::_2_expects ... ignored
+test position_inner::tests::position_inner_decrease_contracts_inverse::_5_expects ... ignored
+test position_inner::tests::position_inner_decrease_contracts_2::_5_side_sell_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_basic::_2_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_basic::_1_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_basic::_5_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_win::_1_side_buy_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_win::_1_side_sell_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_win::_2_side_buy_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_win::_2_side_sell_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_win::_5_side_sell_expects ... ok
+test position_inner::tests::position_inner_decrease_contracts_win::_5_side_buy_expects ... ok
+test position_inner::tests::position_inner_entry_price_linear::_1_expects ... ok
+test position_inner::tests::position_inner_entry_price_linear::_2_expects ... ok
+test position_inner::tests::position_inner_entry_price_inverse::_50_expects ... FAILED
+test position_inner::tests::position_inner_entry_price_inverse::_90_expects ... FAILED
+test position_inner::tests::position_inner_entry_price_inverse::_20_expects ... FAILED
+test position_inner::tests::position_inner_entry_price_linear::_5_expects ... ok
+test position_inner::tests::position_inner_entry_price_inverse::_10_expects ... FAILED
+test position_inner::tests::position_inner_entry_price_linear::_9_expects ... ok
+test position_inner::tests::position_inner_increase_contracts::_2_expects ... ok
+test position_inner::tests::position_inner_new::_1_expects ... ok
+test position_inner::tests::position_inner_increase_contracts::_1_expects ... ok
+test position_inner::tests::position_inner_new::_2_expects ... ok
+test position_inner::tests::position_inner_increase_contracts::_5_expects ... ok
+test position_inner::tests::position_inner_new::_5_expects ... ok
+test risk_engine::isolated_margin::tests::isolated_margin_check_maintenance_margin_long::_2_75_expects ... ok
+test risk_engine::isolated_margin::tests::isolated_margin_check_maintenance_margin_long::_3_84_expects ... ok
+test risk_engine::isolated_margin::tests::isolated_margin_check_maintenance_margin_short::_2_126_expects ... ok
+test risk_engine::isolated_margin::tests::isolated_margin_check_maintenance_margin_long::_5_90_expects ... ok
+test risk_engine::isolated_margin::tests::isolated_margin_check_maintenance_margin_short::_3_117_expects ... ok
+test risk_engine::isolated_margin::tests::isolated_margin_quantity_minus_position ... ok
+test risk_engine::isolated_margin::tests::isolated_margin_check_maintenance_margin_short::_5_111_expects ... ok
+test tests::amend::amend_limit_order_qty::basecurrency_new_1_0_expects ... ok
+test tests::amend::amend_limit_order_qty::basecurrency_new_3_0_expects ... ok
+test tests::amend::amend_limit_order_qty::basecurrency_new_10_0_expects ... ok
+test tests::submit_limit_buy_order::submit_limit_buy_order_turnaround_short ... ok
+test tests::submit_limit_sell_order::submit_limit_sell_order_turnaround_long ... ok
+test tests::cancel_limit_order::cancel_limit_order ... ok
+test tests::submit_market_sell_order::submit_market_sell_order_reject ... ok
+test types::fee::tests::size_of_fee ... ok
+test types::leverage::tests::leverage ... ok
+test types::leverage::tests::leverage_init_margin_req ... ok
+test types::leverage::tests::size_of_leverage ... ok
+test types::limit_order::tests::limit_order_fill_full::side_buy_100_1_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_buy_100_3_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_buy_100_2_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_buy_110_1_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_buy_110_2_expects ... ok
+test tests::submit_market_buy_order::submit_market_buy_order_reject ... ok
+test types::limit_order::tests::limit_order_fill_full::side_buy_120_2_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_buy_120_3_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_sell_100_1_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_sell_100_3_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_sell_110_1_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_buy_120_1_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_sell_110_2_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_sell_110_3_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_sell_100_2_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_sell_120_1_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_sell_120_2_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_buy_110_3_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_sell_120_1_expects ... ok
+test types::limit_order::tests::limit_order_fill_full::side_sell_120_3_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_sell_120_2_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_buy_100_1_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_buy_100_2_expects ... ok
+test types::side::tests::side_from_taker_quantity_panic - should panic ... ok
+test types::smol_currency::tests::convert_base_to_quote ... ok
+test types::smol_currency::tests::base_currency_pnl ... FAILED
+test types::smol_currency::tests::convert_quote_to_base ... FAILED
+test types::smol_currency::tests::quote_currency_pnl ... ok
+test utils::tests::test_convert_decimals ... ok
+test utils::tests::test_decimal_from_f64 ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_buy_110_1_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_buy_100_3_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_buy_110_3_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_buy_120_2_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_buy_120_3_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_sell_100_1_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_sell_100_2_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_sell_100_3_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_sell_110_1_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_sell_110_3_expects ... ok
+test types::limit_order::tests::size_of_limit_order ... ok
+test types::side::tests::side_from_taker_quantity ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_buy_110_2_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_buy_120_1_expects ... ok
+test tests::submit_limit_buy_order::submit_limit_buy_order_above_ask ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_sell_110_2_expects ... ok
+test types::limit_order::tests::limit_order_fill_partial::side_sell_120_3_expects ... ok
+test tests::submit_market_sell_order::submit_market_sell_order ... ok
+test tests::submit_limit_sell_order::submit_limit_sell_order_below_bid ... ok
+test tests::amend::amend_limit_order_qty_with_partial_fill_leading_to_cancel::basecurrency_new_1_0_expects ... ok
+test tests::submit_market_buy_order::submit_market_buy_order_no_position ... ok
+test tests::submit_market_sell_order::submit_market_sell_order_turnaround_long ... ok
+test tests::submit_market_buy_order::submit_market_buy_order_with_short_position ... ok
+test tests::submit_market_buy_order::submit_market_buy_order_with_long_position ... ok
+test tests::amend::amend_limit_order_qty::basecurrency_new_5_0_expects ... ok
+test tests::amend::amend_limit_order_qty_with_partial_fill_leading_to_cancel::basecurrency_new_2_0_expects ... ok
+test tests::submit_limit_buy_order::submit_limit_buy_order_no_position ... ok
+test tests::amend::amend_limit_order_qty_with_partial_fill::basecurrency_new_5_0_expects ... ok
+test tests::submit_market_sell_order::submit_market_sell_order_with_short_position ... ok
+test tests::submit_market_sell_order::submit_market_sell_order_with_long_position ... ok
+test tests::submit_market_buy_order::submit_market_buy_order_turnaround_short ... ok
+test tests::submit_limit_buy_order::submit_limit_buy_order_with_long ... ok
+test tests::amend::amend_limit_order_qty_with_partial_fill_leading_to_cancel::basecurrency_new_3_0_expects ... ok
+test tests::partial_order_fill::partial_limit_order_fill::with_buy_order ... ok
+test tests::amend::amend_limit_order_qty_with_partial_fill::basecurrency_new_6_0_expects ... ok
+test tests::amend::amend_limit_order_qty_with_partial_fill::basecurrency_new_4_0_expects ... ok
+test tests::submit_limit_buy_order::submit_limit_buy_order_with_short ... ok
+test tests::submit_limit_sell_order::submit_limit_sell_order_no_position ... ok
+test tests::partial_order_fill::partial_limit_order_fill::with_sell_order ... ok
+test tests::submit_limit_buy_order::submit_limit_buy_order_no_position_max ... ok
+test tests::submit_limit_sell_order::submit_limit_sell_order_no_position_max ... ok
+
+failures:
+
+---- position_inner::tests::position_inner_entry_price_inverse::_50_expects stdout ----
+2025-03-10T19:11:51.569666Z TRACE lfest::position_inner: new position: qty 50.00000 Quote @ 100.00000 Quote
+[1;31mAssertion failed[0m at src/accounting/transaction.rs:64:9:
+  assert!( amount > BaseOrQuote :: zero() )
+with expansion:
+  BaseCurrency(Decimal(0)) > BaseCurrency(Decimal(0))
+Note: Debug output of left and right is identical.
+with message:
+  The amount of a transaction must be greater than zero
+
+
+thread 'position_inner::tests::position_inner_entry_price_inverse::_50_expects' panicked at src/accounting/transaction.rs:64:9:
+assertion failed
+
+---- position_inner::tests::position_inner_entry_price_inverse::_90_expects stdout ----
+2025-03-10T19:11:51.569688Z TRACE lfest::position_inner: new position: qty 90.00000 Quote @ 100.00000 Quote
+Assertion failed at src/accounting/transaction.rs:64:9:
+  assert!( amount > BaseOrQuote :: zero() )
+with expansion:
+  BaseCurrency(Decimal(0)) > BaseCurrency(Decimal(0))
+Note: Debug output of left and right is identical.
+with message:
+  The amount of a transaction must be greater than zero
+
+
+thread 'position_inner::tests::position_inner_entry_price_inverse::_90_expects' panicked at src/accounting/transaction.rs:64:9:
+assertion failed
+
+---- position_inner::tests::position_inner_entry_price_inverse::_20_expects stdout ----
+2025-03-10T19:11:51.569625Z TRACE lfest::position_inner: new position: qty 20.00000 Quote @ 100.00000 Quote
+[1;31mAssertion failed[0m at [1msrc/accounting/transaction.rs[0m:64:9:
+  [35massert[0m[35m!([0m [36mamount[0m [1;34m>[0m [33mBaseOrQuote :: zero()[0m [35m)[0m
+with expansion:
+  BaseCurrency(Decimal(0)) > BaseCurrency(Decimal(0))
+Note: Debug output of left and right is identical.
+with message:
+  The amount of a transaction must be greater than zero
+
+
+thread 'position_inner::tests::position_inner_entry_price_inverse::_20_expects' panicked at src/accounting/transaction.rs:64:9:
+assertion failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- position_inner::tests::position_inner_entry_price_inverse::_10_expects stdout ----
+2025-03-10T19:11:51.569585Z TRACE lfest::position_inner: new position: qty 10.00000 Quote @ 100.00000 Quote
+[1;31mAssertion failed[0m at [1msrc/accounting/transaction.rs[0m:64:9:
+  [35massert[0m[35m!([0m [36mamount[0m [1;34m>[0m [33mBaseOrQuote :: zero()[0m [35m)[0m
+with expansion:
+  BaseCurrency(Decimal(0)) > BaseCurrency(Decimal(0))
+Note: Debug output of left and right is identical.
+with message:
+  The amount of a transaction must be greater than zero
+
+
+thread 'position_inner::tests::position_inner_entry_price_inverse::_10_expects' panicked at src/accounting/transaction.rs:64:9:
+assertion failed
+
+---- types::smol_currency::tests::base_currency_pnl stdout ----
+
+thread 'types::smol_currency::tests::base_currency_pnl' panicked at src/types/smol_currency/mod.rs:103:9:
+assertion `left == right` failed
+  left: BaseCurrency(Decimal(0))
+ right: BaseCurrency(Decimal(25000))
+
+---- types::smol_currency::tests::convert_quote_to_base stdout ----
+
+thread 'types::smol_currency::tests::convert_quote_to_base' panicked at src/types/smol_currency/mod.rs:80:9:
+assertion `left == right` failed
+  left: BaseCurrency(Decimal(0))
+ right: BaseCurrency(Decimal(2500))
+
+
+failures:
+    position_inner::tests::position_inner_entry_price_inverse::_10_expects
+    position_inner::tests::position_inner_entry_price_inverse::_20_expects
+    position_inner::tests::position_inner_entry_price_inverse::_50_expects
+    position_inner::tests::position_inner_entry_price_inverse::_90_expects
+    types::smol_currency::tests::base_currency_pnl
+    types::smol_currency::tests::convert_quote_to_base
+
+test result: FAILED. 687 passed; 6 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `-p lfest --lib`
+
+*** result: Failure(101)
