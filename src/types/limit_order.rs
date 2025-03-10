@@ -393,4 +393,16 @@ mod tests {
             72
         );
     }
+
+    #[test]
+    fn limit_order_new_with_user_order_id() {
+        let order = LimitOrder::new_with_user_order_id(
+            Side::Buy,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+            1,
+        )
+        .unwrap();
+        assert_eq!(order.user_order_id(), 1);
+    }
 }

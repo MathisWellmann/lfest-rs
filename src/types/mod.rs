@@ -84,3 +84,19 @@ impl<T> UserOrderId for T where
     T: Clone + Copy + Eq + PartialEq + std::fmt::Debug + std::fmt::Display + Default
 {
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn user_balances() {
+        let balances = UserBalances {
+            available_wallet_balance: QuoteCurrency::<i64, 5>::new(1000, 0),
+            position_margin: QuoteCurrency::new(200, 0),
+            order_margin: QuoteCurrency::new(100, 0),
+            _q: std::marker::PhantomData,
+        };
+        assert_eq!(balances.sum(), QuoteCurrency::new(1300, 0));
+    }
+}

@@ -40,3 +40,21 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn taker_trade() {
+        let trade = Trade {
+            price: QuoteCurrency::<i64, 5>::new(100, 0),
+            quantity: BaseCurrency::new(5, 0),
+            side: Side::Buy,
+            timestamp_exchange_ns: 1.into(),
+        };
+        assert_eq!(trade.size(), 5.0);
+        assert_eq!(trade.price(), 100.0);
+        assert_eq!(trade.timestamp_exchange_ns(), 1_i64);
+    }
+}

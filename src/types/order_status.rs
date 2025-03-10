@@ -153,3 +153,23 @@ where
         )
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::types::BaseCurrency;
+
+    #[test]
+    fn filled_quantity_fmt() {
+        let qty = FilledQuantity::<i64, 5, BaseCurrency<i64, 5>>::Unfilled;
+        assert_eq!(qty.to_string(), "Unfilled".to_string());
+        let qty = FilledQuantity::Filled {
+            cumulative_qty: BaseCurrency::<i64, 1>::new(5, 0),
+            avg_price: QuoteCurrency::new(100, 0),
+        };
+        assert_eq!(
+            qty.to_string(),
+            "Filled( cumulative_qty: 5.0 Base, avg_price: 100.0 Quote)"
+        );
+    }
+}

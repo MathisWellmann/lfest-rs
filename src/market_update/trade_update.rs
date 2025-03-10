@@ -98,6 +98,19 @@ mod tests {
     use super::*;
     use crate::prelude::*;
 
+    #[test]
+    fn trade_update_market_state() {
+        let trade = Trade {
+            price: QuoteCurrency::<i64, 5>::new(100, 0),
+            quantity: BaseCurrency::new(5, 0),
+            side: Side::Buy,
+            timestamp_exchange_ns: 0.into(),
+        };
+        let mut state = MarketState::default();
+        trade.update_market_state(&mut state);
+        assert_eq!(state.last_trade_price(), QuoteCurrency::new(100, 0));
+    }
+
     #[test_case::test_matrix(
         [100, 110, 120],
         [1, 2, 3],

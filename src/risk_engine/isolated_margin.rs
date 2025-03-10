@@ -164,7 +164,12 @@ where
 
                 let fee = new_notional_value * *self.contract_spec.fee_taker().as_ref();
 
-                if new_margin_req + fee > available_wallet_balance + released_from_old_pos {
+                if Self::margin_exceeds_risk(
+                    new_margin_req,
+                    fee,
+                    available_wallet_balance,
+                    released_from_old_pos,
+                ) {
                     return Err(RiskError::NotEnoughAvailableBalance);
                 }
             }
@@ -216,12 +221,27 @@ where
 
                 let fee = new_notional_value * *self.contract_spec.fee_taker().as_ref();
 
-                if new_margin_req + fee > available_wallet_balance + released_from_old_pos {
+                if Self::margin_exceeds_risk(
+                    new_margin_req,
+                    fee,
+                    available_wallet_balance,
+                    released_from_old_pos,
+                ) {
                     return Err(RiskError::NotEnoughAvailableBalance);
                 }
             }
         }
         Ok(())
+    }
+
+    #[inline(always)]
+    fn margin_exceeds_risk(
+        new_margin_req: BaseOrQuote::PairedCurrency,
+        tx_fee: BaseOrQuote::PairedCurrency,
+        available_wallet_balance: BaseOrQuote::PairedCurrency,
+        released_margin_from_old_pos: BaseOrQuote::PairedCurrency,
+    ) -> bool {
+        new_margin_req + tx_fee > available_wallet_balance + released_margin_from_old_pos
     }
 
     #[inline(always)]
@@ -240,6 +260,34 @@ mod tests {
 
     use super::*;
     use crate::{prelude::*, test_fee_maker, test_fee_taker, MockTransactionAccounting, DECIMALS};
+
+    #[test]
+    fn isolated_margin_exceeds_risk() {
+        assert!(
+            !IsolatedMarginRiskEngine::<i64, 5, BaseCurrency<i64, 5>>::margin_exceeds_risk(
+                QuoteCurrency::<i64, 5>::new(10, 0),
+                QuoteCurrency::new(1, 1),
+                QuoteCurrency::new(1000, 0),
+                QuoteCurrency::new(0, 0)
+            )
+        );
+        assert!(
+            IsolatedMarginRiskEngine::<i64, 5, BaseCurrency<i64, 5>>::margin_exceeds_risk(
+                QuoteCurrency::<i64, 5>::new(1000, 0),
+                QuoteCurrency::new(1, 1),
+                QuoteCurrency::new(1000, 0),
+                QuoteCurrency::new(0, 0)
+            )
+        );
+        assert!(
+            !IsolatedMarginRiskEngine::<i64, 5, BaseCurrency<i64, 5>>::margin_exceeds_risk(
+                QuoteCurrency::<i64, 5>::new(1000, 0),
+                QuoteCurrency::new(1, 1),
+                QuoteCurrency::new(1000, 0),
+                QuoteCurrency::new(1, 0)
+            )
+        );
+    }
 
     #[test]
     fn isolated_margin_quantity_minus_position() {

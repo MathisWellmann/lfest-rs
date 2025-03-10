@@ -273,3 +273,20 @@ where
         self.0.to_f64()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn base_currency() {
+        let v = QuoteCurrency::<i64, 5>::new(100, 0);
+        assert!(v.is_positive());
+        assert!(!v.is_negative());
+        let v = QuoteCurrency::<i64, 5>::new(-100, 0);
+        assert!(!v.is_positive());
+        assert!(v.is_negative());
+        let v = QuoteCurrency::<i64, 5>::new(0, 0);
+        assert!(v.is_zero());
+    }
+}

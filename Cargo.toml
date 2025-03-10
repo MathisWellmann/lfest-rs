@@ -23,7 +23,7 @@ derive_more = { version = "2", features = ["full"] }
 # ] }
 const-decimal = { git = "https://github.com/OliverNChalk/const-decimal", features = [
   "serde",
-] }
+] , version = "0.3.0"}
 distrs = "0.2"
 num-traits = "0.2"
 typed-builder = "0.20"
