@@ -1,0 +1,21 @@
+--- src/exchange.rs
++++ replace < with > in Exchange<I, D, BaseOrQuote, UserOrderIdT, TransactionAccountingT>::amend_limit_order
+@@ -373,17 +373,17 @@
+         mut new_order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+         self.order_rate_limiter
+             .aquire(self.market_state.current_ts_ns())?;
+         let existing_order = self
+             .active_limit_orders
+             .get_by_id(existing_order_id)
+             .ok_or_else(|| {
+-                if existing_order_id < self.next_order_id {
++                if existing_order_id > /* ~ changed by cargo-mutants ~ */ self.next_order_id {
+                     Error::OrderNoLongerActive
+                 } else {
+                     Error::OrderIdNotFound {
+                         order_id: existing_order_id,
+                     }
+                 }
+             })?;
+         // When the order is in partially filled status and the new quantity <= `filled_quantity`, as per `binance` docs.

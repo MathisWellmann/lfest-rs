@@ -1,3 +1,4 @@
+use num::Zero;
 use tracing::trace;
 
 use super::RiskEngine;
@@ -5,7 +6,7 @@ use crate::{
     contract_specification::ContractSpecification,
     market_state::MarketState,
     order_margin::OrderMargin,
-    prelude::{Currency, Mon, Position, QuoteCurrency, RiskError},
+    prelude::{Currency, Mon, Position, PositionInner, QuoteCurrency, RiskError},
     types::{LimitOrder, MarginCurrency, MarketOrder, Pending, Side, UserOrderId},
 };
 
@@ -118,6 +119,7 @@ impl<I, const D: u8, BaseOrQuote> IsolatedMarginRiskEngine<I, D, BaseOrQuote>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     fn check_market_buy_order<UserOrderIdT>(
         &self,
@@ -152,10 +154,13 @@ where
                 // The order reduces the short and puts on a long
                 let released_from_old_pos = position_margin;
 
-                let new_long_size = order.quantity() - pos_inner.quantity();
+                let new_long_size = Self::quantity_minus_position(order.quantity(), pos_inner);
+                assert2::debug_assert!(new_long_size > BaseOrQuote::zero());
                 let new_notional_value =
                     BaseOrQuote::PairedCurrency::convert_from(new_long_size, fill_price);
+                assert2::debug_assert!(new_notional_value > BaseOrQuote::PairedCurrency::zero());
                 let new_margin_req = new_notional_value * self.contract_spec.init_margin_req();
+                assert2::debug_assert!(new_margin_req > BaseOrQuote::PairedCurrency::zero());
 
                 let fee = new_notional_value * *self.contract_spec.fee_taker().as_ref();
 
@@ -201,10 +206,13 @@ where
                 // The order reduces the long position and opens a short.
                 let released_from_old_pos = position_margin;
 
-                let new_short_size = order.quantity() - pos_inner.quantity();
+                let new_short_size = Self::quantity_minus_position(order.quantity(), pos_inner);
+                assert2::debug_assert!(new_short_size > BaseOrQuote::zero());
                 let new_notional_value =
                     BaseOrQuote::PairedCurrency::convert_from(new_short_size, fill_price);
+                assert2::debug_assert!(new_notional_value > BaseOrQuote::PairedCurrency::zero());
                 let new_margin_req = new_notional_value * self.contract_spec.init_margin_req();
+                assert2::debug_assert!(new_margin_req > BaseOrQuote::PairedCurrency::zero());
 
                 let fee = new_notional_value * *self.contract_spec.fee_taker().as_ref();
 
@@ -215,6 +223,14 @@ where
         }
         Ok(())
     }
+
+    #[inline(always)]
+    fn quantity_minus_position(
+        quantity: BaseOrQuote,
+        position_inner: &PositionInner<I, D, BaseOrQuote>,
+    ) -> BaseOrQuote {
+        quantity - position_inner.quantity()
+    }
 }
 
 #[cfg(test)]
@@ -224,6 +240,21 @@ mod tests {
 
     use super::*;
     use crate::{prelude::*, test_fee_maker, test_fee_taker, MockTransactionAccounting, DECIMALS};
+
+    #[test]
+    fn isolated_margin_quantity_minus_position() {
+        assert_eq!(
+            IsolatedMarginRiskEngine::quantity_minus_position(
+                BaseCurrency::new(10, 0),
+                &PositionInner::from_parts(
+                    BaseCurrency::<i64, 5>::new(5, 0),
+                    QuoteCurrency::new(100, 0),
+                    QuoteCurrency::new(0, 0),
+                )
+            ),
+            BaseCurrency::new(5, 0)
+        );
+    }
 
     #[test_case::test_case(2, 75)]
     #[test_case::test_case(3, 84)]

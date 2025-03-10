@@ -1,0 +1,21 @@
+--- src/order_rate_limiter.rs
++++ replace == with != in OrderRateLimiter::aquire
+@@ -46,17 +46,17 @@
+     /// returns `true` if the rate limit has been reached.
+     #[inline(always)]
+     pub(crate) fn aquire(&mut self, current_ts_ns: TimestampNs) -> crate::Result<()> {
+         if !self.is_in_bucket(current_ts_ns) {
+             self.new_bucket(current_ts_ns);
+             self.remaining -= 1;
+             return Ok(());
+         }
+-        if self.remaining == 0 {
++        if self.remaining != /* ~ changed by cargo-mutants ~ */ 0 {
+             return Err(Error::RateLimitReached);
+         }
+         self.remaining -= 1;
+         Ok(())
+     }
+ }
+ 
+ #[cfg(test)]

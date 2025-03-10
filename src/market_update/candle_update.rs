@@ -8,6 +8,7 @@ use crate::{
     Result,
 };
 
+// TODO: use `typed-builder` and `getset` for construction and getters.
 /// A new candle has been created.
 /// Here we can use the `high` and `low` prices to see if our simulated resting orders
 /// have been executed over the last period as a proxy in absence of actual `Trade` flow.
@@ -111,4 +112,21 @@ macro_rules! candle {
             high: $h,
         }
     }};
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn candle_update() {
+        let candle = Candle {
+            bid: QuoteCurrency::<i64, 5>::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            low: QuoteCurrency::new(95, 0),
+            high: QuoteCurrency::new(105, 0),
+            timestamp_exchange_ns: 1.into(),
+        };
+        todo!();
+    }
 }

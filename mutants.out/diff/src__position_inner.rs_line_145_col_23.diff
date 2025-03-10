@@ -1,0 +1,21 @@
+--- src/position_inner.rs
++++ replace += with -= in PositionInner<I, D, BaseOrQuote>::increase_contracts
+@@ -137,17 +137,17 @@
+         let value = BaseOrQuote::PairedCurrency::convert_from(qty, entry_price);
+         let new_entry_price = QuoteCurrency::new_weighted_price(
+             self.entry_price,
+             *self.quantity.as_ref(),
+             entry_price,
+             *qty.as_ref(),
+         );
+ 
+-        self.quantity += qty;
++        self.quantity -= /* ~ changed by cargo-mutants ~ */ qty;
+         self.entry_price = new_entry_price;
+         self.outstanding_fees += fees;
+ 
+         let margin = value * init_margin_req;
+         let transaction =
+             Transaction::new(USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT, margin);
+         accounting
+             .create_margin_transfer(transaction)

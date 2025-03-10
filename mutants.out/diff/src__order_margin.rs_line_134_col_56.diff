@@ -1,0 +1,21 @@
+--- src/order_margin.rs
++++ replace - with + in OrderMargin<I, D, BaseOrQuote, UserOrderIdT>::order_margin_internal
+@@ -126,17 +126,17 @@
+             Position::Neutral => {}
+             Position::Long(inner) => {
+                 let mut outstanding_pos_qty = inner.quantity();
+                 let mut i = 0;
+                 while outstanding_pos_qty > BaseOrQuote::zero() {
+                     if i >= sell_orders.len() {
+                         break;
+                     }
+-                    let new_qty = max(sell_orders[i].1 - outstanding_pos_qty, BaseOrQuote::zero());
++                    let new_qty = max(sell_orders[i].1 + /* ~ changed by cargo-mutants ~ */ outstanding_pos_qty, BaseOrQuote::zero());
+                     trace!("sells order_qty: {}, outstanding_pos_qty: {outstanding_pos_qty} new_qty: {new_qty}", sell_orders[i].1);
+                     outstanding_pos_qty -= min(sell_orders[i].1, outstanding_pos_qty);
+                     sell_orders[i].1 = new_qty;
+                     i += 1;
+                 }
+             }
+             Position::Short(inner) => {
+                 let mut outstanding_pos_qty = inner.quantity();

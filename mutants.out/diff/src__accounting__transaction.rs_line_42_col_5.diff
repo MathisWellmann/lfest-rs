@@ -1,0 +1,29 @@
+--- src/accounting/transaction.rs
++++ replace account_from_int -> &'static str with "xyzzy"
+@@ -34,25 +34,17 @@
+             account_from_int(self.credit_account_id),
+             self.amount
+         )
+     }
+ }
+ 
+ /// For making accounts more readable in `Debug` formatting.
+ fn account_from_int(int: usize) -> &'static str {
+-    match int {
+-        USER_WALLET_ACCOUNT => "USER_WALLET_ACCOUNT",
+-        USER_ORDER_MARGIN_ACCOUNT => "USER_ORDER_MARGIN_ACCOUNT",
+-        USER_POSITION_MARGIN_ACCOUNT => "USER_POSITION_MARGIN_ACCOUNT",
+-        EXCHANGE_FEE_ACCOUNT => "EXCHANGE_FEE_ACCOUNT",
+-        BROKER_MARGIN_ACCOUNT => "BROKER_MARGIN_ACCOUNT",
+-        TREASURY_ACCOUNT => "TREASURY_ACCOUNT",
+-        _ => panic!("invalid account"),
+-    }
++    "xyzzy" /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ impl<I, const D: u8, BaseOrQuote> Transaction<I, D, BaseOrQuote>
+ where
+     I: Mon<D>,
+     BaseOrQuote: MarginCurrency<I, D>,
+ {
+     #[tracing::instrument(level = "trace")]

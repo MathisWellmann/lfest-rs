@@ -1,0 +1,21 @@
+--- src/risk_engine/isolated_margin.rs
++++ replace > with == in IsolatedMarginRiskEngine<I, D, BaseOrQuote>::check_market_sell_order
+@@ -185,17 +185,17 @@
+ 
+         match position {
+             Position::Neutral | Position::Short(_) => {
+                 let notional_value =
+                     BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
+                 let margin_req = notional_value * self.contract_spec.init_margin_req();
+                 let fee = notional_value * *self.contract_spec.fee_taker().as_ref();
+ 
+-                if margin_req + fee > available_wallet_balance {
++                if margin_req + fee == /* ~ changed by cargo-mutants ~ */ available_wallet_balance {
+                     return Err(RiskError::NotEnoughAvailableBalance);
+                 }
+             }
+             Position::Long(pos_inner) => {
+                 // Else its a long position which needs to be reduced
+                 if order.quantity() <= pos_inner.quantity() {
+                     // The order strictly reduces the position, so no additional margin is required.
+                     return Ok(());

@@ -1,3 +1,5 @@
+use num::Zero;
+
 use super::MarketUpdate;
 use crate::{
     order_filters::{enforce_max_price, enforce_min_price, enforce_step_size},
@@ -73,6 +75,7 @@ where
     }
 
     fn validate_market_update(&self, price_filter: &PriceFilter<I, D>) -> Result<()> {
+        debug_assert!(self.price > QuoteCurrency::zero());
         enforce_min_price(price_filter.min_price(), self.price)?;
         enforce_max_price(price_filter.max_price(), self.price)?;
         enforce_step_size(price_filter.tick_size(), self.price)?;

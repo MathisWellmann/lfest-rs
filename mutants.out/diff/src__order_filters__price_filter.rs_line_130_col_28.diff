@@ -1,0 +1,21 @@
+--- src/order_filters/price_filter.rs
++++ replace > with == in PriceFilter<I, D>::validate_limit_price
+@@ -122,17 +122,17 @@
+         limit_price: QuoteCurrency<I, D>,
+         mark_price: QuoteCurrency<I, D>,
+     ) -> Result<(), OrderError> {
+         if limit_price <= QuoteCurrency::zero() {
+             return Err(OrderError::LimitPriceBelowMin);
+         }
+ 
+         if let Some(max_price) = self.max_price {
+-            if limit_price > max_price {
++            if limit_price == /* ~ changed by cargo-mutants ~ */ max_price {
+                 return Err(OrderError::LimitPriceAboveMax);
+             }
+         }
+ 
+         let min_price = if let Some(min_price) = self.min_price {
+             if limit_price < min_price {
+                 return Err(OrderError::LimitPriceBelowMin);
+             }

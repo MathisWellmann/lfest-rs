@@ -12,8 +12,8 @@ use crate::{
     order_margin::OrderMargin,
     order_rate_limiter::OrderRateLimiter,
     prelude::{
-        ActiveLimitOrders, Currency, MarketUpdate, Mon, OrderError, Position, QuoteCurrency,
-        RePricing, Transaction, EXCHANGE_FEE_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT,
+        ActiveLimitOrders, Currency, EXCHANGE_FEE_ACCOUNT, MarketUpdate, Mon, OrderError, Position,
+        QuoteCurrency, RePricing, Transaction, USER_ORDER_MARGIN_ACCOUNT,
         USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
     },
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
@@ -198,6 +198,8 @@ where
     // Liquidate the position by closing it with a market order.
     fn liquidate(&mut self) {
         warn!("liquidating position {}", self.position);
+        debug_assert!(self.market_state.ask() > QuoteCurrency::zero());
+        debug_assert!(self.market_state.bid() > QuoteCurrency::zero());
         let order = match &self.position {
             Position::Long(pos) => {
                 MarketOrder::new(Side::Sell, pos.quantity()).expect("Can create market order.")
@@ -238,6 +240,8 @@ where
         );
         let order = order.into_pending(meta);
 
+        debug_assert!(self.market_state.ask() > QuoteCurrency::zero());
+        debug_assert!(self.market_state.bid() > QuoteCurrency::zero());
         let fill_price = match order.side() {
             Side::Buy => self.market_state.ask(),
             Side::Sell => self.market_state.bid(),
@@ -508,7 +512,10 @@ where
             &self.position,
         );
 
-        assert!(new_order_margin <= order_margin, "When cancelling a limit order, the new order margin is smaller or equal the old order margin");
+        assert!(
+            new_order_margin <= order_margin,
+            "When cancelling a limit order, the new order margin is smaller or equal the old order margin"
+        );
         if new_order_margin < order_margin {
             let delta = order_margin - new_order_margin;
             let transaction =

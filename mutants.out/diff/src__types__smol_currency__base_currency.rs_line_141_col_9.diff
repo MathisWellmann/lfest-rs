@@ -1,0 +1,21 @@
+--- src/types/smol_currency/base_currency.rs
++++ replace <impl One for BaseCurrency<I, D>>::one -> Self with Default::default()
+@@ -133,17 +133,17 @@
+ }
+ 
+ impl<I, const D: u8> One for BaseCurrency<I, D>
+ where
+     I: Mon<D>,
+ {
+     #[inline]
+     fn one() -> Self {
+-        Self(Decimal::one())
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     #[inline]
+     fn set_one(&mut self) {
+         *self = One::one();
+     }
+ 
+     #[inline]

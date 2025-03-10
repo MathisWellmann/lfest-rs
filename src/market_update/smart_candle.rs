@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn smart_candle_no_buys() {
         let trades = &[Trade {
-            timestamp_exchange_ns: 0.into(),
+            timestamp_exchange_ns: 1.into(),
             price: QuoteCurrency::<i64, 5>::new(100, 0),
             quantity: BaseCurrency::new(1, 0),
             side: Side::Sell,
@@ -219,7 +219,7 @@ mod tests {
         let bba = Bba {
             bid: QuoteCurrency::new(100, 0),
             ask: QuoteCurrency::new(101, 0),
-            timestamp_exchange_ns: 0.into(),
+            timestamp_exchange_ns: 1.into(),
         };
         let pf = PriceFilter::new(
             None,
@@ -237,7 +237,7 @@ mod tests {
                 aggregate_buy_volume: Vec::new(),
                 aggregate_sell_volume: vec![(QuoteCurrency::new(100, 0), BaseCurrency::new(1, 0))],
                 bba,
-                last_timestamp_exchange_ns: 0.into(),
+                last_timestamp_exchange_ns: 1.into(),
                 high: QuoteCurrency::new(100, 0),
                 low: QuoteCurrency::new(100, 0)
             }

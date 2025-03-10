@@ -1,0 +1,21 @@
+--- src/market_update/trade_update.rs
++++ replace < with > in <impl MarketUpdate<I, D, BaseOrQuote> for Trade<I, D, BaseOrQuote>>::limit_order_filled
+@@ -58,17 +58,17 @@
+             self.quantity > BaseOrQuote::zero(),
+             "The trade quantity must be greater than zero."
+         );
+         debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
+ 
+         // Notice that the limit order price must be strictly lower or higher than the limit order price,
+         // because we assume the limit order has the worst possible queue position in the book.
+         if match order.side() {
+-            Side::Buy => self.price < order.limit_price() && matches!(self.side, Side::Sell),
++            Side::Buy => self.price > /* ~ changed by cargo-mutants ~ */ order.limit_price() && matches!(self.side, Side::Sell),
+             Side::Sell => self.price > order.limit_price() && matches!(self.side, Side::Buy),
+         } {
+             // Execute up to the quantity of the incoming `Trade`.
+             let filled_qty = min(self.quantity, order.remaining_quantity());
+             Some(filled_qty)
+         } else {
+             None
+         }

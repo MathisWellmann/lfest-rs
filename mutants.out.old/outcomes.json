@@ -1,0 +1,32 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Failure",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 11.641179066,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/nix/store/v2d7zb1wrsn94pv0hdl4v5nj96msh0lf-cargo-1.85.0-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=lfest@0.100.0"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 0,
+  "missed": 0,
+  "caught": 0,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

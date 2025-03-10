@@ -1,0 +1,4 @@
+src/types/limit_order.rs:249:41: replace -= with /= in LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>::fill
+src/accounting/transaction.rs:42:5: replace account_from_int -> &'static str with "xyzzy"
+src/types/market_order.rs:101:9: replace MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>::new_with_user_order_id -> Result<Self, OrderError> with Ok(Default::default())
+src/position_inner.rs:169:9: replace PositionInner<I, D, BaseOrQuote>::decrease_contracts with ()
