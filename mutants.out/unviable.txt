@@ -1,6 +1,0 @@
-src/exchange.rs:169:9: replace Exchange<I, D, BaseOrQuote, UserOrderIdT, TransactionAccountingT>::update_state -> Result<&Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderIdT>>> with Ok(&vec![])
-src/utils.rs:35:5: replace max -> T with Default::default()
-src/exchange.rs:229:9: replace Exchange<I, D, BaseOrQuote, UserOrderIdT, TransactionAccountingT>::submit_market_order -> Result<MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> with Ok(Default::default())
-src/mock_exchange.rs:61:5: replace mock_exchange_linear_with_account_tracker -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId, InMemoryTransactionAccounting<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>, > with Default::default()
-src/position_inner.rs:169:9: replace PositionInner<I, D, BaseOrQuote>::decrease_contracts with ()
-src/risk_engine/isolated_margin.rs:198:49: replace * with + in IsolatedMarginRiskEngine<I, D, BaseOrQuote>::check_market_sell_order
