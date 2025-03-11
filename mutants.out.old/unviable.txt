@@ -1,5 +1,0 @@
-src/types/market_order.rs:118:9: replace MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>::into_pending -> MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>> with Default::default()
-src/mock_exchange.rs:30:5: replace mock_exchange_linear -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId, InMemoryTransactionAccounting<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>, > with Default::default()
-src/accounting/account.rs:38:28: replace += with *= in TAccount<I, D, BaseOrQuote>::post_debit
-src/types/market_order.rs:101:9: replace MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>::new_with_user_order_id -> Result<Self, OrderError> with Ok(Default::default())
-src/load_trades_from_csv.rs:21:5: replace load_trades_from_csv -> Vec<Trade<I, D, QuoteCurrency<I, D>>> with vec![]

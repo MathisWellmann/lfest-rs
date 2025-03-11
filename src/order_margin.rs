@@ -51,12 +51,18 @@ where
             );
             assert!(order.remaining_quantity() < active_order.remaining_quantity(), "An update to an existing order must mean the new order has less quantity than the tracked order.");
             debug_assert_eq!(order.id(), active_order.id());
-
-            // when an existing limit order is updated for margin purposes here, its quantity is always reduced.
-            let removed_qty = active_order.remaining_quantity() - order.remaining_quantity();
-            assert!(removed_qty > BaseOrQuote::zero());
+            Self::assert_limit_order_update_reduces_qty(&active_order, order);
         }
         Ok(())
+    }
+
+    fn assert_limit_order_update_reduces_qty(
+        active_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        updated_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+    ) {
+        // when an existing limit order is updated for margin purposes here, its quantity is always reduced.
+        let removed_qty = active_order.remaining_quantity() - updated_order.remaining_quantity();
+        assert!(removed_qty > BaseOrQuote::zero());
     }
 
     /// Remove an order from being tracked for margin purposes.
@@ -187,6 +193,23 @@ where
 mod tests {
     use super::*;
     use crate::{prelude::*, test_fee_maker, MockTransactionAccounting, DECIMALS};
+
+    #[test]
+    fn order_margin_assert_limit_order_reduces_qty() {
+        let new_active_order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 1.into());
+        let active_order = new_active_order.into_pending(meta);
+
+        let mut updated_order = active_order.clone();
+        updated_order.fill(BaseCurrency::new(1, 0), 1.into());
+
+        OrderMargin::assert_limit_order_update_reduces_qty(&active_order, &updated_order);
+    }
 
     #[test_case::test_matrix(
         [1, 2, 5]

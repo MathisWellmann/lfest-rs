@@ -55,6 +55,6 @@ mod test {
         };
         assert_eq!(trade.size(), 5.0);
         assert_eq!(trade.price(), 100.0);
-        assert_eq!(trade.timestamp_exchange_ns(), 1_i64);
+        assert_eq!(trade.timestamp(), 1_i64);
     }
 }

@@ -39,7 +39,11 @@ where
     I: Mon<D>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "bid: {}, ask: {}", self.bid, self.ask)
+        write!(
+            f,
+            "bid: {}, ask: {}, ts: {}",
+            self.bid, self.ask, self.timestamp_exchange_ns
+        )
     }
 }
 
@@ -89,5 +93,18 @@ mod tests {
     fn size_of_bba() {
         assert_eq!(std::mem::size_of::<Bba<i32, 4>>(), 16);
         assert_eq!(std::mem::size_of::<Bba<i64, 4>>(), 24);
+    }
+
+    #[test]
+    fn bba_update_display() {
+        let update = Bba {
+            bid: QuoteCurrency::<i64, 1>::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 1.into(),
+        };
+        assert_eq!(
+            &update.to_string(),
+            "bid: 100.0 Quote, ask: 101.0 Quote, ts: 1"
+        );
     }
 }

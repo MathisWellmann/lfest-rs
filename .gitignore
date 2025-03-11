@@ -1,5 +1,7 @@
 /target
 /vendor
 /.direnv
+/mutants.out
+/mutants.out.old
 .idea
 .nvimlog

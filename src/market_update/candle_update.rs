@@ -7,7 +7,7 @@ use crate::{
         enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
     },
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side},
-    types::{TimestampNs, UserOrderId},
+    types::{Error, TimestampNs, UserOrderId},
     Result,
 };
 
@@ -38,6 +38,44 @@ where
     /// The nanosecond timestamp at which this event occurred at the exchange.
     #[getset(get_copy = "pub")]
     timestamp_exchange_ns: TimestampNs,
+}
+
+impl<I, const D: u8> Candle<I, D>
+where
+    I: Mon<D>,
+{
+    /// Create a new `Candle` with sanity checks performed on the prices.
+    pub fn new(
+        bid: QuoteCurrency<I, D>,
+        ask: QuoteCurrency<I, D>,
+        low: QuoteCurrency<I, D>,
+        high: QuoteCurrency<I, D>,
+        timestamp_exchange_ns: TimestampNs,
+    ) -> Result<Self> {
+        if bid < low {
+            return Err(Error::InvalidCandlePrices);
+        }
+        if ask < low {
+            return Err(Error::InvalidCandlePrices);
+        }
+        if high < low {
+            return Err(Error::InvalidCandlePrices);
+        }
+        if bid > high {
+            return Err(Error::InvalidCandlePrices);
+        }
+        if ask > high {
+            return Err(Error::InvalidCandlePrices);
+        }
+
+        Ok(Self {
+            bid,
+            ask,
+            low,
+            high,
+            timestamp_exchange_ns,
+        })
+    }
 }
 
 impl<I, const D: u8> std::fmt::Display for Candle<I, D>
@@ -156,5 +194,26 @@ mod test {
         .unwrap();
         assert_eq!(candle.limit_order_filled(&order), None);
         assert_eq!(candle.timestamp_exchange_ns(), 1.into());
+        assert_eq!(
+            <Candle<i64, 5> as MarketUpdate<i64, 5, BaseCurrency<i64, 5>>>::timestamp_exchange_ns(
+                &candle
+            ),
+            1.into()
+        );
+    }
+
+    #[test]
+    fn candle_update_display() {
+        let candle = Candle {
+            bid: QuoteCurrency::<i64, 1>::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            low: QuoteCurrency::new(95, 0),
+            high: QuoteCurrency::new(105, 0),
+            timestamp_exchange_ns: 1.into(),
+        };
+        assert_eq!(
+            &candle.to_string(),
+            "bid: 100.0 Quote, ask: 101.0 Quote, high: 105.0 Quote, low: 95.0 Quote",
+        );
     }
 }

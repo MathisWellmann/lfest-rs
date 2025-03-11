@@ -288,5 +288,8 @@ mod test {
         assert!(v.is_negative());
         let v = QuoteCurrency::<i64, 5>::new(0, 0);
         assert!(v.is_zero());
+        assert!(!v.is_one());
+        let v = QuoteCurrency::<i64, 5>::new(1, 0);
+        assert!(v.is_one());
     }
 }

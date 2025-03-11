@@ -49,4 +49,7 @@ pub enum Error {
 
     #[error("The order rate limit was reached for this period.")]
     RateLimitReached,
+
+    #[error("The provided prices for `Candle` don't make sense.")]
+    InvalidCandlePrices,
 }
