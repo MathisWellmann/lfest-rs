@@ -126,12 +126,12 @@ where
             - QuoteCurrency::convert_from(quantity, entry_price)
     }
 
-    fn price_paid_for_qty(total_cost: Self, quantity: Self::PairedCurrency) -> QuoteCurrency<I, D> {
+    fn price_paid_for_qty(total_cost: Self, quantity: Decimal<I, D>) -> QuoteCurrency<I, D> {
         if quantity.is_zero() {
             return QuoteCurrency::zero();
         }
 
-        QuoteCurrency(*total_cost.as_ref() / *quantity.as_ref())
+        QuoteCurrency(*total_cost.as_ref() / quantity)
     }
 }
 
@@ -291,5 +291,16 @@ mod test {
         assert!(!v.is_one());
         let v = QuoteCurrency::<i64, 5>::new(1, 0);
         assert!(v.is_one());
+    }
+
+    #[test]
+    fn quote_currency_price_paid_for_qty() {
+        assert_eq!(
+            QuoteCurrency::price_paid_for_qty(
+                QuoteCurrency::<i64, 5>::new(1000, 0),
+                Decimal::try_from_scaled(5, 0).unwrap()
+            ),
+            QuoteCurrency::new(200, 0)
+        );
     }
 }

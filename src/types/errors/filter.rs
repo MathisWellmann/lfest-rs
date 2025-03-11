@@ -3,14 +3,14 @@
 #[allow(missing_docs)]
 pub enum FilterError {
     #[error("Some price in MarketUpdate is too low.")]
-    MarketUpdatePriceTooLow,
+    PriceTooLow,
 
     #[error("Some price in MarketUpdate is too high.")]
-    MarketUpdatePriceTooHigh,
+    PriceTooHigh,
 
     #[error("Some price in MarketUpdate does not conform to the step size")]
-    MarketUpdatePriceStepSize { price: String, step_size: String },
+    PriceStepSize { price: String, step_size: String },
 
     #[error("The bid ask spread does not exist in this MarketUpdate.")]
-    InvalidMarketUpdateBidAskSpread,
+    InvalidBidAskSpread,
 }

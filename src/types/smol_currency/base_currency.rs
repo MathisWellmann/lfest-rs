@@ -97,6 +97,7 @@ impl<I, const D: u8> MarginCurrency<I, D> for BaseCurrency<I, D>
 where
     I: Mon<D>,
 {
+    #[inline]
     fn pnl(
         entry_price: QuoteCurrency<I, D>,
         exit_price: QuoteCurrency<I, D>,
@@ -109,11 +110,12 @@ where
             - BaseCurrency::convert_from(quantity, exit_price)
     }
 
-    fn price_paid_for_qty(total_cost: Self, quantity: Self::PairedCurrency) -> QuoteCurrency<I, D> {
+    #[inline]
+    fn price_paid_for_qty(total_cost: Self, quantity: Decimal<I, D>) -> QuoteCurrency<I, D> {
         if total_cost.is_zero() {
             return QuoteCurrency::zero();
         }
-        QuoteCurrency::from(*quantity.as_ref() / *total_cost.as_ref())
+        QuoteCurrency::from(quantity / *total_cost.as_ref())
     }
 }
 
@@ -275,5 +277,16 @@ mod test {
         assert!(v.is_zero());
         let v = BaseCurrency::<i64, 5>::new(8, 0);
         assert_eq!(v.rem(BaseCurrency::new(5, 0)), BaseCurrency::new(3, 0));
+    }
+
+    #[test]
+    fn base_currency_price_paid_for_qty() {
+        assert_eq!(
+            BaseCurrency::price_paid_for_qty(
+                BaseCurrency::<i64, 5>::new(5, 0),
+                Decimal::try_from_scaled(1000, 0).unwrap()
+            ),
+            QuoteCurrency::new(200, 0)
+        );
     }
 }

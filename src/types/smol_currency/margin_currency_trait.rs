@@ -1,3 +1,5 @@
+use const_decimal::Decimal;
+
 use super::{Currency, Mon, QuoteCurrency};
 
 /// Each Currency that is used as margin has to implement this trait.
@@ -31,5 +33,5 @@ where
     ) -> Self;
 
     /// Compute the price paid for the `total_cost` for `quantity` number of contracts.
-    fn price_paid_for_qty(total_cost: Self, quantity: Self::PairedCurrency) -> QuoteCurrency<I, D>;
+    fn price_paid_for_qty(total_cost: Self, quantity: Decimal<I, D>) -> QuoteCurrency<I, D>;
 }
