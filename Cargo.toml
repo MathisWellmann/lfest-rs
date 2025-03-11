@@ -2,7 +2,7 @@ cargo-features = ["edition2024"]
 
 [package]
 name = "lfest"
-version = "0.101.1"
+version = "0.102.0"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2024"
 license-file = "LICENSE"
