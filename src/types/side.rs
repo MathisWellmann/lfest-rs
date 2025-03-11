@@ -63,4 +63,10 @@ mod tests {
     fn side_from_taker_quantity_panic() {
         Side::from_taker_quantity(QuoteCurrency::<i64, 4>::zero());
     }
+
+    #[test]
+    fn side_display() {
+        assert_eq!(&Side::Buy.to_string(), "Buy");
+        assert_eq!(&Side::Sell.to_string(), "Sell");
+    }
 }

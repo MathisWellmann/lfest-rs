@@ -1,6 +1,6 @@
 use getset::{CopyGetters, Getters};
 
-use super::{order_meta::ExchangeOrderMeta, Currency, Mon, QuoteCurrency, TimestampNs};
+use super::{Currency, Mon, QuoteCurrency, TimestampNs, order_meta::ExchangeOrderMeta};
 
 /// A new order has not been received by the exchange and has thus some pieces of information not available.
 /// This also means the various filters (e.g `PriceFilter` and `QuantityFilter`) have not been checked.
@@ -170,6 +170,16 @@ mod test {
         assert_eq!(
             qty.to_string(),
             "Filled( cumulative_qty: 5.0 Base, avg_price: 100.0 Quote)"
+        );
+    }
+
+    #[test]
+    fn order_status_pending_display() {
+        let meta = ExchangeOrderMeta::new(1.into(), 2.into());
+        let v = Pending::<i64, 1, BaseCurrency<i64, 1>>::new(meta);
+        assert_eq!(
+            &v.to_string(),
+            "Pending ( meta: ExchangeOrderMeta( id: 1, ts_ns_exchange_received: 2), filled_quantity: Unfilled)"
         );
     }
 }

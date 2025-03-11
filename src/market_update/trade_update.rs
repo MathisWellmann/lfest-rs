@@ -2,11 +2,11 @@ use num::Zero;
 
 use super::MarketUpdate;
 use crate::{
+    Result,
     order_filters::{enforce_max_price, enforce_min_price, enforce_step_size},
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side},
     types::{TimestampNs, UserOrderId},
     utils::min,
-    Result,
 };
 
 /// A taker trade that consumes liquidity in the book.
@@ -26,6 +26,24 @@ where
     /// Either a buy or sell order.
     // TODO: remove field and derive from sign of `quantity` to save size of struct.
     pub side: Side,
+}
+
+impl<I, const D: u8, BaseOrQuote> Trade<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+{
+    /// If `true` then the `Trade` update fills the `order`.
+    #[inline(always)]
+    fn fills_order<UserOrderIdT: UserOrderId>(
+        &self,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+    ) -> bool {
+        match order.side() {
+            Side::Buy => self.price < order.limit_price() && matches!(self.side, Side::Sell),
+            Side::Sell => self.price > order.limit_price() && matches!(self.side, Side::Buy),
+        }
+    }
 }
 
 impl<I, const D: u8, BaseOrQuote> std::fmt::Display for Trade<I, D, BaseOrQuote>
@@ -62,10 +80,7 @@ where
 
         // Notice that the limit order price must be strictly lower or higher than the limit order price,
         // because we assume the limit order has the worst possible queue position in the book.
-        if match order.side() {
-            Side::Buy => self.price < order.limit_price() && matches!(self.side, Side::Sell),
-            Side::Sell => self.price > order.limit_price() && matches!(self.side, Side::Buy),
-        } {
+        if self.fills_order(order) {
             // Execute up to the quantity of the incoming `Trade`.
             let filled_qty = min(self.quantity, order.remaining_quantity());
             Some(filled_qty)
@@ -97,6 +112,132 @@ where
 mod tests {
     use super::*;
     use crate::prelude::*;
+
+    // A buy trade can never fill a buy limit order.
+    #[test_case::test_matrix([90, 95, 100, 105, 110])]
+    fn trade_update_fills_buy_order_never(price: i64) {
+        let new_order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::default();
+        let order = new_order.into_pending(meta);
+
+        let trade = Trade {
+            price: QuoteCurrency::<i64, 1>::new(price, 0),
+            quantity: BaseCurrency::new(5, 0),
+            side: Side::Buy,
+            timestamp_exchange_ns: 0.into(),
+        };
+        assert!(!trade.fills_order(&order));
+    }
+
+    // A sell trade can fill a buy limit order at certain prices.
+    #[test_case::test_matrix([90, 95, 99])]
+    fn trade_update_fills_buy_order(price: i64) {
+        let new_order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::default();
+        let order = new_order.into_pending(meta);
+
+        let trade = Trade {
+            price: QuoteCurrency::<i64, 1>::new(price, 0),
+            quantity: BaseCurrency::new(5, 0),
+            side: Side::Sell,
+            timestamp_exchange_ns: 0.into(),
+        };
+        assert!(trade.fills_order(&order));
+    }
+
+    // A sell trade can fill a buy limit order at certain prices.
+    #[test_case::test_matrix([100, 101, 105, 110])]
+    fn trade_update_fills_buy_order_not(price: i64) {
+        let new_order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::default();
+        let order = new_order.into_pending(meta);
+
+        let trade = Trade {
+            price: QuoteCurrency::<i64, 1>::new(price, 0),
+            quantity: BaseCurrency::new(5, 0),
+            side: Side::Sell,
+            timestamp_exchange_ns: 0.into(),
+        };
+        assert!(!trade.fills_order(&order));
+    }
+
+    // A buy trade can never fill a buy limit order.
+    #[test_case::test_matrix([90, 95, 100, 105, 110])]
+    fn trade_update_fills_sell_order_never(price: i64) {
+        let new_order = LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::default();
+        let order = new_order.into_pending(meta);
+
+        let trade = Trade {
+            price: QuoteCurrency::<i64, 1>::new(price, 0),
+            quantity: BaseCurrency::new(5, 0),
+            side: Side::Sell,
+            timestamp_exchange_ns: 0.into(),
+        };
+        assert!(!trade.fills_order(&order));
+    }
+
+    // A sell trade can fill a buy limit order at certain prices.
+    #[test_case::test_matrix([101, 105, 110])]
+    fn trade_update_fills_sell_order(price: i64) {
+        let new_order = LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::default();
+        let order = new_order.into_pending(meta);
+
+        let trade = Trade {
+            price: QuoteCurrency::<i64, 1>::new(price, 0),
+            quantity: BaseCurrency::new(5, 0),
+            side: Side::Buy,
+            timestamp_exchange_ns: 0.into(),
+        };
+        assert!(trade.fills_order(&order));
+    }
+
+    // A sell trade can fill a buy limit order at certain prices.
+    #[test_case::test_matrix([90, 95, 99])]
+    fn trade_update_fills_sell_order_not(price: i64) {
+        let new_order = LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::default();
+        let order = new_order.into_pending(meta);
+
+        let trade = Trade {
+            price: QuoteCurrency::<i64, 1>::new(price, 0),
+            quantity: BaseCurrency::new(5, 0),
+            side: Side::Buy,
+            timestamp_exchange_ns: 0.into(),
+        };
+        assert!(!trade.fills_order(&order));
+    }
 
     #[test]
     fn trade_update_market_state() {

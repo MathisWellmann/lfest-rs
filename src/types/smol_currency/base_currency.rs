@@ -258,6 +258,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use std::ops::Rem;
+
     use super::*;
 
     #[test]
@@ -271,5 +273,7 @@ mod test {
         assert_eq!(Into::<f64>::into(v), -100.0_f64);
         let v = BaseCurrency::<i64, 5>::new(0, 0);
         assert!(v.is_zero());
+        let v = BaseCurrency::<i64, 5>::new(8, 0);
+        assert_eq!(v.rem(BaseCurrency::new(5, 0)), BaseCurrency::new(3, 0));
     }
 }
