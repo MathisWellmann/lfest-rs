@@ -32,10 +32,11 @@
         with pkgs; {
           devShells.default = mkShell {
             buildInputs = [
-              (lib.hiPrio rust-bin.nightly."2024-04-01".rustfmt)
+              (lib.hiPrio rust-bin.nightly."2025-02-01".rustfmt)
               rust
               cargo-semver-checks
               cargo-mutants
+              cargo-outdated
               taplo
             ];
           };

@@ -1,3 +1,5 @@
+cargo-features = ["edition2024"]
+
 [package]
 name = "lfest"
 version = "0.101.1"
