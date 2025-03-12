@@ -1,7 +1,7 @@
 use std::hint::black_box;
 
 use const_decimal::Decimal;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use lfest::{load_trades_from_csv, prelude::*};
 
 const DECIMALS: u8 = 5;

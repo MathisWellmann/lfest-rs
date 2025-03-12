@@ -19,11 +19,7 @@ pub(crate) fn min<T>(v0: T, v1: T) -> T
 where
     T: PartialOrd,
 {
-    if v0 < v1 {
-        v0
-    } else {
-        v1
-    }
+    if v0 < v1 { v0 } else { v1 }
 }
 
 /// Return the maximum of two values
@@ -32,11 +28,7 @@ pub(crate) fn max<T>(v0: T, v1: T) -> T
 where
     T: PartialOrd,
 {
-    if v0 > v1 {
-        v0
-    } else {
-        v1
-    }
+    if v0 > v1 { v0 } else { v1 }
 }
 
 /// Asserts that the users wallet balance is greater than zero.

@@ -1,8 +1,8 @@
 use getset::{CopyGetters, Getters};
 
 use super::{
-    order_status::NewOrder, Currency, ExchangeOrderMeta, Filled, Mon, OrderError, Pending,
-    QuoteCurrency, Side, TimestampNs, UserOrderId,
+    Currency, ExchangeOrderMeta, Filled, Mon, OrderError, Pending, QuoteCurrency, Side,
+    TimestampNs, UserOrderId, order_status::NewOrder,
 };
 
 /// Defines an market order aka taker order.
@@ -151,5 +151,44 @@ where
             side: self.side,
             _quote: std::marker::PhantomData,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{types::BaseCurrency, utils::NoUserOrderId};
+
+    #[test_case::test_matrix([Side::Buy, Side::Sell])]
+    fn market_order_new(side: Side) {
+        let _order =
+            MarketOrder::<_, 5, _, NoUserOrderId, _>::new(side, BaseCurrency::<i64, 5>::new(5, 0))
+                .unwrap();
+        assert_eq!(
+            MarketOrder::<_, 5, _, NoUserOrderId, _>::new(side, BaseCurrency::<i64, 5>::new(0, 0)),
+            Err(OrderError::OrderQuantityLTEZero)
+        );
+        assert_eq!(
+            MarketOrder::<_, 5, _, NoUserOrderId, _>::new(side, BaseCurrency::<i64, 5>::new(-5, 0)),
+            Err(OrderError::OrderQuantityLTEZero)
+        );
+    }
+
+    #[test_case::test_matrix([Side::Buy, Side::Sell])]
+    fn market_order_new_with_user_order_id(side: Side) {
+        let _order = MarketOrder::<_, 5, _, u64, _>::new_with_user_order_id(
+            side,
+            BaseCurrency::<i64, 5>::new(5, 0),
+            1,
+        )
+        .unwrap();
+        assert_eq!(
+            MarketOrder::new_with_user_order_id(side, BaseCurrency::<i64, 5>::new(0, 0), 1),
+            Err(OrderError::OrderQuantityLTEZero)
+        );
+        assert_eq!(
+            MarketOrder::new_with_user_order_id(side, BaseCurrency::<i64, 5>::new(-5, 0), 1),
+            Err(OrderError::OrderQuantityLTEZero)
+        );
     }
 }

@@ -7,8 +7,8 @@ use tracing::{debug, trace};
 
 use crate::{
     prelude::{
-        Currency, Mon, QuoteCurrency, Transaction, TransactionAccounting, EXCHANGE_FEE_ACCOUNT,
-        TREASURY_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
+        Currency, EXCHANGE_FEE_ACCOUNT, Mon, QuoteCurrency, TREASURY_ACCOUNT, Transaction,
+        TransactionAccounting, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
     },
     types::MarginCurrency,
 };
@@ -234,7 +234,7 @@ mod tests {
     use num_traits::One;
 
     use super::*;
-    use crate::{prelude::*, test_fee_maker, DECIMALS};
+    use crate::{DECIMALS, prelude::*, test_fee_maker};
 
     #[test_case::test_matrix([1, 2, 5])]
     fn position_inner_new(leverage: u8) {

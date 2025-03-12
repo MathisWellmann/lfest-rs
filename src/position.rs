@@ -282,7 +282,17 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{prelude::*, MockTransactionAccounting};
+    use crate::{MockTransactionAccounting, prelude::*};
+
+    #[test]
+    fn position_display() {
+        let pos = Position::Short(PositionInner::from_parts(
+            BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(317, 3).unwrap()),
+            QuoteCurrency::from(Decimal::try_from_scaled(958423665, 5).unwrap()),
+            QuoteCurrency::zero(),
+        ));
+        assert_eq!(&pos.to_string(), "Short 0.31700 Base @ 9584.23665 Quote");
+    }
 
     #[test]
     #[tracing_test::traced_test]

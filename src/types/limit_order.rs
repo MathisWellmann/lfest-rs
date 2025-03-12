@@ -2,8 +2,8 @@ use getset::{CopyGetters, Getters, Setters};
 use num_traits::Zero;
 
 use super::{
-    order_meta::ExchangeOrderMeta, order_status::NewOrder, Currency, Filled, FilledQuantity,
-    MarginCurrency, Mon, OrderId, Pending, QuoteCurrency, RePricing, TimestampNs, UserOrderId,
+    Currency, Filled, FilledQuantity, MarginCurrency, Mon, OrderId, Pending, QuoteCurrency,
+    RePricing, TimestampNs, UserOrderId, order_meta::ExchangeOrderMeta, order_status::NewOrder,
 };
 use crate::{
     types::{OrderError, Side},
@@ -342,6 +342,7 @@ mod tests {
             &Filled::new(meta, 0.into(), limit_price, qty)
         );
         assert_eq!(filled_order.total_quantity(), qty);
+        assert_eq!(filled_order.remaining_quantity(), QuoteCurrency::zero());
     }
 
     #[test_matrix(

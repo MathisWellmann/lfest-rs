@@ -54,7 +54,21 @@ mod test {
             timestamp_exchange_ns: 1.into(),
         };
         assert_eq!(trade.size(), 5.0);
+        assert_eq!(
+            <Trade<i64, 5, BaseCurrency<i64, 5>> as TakerTrade>::size(&trade),
+            5.0
+        );
         assert_eq!(trade.price(), 100.0);
         assert_eq!(trade.timestamp(), 1_i64);
+
+        let t: trade_aggregation::Trade = trade.into();
+        assert_eq!(
+            t,
+            trade_aggregation::Trade {
+                price: 100.0,
+                size: 5.0,
+                timestamp: 1,
+            }
+        );
     }
 }

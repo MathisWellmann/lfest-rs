@@ -1,7 +1,7 @@
 use crate::{
+    Result,
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter},
     types::{TimestampNs, UserOrderId},
-    Result,
 };
 
 /// The interface of what a market update must be able to do.

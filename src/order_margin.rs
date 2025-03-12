@@ -6,11 +6,11 @@ use num_traits::{One, Zero};
 use tracing::trace;
 
 use crate::{
+    Result,
     exchange::CancelBy,
     prelude::{ActiveLimitOrders, Currency, Mon, Position},
     types::{LimitOrder, MarginCurrency, Pending, Side, UserOrderId},
     utils::{max, min},
-    Result,
 };
 
 /// An implementation for computing the order margin online, aka with every change to the active orders.
@@ -49,7 +49,10 @@ where
                 &active_order, order,
                 "An update to an order should not be the same as the existing one"
             );
-            assert!(order.remaining_quantity() < active_order.remaining_quantity(), "An update to an existing order must mean the new order has less quantity than the tracked order.");
+            assert!(
+                order.remaining_quantity() < active_order.remaining_quantity(),
+                "An update to an existing order must mean the new order has less quantity than the tracked order."
+            );
             debug_assert_eq!(order.id(), active_order.id());
             Self::assert_limit_order_update_reduces_qty(&active_order, order);
         }
@@ -100,7 +103,9 @@ where
         >,
     ) -> BaseOrQuote::PairedCurrency {
         debug_assert!(init_margin_req <= Decimal::one());
-        trace!("order_margin_internal: position: {position:?}, active_limit_orders: {active_limit_orders:?}");
+        trace!(
+            "order_margin_internal: position: {position:?}, active_limit_orders: {active_limit_orders:?}"
+        );
 
         let mut buy_orders = Vec::from_iter(
             active_limit_orders
@@ -138,7 +143,10 @@ where
                         break;
                     }
                     let new_qty = max(sell_orders[i].1 - outstanding_pos_qty, BaseOrQuote::zero());
-                    trace!("sells order_qty: {}, outstanding_pos_qty: {outstanding_pos_qty} new_qty: {new_qty}", sell_orders[i].1);
+                    trace!(
+                        "sells order_qty: {}, outstanding_pos_qty: {outstanding_pos_qty} new_qty: {new_qty}",
+                        sell_orders[i].1
+                    );
                     outstanding_pos_qty -= min(sell_orders[i].1, outstanding_pos_qty);
                     sell_orders[i].1 = new_qty;
                     i += 1;
@@ -152,7 +160,10 @@ where
                         break;
                     }
                     let new_qty = max(buy_orders[i].1 - outstanding_pos_qty, BaseOrQuote::zero());
-                    trace!("buys order_qty: {}, outstanding_pos_qty: {outstanding_pos_qty} new_qty: {new_qty}", buy_orders[i].1);
+                    trace!(
+                        "buys order_qty: {}, outstanding_pos_qty: {outstanding_pos_qty} new_qty: {new_qty}",
+                        buy_orders[i].1
+                    );
                     outstanding_pos_qty -= min(buy_orders[i].1, outstanding_pos_qty);
                     buy_orders[i].1 = new_qty;
                     i += 1;
@@ -192,7 +203,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{prelude::*, test_fee_maker, MockTransactionAccounting, DECIMALS};
+    use crate::{DECIMALS, MockTransactionAccounting, prelude::*, test_fee_maker};
 
     #[test]
     fn order_margin_assert_limit_order_reduces_qty() {

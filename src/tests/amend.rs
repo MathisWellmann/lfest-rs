@@ -1,20 +1,22 @@
 use test_case::test_matrix;
 
-use crate::{mock_exchange_linear, prelude::*, DECIMALS};
+use crate::{DECIMALS, mock_exchange_linear, prelude::*};
 
 #[tracing_test::traced_test]
 #[test_matrix([BaseCurrency::new(1, 0), BaseCurrency::new(3, 0), BaseCurrency::new(5, 0), BaseCurrency::new(10, 0)])]
 fn amend_limit_order_qty(new_qty: BaseCurrency<i64, DECIMALS>) {
     let mut exchange = mock_exchange_linear();
 
-    assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(100, 0),
-            ask: QuoteCurrency::new(101, 0),
-            timestamp_exchange_ns: 1.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(100, 0),
+                ask: QuoteCurrency::new(101, 0),
+                timestamp_exchange_ns: 1.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
     let order = LimitOrder::new(
         Side::Buy,
         QuoteCurrency::new(100, 0),
@@ -44,14 +46,16 @@ fn amend_limit_order_qty(new_qty: BaseCurrency<i64, DECIMALS>) {
 fn amend_limit_order_qty_with_partial_fill_leading_to_cancel(new_qty: BaseCurrency<i64, DECIMALS>) {
     let mut exchange = mock_exchange_linear();
 
-    assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(100, 0),
-            ask: QuoteCurrency::new(101, 0),
-            timestamp_exchange_ns: 1.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(100, 0),
+                ask: QuoteCurrency::new(101, 0),
+                timestamp_exchange_ns: 1.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
     let order = LimitOrder::new(
         Side::Buy,
         QuoteCurrency::new(100, 0),
@@ -92,14 +96,16 @@ fn amend_limit_order_qty_with_partial_fill_leading_to_cancel(new_qty: BaseCurren
 fn amend_limit_order_qty_with_partial_fill(new_qty: BaseCurrency<i64, DECIMALS>) {
     let mut exchange = mock_exchange_linear();
 
-    assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(100, 0),
-            ask: QuoteCurrency::new(101, 0),
-            timestamp_exchange_ns: 1.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(100, 0),
+                ask: QuoteCurrency::new(101, 0),
+                timestamp_exchange_ns: 1.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
     let order = LimitOrder::new(
         Side::Buy,
         QuoteCurrency::new(100, 0),

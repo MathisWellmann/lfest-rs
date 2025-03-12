@@ -1,4 +1,4 @@
-use super::{account::TAccount, Mon};
+use super::{Mon, account::TAccount};
 use crate::types::MarginCurrency;
 
 /// Asserts that the accounting equation holds true.

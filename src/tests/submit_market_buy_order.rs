@@ -29,14 +29,16 @@ fn submit_market_buy_order_no_position() {
     let mut exchange = mock_exchange_linear();
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
-    assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(100, 0),
-            ask: QuoteCurrency::new(101, 0),
-            timestamp_exchange_ns: 0.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(100, 0),
+                ask: QuoteCurrency::new(101, 0),
+                timestamp_exchange_ns: 0.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
 
     let qty = BaseCurrency::new(5, 0);
     let order = MarketOrder::new(Side::Buy, qty).unwrap();

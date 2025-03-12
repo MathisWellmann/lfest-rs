@@ -8,14 +8,16 @@ fn submit_limit_sell_order_no_position() {
     let mut exchange = mock_exchange_linear();
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
-    assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(99, 0),
-            ask: QuoteCurrency::new(100, 0),
-            timestamp_exchange_ns: 0.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(99, 0),
+                ask: QuoteCurrency::new(100, 0),
+                timestamp_exchange_ns: 0.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
 
     let limit_price = QuoteCurrency::new(100, 0);
     let order = LimitOrder::new(Side::Sell, limit_price, BaseCurrency::new(9, 0)).unwrap();
@@ -118,14 +120,16 @@ fn submit_limit_sell_order_no_position() {
 #[tracing_test::traced_test]
 fn submit_limit_sell_order_no_position_max() {
     let mut exchange = mock_exchange_linear();
-    assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(99, 0),
-            ask: QuoteCurrency::new(100, 0),
-            timestamp_exchange_ns: 0.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(99, 0),
+                ask: QuoteCurrency::new(100, 0),
+                timestamp_exchange_ns: 0.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
 
     let order = LimitOrder::new(
         Side::Sell,

@@ -1,12 +1,12 @@
 use tracing::trace;
 
 use super::{
-    account::TAccount, transaction::Transaction, utils::debug_assert_accounting_equation,
-    AccountId, Mon, TransactionAccounting,
+    AccountId, Mon, TransactionAccounting, account::TAccount, transaction::Transaction,
+    utils::debug_assert_accounting_equation,
 };
 use crate::{
-    types::{Error, MarginCurrency},
     Result,
+    types::{Error, MarginCurrency},
 };
 
 const N_ACCOUNTS: usize = 6;

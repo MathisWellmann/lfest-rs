@@ -178,14 +178,16 @@ fn submit_market_sell_order_turnaround_long() {
     let mut exchange = mock_exchange_linear();
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
-    assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(99, 0),
-            ask: QuoteCurrency::new(100, 0),
-            timestamp_exchange_ns: 0.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(99, 0),
+                ask: QuoteCurrency::new(100, 0),
+                timestamp_exchange_ns: 0.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
 
     // First enter a long position
     let qty = BaseCurrency::new(9, 0);

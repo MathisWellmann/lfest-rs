@@ -3,12 +3,12 @@ use typed_builder::TypedBuilder;
 
 use super::MarketUpdate;
 use crate::{
+    Result,
     order_filters::{
         enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
     },
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side},
     types::{Error, TimestampNs, UserOrderId},
-    Result,
 };
 
 /// A new candle has been created.
@@ -76,6 +76,21 @@ where
             timestamp_exchange_ns,
         })
     }
+
+    #[inline(always)]
+    fn fills_limit_order<UserOrderIdT, BaseOrQuote>(
+        &self,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+    ) -> bool
+    where
+        UserOrderIdT: UserOrderId,
+        BaseOrQuote: Currency<I, D>,
+    {
+        match order.side() {
+            Side::Buy => self.low < order.limit_price(),
+            Side::Sell => self.high > order.limit_price(),
+        }
+    }
 }
 
 impl<I, const D: u8> std::fmt::Display for Candle<I, D>
@@ -106,10 +121,7 @@ where
         debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
 
         // As a simplifying assumption, the order always get executed fully when using candles if the price is right.
-        if match order.side() {
-            Side::Buy => self.low < order.limit_price(),
-            Side::Sell => self.high > order.limit_price(),
-        } {
+        if self.fills_limit_order(order) {
             // Order is executed fully with candles.
             Some(match order.side() {
                 Side::Buy => order.remaining_quantity(),
@@ -167,6 +179,50 @@ macro_rules! candle {
 mod test {
     use super::*;
     use crate::types::{BaseCurrency, ExchangeOrderMeta};
+
+    #[test_case::test_matrix([
+        96, 99, 100, 1000
+    ])]
+    fn candle_update_fills_buy_limit_order(limit_price: i64) {
+        let candle = Candle {
+            bid: QuoteCurrency::<i64, 5>::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            low: QuoteCurrency::new(95, 0),
+            high: QuoteCurrency::new(105, 0),
+            timestamp_exchange_ns: 1.into(),
+        };
+        let new_order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(limit_price, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 1.into());
+        let order = new_order.into_pending(meta);
+        assert!(candle.fills_limit_order(&order));
+    }
+
+    #[test_case::test_matrix([
+        1, 10, 50, 90, 95
+    ])]
+    fn candle_update_fills_buy_limit_order_not(limit_price: i64) {
+        let candle = Candle {
+            bid: QuoteCurrency::<i64, 5>::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            low: QuoteCurrency::new(95, 0),
+            high: QuoteCurrency::new(105, 0),
+            timestamp_exchange_ns: 1.into(),
+        };
+        let new_order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(limit_price, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 1.into());
+        let order = new_order.into_pending(meta);
+        assert!(!candle.fills_limit_order(&order));
+    }
 
     #[test]
     fn candle_update() {

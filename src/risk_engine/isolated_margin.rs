@@ -78,7 +78,9 @@ where
             position,
         );
 
-        trace!("order_margin: {order_margin:?}, new_order_margin: {new_order_margin:?}, available_wallet_balance: {available_wallet_balance:?}");
+        trace!(
+            "order_margin: {order_margin:?}, new_order_margin: {new_order_margin:?}, available_wallet_balance: {available_wallet_balance:?}"
+        );
         if new_order_margin > available_wallet_balance + order_margin {
             return Err(RiskError::NotEnoughAvailableBalance);
         }
@@ -259,7 +261,7 @@ mod tests {
     use num_traits::One;
 
     use super::*;
-    use crate::{prelude::*, test_fee_maker, test_fee_taker, MockTransactionAccounting, DECIMALS};
+    use crate::{DECIMALS, MockTransactionAccounting, prelude::*, test_fee_maker, test_fee_taker};
 
     #[test]
     fn isolated_margin_exceeds_risk() {

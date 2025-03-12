@@ -1,7 +1,7 @@
 use getset::CopyGetters;
 
 use super::{
-    AccountId, MarginCurrency, Mon, QuoteCurrency, BROKER_MARGIN_ACCOUNT, EXCHANGE_FEE_ACCOUNT,
+    AccountId, BROKER_MARGIN_ACCOUNT, EXCHANGE_FEE_ACCOUNT, MarginCurrency, Mon, QuoteCurrency,
     TREASURY_ACCOUNT, USER_ORDER_MARGIN_ACCOUNT, USER_POSITION_MARGIN_ACCOUNT, USER_WALLET_ACCOUNT,
 };
 

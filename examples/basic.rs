@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use const_decimal::Decimal;
 use lfest::{load_trades_from_csv, prelude::*};
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 use tracing::error;
 
 const DECIMALS: u8 = 4;
@@ -76,7 +76,7 @@ fn main() {
                 QuoteCurrency::convert_from(order_value, exchange.market_state().bid());
             let order = if rng.random() {
                 MarketOrder::new(Side::Sell, order_size).unwrap() // Sell using
-                                                                  // market order
+            // market order
             } else {
                 MarketOrder::new(Side::Buy, order_size).unwrap() // Buy using market order
             };

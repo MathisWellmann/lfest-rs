@@ -2,12 +2,12 @@ use const_decimal::Decimal;
 
 use super::MarketUpdate;
 use crate::{
+    Result,
     order_filters::{
         enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
     },
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency},
     types::{TimestampNs, UserOrderId},
-    Result,
 };
 
 /// An update to the best bid and ask has occured.
@@ -59,7 +59,9 @@ where
         &self,
         _limit_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Option<BaseOrQuote> {
-        unreachable!("This should never be called, because a best bid and ask update can never fill a limit order.");
+        unreachable!(
+            "This should never be called, because a best bid and ask update can never fill a limit order."
+        );
     }
 
     fn validate_market_update(&self, price_filter: &PriceFilter<I, D>) -> Result<()> {

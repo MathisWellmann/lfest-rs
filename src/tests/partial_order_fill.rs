@@ -1,6 +1,6 @@
 use test_case::test_case;
 
-use crate::{mock_exchange_linear, prelude::*, DECIMALS};
+use crate::{DECIMALS, mock_exchange_linear, prelude::*};
 
 #[tracing_test::traced_test]
 #[test_case(QuoteCurrency::new(100, 0), BaseCurrency::new(2, 0), Side::Buy, QuoteCurrency::new(99, 0); "With buy order")]
@@ -13,14 +13,16 @@ fn partial_limit_order_fill(
 ) {
     let mut exchange = mock_exchange_linear();
 
-    assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(100, 0),
-            ask: QuoteCurrency::new(101, 0),
-            timestamp_exchange_ns: 1.into()
-        },)
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(100, 0),
+                ask: QuoteCurrency::new(101, 0),
+                timestamp_exchange_ns: 1.into()
+            },)
+            .unwrap()
+            .is_empty()
+    );
     let order = LimitOrder::new(side, limit_price, qty).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
     assert_eq!(exchange.active_limit_orders().len(), 1);
@@ -39,9 +41,11 @@ fn partial_limit_order_fill(
     let ts = 1;
     let meta = ExchangeOrderMeta::new(0.into(), ts.into());
     let mut order = order.into_pending(meta);
-    assert!(order
-        .fill(qty / BaseCurrency::new(2, 0), ts.into())
-        .is_none());
+    assert!(
+        order
+            .fill(qty / BaseCurrency::new(2, 0), ts.into())
+            .is_none()
+    );
     let expected_order_update = LimitOrderUpdate::PartiallyFilled(order);
     assert_eq!(exec_orders[0], expected_order_update);
 }

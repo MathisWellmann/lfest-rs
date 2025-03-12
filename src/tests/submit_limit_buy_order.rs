@@ -9,14 +9,16 @@ use crate::{
 #[tracing_test::traced_test]
 fn submit_limit_buy_order_no_position() {
     let mut exchange = mock_exchange_linear();
-    assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(99, 0),
-            ask: QuoteCurrency::new(100, 0),
-            timestamp_exchange_ns: 0.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(99, 0),
+                ask: QuoteCurrency::new(100, 0),
+                timestamp_exchange_ns: 0.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
 
     let limit_price = QuoteCurrency::new(98, 0);
     let qty = BaseCurrency::new(5, 0);
@@ -55,14 +57,16 @@ fn submit_limit_buy_order_no_position() {
     );
     let bid = QuoteCurrency::new(96, 0);
     let ask = QuoteCurrency::new(99, 0);
-    assert!(exchange
-        .update_state(&Bba {
-            bid,
-            ask,
-            timestamp_exchange_ns: 1.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid,
+                ask,
+                timestamp_exchange_ns: 1.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
     let mut accounting = InMemoryTransactionAccounting::new(QuoteCurrency::new(1000, 0));
     let init_margin_req = Decimal::one();
     assert_eq!(
@@ -98,14 +102,16 @@ fn submit_limit_buy_order_no_position() {
     .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
-    assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(96, 0),
-            ask: QuoteCurrency::new(97, 0),
-            timestamp_exchange_ns: 2.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(96, 0),
+                ask: QuoteCurrency::new(97, 0),
+                timestamp_exchange_ns: 2.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
 
     let ts: TimestampNs = 1.into();
     let meta = ExchangeOrderMeta::new(1.into(), ts);
@@ -133,14 +139,16 @@ fn submit_limit_buy_order_no_position() {
 #[tracing_test::traced_test]
 fn submit_limit_buy_order_no_position_max() {
     let mut exchange = mock_exchange_linear();
-    assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(100, 0),
-            ask: QuoteCurrency::new(101, 0),
-            timestamp_exchange_ns: 0.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(100, 0),
+                ask: QuoteCurrency::new(101, 0),
+                timestamp_exchange_ns: 0.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
 
     let order = LimitOrder::new(
         Side::Buy,
@@ -198,14 +206,16 @@ fn submit_limit_buy_order_with_long() {
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(99, 0);
     let ask = QuoteCurrency::new(100, 0);
-    assert!(exchange
-        .update_state(&Bba {
-            bid,
-            ask,
-            timestamp_exchange_ns: 0.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid,
+                ask,
+                timestamp_exchange_ns: 0.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
     let qty = BaseCurrency::new(9, 0);
     let order = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
@@ -293,14 +303,16 @@ fn submit_limit_buy_order_with_short() {
     let mut exchange = mock_exchange_linear();
     let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
-    assert!(exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(100, 0),
-            ask: QuoteCurrency::new(101, 0),
-            timestamp_exchange_ns: 0.into()
-        })
-        .unwrap()
-        .is_empty());
+    assert!(
+        exchange
+            .update_state(&Bba {
+                bid: QuoteCurrency::new(100, 0),
+                ask: QuoteCurrency::new(101, 0),
+                timestamp_exchange_ns: 0.into()
+            })
+            .unwrap()
+            .is_empty()
+    );
     let order = MarketOrder::new(Side::Sell, BaseCurrency::new(9, 0)).unwrap();
     exchange.submit_market_order(order).unwrap();
 
