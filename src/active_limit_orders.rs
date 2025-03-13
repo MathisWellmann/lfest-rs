@@ -231,4 +231,23 @@ mod tests {
         assert_eq!(alo.len(), 3);
         assert!(alo.insert(order_1).is_err());
     }
+
+    #[test]
+    fn active_limit_orders_display() {
+        let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::new(3);
+        let order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let order = order.into_pending(meta);
+        alo.insert(order.clone()).unwrap();
+
+        assert_eq!(
+            &alo.to_string(),
+            "ActiveLimitOrders:\nuser_id: NoUserOrderId, limit Buy 5.00000 Base @ 100.00000 Quote, state: Pending { meta: ExchangeOrderMeta { id: OrderId(0), ts_ns_exchange_received: TimestampNs(0) }, filled_quantity: Unfilled }\n"
+        );
+    }
 }

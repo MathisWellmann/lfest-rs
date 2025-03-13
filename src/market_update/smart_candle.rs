@@ -206,12 +206,12 @@ mod tests {
 
     use super::*;
     use crate::{
+        prelude::MarketState,
         types::{BaseCurrency, ExchangeOrderMeta, LimitOrder},
         utils::NoUserOrderId,
     };
 
-    #[test]
-    fn smart_candle_no_buys() {
+    fn mock_smart_candle() -> SmartCandle<i64, 5, BaseCurrency<i64, 5>> {
         let trades = &[Trade {
             timestamp_exchange_ns: 1.into(),
             price: QuoteCurrency::<i64, 5>::new(100, 0),
@@ -231,19 +231,37 @@ mod tests {
             Decimal::try_from_scaled(5, 1).unwrap(),
         )
         .unwrap();
-        let smart_candle = SmartCandle::new(trades, bba, &pf);
+        SmartCandle::new(trades, bba, &pf)
+    }
 
+    #[test]
+    fn smart_candle_update_market_state() {
+        let smart_candle = mock_smart_candle();
+        let mut state = MarketState::default();
+        smart_candle.update_market_state(&mut state);
+        assert_eq!(state.bid(), QuoteCurrency::new(100, 0));
+        assert_eq!(state.ask(), QuoteCurrency::new(101, 0));
+    }
+
+    #[test]
+    fn smart_candle_no_buys() {
+        let smart_candle = mock_smart_candle();
         assert_eq!(
             smart_candle,
             SmartCandle {
                 aggregate_buy_volume: Vec::new(),
                 aggregate_sell_volume: vec![(QuoteCurrency::new(100, 0), BaseCurrency::new(1, 0))],
-                bba,
+                bba: Bba {
+                    bid: QuoteCurrency::new(100, 0),
+                    ask: QuoteCurrency::new(101, 0),
+                    timestamp_exchange_ns: 1.into(),
+                },
                 last_timestamp_exchange_ns: 1.into(),
                 high: QuoteCurrency::new(100, 0),
                 low: QuoteCurrency::new(100, 0)
             }
-        )
+        );
+        assert_eq!(smart_candle.timestamp_exchange_ns(), 1.into());
     }
 
     #[test]

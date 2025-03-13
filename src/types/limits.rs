@@ -3,7 +3,7 @@ use getset::CopyGetters;
 use super::{ConfigError, Error};
 
 /// Defines the maximum order message rates, e.g.: limits order submission to 10 per second.
-#[derive(Debug, Clone, CopyGetters, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, CopyGetters, Serialize, Deserialize)]
 pub struct OrderRateLimits {
     /// How many orders can be submitted per second.
     #[getset(get_copy = "pub")]

@@ -222,6 +222,24 @@ mod tests {
         OrderMargin::assert_limit_order_update_reduces_qty(&active_order, &updated_order);
     }
 
+    #[test]
+    #[should_panic]
+    fn order_margin_assert_limit_order_reduces_qty_panic() {
+        let new_active_order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 1.into());
+        let order_0 = new_active_order.into_pending(meta);
+
+        let mut order_1 = order_0.clone();
+        order_1.fill(BaseCurrency::new(1, 0), 1.into());
+
+        OrderMargin::assert_limit_order_update_reduces_qty(&order_1, &order_0);
+    }
+
     #[test_case::test_matrix(
         [1, 2, 5]
     )]
