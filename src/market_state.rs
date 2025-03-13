@@ -40,7 +40,7 @@ impl<I: Mon<D>, const D: u8> std::fmt::Display for MarketState<I, D> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "bid: {}, ask: {}, ts_ns: {}, step: {}",
+            "MarketState( bid: {}, ask: {}, ts_ns: {}, step: {} )",
             self.bid, self.ask, self.current_ts_ns, self.step
         )
     }
@@ -103,5 +103,19 @@ where
             current_ts_ns,
             step,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn market_state_display() {
+        let state = MarketState::<i64, 1>::default();
+        assert_eq!(
+            &state.to_string(),
+            "MarketState( bid: 0.0 Quote, ask: 0.0 Quote, ts_ns: 0, step: 0 )"
+        );
     }
 }

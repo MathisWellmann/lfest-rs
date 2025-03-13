@@ -26,6 +26,7 @@ pub use order_update::LimitOrderUpdate;
 pub use re_pricing::RePricing;
 pub use side::Side;
 pub use smol_currency::{BaseCurrency, Currency, MarginCurrency, Mon, QuoteCurrency};
+pub(crate) use timestamp_ns::NANOS_PER_SECOND;
 pub use timestamp_ns::TimestampNs;
 
 /// Natural Logarithmic Returns newtype wrapping a borrowed slice of generic floats.

@@ -102,7 +102,9 @@ where
             &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         >,
     ) -> BaseOrQuote::PairedCurrency {
+        debug_assert!(init_margin_req > Decimal::zero());
         debug_assert!(init_margin_req <= Decimal::one());
+
         trace!(
             "order_margin_internal: position: {position:?}, active_limit_orders: {active_limit_orders:?}"
         );

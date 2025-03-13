@@ -293,6 +293,7 @@ mod test {
         assert!(!v.is_one());
         let v = QuoteCurrency::<i64, 5>::new(1, 0);
         assert!(v.is_one());
+        assert_eq!(Into::<f64>::into(v), 1_f64);
         let v = QuoteCurrency::<i64, 5>::new(8, 0);
         assert_eq!(v.rem(QuoteCurrency::new(5, 0)), QuoteCurrency::new(3, 0));
         assert_eq!(v.div(QuoteCurrency::new(2, 0)), QuoteCurrency::new(4, 0));

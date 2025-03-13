@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 
 use const_decimal::Decimal;
 use getset::{CopyGetters, Getters};
+use num::One;
 use num_traits::{Signed, Zero};
 use tracing::{debug, trace};
 
@@ -84,7 +85,10 @@ where
         trace!("new position: qty {quantity} @ {entry_price}");
         assert!(quantity > BaseOrQuote::zero());
         assert!(entry_price > QuoteCurrency::zero());
+        debug_assert!(init_margin_req > Decimal::zero());
+        debug_assert!(init_margin_req <= Decimal::one());
 
+        // TODO: single function which computes this across the codebase.
         let margin =
             BaseOrQuote::PairedCurrency::convert_from(quantity, entry_price) * init_margin_req;
         let transaction =
@@ -101,7 +105,7 @@ where
     }
 
     /// The cost of the position.
-    #[inline]
+    #[inline(always)]
     pub fn total_cost(&self) -> BaseOrQuote::PairedCurrency {
         BaseOrQuote::PairedCurrency::convert_from(self.quantity, self.entry_price)
     }
@@ -109,6 +113,7 @@ where
     /// Return the positions unrealized profit and loss
     /// denoted in QUOTE when using linear futures,
     /// denoted in BASE when using inverse futures
+    #[inline(always)]
     pub fn unrealized_pnl(
         &self,
         mark_to_market_price: QuoteCurrency<I, D>,
@@ -234,7 +239,7 @@ mod tests {
     use num_traits::One;
 
     use super::*;
-    use crate::{DECIMALS, prelude::*, test_fee_maker};
+    use crate::{DECIMALS, MockTransactionAccounting, prelude::*, test_fee_maker};
 
     #[test_case::test_matrix([1, 2, 5])]
     fn position_inner_new(leverage: u8) {
@@ -511,5 +516,21 @@ mod tests {
             fees,
         );
         assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
+    }
+
+    #[test]
+    fn position_inner_display() {
+        let mut acc = MockTransactionAccounting::default();
+        let pos = PositionInner::new(
+            BaseCurrency::<i64, 1>::new(5, 1),
+            QuoteCurrency::new(100, 0),
+            &mut acc,
+            Decimal::try_from_scaled(1, 0).unwrap(),
+            QuoteCurrency::new(1, 1),
+        );
+        assert_eq!(
+            &pos.to_string(),
+            "PositionInner( quantity: 0.5 Base, outstanding_fees: 0.1 Quote)"
+        );
     }
 }

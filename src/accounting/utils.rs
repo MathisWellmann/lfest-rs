@@ -24,3 +24,23 @@ pub(crate) fn debug_assert_accounting_equation<I, const D: u8, BaseOrQuote>(
         "The accounting balance has been violated"
     );
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::types::BaseCurrency;
+
+    #[test]
+    fn test_accounting_equation() {
+        debug_assert_accounting_equation(&[TAccount::<i64, 1, BaseCurrency<_, 1>>::default(); 5]);
+        debug_assert_accounting_equation(&[TAccount::<i32, 1, BaseCurrency<_, 1>>::default(); 5]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_accounting_equation_panic() {
+        let mut accounts = [TAccount::default()];
+        accounts[0].post_credit(BaseCurrency::<i64, 1>::new(5, 0));
+        debug_assert_accounting_equation(&accounts);
+    }
+}

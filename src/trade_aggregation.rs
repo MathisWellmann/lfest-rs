@@ -59,6 +59,10 @@ mod test {
             5.0
         );
         assert_eq!(trade.price(), 100.0);
+        assert_eq!(
+            <Trade<i64, 5, BaseCurrency<i64, 5>> as TakerTrade>::price(&trade),
+            100.0
+        );
         assert_eq!(trade.timestamp(), 1_i64);
 
         let t: trade_aggregation::Trade = trade.into();

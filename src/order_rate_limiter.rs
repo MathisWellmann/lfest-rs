@@ -1,7 +1,5 @@
 use crate::types::{Error, TimestampNs};
 
-const NANOS_PER_SECOND: i64 = 1_000_000_000;
-
 /// Limits the rate at which limit orders can be submitted.
 /// Operates on buckets measured in seconds.
 #[derive(Clone, Debug)]
@@ -30,15 +28,14 @@ impl OrderRateLimiter {
             current_ts_ns >= self.bucket_start_ns,
             "Timestamps are assumed to always increment. Here we don't additionally check for the lower bound of the bucket."
         );
-        let bucket_end_ts_ns = self.bucket_start_ns + NANOS_PER_SECOND.into();
+        let bucket_end_ts_ns = self.bucket_start_ns + crate::types::NANOS_PER_SECOND.into();
         current_ts_ns < bucket_end_ts_ns
     }
 
     /// Set the new bucket start timestamp by rounding to the nearest second.
     #[inline(always)]
     fn new_bucket(&mut self, current_ts_ns: TimestampNs) {
-        let ns = *current_ts_ns.as_ref();
-        self.bucket_start_ns = (ns - ns % NANOS_PER_SECOND).into();
+        self.bucket_start_ns = current_ts_ns.floor_to_nearest_second();
         self.remaining = self.orders_per_second;
     }
 
