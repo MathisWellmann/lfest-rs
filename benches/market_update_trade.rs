@@ -1,3 +1,4 @@
+//! Benchmark the `update_state` method of `Exchange` for `TradeEvent`
 use std::hint::black_box;
 
 use const_decimal::Decimal;

@@ -217,7 +217,7 @@ where
                 if filled_quantity == self.remaining_quantity {
                     self.remaining_quantity -= filled_quantity;
                     return Some(LimitOrder {
-                        user_order_id: self.user_order_id.clone(),
+                        user_order_id: self.user_order_id,
                         state: Filled::new(
                             self.state.meta().clone(),
                             ts_ns,
@@ -250,7 +250,7 @@ where
 
                 if self.remaining_quantity.is_zero() {
                     return Some(LimitOrder {
-                        user_order_id: self.user_order_id.clone(),
+                        user_order_id: self.user_order_id,
                         state: Filled::new(meta, ts_ns, price, *cumulative_qty),
                         limit_price: self.limit_price,
                         remaining_quantity: BaseOrQuote::zero(),

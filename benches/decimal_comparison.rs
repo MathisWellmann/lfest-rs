@@ -1,3 +1,5 @@
+//! Compare the crates providing decimal implementations.
+
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use fpdec::{Dec, Decimal};
 use lfest::prelude::*;

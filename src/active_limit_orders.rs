@@ -29,9 +29,9 @@ where
     UserOrderIdT: UserOrderId,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ActiveLimitOrders:\n")?;
+        writeln!(f, "ActiveLimitOrders:")?;
         for order in self.arena.iter() {
-            write!(f, "{order}\n")?;
+            writeln!(f, "{order}")?;
         }
         Ok(())
     }
@@ -68,6 +68,7 @@ where
     /// If we did not have this key present, `Ok(None)` is returned.
     /// If we did have this key present, the value is updated, and the old value is returned.
     #[inline]
+    #[allow(clippy::type_complexity)]
     pub(crate) fn insert(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
@@ -117,13 +118,10 @@ where
         &mut self,
         order_id: OrderId,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        let Some(pos) = self
+        let pos = self
             .arena
             .iter_mut()
-            .position(|order| order.id() == order_id)
-        else {
-            return None;
-        };
+            .position(|order| order.id() == order_id)?;
         Some(self.arena.swap_remove(pos))
     }
 
@@ -134,13 +132,10 @@ where
         &mut self,
         user_order_id: UserOrderIdT,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        let Some(pos) = self
+        let pos = self
             .arena
             .iter_mut()
-            .position(|order| order.user_order_id() == user_order_id)
-        else {
-            return None;
-        };
+            .position(|order| order.user_order_id() == user_order_id)?;
         Some(self.arena.swap_remove(pos))
     }
 

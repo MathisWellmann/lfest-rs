@@ -72,12 +72,14 @@ where
     pub(crate) fn remove(&mut self, by: CancelBy<UserOrderIdT>) {
         match by {
             CancelBy::OrderId(order_id) => {
-                self.active_limit_orders
+                let _ = self
+                    .active_limit_orders
                     .remove_by_order_id(order_id)
                     .expect("Its an internal method call; it must work");
             }
             CancelBy::UserOrderId(user_order_id) => {
-                self.active_limit_orders
+                let _ = self
+                    .active_limit_orders
                     .remove_by_user_order_id(user_order_id)
                     .expect("Its an internal method call; it must work");
             }

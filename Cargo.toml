@@ -1,5 +1,3 @@
-cargo-features = ["edition2024"]
-
 [package]
 name = "lfest"
 version = "0.103.0"
@@ -12,6 +10,15 @@ readme = "README.md"
 keywords = ["exchange", "trading", "simulation", "backest", "leverage"]
 categories = ["finance", "simulation"]
 exclude = ["/img", "/data", "/.idea", "/vendor", "/.direnv"]
+
+[lints.rust]
+missing_docs = "warn"
+unused_imports = "deny"
+dead_code = "deny"
+unsafe_code = "deny"
+
+[lints.clippy]
+all = "deny"
 
 [dependencies]
 tracing = { version = "0.1", features = ["release_max_level_info"] }

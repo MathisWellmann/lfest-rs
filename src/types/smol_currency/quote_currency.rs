@@ -264,13 +264,13 @@ where
     }
 }
 
-impl<I, const D: u8> Into<f64> for QuoteCurrency<I, D>
+impl<I, const D: u8> From<QuoteCurrency<I, D>> for f64
 where
     I: Mon<D>,
 {
     #[inline]
-    fn into(self) -> f64 {
-        self.0.to_f64()
+    fn from(val: QuoteCurrency<I, D>) -> Self {
+        val.0.to_f64()
     }
 }
 
