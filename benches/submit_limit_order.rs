@@ -1,3 +1,5 @@
+//! Benchmark the submission of limit orders.
+
 use std::hint::black_box;
 
 use const_decimal::Decimal;
@@ -32,7 +34,7 @@ fn submit_limit_orders<U>(
         starting_balance,
         200,
         contract_spec,
-        OrderRateLimits::default(),
+        OrderRateLimits::new(n as _).unwrap(),
     )
     .unwrap();
     let mut exchange = Exchange::<

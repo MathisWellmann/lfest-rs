@@ -1,3 +1,5 @@
+//! Benchmark the submission of limit orders.
+
 use std::hint::black_box;
 
 use const_decimal::Decimal;
@@ -29,45 +31,45 @@ fn submit_market_orders<I, const D: u8, BaseOrQuote, U>(
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let starting_balance = BaseCurrency::new(100000, 0);
-    let contract_spec = ContractSpecification::new(
-        leverage!(1),
-        Decimal::try_from_scaled(5, 1).unwrap(),
-        PriceFilter::new(
-            None,
-            None,
-            QuoteCurrency::new(5, 1),
-            Decimal::TWO,
-            Decimal::try_from_scaled(5, 1).unwrap(),
-        )
-        .expect("is valid filter"),
-        QuantityFilter::new(None, None, QuoteCurrency::new(1, 2)).expect("is valid filter"),
-        Fee::from(Decimal::try_from_scaled(2, 1).unwrap()),
-        Fee::from(Decimal::try_from_scaled(6, 1).unwrap()),
-    )
-    .expect("works");
-    let config = Config::new(
-        starting_balance,
-        200,
-        contract_spec,
-        OrderRateLimits::default(),
-    )
-    .unwrap();
-    let mut exchange = Exchange::new(config);
-    exchange
-        .update_state(&Bba {
-            bid: QuoteCurrency::new(100, 0),
-            ask: QuoteCurrency::new(101, 0),
-            timestamp_exchange_ns: 0.into(),
-        })
-        .expect("is valid market update");
-
     let order = MarketOrder::new(Side::Buy, QuoteCurrency::new(1, 2)).unwrap();
     let mut group = c.benchmark_group("submit_market_order");
     const N: usize = 1_000;
     group.throughput(criterion::Throughput::Elements(N as u64));
     group.bench_function(&format!("submit_market_order_{N}"), |b| {
         b.iter(|| {
+            let starting_balance = BaseCurrency::new(100000, 0);
+            let contract_spec = ContractSpecification::new(
+                leverage!(1),
+                Decimal::try_from_scaled(5, 1).unwrap(),
+                PriceFilter::new(
+                    None,
+                    None,
+                    QuoteCurrency::new(5, 1),
+                    Decimal::TWO,
+                    Decimal::try_from_scaled(5, 1).unwrap(),
+                )
+                .expect("is valid filter"),
+                QuantityFilter::new(None, None, QuoteCurrency::new(1, 2)).expect("is valid filter"),
+                Fee::from(Decimal::try_from_scaled(2, 1).unwrap()),
+                Fee::from(Decimal::try_from_scaled(6, 1).unwrap()),
+            )
+            .expect("works");
+            let config = Config::new(
+                starting_balance,
+                200,
+                contract_spec,
+                OrderRateLimits::new(u16::MAX).unwrap(),
+            )
+            .unwrap();
+            let mut exchange = Exchange::new(config);
+            exchange
+                .update_state(&Bba {
+                    bid: QuoteCurrency::new(100, 0),
+                    ask: QuoteCurrency::new(101, 0),
+                    timestamp_exchange_ns: 0.into(),
+                })
+                .expect("is valid market update");
+
             submit_market_orders::<
                 i64,
                 DECIMALS,
