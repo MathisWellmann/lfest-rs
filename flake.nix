@@ -37,7 +37,7 @@
               cargo-semver-checks
               cargo-mutants
               cargo-outdated
-              # cargo-tarpaulin # Code coverage
+              cargo-tarpaulin # Code coverage
               taplo
             ];
           };

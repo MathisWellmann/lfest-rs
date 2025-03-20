@@ -17,6 +17,8 @@ procs:
     shell: "cargo doc"
   cargo-mutants:
     shell: "cargo mutants"
+  cargo-tarpaulin:
+    shell: "cargo tarpaulin --target-dir target/tarpaulin"
   taplo:
     shell: "taplo fmt"
   semver-checks:
