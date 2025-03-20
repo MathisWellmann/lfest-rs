@@ -109,6 +109,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::{prelude::Bba, types::BaseCurrency};
 
     #[test]
     fn market_state_display() {
@@ -117,5 +118,22 @@ mod test {
             &state.to_string(),
             "MarketState( bid: 0.0 Quote, ask: 0.0 Quote, ts_ns: 0, step: 0 )"
         );
+    }
+
+    #[test]
+    fn market_state_mid_price() {
+        let mut state = MarketState::<i64, 1>::default();
+        let pf = PriceFilter::default();
+        state
+            .update_state::<_, BaseCurrency<_, 1>>(
+                &Bba {
+                    bid: QuoteCurrency::<i64, 1>::new(100, 0),
+                    ask: QuoteCurrency::new(101, 0),
+                    timestamp_exchange_ns: 1.into(),
+                },
+                &pf,
+            )
+            .unwrap();
+        assert_eq!(state.mid_price(), QuoteCurrency::new(1005, 1));
     }
 }

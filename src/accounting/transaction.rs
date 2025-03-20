@@ -6,7 +6,7 @@ use super::{
 };
 
 /// A transaction involves two parties.
-#[derive(Clone, CopyGetters)]
+#[derive(Clone, CopyGetters, Debug)]
 pub struct Transaction<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
@@ -21,7 +21,7 @@ where
     _quote: std::marker::PhantomData<QuoteCurrency<I, D>>,
 }
 
-impl<I, const D: u8, BaseOrQuote> std::fmt::Debug for Transaction<I, D, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> std::fmt::Display for Transaction<I, D, BaseOrQuote>
 where
     I: Mon<D>,
     BaseOrQuote: MarginCurrency<I, D>,
@@ -29,7 +29,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "debit_account_id: {}, credit_account_id: {}, amount: {}",
+            "Transaction( debit_account_id: {}, credit_account_id: {}, amount: {} )",
             account_from_int(self.debit_account_id),
             account_from_int(self.credit_account_id),
             self.amount
@@ -55,7 +55,6 @@ where
     I: Mon<D>,
     BaseOrQuote: MarginCurrency<I, D>,
 {
-    #[tracing::instrument(level = "trace")]
     pub(crate) fn new(
         debit_account_id: AccountId,
         credit_account_id: AccountId,
@@ -75,5 +74,20 @@ where
             amount,
             _quote: std::marker::PhantomData,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::types::BaseCurrency;
+
+    #[test]
+    fn transaction_display() {
+        let t = Transaction::new(0, 1, BaseCurrency::<i64, 1>::new(5, 0));
+        assert_eq!(
+            &t.to_string(),
+            "Transaction( debit_account_id: USER_WALLET_ACCOUNT, credit_account_id: USER_ORDER_MARGIN_ACCOUNT, amount: 5.0 Base )"
+        );
     }
 }

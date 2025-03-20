@@ -224,6 +224,50 @@ mod test {
         assert!(!candle.fills_limit_order(&order));
     }
 
+    #[test_case::test_matrix([
+        1, 10, 94, 95, 96, 104
+    ])]
+    fn candle_update_fills_sell_limit_order(limit_price: i64) {
+        let candle = Candle {
+            bid: QuoteCurrency::<i64, 5>::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            low: QuoteCurrency::new(95, 0),
+            high: QuoteCurrency::new(105, 0),
+            timestamp_exchange_ns: 1.into(),
+        };
+        let new_order = LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(limit_price, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 1.into());
+        let order = new_order.into_pending(meta);
+        assert!(candle.fills_limit_order(&order));
+    }
+
+    #[test_case::test_matrix([
+        105, 110, 1000
+    ])]
+    fn candle_update_fills_sell_limit_order_not(limit_price: i64) {
+        let candle = Candle {
+            bid: QuoteCurrency::<i64, 5>::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            low: QuoteCurrency::new(95, 0),
+            high: QuoteCurrency::new(105, 0),
+            timestamp_exchange_ns: 1.into(),
+        };
+        let new_order = LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(limit_price, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 1.into());
+        let order = new_order.into_pending(meta);
+        assert!(!candle.fills_limit_order(&order));
+    }
+
     #[test]
     fn candle_update() {
         let candle = Candle {

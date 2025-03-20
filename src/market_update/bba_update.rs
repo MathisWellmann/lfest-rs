@@ -28,7 +28,7 @@ where
 
 impl<I: Mon<D>, const D: u8> Bba<I, D> {
     /// The mid price between the bid and ask.
-    #[inline]
+    #[inline(always)]
     pub fn mid_price(&self) -> QuoteCurrency<I, D> {
         (self.bid + self.ask) / Decimal::TWO
     }
