@@ -91,6 +91,14 @@ where
         Ok(None)
     }
 
+    /// Get the first stored limit order, if any.
+    #[inline(always)]
+    pub fn get_first(
+        &self,
+    ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+        self.arena.first()
+    }
+
     /// Get a `LimitOrder` by the given `OrderId` if any.
     /// Optimized to be fast for small number of active limit orders.
     #[inline]
