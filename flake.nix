@@ -28,6 +28,20 @@
             targets = ["x86_64-unknown-linux-gnu"];
           }
         );
+        cargo_upgrades = pkgs.rustPlatform.buildRustPackage {
+          name = "cargo-upgrades";
+          src = builtins.fetchGit {
+            url = "https://gitlab.com/kornelski/cargo-upgrades";
+            rev = "95e1d282dd165c69f0eb4dc66a09db5265734f54";
+          };
+          useFetchCargoVendor = true;
+          cargoHash = "sha256-yEUfWe4/kSvBPx3xneff45+K3Gix2QXDjUesm+psUxI=";
+          doCheck = false; # Tests fail at the current revision.
+          meta = {
+            description = "Check for outdated dependencies in a cargo workspace";
+            homepage = "https://gitlab.com/kornelski/cargo-upgrades";
+          };
+        };
       in
         with pkgs; {
           devShells.default = mkShell {
@@ -36,7 +50,7 @@
               rust
               cargo-semver-checks
               cargo-mutants
-              cargo-outdated
+              cargo_upgrades
               cargo-tarpaulin # Code coverage
               taplo
             ];

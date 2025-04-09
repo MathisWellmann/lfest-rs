@@ -35,7 +35,7 @@ const-decimal = { git = "https://github.com/OliverNChalk/const-decimal", feature
 ], version = "0.3.0" }
 distrs = "0.2"
 num-traits = "0.2"
-typed-builder = "0.20"
+typed-builder = "0.21"
 getset = "0.1.2"
 sliding_features = "6"
 assert2 = "0.3"
@@ -50,7 +50,7 @@ rand = "0.9"
 rand_distr = "0.5"
 test-case = "3"
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
-ron = "0.8"
+ron = "0.10"
 criterion = "0.5"
 # fpdec = { version = "0.10", features = ["serde-as-str", "num-traits"] }
 fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs", rev = "40cf802", features = [
