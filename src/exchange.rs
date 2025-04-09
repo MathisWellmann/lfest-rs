@@ -598,21 +598,18 @@ where
                     )
                 );
 
-                if let Some(filled_order) =
-                    order.fill(filled_qty, market_update.timestamp_exchange_ns())
-                {
+                let limit_order_update =
+                    order.fill(filled_qty, market_update.timestamp_exchange_ns());
+                if let LimitOrderUpdate::FullyFilled { .. } = limit_order_update {
                     self.ids_to_remove.push(order.state().meta().id());
                     self.order_margin.remove(CancelBy::OrderId(order.id()));
-                    self.limit_order_updates
-                        .push(LimitOrderUpdate::FullyFilled(filled_order));
                 } else {
                     debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
-                    self.limit_order_updates
-                        .push(LimitOrderUpdate::PartiallyFilled(order.clone()));
                     self.order_margin
                         .update(order)
                         .expect("Can update an existing order");
                 }
+                self.limit_order_updates.push(limit_order_update);
 
                 let value =
                     BaseOrQuote::PairedCurrency::convert_from(filled_qty, order.limit_price());

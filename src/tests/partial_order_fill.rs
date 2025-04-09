@@ -41,11 +41,14 @@ fn partial_limit_order_fill(
     let ts = 1;
     let meta = ExchangeOrderMeta::new(0.into(), ts.into());
     let mut order = order.into_pending(meta);
-    assert!(
-        order
-            .fill(qty / BaseCurrency::new(2, 0), ts.into())
-            .is_none()
-    );
-    let expected_order_update = LimitOrderUpdate::PartiallyFilled(order);
+    assert!(matches!(
+        order.fill(qty / BaseCurrency::new(2, 0), ts.into()),
+        LimitOrderUpdate::PartiallyFilled { .. }
+    ));
+    let expected_order_update = LimitOrderUpdate::PartiallyFilled {
+        fill_price: limit_price,
+        filled_quantity: qty / BaseCurrency::new(2, 0),
+        order_after_fill: order,
+    };
     assert_eq!(exec_orders[0], expected_order_update);
 }

@@ -40,10 +40,7 @@ fn submit_limit_buy_order_no_position() {
     let ts = 0;
     let meta = ExchangeOrderMeta::new(0.into(), ts.into());
     let mut order = order.into_pending(meta);
-    let filled_order = order
-        .fill(order.remaining_quantity(), ts.into())
-        .expect("Order is fully filled.");
-    let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
+    let expected_order_update = order.fill(order.remaining_quantity(), ts.into());
     assert_eq!(
         exchange
             .update_state(&Trade {
@@ -116,10 +113,7 @@ fn submit_limit_buy_order_no_position() {
     let ts: TimestampNs = 1.into();
     let meta = ExchangeOrderMeta::new(1.into(), ts);
     let mut order = order.into_pending(meta);
-    let filled_order = order
-        .fill(order.remaining_quantity(), 3.into())
-        .expect("order is filled with this.");
-    let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
+    let expected_order_update = order.fill(order.remaining_quantity(), 3.into());
     assert_eq!(
         exchange
             .update_state(&Trade {
@@ -279,10 +273,7 @@ fn submit_limit_buy_order_with_long() {
 
     let meta = ExchangeOrderMeta::new(2.into(), 1.into());
     let mut order = order.into_pending(meta);
-    let filled_order = order
-        .fill(order.remaining_quantity(), 2.into())
-        .expect("order is fully filled");
-    let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
+    let expected_order_update = order.fill(order.remaining_quantity(), 2.into());
     assert_eq!(
         exchange
             .update_state(&Trade {
@@ -366,10 +357,7 @@ fn submit_limit_buy_order_with_short() {
 
     let meta = ExchangeOrderMeta::new(2.into(), 0.into());
     let mut order = order.into_pending(meta);
-    let filled_order = order
-        .fill(order.remaining_quantity(), 1.into())
-        .expect("Order is filled with this.");
-    let expected_order_update = LimitOrderUpdate::FullyFilled(filled_order);
+    let expected_order_update = order.fill(order.remaining_quantity(), 1.into());
     assert_eq!(
         exchange
             .update_state(&Trade {

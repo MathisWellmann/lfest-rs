@@ -507,7 +507,14 @@ mod tests {
 
         // Now partially fill the order
         let filled_qty = qty / BaseCurrency::new(2, 0);
-        assert!(order.fill(filled_qty, 0.into()).is_none());
+        assert!(matches!(
+            order.fill(filled_qty, 0.into()),
+            LimitOrderUpdate::PartiallyFilled {
+                filled_quantity: filled_qty,
+                fill_price: limit_price,
+                ..
+            }
+        ));
         order_margin.update(&order).unwrap();
 
         let remaining_qty = order.remaining_quantity();
