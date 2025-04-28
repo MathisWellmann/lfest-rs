@@ -16,16 +16,23 @@ where
     BaseOrQuote: Currency<I, D>,
 {
     /// The highest price seen during the candle.
+    #[getset(get_copy = "pub")]
     high: QuoteCurrency<I, D>,
+
     /// The lowest price seen during the candle.
+    #[getset(get_copy = "pub")]
     low: QuoteCurrency<I, D>,
+
     /// Each price level contains the cumulative buy quantities of all higher price levels and the current one.
     aggregate_buy_volume: Vec<(QuoteCurrency<I, D>, BaseOrQuote)>,
+
     // Each price level contains the cumulative sell quanties of all lower price levels and the current one.
     aggregate_sell_volume: Vec<(QuoteCurrency<I, D>, BaseOrQuote)>,
+
     /// The best bid and ask information
     #[getset(get_copy = "pub")]
     bba: Bba<I, D>,
+
     /// The last timestamp in nanoseconds
     #[getset(get_copy = "pub")]
     last_timestamp_exchange_ns: TimestampNs,
