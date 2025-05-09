@@ -21,7 +21,7 @@ where
     OrderStatus: Clone,
 {
     /// Order Id provided by the user, can be any type really.
-    #[getset(get = "pub")]
+    #[getset(get_copy = "pub")]
     user_order_id: UserOrderIdT,
 
     /// Whether its a buy or sell order.
