@@ -29,3 +29,23 @@ where
 
 /// The identifier of an account in the accounting infrastructure.
 pub(crate) type AccountId = usize;
+
+// No-Op implementation which can be useful sometimes.
+impl<I, const D: u8, BaseOrQuote> TransactionAccounting<I, D, BaseOrQuote> for ()
+where
+    I: Mon<D>,
+    BaseOrQuote: MarginCurrency<I, D>,
+{
+    fn new(_user_starting_wallet_balance: BaseOrQuote) -> Self {}
+
+    fn create_margin_transfer(
+        &mut self,
+        _transaction: Transaction<I, D, BaseOrQuote>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    fn margin_balance_of(&self, _account: AccountId) -> Result<BaseOrQuote> {
+        Ok(BaseOrQuote::zero())
+    }
+}
