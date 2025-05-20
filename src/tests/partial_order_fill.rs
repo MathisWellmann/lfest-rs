@@ -43,9 +43,9 @@ fn partial_limit_order_fill(
     let mut order = order.into_pending(meta);
     assert!(matches!(
         order.fill(qty / BaseCurrency::new(2, 0), ts.into()),
-        LimitOrderUpdate::PartiallyFilled { .. }
+        LimitOrderFill::PartiallyFilled { .. }
     ));
-    let expected_order_update = LimitOrderUpdate::PartiallyFilled {
+    let expected_order_update = LimitOrderFill::PartiallyFilled {
         fill_price: limit_price,
         filled_quantity: qty / BaseCurrency::new(2, 0),
         order_after_fill: order,

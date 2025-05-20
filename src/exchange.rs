@@ -18,8 +18,8 @@ use crate::{
     },
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     types::{
-        Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderUpdate, MarginCurrency,
-        MarketOrder, NewOrder, OrderId, Pending, Result, Side, UserBalances, UserOrderId,
+        Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderFill, MarginCurrency, MarketOrder,
+        NewOrder, OrderId, Pending, Result, Side, UserBalances, UserOrderId,
     },
     utils::assert_user_wallet_balance,
 };
@@ -91,7 +91,7 @@ where
     order_margin: OrderMargin<I, D, BaseOrQuote, UserOrderIdT>,
 
     // To avoid allocations in hot-paths
-    limit_order_updates: Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderIdT>>,
+    limit_order_updates: Vec<LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT>>,
     ids_to_remove: Vec<OrderId>,
 
     order_rate_limiter: OrderRateLimiter,
@@ -162,7 +162,7 @@ where
     pub fn update_state<U>(
         &mut self,
         market_update: &U,
-    ) -> Result<&Vec<LimitOrderUpdate<I, D, BaseOrQuote, UserOrderIdT>>>
+    ) -> Result<&Vec<LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT>>>
     where
         U: MarketUpdate<I, D, BaseOrQuote>,
     {
@@ -600,7 +600,7 @@ where
 
                 let limit_order_update =
                     order.fill(filled_qty, market_update.timestamp_exchange_ns());
-                if let LimitOrderUpdate::FullyFilled { .. } = limit_order_update {
+                if let LimitOrderFill::FullyFilled { .. } = limit_order_update {
                     self.ids_to_remove.push(order.state().meta().id());
                     self.order_margin.remove(CancelBy::OrderId(order.id()));
                 } else {

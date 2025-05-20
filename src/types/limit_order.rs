@@ -2,7 +2,7 @@ use getset::{CopyGetters, Getters, Setters};
 use num_traits::Zero;
 
 use super::{
-    Currency, Filled, FilledQuantity, LimitOrderUpdate, MarginCurrency, Mon, OrderId, Pending,
+    Currency, Filled, FilledQuantity, LimitOrderFill, MarginCurrency, Mon, OrderId, Pending,
     QuoteCurrency, RePricing, TimestampNs, UserOrderId, order_meta::ExchangeOrderMeta,
     order_status::NewOrder,
 };
@@ -194,7 +194,7 @@ where
         &mut self,
         filled_quantity: BaseOrQuote,
         ts_ns: TimestampNs,
-    ) -> LimitOrderUpdate<I, D, BaseOrQuote, UserOrderIdT> {
+    ) -> LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT> {
         debug_assert!(
             filled_quantity <= self.remaining_quantity,
             "The filled quantity can not be greater than the limit order quantity"
@@ -223,7 +223,7 @@ where
                         side: self.side,
                         re_pricing: self.re_pricing,
                     };
-                    return LimitOrderUpdate::FullyFilled {
+                    return LimitOrderFill::FullyFilled {
                         fill_price,
                         filled_quantity,
                         order_after_fill,
@@ -256,7 +256,7 @@ where
                         side: self.side,
                         re_pricing: self.re_pricing,
                     };
-                    return LimitOrderUpdate::FullyFilled {
+                    return LimitOrderFill::FullyFilled {
                         fill_price,
                         filled_quantity,
                         order_after_fill,
@@ -265,7 +265,7 @@ where
             }
         };
 
-        LimitOrderUpdate::PartiallyFilled {
+        LimitOrderFill::PartiallyFilled {
             fill_price,
             filled_quantity,
             order_after_fill: self.clone(),
@@ -344,7 +344,7 @@ mod tests {
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
 
         let mut order = order.into_pending(meta.clone());
-        let LimitOrderUpdate::FullyFilled {
+        let LimitOrderFill::FullyFilled {
             fill_price,
             filled_quantity,
             order_after_fill,
@@ -377,7 +377,7 @@ mod tests {
         let mut order = order.into_pending(meta.clone());
         assert!(matches!(
             order.fill(qty, 0.into()),
-            LimitOrderUpdate::PartiallyFilled {
+            LimitOrderFill::PartiallyFilled {
                 fill_price: limit_price,
                 filled_quantity: qty,
                 ..

@@ -509,7 +509,7 @@ mod tests {
         let filled_qty = qty / BaseCurrency::new(2, 0);
         assert!(matches!(
             order.fill(filled_qty, 0.into()),
-            LimitOrderUpdate::PartiallyFilled {
+            LimitOrderFill::PartiallyFilled {
                 filled_quantity: filled_qty,
                 fill_price: limit_price,
                 ..

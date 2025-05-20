@@ -4,7 +4,7 @@ use super::{Currency, Filled, LimitOrder, Mon, Pending, QuoteCurrency, UserOrder
 
 /// Contains the possible updates to limit orders.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum LimitOrderUpdate<I, const D: u8, BaseOrQuote, UserOrderIdT>
+pub enum LimitOrderFill<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D> + Display,
     BaseOrQuote: Currency<I, D> + Display,
@@ -31,7 +31,7 @@ where
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> std::fmt::Display
-    for LimitOrderUpdate<I, D, BaseOrQuote, UserOrderIdT>
+    for LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D> + Display,
     BaseOrQuote: Currency<I, D> + Display,
@@ -39,7 +39,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LimitOrderUpdate::PartiallyFilled {
+            LimitOrderFill::PartiallyFilled {
                 fill_price,
                 filled_quantity,
                 order_after_fill,
@@ -47,7 +47,7 @@ where
                 f,
                 "PartiallyFilled( fill_price: {fill_price}, filled_quantity: {filled_quantity}, order_after_fill: {order_after_fill})"
             ),
-            LimitOrderUpdate::FullyFilled {
+            LimitOrderFill::FullyFilled {
                 fill_price,
                 filled_quantity,
                 order_after_fill,

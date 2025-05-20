@@ -81,8 +81,7 @@ where
     }
 
     /// Change a position while doing proper accounting and balance transfers.
-    #[tracing::instrument(level = "debug")]
-    pub(crate) fn change_position<Acc>(
+    pub fn change_position<Acc>(
         &mut self,
         filled_qty: BaseOrQuote,
         fill_price: QuoteCurrency<I, D>,

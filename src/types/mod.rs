@@ -22,7 +22,7 @@ pub use market_order::MarketOrder;
 pub use order_id::OrderId;
 pub use order_meta::ExchangeOrderMeta;
 pub use order_status::{Filled, FilledQuantity, NewOrder, Pending};
-pub use order_update::LimitOrderUpdate;
+pub use order_update::LimitOrderFill;
 pub use re_pricing::RePricing;
 pub use side::Side;
 pub use smol_currency::{BaseCurrency, Currency, MarginCurrency, Mon, QuoteCurrency};
