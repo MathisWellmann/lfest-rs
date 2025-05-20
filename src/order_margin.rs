@@ -221,7 +221,8 @@ mod tests {
         let active_order = new_active_order.into_pending(meta);
 
         let mut updated_order = active_order.clone();
-        updated_order.fill(BaseCurrency::new(1, 0), 1.into());
+        let fee = QuoteCurrency::new(0, 0);
+        updated_order.fill(BaseCurrency::new(1, 0), fee, 1.into());
 
         OrderMargin::assert_limit_order_update_reduces_qty(&active_order, &updated_order);
     }
@@ -239,7 +240,8 @@ mod tests {
         let order_0 = new_active_order.into_pending(meta);
 
         let mut order_1 = order_0.clone();
-        order_1.fill(BaseCurrency::new(1, 0), 1.into());
+        let fee = QuoteCurrency::new(0, 0);
+        order_1.fill(BaseCurrency::new(1, 0), fee, 1.into());
 
         OrderMargin::assert_limit_order_update_reduces_qty(&order_1, &order_0);
     }
@@ -490,8 +492,8 @@ mod tests {
     fn order_margin_neutral_update_partial_fills(
         leverage: u8,
         side: Side,
-        limit_price: i32,
-        qty: i32,
+        limit_price: i64,
+        qty: i64,
     ) {
         let mut order_margin = OrderMargin::<_, DECIMALS, _, NoUserOrderId>::new(10);
 
@@ -507,14 +509,20 @@ mod tests {
 
         // Now partially fill the order
         let filled_qty = qty / BaseCurrency::new(2, 0);
-        assert!(matches!(
-            order.fill(filled_qty, 0.into()),
+        let fee = QuoteCurrency::convert_from(filled_qty, limit_price) * *test_fee_maker().as_ref();
+        match order.fill(filled_qty, fee, 0.into()) {
             LimitOrderFill::PartiallyFilled {
-                filled_quantity: filled_qty,
-                fill_price: limit_price,
-                ..
+                fill_price,
+                filled_quantity,
+                fee: f,
+                order_after_fill: _,
+            } => {
+                assert_eq!(fill_price, limit_price);
+                assert_eq!(filled_quantity, filled_qty);
+                assert_eq!(f, fee);
             }
-        ));
+            LimitOrderFill::FullyFilled { .. } => panic!("Expected `PartiallyFilled`"),
+        }
         order_margin.update(&order).unwrap();
 
         let remaining_qty = order.remaining_quantity();

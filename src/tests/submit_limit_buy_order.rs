@@ -40,7 +40,7 @@ fn submit_limit_buy_order_no_position() {
     let ts = 0;
     let meta = ExchangeOrderMeta::new(0.into(), ts.into());
     let mut order = order.into_pending(meta);
-    let expected_order_update = order.fill(order.remaining_quantity(), ts.into());
+    let expected_order_update = order.fill(order.remaining_quantity(), fee, ts.into());
     assert_eq!(
         exchange
             .update_state(&Trade {
@@ -98,6 +98,8 @@ fn submit_limit_buy_order_no_position() {
     )
     .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
+    let fee = QuoteCurrency::convert_from(order.remaining_quantity(), order.limit_price())
+        * *test_fee_maker().as_ref();
 
     assert!(
         exchange
@@ -113,7 +115,8 @@ fn submit_limit_buy_order_no_position() {
     let ts: TimestampNs = 1.into();
     let meta = ExchangeOrderMeta::new(1.into(), ts);
     let mut order = order.into_pending(meta);
-    let expected_order_update = order.fill(order.remaining_quantity(), 3.into());
+    let fee = QuoteCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
+    let expected_order_update = order.fill(order.remaining_quantity(), fee, 3.into());
     assert_eq!(
         exchange
             .update_state(&Trade {
@@ -270,10 +273,12 @@ fn submit_limit_buy_order_with_long() {
     )
     .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
+    let f = QuoteCurrency::convert_from(order.remaining_quantity(), order.limit_price())
+        * *test_fee_maker().as_ref();
 
     let meta = ExchangeOrderMeta::new(2.into(), 1.into());
     let mut order = order.into_pending(meta);
-    let expected_order_update = order.fill(order.remaining_quantity(), 2.into());
+    let expected_order_update = order.fill(order.remaining_quantity(), f, 2.into());
     assert_eq!(
         exchange
             .update_state(&Trade {
@@ -354,10 +359,12 @@ fn submit_limit_buy_order_with_short() {
     )
     .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
+    let fee = QuoteCurrency::convert_from(order.remaining_quantity(), order.limit_price())
+        * *test_fee_maker().as_ref();
 
     let meta = ExchangeOrderMeta::new(2.into(), 0.into());
     let mut order = order.into_pending(meta);
-    let expected_order_update = order.fill(order.remaining_quantity(), 1.into());
+    let expected_order_update = order.fill(order.remaining_quantity(), fee, 1.into());
     assert_eq!(
         exchange
             .update_state(&Trade {

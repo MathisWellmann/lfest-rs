@@ -598,8 +598,12 @@ where
                     )
                 );
 
+                let value =
+                    BaseOrQuote::PairedCurrency::convert_from(filled_qty, order.limit_price());
+                let fee = value * *self.config.contract_spec().fee_maker().as_ref();
+
                 let limit_order_update =
-                    order.fill(filled_qty, market_update.timestamp_exchange_ns());
+                    order.fill(filled_qty, fee, market_update.timestamp_exchange_ns());
                 if let LimitOrderFill::FullyFilled { .. } = limit_order_update {
                     self.ids_to_remove.push(order.state().meta().id());
                     self.order_margin.remove(CancelBy::OrderId(order.id()));
@@ -611,16 +615,13 @@ where
                 }
                 self.limit_order_updates.push(limit_order_update);
 
-                let value =
-                    BaseOrQuote::PairedCurrency::convert_from(filled_qty, order.limit_price());
-                let fees = value * *self.config.contract_spec().fee_maker().as_ref();
                 self.position.change_position(
                     filled_qty,
                     order.limit_price(),
                     order.side(),
                     &mut self.transaction_accounting,
                     self.config.contract_spec().init_margin_req(),
-                    fees,
+                    fee,
                 );
 
                 let new_order_margin = self.order_margin.order_margin(

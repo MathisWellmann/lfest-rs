@@ -1,6 +1,6 @@
 use test_case::test_case;
 
-use crate::{DECIMALS, mock_exchange_linear, prelude::*};
+use crate::{DECIMALS, mock_exchange_linear, prelude::*, test_fee_maker};
 
 #[tracing_test::traced_test]
 #[test_case(QuoteCurrency::new(100, 0), BaseCurrency::new(2, 0), Side::Buy, QuoteCurrency::new(99, 0); "With buy order")]
@@ -41,13 +41,16 @@ fn partial_limit_order_fill(
     let ts = 1;
     let meta = ExchangeOrderMeta::new(0.into(), ts.into());
     let mut order = order.into_pending(meta);
+    let fill_qty = qty / BaseCurrency::new(2, 0);
+    let f = QuoteCurrency::convert_from(fill_qty, order.limit_price()) * *test_fee_maker().as_ref();
     assert!(matches!(
-        order.fill(qty / BaseCurrency::new(2, 0), ts.into()),
+        order.fill(fill_qty, f, ts.into()),
         LimitOrderFill::PartiallyFilled { .. }
     ));
     let expected_order_update = LimitOrderFill::PartiallyFilled {
         fill_price: limit_price,
         filled_quantity: qty / BaseCurrency::new(2, 0),
+        fee: f,
         order_after_fill: order,
     };
     assert_eq!(exec_orders[0], expected_order_update);

@@ -16,6 +16,8 @@ where
         fill_price: QuoteCurrency<I, D>,
         /// The quantity that was filled in the event.
         filled_quantity: BaseOrQuote,
+        /// The fee is proportional to the traded quantity and the price.
+        fee: BaseOrQuote::PairedCurrency,
         /// The order state after it was filled.
         order_after_fill: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     },
@@ -25,6 +27,8 @@ where
         fill_price: QuoteCurrency<I, D>,
         /// The quantity that was filled in the event.
         filled_quantity: BaseOrQuote,
+        /// The fee is proportional to the traded quantity and the price.
+        fee: BaseOrQuote::PairedCurrency,
         /// The order state after it was filled.
         order_after_fill: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>,
     },
@@ -42,18 +46,20 @@ where
             LimitOrderFill::PartiallyFilled {
                 fill_price,
                 filled_quantity,
+                fee,
                 order_after_fill,
             } => write!(
                 f,
-                "PartiallyFilled( fill_price: {fill_price}, filled_quantity: {filled_quantity}, order_after_fill: {order_after_fill})"
+                "PartiallyFilled( fill_price: {fill_price}, filled_quantity: {filled_quantity}, fee: {fee}, order_after_fill: {order_after_fill})"
             ),
             LimitOrderFill::FullyFilled {
                 fill_price,
                 filled_quantity,
+                fee,
                 order_after_fill,
             } => write!(
                 f,
-                "FullyFilled( fill_price: {fill_price}, filled_quantity: {filled_quantity}, order_after_fill: {order_after_fill})"
+                "FullyFilled( fill_price: {fill_price}, filled_quantity: {filled_quantity}, fee: {fee}, order_after_fill: {order_after_fill})"
             ),
         }
     }

@@ -28,9 +28,9 @@ fn submit_limit_sell_order_no_position() {
     // Now fill the order
     let meta = ExchangeOrderMeta::new(0.into(), 0.into());
     let mut order = order.into_pending(meta);
-    let expected_order_update = order.fill(order.remaining_quantity(), 1.into()) else {
-        panic!("Order must be fully filled");
-    };
+    let fee = QuoteCurrency::convert_from(order.remaining_quantity(), order.limit_price())
+        * *test_fee_maker().as_ref();
+    let expected_order_update = order.fill(order.remaining_quantity(), fee, 1.into());
     assert_eq!(
         exchange
             .update_state(&Trade {
@@ -87,7 +87,9 @@ fn submit_limit_sell_order_no_position() {
 
     let meta = ExchangeOrderMeta::new(1.into(), 2.into());
     let mut order = order.into_pending(meta);
-    let expected_order_update = order.fill(order.remaining_quantity(), 3.into());
+    let fee = QuoteCurrency::convert_from(order.remaining_quantity(), order.limit_price())
+        * *test_fee_maker().as_ref();
+    let expected_order_update = order.fill(order.remaining_quantity(), fee, 3.into());
     assert_eq!(
         exchange
             .update_state(&Trade {

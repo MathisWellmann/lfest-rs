@@ -42,6 +42,7 @@ impl<I, const D: u8> QuoteCurrency<I, D>
 where
     I: Mon<D>,
 {
+    // TODO: return `Result`
     /// Create a new instance from an `integer` and a `scale`.
     pub fn new(integer: I, scale: u8) -> Self {
         Self(Decimal::try_from_scaled(integer, scale).expect("Make sure the inputs are correct."))
