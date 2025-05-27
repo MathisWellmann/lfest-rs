@@ -2,7 +2,7 @@ use crate::{
     market_state::MarketState,
     order_margin::OrderMargin,
     prelude::{Currency, Mon, Position, QuoteCurrency, RiskError},
-    types::{LimitOrder, MarginCurrency, MarketOrder, Pending, UserOrderId},
+    types::{Balances, LimitOrder, MarginCurrency, MarketOrder, Pending, UserOrderId},
 };
 
 pub(crate) trait RiskEngine<I, const D: u8, BaseOrQuote, UserOrderIdT>
@@ -29,10 +29,9 @@ where
     fn check_market_order(
         &self,
         position: &Position<I, D, BaseOrQuote>,
-        position_margin: BaseOrQuote::PairedCurrency,
         order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
-        available_wallet_balance: BaseOrQuote::PairedCurrency,
+        balances: &mut Balances<I, D, BaseOrQuote::PairedCurrency>,
     ) -> Result<(), RiskError>;
 
     /// Checks if the account it able to satisfy the margin requirements for a new limit order.

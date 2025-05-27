@@ -37,13 +37,8 @@ fn main() {
         OrderRateLimits::default(),
     )
     .unwrap();
-    let mut exchange = Exchange::<
-        i64,
-        DECIMALS,
-        QuoteCurrency<i64, DECIMALS>,
-        NoUserOrderId,
-        InMemoryTransactionAccounting<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
-    >::new(config);
+    let mut exchange =
+        Exchange::<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>, NoUserOrderId>::new(config);
 
     // load trades from csv file
     let prices = Vec::from_iter(
@@ -70,8 +65,8 @@ fn main() {
 
         if i % 100 == 0 {
             // Trade a fraction of the available wallet balance
-            let order_value = exchange.user_balances().available_wallet_balance
-                * Decimal::try_from_scaled(1, 1).unwrap();
+            let order_value =
+                exchange.balances().available * Decimal::try_from_scaled(1, 1).unwrap();
             let order_size =
                 QuoteCurrency::convert_from(order_value, exchange.market_state().bid());
             let order = if rng.random() {

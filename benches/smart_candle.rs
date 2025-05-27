@@ -1,3 +1,5 @@
+//! Benchmark the `SmartCandle`
+
 use const_decimal::Decimal;
 use criterion::{Criterion, criterion_group, criterion_main};
 use lfest::{load_trades_from_csv, prelude::*};
@@ -31,13 +33,10 @@ fn criterion_benchmark(c: &mut Criterion) {
         OrderRateLimits::default(),
     )
     .unwrap();
-    let mut exchange = Exchange::<
-        DecimalT,
-        DECIMALS,
-        QuoteCurrency<DecimalT, DECIMALS>,
-        NoUserOrderId,
-        InMemoryTransactionAccounting<DecimalT, DECIMALS, BaseCurrency<DecimalT, DECIMALS>>,
-    >::new(config);
+    let mut exchange =
+        Exchange::<DecimalT, DECIMALS, QuoteCurrency<DecimalT, DECIMALS>, NoUserOrderId>::new(
+            config,
+        );
 
     let trades = load_trades_from_csv("./data/Bitmex_XBTUSD_1M.csv");
     const COUNT: usize = 1_000_000;

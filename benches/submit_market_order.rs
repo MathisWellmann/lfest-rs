@@ -9,13 +9,7 @@ use lfest::prelude::*;
 const DECIMALS: u8 = 5;
 
 fn submit_market_orders<I, const D: u8, BaseOrQuote, U>(
-    exchange: &mut Exchange<
-        I,
-        D,
-        BaseOrQuote,
-        NoUserOrderId,
-        InMemoryTransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
-    >,
+    exchange: &mut Exchange<I, D, BaseOrQuote, NoUserOrderId>,
     order: &MarketOrder<I, D, BaseOrQuote, NoUserOrderId, NewOrder>,
     n: usize,
 ) where

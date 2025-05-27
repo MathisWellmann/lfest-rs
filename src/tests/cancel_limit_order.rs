@@ -27,17 +27,14 @@ fn cancel_limit_order() {
         &expected_order
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(900, 0),
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(900, 0),
             position_margin: QuoteCurrency::zero(),
             order_margin: QuoteCurrency::new(100, 0),
-            _q: std::marker::PhantomData
+            total_fees_paid: QuoteCurrency::zero(),
+            _i: std::marker::PhantomData
         }
-    );
-    assert_eq!(
-        exchange.position().outstanding_fees(),
-        QuoteCurrency::zero()
     );
 
     exchange
@@ -45,12 +42,13 @@ fn cancel_limit_order() {
         .unwrap();
     assert!(exchange.active_limit_orders().is_empty());
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(1000, 0),
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(1000, 0),
             position_margin: QuoteCurrency::zero(),
             order_margin: QuoteCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: QuoteCurrency::zero(),
+            _i: std::marker::PhantomData
         }
     );
     let invalid_id: OrderId = 0.into();

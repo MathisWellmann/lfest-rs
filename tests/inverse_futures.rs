@@ -1,15 +1,13 @@
 //! Test file for the inverse futures mode of the exchange
 
-use lfest::{
-    MockTransactionAccounting, mock_exchange_inverse, prelude::*, test_fee_maker, test_fee_taker,
-};
+use lfest::{mock_exchange_inverse, prelude::*, test_fee_maker, test_fee_taker};
 use num_traits::{One, Zero};
 
 #[test]
 #[tracing_test::traced_test]
 fn inv_long_market_win_full() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::new(1, 0));
-    let mut accounting = MockTransactionAccounting::default();
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
         .update_state(&Bba {
@@ -19,7 +17,7 @@ fn inv_long_market_win_full() {
         })
         .unwrap();
 
-    let value = exchange.user_balances().available_wallet_balance * BaseCurrency::new(8, 1);
+    let value = exchange.balances().available * BaseCurrency::new(8, 1);
     let size = QuoteCurrency::convert_from(value, exchange.market_state().ask());
     let o = MarketOrder::new(Side::Buy, size).unwrap();
     exchange.submit_market_order(o).unwrap();
@@ -44,9 +42,9 @@ fn inv_long_market_win_full() {
         Position::Long(PositionInner::new(
             size,
             bid,
-            &mut accounting,
             init_margin_req,
             fees,
+            &mut balances,
         ))
     );
     assert_eq!(
@@ -54,15 +52,15 @@ fn inv_long_market_win_full() {
         BaseCurrency::zero()
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(2, 1),
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(2, 1),
             position_margin: BaseCurrency::new(8, 1),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fees,
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), fee_1);
 
     let bid = QuoteCurrency::new(2000, 0);
     let ask = QuoteCurrency::new(2001, 0);
@@ -96,12 +94,13 @@ fn inv_long_market_win_full() {
         BaseCurrency::zero()
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(14, 1) - fee_1 - fee_base2,
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(14, 1) - fee_1 - fee_base2,
             position_margin: BaseCurrency::zero(),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fees + fee_base2,
+            _i: std::marker::PhantomData
         }
     );
 }
@@ -110,7 +109,7 @@ fn inv_long_market_win_full() {
 #[tracing_test::traced_test]
 fn inv_long_market_loss_full() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut accounting = MockTransactionAccounting::default();
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(999, 0);
     let ask = QuoteCurrency::new(1000, 0);
@@ -134,9 +133,9 @@ fn inv_long_market_loss_full() {
         Position::Long(PositionInner::new(
             qty,
             entry_price,
-            &mut accounting,
             init_margin_req,
             fees,
+            &mut balances,
         ))
     );
     assert_eq!(
@@ -146,15 +145,15 @@ fn inv_long_market_loss_full() {
         BaseCurrency::new(0, 0)
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(2, 1),
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(2, 1),
             position_margin: BaseCurrency::new(8, 1),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fees,
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), fees);
 
     let bid = QuoteCurrency::new(800, 0);
     let ask = QuoteCurrency::new(801, 0);
@@ -191,12 +190,13 @@ fn inv_long_market_loss_full() {
         BaseCurrency::zero()
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(8, 1) - fee_combined,
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(8, 1) - fee_combined,
             position_margin: BaseCurrency::zero(),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee_combined,
+            _i: std::marker::PhantomData
         }
     );
 }
@@ -205,9 +205,8 @@ fn inv_long_market_loss_full() {
 #[tracing_test::traced_test]
 fn inv_short_market_win_full() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut accounting = MockTransactionAccounting::default();
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
-    let fee_taker = exchange.config().contract_spec().fee_taker();
     let bid = QuoteCurrency::new(1000, 0);
     assert!(
         exchange
@@ -221,7 +220,6 @@ fn inv_short_market_win_full() {
     );
 
     let qty = QuoteCurrency::new(800, 0);
-    let fee0 = BaseCurrency::convert_from(qty, bid) * *fee_taker.as_ref();
     let o = MarketOrder::new(Side::Sell, qty).unwrap();
     exchange.submit_market_order(o).unwrap();
 
@@ -232,21 +230,21 @@ fn inv_short_market_win_full() {
         Position::Short(PositionInner::new(
             qty,
             entry_price,
-            &mut accounting,
             init_margin_req,
             fees,
+            &mut balances,
         ))
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(2, 1),
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(2, 1),
             position_margin: BaseCurrency::new(8, 1),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fees,
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), fee0);
 
     assert!(
         exchange
@@ -295,12 +293,13 @@ fn inv_short_market_win_full() {
         BaseCurrency::zero()
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(12, 1) - fee_combined,
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(12, 1) - fee_combined,
             position_margin: BaseCurrency::zero(),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee_combined,
+            _i: std::marker::PhantomData
         }
     );
 }
@@ -309,7 +308,7 @@ fn inv_short_market_win_full() {
 #[tracing_test::traced_test]
 fn inv_short_market_loss_full() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut accounting = MockTransactionAccounting::default();
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(
         exchange
@@ -346,9 +345,9 @@ fn inv_short_market_loss_full() {
         Position::Short(PositionInner::new(
             size,
             ask,
-            &mut accounting,
             init_margin_req,
             fees,
+            &mut balances,
         ))
     );
     assert_eq!(
@@ -358,15 +357,15 @@ fn inv_short_market_loss_full() {
         BaseCurrency::zero()
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(6, 1),
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(6, 1),
             position_margin: BaseCurrency::new(4, 1),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fees,
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), fees);
 
     assert_eq!(
         exchange.update_state(&Bba {
@@ -379,12 +378,13 @@ fn inv_short_market_loss_full() {
 
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(79964, 5),
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(79964, 5),
             position_margin: BaseCurrency::zero(),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fees,
+            _i: std::marker::PhantomData
         }
     );
 }
@@ -393,7 +393,7 @@ fn inv_short_market_loss_full() {
 #[tracing_test::traced_test]
 fn inv_long_market_win_partial() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut accounting = MockTransactionAccounting::default();
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let order_updates = exchange
         .update_state(&Bba {
@@ -426,9 +426,9 @@ fn inv_long_market_win_partial() {
         Position::Long(PositionInner::new(
             size,
             bid,
-            &mut accounting,
             init_margin_req,
-            fee_0
+            fee_0,
+            &mut balances,
         ))
     );
     assert_eq!(
@@ -436,15 +436,15 @@ fn inv_long_market_win_partial() {
         BaseCurrency::zero()
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(2, 1),
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(2, 1),
             position_margin: BaseCurrency::new(8, 1),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee_0,
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), fee_0);
 
     assert!(
         exchange
@@ -493,12 +493,13 @@ fn inv_long_market_win_partial() {
         BaseCurrency::new(2, 1)
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(8, 1) - fee_0 - fee_1,
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(8, 1) - fee_0 - fee_1,
             position_margin: BaseCurrency::new(4, 1),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee_0 + fee_1,
+            _i: std::marker::PhantomData
         }
     );
 }
@@ -507,7 +508,7 @@ fn inv_long_market_win_partial() {
 #[tracing_test::traced_test]
 fn inv_long_market_loss_partial() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut accounting = MockTransactionAccounting::default();
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(999, 0);
     let ask = QuoteCurrency::new(1000, 0);
@@ -541,9 +542,9 @@ fn inv_long_market_loss_partial() {
         Position::Long(PositionInner::new(
             qty,
             entry_price,
-            &mut accounting,
             init_margin_req,
             fee,
+            &mut balances,
         ))
     );
 
@@ -585,7 +586,6 @@ fn inv_long_market_loss_partial() {
         QuoteCurrency::new(1000, 0)
     );
     assert_eq!(exchange.position().total_cost(), BaseCurrency::new(4, 1));
-    assert_eq!(exchange.position().outstanding_fees(), BaseCurrency::zero());
     assert_eq!(
         exchange
             .position()
@@ -593,12 +593,13 @@ fn inv_long_market_loss_partial() {
         BaseCurrency::new(-1, 1)
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(5, 1) - fee_0 - fee_1,
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(5, 1) - fee_0 - fee_1,
             position_margin: BaseCurrency::new(4, 1),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee + fee_1,
+            _i: std::marker::PhantomData
         }
     );
 }
@@ -607,7 +608,7 @@ fn inv_long_market_loss_partial() {
 #[tracing_test::traced_test]
 fn inv_short_market_win_partial() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut accounting = MockTransactionAccounting::default();
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(1000, 0);
     let _ = exchange
@@ -638,9 +639,9 @@ fn inv_short_market_win_partial() {
         Position::Short(PositionInner::new(
             qty,
             QuoteCurrency::new(1000, 0),
-            &mut accounting,
             init_margin_req,
             fee_0,
+            &mut balances,
         ))
     );
     assert_eq!(
@@ -648,15 +649,15 @@ fn inv_short_market_win_partial() {
         BaseCurrency::zero()
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(2, 1),
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(2, 1),
             position_margin: BaseCurrency::new(8, 1),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee_0,
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), fee_0);
 
     let ask = QuoteCurrency::new(800, 0);
     let order_updates = exchange
@@ -695,9 +696,9 @@ fn inv_short_market_win_partial() {
         Position::Short(PositionInner::new(
             QuoteCurrency::new(400, 0),
             QuoteCurrency::new(1000, 0),
-            &mut accounting,
             init_margin_req,
             BaseCurrency::zero(),
+            &mut balances,
         ))
     );
     assert_eq!(
@@ -707,22 +708,22 @@ fn inv_short_market_win_partial() {
         BaseCurrency::new(1, 1)
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(7, 1) - fee_0 - fee_1,
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(7, 1) - fee_0 - fee_1,
             position_margin: BaseCurrency::new(4, 1),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee_0 + fee_1,
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), BaseCurrency::zero());
 }
 
 #[test]
 #[tracing_test::traced_test]
 fn inv_short_market_loss_partial() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut accounting = MockTransactionAccounting::default();
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let order_updates = exchange
         .update_state(&Bba {
@@ -758,9 +759,9 @@ fn inv_short_market_loss_partial() {
         Position::Short(PositionInner::new(
             size,
             ask,
-            &mut accounting,
             init_margin_req,
             fee_base1,
+            &mut balances,
         ))
     );
     assert_eq!(
@@ -768,15 +769,15 @@ fn inv_short_market_loss_partial() {
         BaseCurrency::zero()
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(2, 1),
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(2, 1),
             position_margin: BaseCurrency::new(8, 1),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee_0 + fee_base1,
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), fee_0);
 
     let bid = QuoteCurrency::new(1999, 0);
     let ask = QuoteCurrency::new(2000, 0);
@@ -790,12 +791,13 @@ fn inv_short_market_loss_partial() {
     );
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(59928, 5),
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(59928, 5),
             position_margin: BaseCurrency::zero(),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee_0 + fee_base1,
+            _i: std::marker::PhantomData
         }
     );
 }
@@ -843,12 +845,13 @@ fn inv_test_market_roundtrip() {
         BaseCurrency::zero()
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::one() - BaseCurrency::new(2, 0) * fee0,
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::one() - BaseCurrency::new(2, 0) * fee0,
             position_margin: BaseCurrency::zero(),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee0,
+            _i: std::marker::PhantomData
         }
     );
 }
@@ -857,7 +860,7 @@ fn inv_test_market_roundtrip() {
 #[tracing_test::traced_test]
 fn inv_execute_limit() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut accounting = MockTransactionAccounting::default();
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(1000, 0);
     let ask = QuoteCurrency::new(1001, 0);
@@ -871,16 +874,18 @@ fn inv_execute_limit() {
 
     let limit_price = QuoteCurrency::new(900, 0);
     let qty = QuoteCurrency::new(450, 0);
+    let fee_0 = BaseCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     let o = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.active_limit_orders().len(), 1);
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(5, 1),
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(5, 1),
             position_margin: BaseCurrency::zero(),
             order_margin: BaseCurrency::new(5, 1),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee_0,
+            _i: std::marker::PhantomData
         }
     );
 
@@ -907,27 +912,26 @@ fn inv_execute_limit() {
     assert_eq!(exchange.market_state().bid(), QuoteCurrency::new(750, 0));
     assert_eq!(exchange.market_state().ask(), QuoteCurrency::new(751, 0));
     assert_eq!(exchange.active_limit_orders().len(), 0);
-    let fee_0 = BaseCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(
             qty,
             limit_price,
-            &mut accounting,
             init_margin_req,
             fee_0,
+            &mut balances,
         ))
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(5, 1),
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(5, 1),
             position_margin: BaseCurrency::new(5, 1),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee_0,
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), fee_0);
 
     let limit_price = QuoteCurrency::new(1000, 0);
     let fee_1 = BaseCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
@@ -958,12 +962,13 @@ fn inv_execute_limit() {
     assert_eq!(exchange.active_limit_orders().len(), 0);
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(105, 2) - fee_0 - fee_1,
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(105, 2) - fee_0 - fee_1,
             position_margin: BaseCurrency::zero(),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee_0 + fee_1,
+            _i: std::marker::PhantomData
         }
     );
 
@@ -998,21 +1003,19 @@ fn inv_execute_limit() {
         Position::Short(PositionInner::new(
             qty,
             limit_price,
-            &mut accounting,
             init_margin_req,
-            fee_2
+            fee_2,
+            &mut balances,
         ))
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: BaseCurrency::new(105, 2)
-                - fee_0
-                - fee_1
-                - BaseCurrency::convert_from(qty, limit_price),
+        exchange.balances(),
+        &Balances {
+            available: BaseCurrency::new(105, 2) - fee_0 - fee_1 - fee_2,
             position_margin: BaseCurrency::new(5, 1),
             order_margin: BaseCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee_0 + fee_1 + fee_2,
+            _i: std::marker::PhantomData
         }
     );
 }

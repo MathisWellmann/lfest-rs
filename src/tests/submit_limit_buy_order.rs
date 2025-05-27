@@ -1,9 +1,6 @@
 use const_decimal::Decimal;
 
-use crate::{
-    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, test_fee_maker,
-    test_fee_taker,
-};
+use crate::{mock_exchange_linear, prelude::*, test_fee_maker, test_fee_taker};
 
 #[test]
 #[tracing_test::traced_test]
@@ -27,12 +24,13 @@ fn submit_limit_buy_order_no_position() {
     assert_eq!(exchange.position(), &Position::Neutral);
     let fee = QuoteCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(510, 0),
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(510, 0),
             position_margin: QuoteCurrency::new(0, 0),
             order_margin: QuoteCurrency::new(490, 0),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee,
+            _i: std::marker::PhantomData
         }
     );
 
@@ -64,30 +62,27 @@ fn submit_limit_buy_order_no_position() {
             .unwrap()
             .is_empty()
     );
-    let mut accounting = InMemoryTransactionAccounting::new(QuoteCurrency::new(1000, 0));
+    let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
     let init_margin_req = Decimal::one();
     assert_eq!(
         exchange.position(),
         &Position::Long(PositionInner::new(
             qty,
             limit_price,
-            &mut accounting,
             init_margin_req,
             fee,
+            &mut balances,
         ))
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(510, 0),
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(510, 0),
             position_margin: QuoteCurrency::new(490, 0),
             order_margin: QuoteCurrency::new(0, 0),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee,
+            _i: std::marker::PhantomData
         }
-    );
-    assert_eq!(
-        exchange.position().outstanding_fees(),
-        QuoteCurrency::new(98, 3)
     );
 
     // close the position again with a limit order.
@@ -98,8 +93,6 @@ fn submit_limit_buy_order_no_position() {
     )
     .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
-    let fee = QuoteCurrency::convert_from(order.remaining_quantity(), order.limit_price())
-        * *test_fee_maker().as_ref();
 
     assert!(
         exchange
@@ -199,7 +192,7 @@ fn submit_limit_buy_order_no_position_max() {
 #[tracing_test::traced_test]
 fn submit_limit_buy_order_with_long() {
     let mut exchange = mock_exchange_linear();
-    let mut accounting = MockTransactionAccounting::default();
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(99, 0);
     let ask = QuoteCurrency::new(100, 0);
@@ -223,23 +216,20 @@ fn submit_limit_buy_order_with_long() {
         Position::Long(PositionInner::new(
             BaseCurrency::new(9, 0),
             QuoteCurrency::new(100, 0),
-            &mut accounting,
             init_margin_req,
             fee,
+            &mut balances,
         )),
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(100, 0),
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(100, 0),
             position_margin: QuoteCurrency::new(900, 0),
             order_margin: QuoteCurrency::new(0, 0),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee,
+            _i: std::marker::PhantomData
         }
-    );
-    assert_eq!(
-        exchange.position().outstanding_fees(),
-        QuoteCurrency::new(54, 2)
     );
 
     assert_eq!(
@@ -297,7 +287,7 @@ fn submit_limit_buy_order_with_long() {
 #[test]
 fn submit_limit_buy_order_with_short() {
     let mut exchange = mock_exchange_linear();
-    let mut accounting = MockTransactionAccounting::default();
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(
         exchange
@@ -320,23 +310,20 @@ fn submit_limit_buy_order_with_short() {
         Position::Short(PositionInner::new(
             qty,
             entry_price,
-            &mut accounting,
             init_margin_req,
-            fee
+            fee,
+            &mut balances,
         ))
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(100, 0),
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(100, 0),
             position_margin: QuoteCurrency::new(900, 0),
             order_margin: QuoteCurrency::new(0, 0),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee,
+            _i: std::marker::PhantomData
         }
-    );
-    assert_eq!(
-        exchange.position().outstanding_fees(),
-        QuoteCurrency::new(54, 2)
     );
 
     // Another sell limit order should not work

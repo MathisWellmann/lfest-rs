@@ -1,17 +1,14 @@
 //! Test if a pure limit order strategy works correctly
 
-use lfest::{
-    MockTransactionAccounting, mock_exchange_linear, mock_exchange_linear_with_account_tracker,
-    prelude::*,
-};
+use lfest::{mock_exchange_linear, mock_exchange_linear_with_account_tracker, prelude::*};
 use num_traits::Zero;
 
 #[test]
 #[tracing_test::traced_test]
 fn limit_orders_only() {
     let mut exchange = mock_exchange_linear_with_account_tracker(QuoteCurrency::new(1000, 0));
+    let mut balances = exchange.balances().clone();
 
-    let mut accounting = MockTransactionAccounting::default();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let fee_maker = exchange.config().contract_spec().fee_maker();
 
@@ -31,19 +28,16 @@ fn limit_orders_only() {
     let o = LimitOrder::new(Side::Buy, bid, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(10, 0),
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(10, 0),
             position_margin: QuoteCurrency::zero(),
             order_margin: QuoteCurrency::new(990, 0),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee0,
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(
-        exchange.position().outstanding_fees(),
-        QuoteCurrency::zero()
-    );
-    assert_eq!(exchange.fees_paid(), QuoteCurrency::zero());
+    assert_eq!(exchange.balances().total_fees_paid, QuoteCurrency::zero());
 
     let order_updates = exchange
         .update_state(&Trade {
@@ -67,9 +61,9 @@ fn limit_orders_only() {
         Position::Long(PositionInner::new(
             qty,
             QuoteCurrency::new(100, 0),
-            &mut accounting,
             init_margin_req,
-            fee0
+            fee0,
+            &mut balances,
         ))
     );
     assert_eq!(
@@ -79,15 +73,15 @@ fn limit_orders_only() {
         QuoteCurrency::new(-198, 1)
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(10, 0),
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(10, 0),
             position_margin: QuoteCurrency::new(990, 0),
             order_margin: QuoteCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee0,
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(exchange.position().outstanding_fees(), fee0);
 
     let sell_price = QuoteCurrency::new(105, 0);
     let fee1 = QuoteCurrency::convert_from(qty, sell_price) * *fee_maker.as_ref();
@@ -104,12 +98,13 @@ fn limit_orders_only() {
         .unwrap();
     assert!(!order_updates.is_empty());
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(10495, 1) - fee0 - fee1,
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(10495, 1) - fee0 - fee1,
             position_margin: QuoteCurrency::zero(),
             order_margin: QuoteCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee0 + fee1,
+            _i: std::marker::PhantomData
         }
     );
     let order_updates = exchange
@@ -123,17 +118,21 @@ fn limit_orders_only() {
 
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(10495, 1)
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(10495, 1)
                 - QuoteCurrency::new(198, 3)
                 - QuoteCurrency::new(2079, 4),
             position_margin: QuoteCurrency::zero(),
             order_margin: QuoteCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: QuoteCurrency::new(4059, 4),
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(exchange.fees_paid(), QuoteCurrency::new(4059, 4));
+    assert_eq!(
+        exchange.balances().total_fees_paid,
+        QuoteCurrency::new(4059, 4)
+    );
 }
 
 #[test]

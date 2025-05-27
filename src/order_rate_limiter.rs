@@ -39,7 +39,7 @@ impl OrderRateLimiter {
         self.remaining = self.orders_per_second;
     }
 
-    /// Aquire a single permit for a new order related action.
+    /// Acquire a single permit for a new order related action.
     /// returns `true` if the rate limit has been reached.
     #[inline(always)]
     pub(crate) fn aquire(&mut self, current_ts_ns: TimestampNs) -> crate::Result<()> {

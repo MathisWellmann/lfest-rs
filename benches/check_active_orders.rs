@@ -1,3 +1,5 @@
+//! Benchmark regarding checking of active limit orders.
+
 use std::hint::black_box;
 
 use const_decimal::Decimal;
@@ -38,13 +40,10 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut ts_s = 0;
     for n in [1, 2, 3, 5, 10, 100] {
         group.bench_function(&format!("{n}"), |b| {
-            let mut exchange = Exchange::<
-                i64,
-                DECIMALS,
-                QuoteCurrency<i64, DECIMALS>,
-                NoUserOrderId,
-                InMemoryTransactionAccounting<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>,
-            >::new(config.clone());
+            let mut exchange =
+                Exchange::<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>, NoUserOrderId>::new(
+                    config.clone(),
+                );
             let bba = Bba {
                 bid: QuoteCurrency::new(100, 0),
                 ask: QuoteCurrency::new(101, 0),

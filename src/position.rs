@@ -5,8 +5,8 @@ use num_traits::Zero;
 
 use crate::{
     position_inner::PositionInner,
-    prelude::{Currency, Mon, QuoteCurrency, TransactionAccounting, USER_POSITION_MARGIN_ACCOUNT},
-    types::{MarginCurrency, Side},
+    prelude::{Currency, Mon, QuoteCurrency},
+    types::{Balances, MarginCurrency, Side},
 };
 
 /// A futures position can be one of three variants.
@@ -53,15 +53,6 @@ where
         }
     }
 
-    /// Get the outstanding fees of the position that will be payed when reducing the position.
-    pub fn outstanding_fees(&self) -> BaseOrQuote::PairedCurrency {
-        match self {
-            Position::Neutral => BaseOrQuote::PairedCurrency::zero(),
-            Position::Long(inner) => inner.outstanding_fees(),
-            Position::Short(inner) => inner.outstanding_fees(),
-        }
-    }
-
     /// The entry price of the position which is the total cost of the position relative to its quantity.
     pub fn entry_price(&self) -> QuoteCurrency<I, D> {
         match self {
@@ -81,17 +72,15 @@ where
     }
 
     /// Change a position while doing proper accounting and balance transfers.
-    pub fn change_position<Acc>(
+    pub fn change_position(
         &mut self,
         filled_qty: BaseOrQuote,
         fill_price: QuoteCurrency<I, D>,
         side: Side,
-        transaction_accounting: &mut Acc,
         init_margin_req: Decimal<I, D>,
         fees: BaseOrQuote::PairedCurrency,
-    ) where
-        Acc: TransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
-    {
+        balances: &mut Balances<I, D, BaseOrQuote::PairedCurrency>,
+    ) {
         assert2::debug_assert!(
             filled_qty > BaseOrQuote::zero(),
             "The filled_qty must be greater than zero"
@@ -99,9 +88,7 @@ where
         match self {
             Position::Neutral => {
                 debug_assert_eq!(
-                    transaction_accounting
-                        .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
-                        .expect("Is valid account"),
+                    balances.position_margin,
                     BaseOrQuote::PairedCurrency::zero()
                 );
                 match side {
@@ -109,18 +96,18 @@ where
                         *self = Position::Long(PositionInner::new(
                             filled_qty,
                             fill_price,
-                            transaction_accounting,
                             init_margin_req,
                             fees,
+                            balances,
                         ))
                     }
                     Side::Sell => {
                         *self = Position::Short(PositionInner::new(
                             filled_qty,
                             fill_price,
-                            transaction_accounting,
                             init_margin_req,
                             fees,
+                            balances,
                         ))
                     }
                 }
@@ -130,9 +117,9 @@ where
                     inner.increase_contracts(
                         filled_qty,
                         fill_price,
-                        transaction_accounting,
                         init_margin_req,
                         fees,
+                        balances,
                     );
                 }
                 Side::Sell => match filled_qty.cmp(&inner.quantity()) {
@@ -140,26 +127,24 @@ where
                         inner.decrease_contracts(
                             filled_qty,
                             fill_price,
-                            transaction_accounting,
                             init_margin_req,
                             1,
                             fees,
+                            balances,
                         );
                     }
                     Ordering::Equal => {
                         inner.decrease_contracts(
                             filled_qty,
                             fill_price,
-                            transaction_accounting,
                             init_margin_req,
                             1,
                             fees,
+                            balances,
                         );
                         *self = Position::Neutral;
                         debug_assert_eq!(
-                            transaction_accounting
-                                .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
-                                .expect("Is valid account"),
+                            balances.position_margin,
                             BaseOrQuote::PairedCurrency::zero()
                         );
                     }
@@ -168,24 +153,22 @@ where
                         inner.decrease_contracts(
                             inner.quantity(),
                             fill_price,
-                            transaction_accounting,
                             init_margin_req,
                             1,
                             fees,
+                            balances,
                         );
                         assert_eq!(inner.quantity(), BaseOrQuote::zero());
                         debug_assert_eq!(
-                            transaction_accounting
-                                .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
-                                .expect("Is valid account"),
+                            balances.position_margin,
                             BaseOrQuote::PairedCurrency::zero()
                         );
                         *self = Position::Short(PositionInner::new(
                             new_short_qty,
                             fill_price,
-                            transaction_accounting,
                             init_margin_req,
                             BaseOrQuote::PairedCurrency::zero(),
+                            balances,
                         ));
                     }
                 },
@@ -196,26 +179,24 @@ where
                         inner.decrease_contracts(
                             filled_qty,
                             fill_price,
-                            transaction_accounting,
                             init_margin_req,
                             -1,
                             fees,
+                            balances,
                         );
                     }
                     Ordering::Equal => {
                         inner.decrease_contracts(
                             filled_qty,
                             fill_price,
-                            transaction_accounting,
                             init_margin_req,
                             -1,
                             fees,
+                            balances,
                         );
                         *self = Position::Neutral;
                         debug_assert_eq!(
-                            transaction_accounting
-                                .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
-                                .expect("Is valid account"),
+                            balances.position_margin,
                             BaseOrQuote::PairedCurrency::zero()
                         );
                     }
@@ -224,24 +205,22 @@ where
                         inner.decrease_contracts(
                             inner.quantity(),
                             fill_price,
-                            transaction_accounting,
                             init_margin_req,
                             -1,
                             fees,
+                            balances,
                         );
                         assert_eq!(inner.quantity(), BaseOrQuote::zero());
                         debug_assert_eq!(
-                            transaction_accounting
-                                .margin_balance_of(USER_POSITION_MARGIN_ACCOUNT)
-                                .expect("Is valid account"),
+                            balances.position_margin,
                             BaseOrQuote::PairedCurrency::zero()
                         );
                         *self = Position::Long(PositionInner::new(
                             new_long_qty,
                             fill_price,
-                            transaction_accounting,
                             init_margin_req,
                             BaseOrQuote::PairedCurrency::zero(),
+                            balances,
                         ));
                     }
                 },
@@ -249,9 +228,9 @@ where
                     inner.increase_contracts(
                         filled_qty,
                         fill_price,
-                        transaction_accounting,
                         init_margin_req,
                         fees,
+                        balances,
                     );
                 }
             },
@@ -281,14 +260,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MockTransactionAccounting, prelude::*};
+    use crate::prelude::*;
 
     #[test]
     fn position_display() {
         let pos = Position::Short(PositionInner::from_parts(
             BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(317, 3).unwrap()),
             QuoteCurrency::from(Decimal::try_from_scaled(958423665, 5).unwrap()),
-            QuoteCurrency::zero(),
         ));
         assert_eq!(&pos.to_string(), "Short 0.31700 Base @ 9584.23665 Quote");
     }
@@ -296,21 +274,31 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn position_change_position() {
-        let mut pos = Position::Short(PositionInner::from_parts(
-            BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(317, 3).unwrap()),
-            QuoteCurrency::from(Decimal::try_from_scaled(958423665, 5).unwrap()),
-            QuoteCurrency::zero(),
-        ));
-        let mut acc = MockTransactionAccounting::default();
+        let qty = BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(317, 3).unwrap());
+        let entry_price = QuoteCurrency::from(Decimal::try_from_scaled(958423665, 5).unwrap());
+        let notional = QuoteCurrency::convert_from(qty, entry_price);
         let init_margin_req = Decimal::ONE;
         let fees = QuoteCurrency::zero();
+
+        let mut balances = Balances::new(QuoteCurrency::new(10000, 0));
+        let init_margin = notional * init_margin_req;
+        assert!(balances.try_reserve_order_margin(init_margin));
+
+        let mut pos = Position::Short(PositionInner::new(
+            qty,
+            entry_price,
+            init_margin_req,
+            fees,
+            &mut balances,
+        ));
+
         pos.change_position(
             BaseCurrency::new(317, 3),
             QuoteCurrency::new(3020427, 2),
             Side::Buy,
-            &mut acc,
             init_margin_req,
             fees,
+            &mut balances,
         );
     }
 
@@ -318,50 +306,22 @@ mod tests {
     #[tracing_test::traced_test]
     #[ignore]
     fn position_change_position_2() {
-        use crate::accounting::TAccount;
-
         let mut pos = Position::Long(PositionInner::from_parts(
             BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(16800, 5).unwrap()),
             QuoteCurrency::from(Decimal::try_from_scaled(5949354994, 5).unwrap()),
-            QuoteCurrency::from(Decimal::try_from_scaled(600056, 5).unwrap()),
         ));
+        let fee = QuoteCurrency::from(Decimal::try_from_scaled(600056, 5).unwrap());
         let filled_qty = BaseCurrency::new(16800, 5);
         let fill_price = QuoteCurrency::new(6001260000, 5);
-        let mut acc = InMemoryTransactionAccounting::from_accounts([
-            TAccount::from_parts(
-                QuoteCurrency::from(Decimal::try_from_scaled(1499293480, 5).unwrap()),
-                QuoteCurrency::from(Decimal::try_from_scaled(1498785120, 5).unwrap()),
-            ),
-            TAccount::from_parts(
-                QuoteCurrency::from(Decimal::try_from_scaled(499293480, 5).unwrap()),
-                QuoteCurrency::from(Decimal::try_from_scaled(499293480, 5).unwrap()),
-            ),
-            TAccount::from_parts(
-                QuoteCurrency::from(Decimal::try_from_scaled(999491640, 5).unwrap()),
-                QuoteCurrency::from(Decimal::try_from_scaled(0, 0).unwrap()),
-            ),
-            TAccount::from_parts(
-                QuoteCurrency::from(Decimal::try_from_scaled(0, 5).unwrap()),
-                QuoteCurrency::from(Decimal::try_from_scaled(0, 0).unwrap()),
-            ),
-            TAccount::from_parts(
-                QuoteCurrency::from(Decimal::try_from_scaled(0, 5).unwrap()),
-                QuoteCurrency::from(Decimal::try_from_scaled(0, 0).unwrap()),
-            ),
-            TAccount::from_parts(
-                QuoteCurrency::from(Decimal::try_from_scaled(0, 5).unwrap()),
-                QuoteCurrency::from(Decimal::try_from_scaled(1000000000, 5).unwrap()),
-            ),
-        ]);
         let init_margin_req = Decimal::ONE;
-        let fees = QuoteCurrency::zero();
+        let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
         pos.change_position(
             filled_qty,
             fill_price,
             Side::Sell,
-            &mut acc,
             init_margin_req,
-            fees,
+            fee,
+            &mut balances,
         );
     }
 
@@ -369,7 +329,7 @@ mod tests {
     fn size_of_position() {
         assert_eq!(
             std::mem::size_of::<Position<i64, 5, BaseCurrency<_, 5>>>(),
-            32
+            24
         );
     }
 }

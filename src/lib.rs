@@ -5,8 +5,6 @@
 #[macro_use]
 extern crate serde;
 
-// pub mod account_tracker;
-mod accounting;
 mod active_limit_orders;
 mod config;
 mod contract_specification;
@@ -38,7 +36,6 @@ pub mod prelude {
     pub use num_traits::{One, Zero};
 
     pub use crate::{
-        accounting::*,
         active_limit_orders::ActiveLimitOrders,
         config::Config,
         contract_specification::*,

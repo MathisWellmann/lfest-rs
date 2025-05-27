@@ -18,13 +18,7 @@ fn generate_quotes_from_trades(
 }
 
 fn update_state<I, const D: u8, BaseOrQuote, U>(
-    exchange: &mut Exchange<
-        I,
-        D,
-        BaseOrQuote,
-        NoUserOrderId,
-        InMemoryTransactionAccounting<I, D, BaseOrQuote::PairedCurrency>,
-    >,
+    exchange: &mut Exchange<I, D, BaseOrQuote, NoUserOrderId>,
     trades: &[U],
 ) where
     I: Mon<D>,

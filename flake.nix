@@ -48,12 +48,14 @@
             buildInputs = [
               (lib.hiPrio rust-bin.nightly."2025-02-01".rustfmt)
               rust
+              cargo-nextest
               cargo-semver-checks
               cargo-mutants
               cargo_upgrades
               cargo-tarpaulin # Code coverage
               taplo
             ];
+            RUST_BACKTRACE = "1";
           };
         }
     );

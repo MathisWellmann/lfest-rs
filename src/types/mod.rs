@@ -1,3 +1,4 @@
+mod balances;
 mod errors;
 mod fee;
 mod leverage;
@@ -13,6 +14,7 @@ mod side;
 mod smol_currency;
 mod timestamp_ns;
 
+pub use balances::Balances;
 pub use errors::*;
 pub use fee::{Fee, Maker, Taker};
 pub use leverage::Leverage;
@@ -32,48 +34,6 @@ pub use timestamp_ns::TimestampNs;
 /// Natural Logarithmic Returns newtype wrapping a borrowed slice of generic floats.
 pub struct LnReturns<'a, T: num_traits::Float>(pub &'a [T]);
 
-/// The user balances denoted in the margin currency.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct UserBalances<I, const D: u8, BaseOrQuote>
-where
-    I: Mon<D>,
-    BaseOrQuote: MarginCurrency<I, D>,
-{
-    /// The available wallet balance that is used to provide margin for positions and orders.
-    pub available_wallet_balance: BaseOrQuote,
-    /// The margin reserved for the position.
-    pub position_margin: BaseOrQuote,
-    /// The margin reserved for the open limit orders.
-    pub order_margin: BaseOrQuote,
-    /// Just a marker type.
-    pub _q: std::marker::PhantomData<QuoteCurrency<I, D>>,
-}
-
-impl<I, const D: u8, BaseOrQuote> std::fmt::Display for UserBalances<I, D, BaseOrQuote>
-where
-    I: Mon<D>,
-    BaseOrQuote: MarginCurrency<I, D>,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "available_balance: {}, position_margin: {}, order_margin: {}",
-            self.available_wallet_balance, self.position_margin, self.order_margin
-        )
-    }
-}
-
-impl<I, const D: u8, BaseOrQuote> UserBalances<I, D, BaseOrQuote>
-where
-    I: Mon<D>,
-    BaseOrQuote: MarginCurrency<I, D>,
-{
-    /// Sum of all balances.
-    pub fn sum(&self) -> BaseOrQuote {
-        self.available_wallet_balance + self.position_margin + self.order_margin
-    }
-}
-
 /// A custom user order id must satisfy this trait bound.
 pub trait UserOrderId:
     Clone + Copy + Eq + PartialEq + std::fmt::Debug + std::fmt::Display + Default
@@ -84,20 +44,4 @@ pub trait UserOrderId:
 impl<T> UserOrderId for T where
     T: Clone + Copy + Eq + PartialEq + std::fmt::Debug + std::fmt::Display + Default
 {
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn user_balances() {
-        let balances = UserBalances {
-            available_wallet_balance: QuoteCurrency::<i64, 5>::new(1000, 0),
-            position_margin: QuoteCurrency::new(200, 0),
-            order_margin: QuoteCurrency::new(100, 0),
-            _q: std::marker::PhantomData,
-        };
-        assert_eq!(balances.sum(), QuoteCurrency::new(1300, 0));
-    }
 }

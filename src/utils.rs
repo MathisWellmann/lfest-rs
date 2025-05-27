@@ -1,4 +1,3 @@
-use assert2::assert;
 use const_decimal::Decimal;
 
 use crate::prelude::*;
@@ -29,21 +28,6 @@ where
     T: PartialOrd,
 {
     if v0 > v1 { v0 } else { v1 }
-}
-
-/// Asserts that the users wallet balance is greater than zero.
-#[inline]
-pub(crate) fn assert_user_wallet_balance<I, const D: u8, Acc, BaseOrQuote>(
-    transaction_accounting: &Acc,
-) where
-    I: Mon<D>,
-    Acc: TransactionAccounting<I, D, BaseOrQuote>,
-    BaseOrQuote: MarginCurrency<I, D>,
-{
-    let wallet_balance = transaction_accounting
-        .margin_balance_of(USER_WALLET_ACCOUNT)
-        .expect("is valid");
-    assert!(wallet_balance >= BaseOrQuote::zero());
 }
 
 /// Create a `Decimal` from an `f64` value.

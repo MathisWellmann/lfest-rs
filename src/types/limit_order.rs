@@ -25,7 +25,6 @@ where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     UserOrderIdT: UserOrderId,
-    OrderStatus: Clone,
 {
     /// Order Id provided by the user, can be any type really.
     #[getset(get_copy = "pub")]
@@ -35,7 +34,7 @@ where
     #[getset(get_copy = "pub")]
     side: Side,
 
-    /// The limit order price, where it will sit in the orderbook.
+    /// The limit order price, where it will sit in the order book.
     #[getset(get_copy = "pub")]
     limit_price: QuoteCurrency<I, D>,
 
@@ -43,7 +42,7 @@ where
     #[getset(get_copy = "pub")]
     remaining_quantity: BaseOrQuote,
 
-    /// Determines the behaviour for when the limit price locks or crosses an away market quotation.
+    /// Determines the behavior for when the limit price locks or crosses an away market quotation.
     #[getset(get_copy = "pub", set = "pub")]
     re_pricing: RePricing,
 
@@ -307,6 +306,12 @@ where
     #[inline]
     pub fn id(&self) -> OrderId {
         self.state().meta().id()
+    }
+
+    /// The notional value is related to the quantity and its limit price.
+    #[inline]
+    pub fn notional_value(&self) -> BaseOrQuote::PairedCurrency {
+        BaseOrQuote::PairedCurrency::convert_from(self.remaining_quantity, self.limit_price)
     }
 }
 

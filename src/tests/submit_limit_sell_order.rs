@@ -1,12 +1,10 @@
-use crate::{
-    mock_exchange::MockTransactionAccounting, mock_exchange_linear, prelude::*, test_fee_maker,
-};
+use crate::{mock_exchange_linear, prelude::*, test_fee_maker};
 
 #[test]
 #[tracing_test::traced_test]
 fn submit_limit_sell_order_no_position() {
     let mut exchange = mock_exchange_linear();
-    let mut accounting = MockTransactionAccounting::default();
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(
         exchange
@@ -57,23 +55,20 @@ fn submit_limit_sell_order_no_position() {
         Position::Short(PositionInner::new(
             qty,
             entry_price,
-            &mut accounting,
             init_margin_req,
             fee,
+            &mut balances,
         ))
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(100, 0),
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(100, 0),
             position_margin: QuoteCurrency::new(900, 0),
             order_margin: QuoteCurrency::new(0, 0),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee,
+            _i: std::marker::PhantomData
         }
-    );
-    assert_eq!(
-        exchange.position().outstanding_fees(),
-        QuoteCurrency::new(18, 2)
     );
 
     // close the position again
@@ -103,12 +98,13 @@ fn submit_limit_sell_order_no_position() {
     );
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(1000, 0) - fee - fee,
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(1000, 0) - fee - fee,
             position_margin: QuoteCurrency::new(0, 0),
             order_margin: QuoteCurrency::new(0, 0),
-            _q: std::marker::PhantomData
+            total_fees_paid: fee,
+            _i: std::marker::PhantomData
         }
     );
 }

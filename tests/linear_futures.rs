@@ -7,7 +7,7 @@ use lfest::{mock_exchange_linear_with_account_tracker, prelude::*, test_fee_take
 fn lin_long_market_win_full() {
     let starting_balance = QuoteCurrency::new(1000, 0);
     let mut exchange = mock_exchange_linear_with_account_tracker(starting_balance);
-    let mut accounting = InMemoryTransactionAccounting::new(starting_balance);
+    let mut balances = exchange.balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
         .update_state(&Bba {
@@ -16,7 +16,7 @@ fn lin_long_market_win_full() {
             timestamp_exchange_ns: 0.into(),
         })
         .unwrap();
-    assert_eq!(exchange.fees_paid(), QuoteCurrency::zero());
+    assert_eq!(exchange.balances().total_fees_paid, QuoteCurrency::zero());
 
     let qty = BaseCurrency::new(5, 0);
     exchange
@@ -39,9 +39,9 @@ fn lin_long_market_win_full() {
         Position::Long(PositionInner::new(
             qty,
             bid,
-            &mut accounting,
             init_margin_req,
             fees,
+            &mut balances,
         ))
     );
     assert_eq!(
@@ -49,12 +49,13 @@ fn lin_long_market_win_full() {
         QuoteCurrency::zero()
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(500, 0),
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(500, 0),
             position_margin: QuoteCurrency::new(500, 0),
             order_margin: QuoteCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: fees,
+            _i: std::marker::PhantomData
         }
     );
 
@@ -87,13 +88,17 @@ fn lin_long_market_win_full() {
         QuoteCurrency::zero()
     );
     assert_eq!(
-        exchange.user_balances(),
-        UserBalances {
-            available_wallet_balance: QuoteCurrency::new(14991, 1),
+        exchange.balances(),
+        &Balances {
+            available: QuoteCurrency::new(14991, 1),
             position_margin: QuoteCurrency::zero(),
             order_margin: QuoteCurrency::zero(),
-            _q: std::marker::PhantomData
+            total_fees_paid: QuoteCurrency::new(9, 1),
+            _i: std::marker::PhantomData
         }
     );
-    assert_eq!(exchange.fees_paid(), QuoteCurrency::new(9, 1));
+    assert_eq!(
+        exchange.balances().total_fees_paid,
+        QuoteCurrency::new(9, 1)
+    );
 }

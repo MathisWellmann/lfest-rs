@@ -37,13 +37,7 @@ fn submit_limit_orders<U>(
         OrderRateLimits::new(n as _).unwrap(),
     )
     .unwrap();
-    let mut exchange = Exchange::<
-        i64,
-        5,
-        QuoteCurrency<i64, 5>,
-        NoUserOrderId,
-        InMemoryTransactionAccounting<i64, 5, BaseCurrency<i64, 5>>,
-    >::new(config);
+    let mut exchange = Exchange::<i64, 5, QuoteCurrency<i64, 5>, NoUserOrderId>::new(config);
     exchange
         .update_state(&Bba {
             bid: QuoteCurrency::new(100, 0),
