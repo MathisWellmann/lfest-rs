@@ -130,7 +130,7 @@ where
                 let init_margin = notional_value * self.contract_spec.init_margin_req();
 
                 let fee = notional_value * *self.contract_spec.fee_taker().as_ref();
-                if init_margin + fee > balances.available {
+                if init_margin + fee > balances.available() {
                     return Err(RiskError::NotEnoughAvailableBalance);
                 }
                 assert!(
@@ -144,7 +144,7 @@ where
                     return Ok(());
                 }
                 // The order reduces the short and puts on a long
-                let released_from_old_pos = balances.position_margin;
+                let released_from_old_pos = balances.position_margin();
                 balances.free_position_margin(released_from_old_pos);
 
                 let new_long_size = Self::quantity_minus_position(order.quantity(), pos_inner);
@@ -160,7 +160,7 @@ where
                 if Self::margin_exceeds_risk(
                     new_init_margin,
                     fee,
-                    balances.available,
+                    balances.available(),
                     released_from_old_pos,
                 ) {
                     return Err(RiskError::NotEnoughAvailableBalance);
@@ -194,7 +194,7 @@ where
                 let init_margin = notional_value * self.contract_spec.init_margin_req();
                 let fee = notional_value * *self.contract_spec.fee_taker().as_ref();
 
-                if init_margin + fee > balances.available {
+                if init_margin + fee > balances.available() {
                     return Err(RiskError::NotEnoughAvailableBalance);
                 }
                 assert!(
@@ -209,7 +209,7 @@ where
                     return Ok(());
                 }
                 // The order reduces the long position and opens a short.
-                let released_from_old_pos = balances.position_margin;
+                let released_from_old_pos = balances.position_margin();
                 balances.free_position_margin(released_from_old_pos);
 
                 let new_short_size = Self::quantity_minus_position(order.quantity(), pos_inner);
@@ -225,7 +225,7 @@ where
                 if Self::margin_exceeds_risk(
                     new_init_margin,
                     fee,
-                    balances.available,
+                    balances.available(),
                     released_from_old_pos,
                 ) {
                     return Err(RiskError::NotEnoughAvailableBalance);

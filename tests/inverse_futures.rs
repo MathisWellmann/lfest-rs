@@ -17,7 +17,7 @@ fn inv_long_market_win_full() {
         })
         .unwrap();
 
-    let value = exchange.balances().available * BaseCurrency::new(8, 1);
+    let value = exchange.balances().available() * BaseCurrency::new(8, 1);
     let size = QuoteCurrency::convert_from(value, exchange.market_state().ask());
     let o = MarketOrder::new(Side::Buy, size).unwrap();
     exchange.submit_market_order(o).unwrap();
@@ -53,13 +53,12 @@ fn inv_long_market_win_full() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(2, 1),
-            position_margin: BaseCurrency::new(8, 1),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fees,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(2, 1))
+            .position_margin(BaseCurrency::new(8, 1))
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fees)
+            .build()
     );
 
     let bid = QuoteCurrency::new(2000, 0);
@@ -95,13 +94,12 @@ fn inv_long_market_win_full() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(14, 1) - fee_1 - fee_base2,
-            position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fees + fee_base2,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(14, 1) - fee_1 - fee_base2)
+            .position_margin(BaseCurrency::zero())
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fees + fee_base2)
+            .build()
     );
 }
 
@@ -146,13 +144,12 @@ fn inv_long_market_loss_full() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(2, 1),
-            position_margin: BaseCurrency::new(8, 1),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fees,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(2, 1))
+            .position_margin(BaseCurrency::new(8, 1))
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fees)
+            .build()
     );
 
     let bid = QuoteCurrency::new(800, 0);
@@ -191,13 +188,12 @@ fn inv_long_market_loss_full() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(8, 1) - fee_combined,
-            position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee_combined,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(8, 1) - fee_combined)
+            .position_margin(BaseCurrency::zero())
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee_combined)
+            .build()
     );
 }
 
@@ -237,13 +233,12 @@ fn inv_short_market_win_full() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(2, 1),
-            position_margin: BaseCurrency::new(8, 1),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fees,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(2, 1))
+            .position_margin(BaseCurrency::new(8, 1))
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fees)
+            .build()
     );
 
     assert!(
@@ -294,13 +289,12 @@ fn inv_short_market_win_full() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(12, 1) - fee_combined,
-            position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee_combined,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(12, 1) - fee_combined)
+            .position_margin(BaseCurrency::zero())
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee_combined)
+            .build()
     );
 }
 
@@ -358,13 +352,12 @@ fn inv_short_market_loss_full() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(6, 1),
-            position_margin: BaseCurrency::new(4, 1),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fees,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(6, 1))
+            .position_margin(BaseCurrency::new(4, 1))
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fees)
+            .build()
     );
 
     assert_eq!(
@@ -379,13 +372,12 @@ fn inv_short_market_loss_full() {
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(79964, 5),
-            position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fees,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(79964, 5))
+            .position_margin(BaseCurrency::zero())
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fees)
+            .build()
     );
 }
 
@@ -437,13 +429,12 @@ fn inv_long_market_win_partial() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(2, 1),
-            position_margin: BaseCurrency::new(8, 1),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee_0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(2, 1))
+            .position_margin(BaseCurrency::new(8, 1))
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee_0)
+            .build()
     );
 
     assert!(
@@ -494,13 +485,12 @@ fn inv_long_market_win_partial() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(8, 1) - fee_0 - fee_1,
-            position_margin: BaseCurrency::new(4, 1),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee_0 + fee_1,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(8, 1) - fee_0 - fee_1)
+            .position_margin(BaseCurrency::new(4, 1))
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee_0 + fee_1)
+            .build()
     );
 }
 
@@ -594,13 +584,12 @@ fn inv_long_market_loss_partial() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(5, 1) - fee_0 - fee_1,
-            position_margin: BaseCurrency::new(4, 1),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee + fee_1,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(5, 1) - fee_0 - fee_1)
+            .position_margin(BaseCurrency::new(4, 1))
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee + fee_1)
+            .build()
     );
 }
 
@@ -650,13 +639,12 @@ fn inv_short_market_win_partial() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(2, 1),
-            position_margin: BaseCurrency::new(8, 1),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee_0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(2, 1))
+            .position_margin(BaseCurrency::new(8, 1))
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee_0)
+            .build()
     );
 
     let ask = QuoteCurrency::new(800, 0);
@@ -709,13 +697,12 @@ fn inv_short_market_win_partial() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(7, 1) - fee_0 - fee_1,
-            position_margin: BaseCurrency::new(4, 1),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee_0 + fee_1,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(7, 1) - fee_0 - fee_1)
+            .position_margin(BaseCurrency::new(4, 1))
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee_0 + fee_1)
+            .build()
     );
 }
 
@@ -770,13 +757,12 @@ fn inv_short_market_loss_partial() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(2, 1),
-            position_margin: BaseCurrency::new(8, 1),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee_0 + fee_base1,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(2, 1))
+            .position_margin(BaseCurrency::new(8, 1))
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee_0 + fee_base1)
+            .build()
     );
 
     let bid = QuoteCurrency::new(1999, 0);
@@ -792,13 +778,12 @@ fn inv_short_market_loss_partial() {
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(59928, 5),
-            position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee_0 + fee_base1,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(59928, 5))
+            .position_margin(BaseCurrency::zero())
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee_0 + fee_base1)
+            .build()
     );
 }
 
@@ -846,13 +831,12 @@ fn inv_test_market_roundtrip() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::one() - BaseCurrency::new(2, 0) * fee0,
-            position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::one() - BaseCurrency::new(2, 0) * fee0)
+            .position_margin(BaseCurrency::zero())
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee0)
+            .build()
     );
 }
 
@@ -880,13 +864,12 @@ fn inv_execute_limit() {
     assert_eq!(exchange.active_limit_orders().len(), 1);
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(5, 1),
-            position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::new(5, 1),
-            total_fees_paid: fee_0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(5, 1))
+            .position_margin(BaseCurrency::zero())
+            .order_margin(BaseCurrency::new(5, 1))
+            .total_fees_paid(fee_0)
+            .build()
     );
 
     let order_updates = exchange
@@ -924,13 +907,12 @@ fn inv_execute_limit() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(5, 1),
-            position_margin: BaseCurrency::new(5, 1),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee_0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(5, 1))
+            .position_margin(BaseCurrency::new(5, 1))
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee_0)
+            .build()
     );
 
     let limit_price = QuoteCurrency::new(1000, 0);
@@ -963,13 +945,12 @@ fn inv_execute_limit() {
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(105, 2) - fee_0 - fee_1,
-            position_margin: BaseCurrency::zero(),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee_0 + fee_1,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(105, 2) - fee_0 - fee_1)
+            .position_margin(BaseCurrency::zero())
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee_0 + fee_1)
+            .build()
     );
 
     let qty = QuoteCurrency::new(600, 0);
@@ -1010,12 +991,11 @@ fn inv_execute_limit() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: BaseCurrency::new(105, 2) - fee_0 - fee_1 - fee_2,
-            position_margin: BaseCurrency::new(5, 1),
-            order_margin: BaseCurrency::zero(),
-            total_fees_paid: fee_0 + fee_1 + fee_2,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(BaseCurrency::new(105, 2) - fee_0 - fee_1 - fee_2)
+            .position_margin(BaseCurrency::new(5, 1))
+            .order_margin(BaseCurrency::zero())
+            .total_fees_paid(fee_0 + fee_1 + fee_2)
+            .build()
     );
 }

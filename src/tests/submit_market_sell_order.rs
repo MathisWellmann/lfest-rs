@@ -59,13 +59,12 @@ fn submit_market_sell_order() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(500, 0),
-            position_margin: QuoteCurrency::new(500, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fees,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(500, 0))
+            .position_margin(QuoteCurrency::new(500, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fees)
+            .build()
     );
 }
 
@@ -91,13 +90,12 @@ fn submit_market_sell_order_with_short_position() {
     let fee0 = QuoteCurrency::new(3, 1);
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(500, 0),
-            position_margin: QuoteCurrency::new(500, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(500, 0))
+            .position_margin(QuoteCurrency::new(500, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee0)
+            .build()
     );
     assert_eq!(
         exchange.position().clone(),
@@ -117,13 +115,12 @@ fn submit_market_sell_order_with_short_position() {
     let fee1 = QuoteCurrency::new(24, 2);
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(100, 0),
-            position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee0 + fee1,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(100, 0))
+            .position_margin(QuoteCurrency::new(900, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee0 + fee1)
+            .build()
     );
     assert_eq!(
         exchange.position().clone(),
@@ -165,16 +162,17 @@ fn submit_market_sell_order_with_long_position() {
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         &mut balances,
-        &Balances {
-            available: QuoteCurrency::new(1000, 0)
-                - QuoteCurrency::new(54, 2)
-                - QuoteCurrency::new(5346, 4)
-                - QuoteCurrency::new(9, 0),
-            position_margin: QuoteCurrency::new(0, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(
+                QuoteCurrency::new(1000, 0)
+                    - QuoteCurrency::new(54, 2)
+                    - QuoteCurrency::new(5346, 4)
+                    - QuoteCurrency::new(9, 0)
+            )
+            .position_margin(QuoteCurrency::new(0, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee0)
+            .build()
     );
 }
 
@@ -202,13 +200,12 @@ fn submit_market_sell_order_turnaround_long() {
         QuoteCurrency::convert_from(qty, QuoteCurrency::new(100, 0)) * *test_fee_taker().as_ref();
     assert_eq!(
         &mut balances,
-        &Balances {
-            available: QuoteCurrency::new(100, 0),
-            position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(100, 0))
+            .position_margin(QuoteCurrency::new(900, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee0)
+            .build()
     );
     assert_eq!(
         exchange.position().clone(),
@@ -230,13 +227,12 @@ fn submit_market_sell_order_turnaround_long() {
         QuoteCurrency::convert_from(qty, QuoteCurrency::new(99, 0)) * *test_fee_taker().as_ref();
     assert_eq!(
         &mut balances,
-        &Balances {
-            available: QuoteCurrency::new(100, 0) - fee0 - fee1,
-            position_margin: QuoteCurrency::new(891, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee0 + fee1,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(100, 0) - fee0 - fee1)
+            .position_margin(QuoteCurrency::new(891, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee0 + fee1)
+            .build()
     );
     assert_eq!(
         exchange.position().clone(),

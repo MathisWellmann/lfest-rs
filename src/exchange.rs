@@ -308,7 +308,7 @@ where
         self.risk_engine.check_limit_order(
             &self.position,
             &order,
-            self.balances.available,
+            self.balances.available(),
             &self.order_margin,
         )?;
 
@@ -408,8 +408,8 @@ where
             &self.position,
         );
 
-        assert!(new_order_margin >= self.balances.order_margin);
-        let margin = new_order_margin - self.balances.order_margin;
+        assert!(new_order_margin >= self.balances.order_margin());
+        let margin = new_order_margin - self.balances.order_margin();
         debug_assert!(margin >= BaseOrQuote::PairedCurrency::zero());
         if margin > BaseOrQuote::PairedCurrency::zero() {
             assert!(
@@ -423,7 +423,7 @@ where
             &self.active_limit_orders
         );
         debug_assert!(if self.active_limit_orders.is_empty() {
-            self.balances.order_margin.is_zero()
+            self.balances.order_margin().is_zero()
         } else {
             true
         });
@@ -442,7 +442,7 @@ where
         self.order_rate_limiter
             .aquire(self.market_state.current_ts_ns())?;
         debug_assert_eq!(
-            self.balances.order_margin,
+            self.balances.order_margin(),
             self.order_margin.order_margin(
                 self.config.contract_spec().init_margin_req(),
                 &self.position,
@@ -472,10 +472,10 @@ where
         );
 
         debug_assert!(
-            new_order_margin <= self.balances.order_margin,
+            new_order_margin <= self.balances.order_margin(),
             "When cancelling a limit order, the new order margin is smaller or equal the old order margin"
         );
-        let margin = self.balances.order_margin - new_order_margin;
+        let margin = self.balances.order_margin() - new_order_margin;
         self.balances.free_order_margin(margin);
 
         assert_eq!(
@@ -483,7 +483,7 @@ where
             &self.active_limit_orders
         );
         assert!(if self.active_limit_orders.is_empty() {
-            self.balances.order_margin.is_zero()
+            self.balances.order_margin().is_zero()
         } else {
             true
         });
@@ -537,7 +537,7 @@ where
                 );
 
                 debug_assert_eq!(
-                    self.balances.order_margin,
+                    self.balances.order_margin(),
                     self.order_margin.order_margin(
                         self.config.contract_spec().init_margin_req(),
                         &self.position
@@ -578,7 +578,7 @@ where
                     &self.position,
                 );
                 debug_assert!(
-                    new_order_margin <= self.balances.order_margin,
+                    new_order_margin <= self.balances.order_margin(),
                     "The order margin does not increase with a filled limit order event."
                 );
             }
@@ -597,12 +597,12 @@ where
             &self.active_limit_orders
         );
         debug_assert!(if self.active_limit_orders.is_empty() {
-            self.balances.order_margin.is_zero()
+            self.balances.order_margin().is_zero()
         } else {
             true
         });
         debug_assert_eq!(
-            self.balances.order_margin,
+            self.balances.order_margin(),
             self.order_margin.order_margin(
                 self.config.contract_spec().init_margin_req(),
                 &self.position

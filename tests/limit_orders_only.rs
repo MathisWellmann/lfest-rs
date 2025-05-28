@@ -29,15 +29,14 @@ fn limit_orders_only() {
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(10, 0),
-            position_margin: QuoteCurrency::zero(),
-            order_margin: QuoteCurrency::new(990, 0),
-            total_fees_paid: fee0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(10, 0))
+            .position_margin(QuoteCurrency::zero())
+            .order_margin(QuoteCurrency::new(990, 0))
+            .total_fees_paid(fee0)
+            .build()
     );
-    assert_eq!(exchange.balances().total_fees_paid, QuoteCurrency::zero());
+    assert_eq!(exchange.balances().total_fees_paid(), QuoteCurrency::zero());
 
     let order_updates = exchange
         .update_state(&Trade {
@@ -74,13 +73,12 @@ fn limit_orders_only() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(10, 0),
-            position_margin: QuoteCurrency::new(990, 0),
-            order_margin: QuoteCurrency::zero(),
-            total_fees_paid: fee0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(10, 0))
+            .position_margin(QuoteCurrency::new(990, 0))
+            .order_margin(QuoteCurrency::zero())
+            .total_fees_paid(fee0)
+            .build()
     );
 
     let sell_price = QuoteCurrency::new(105, 0);
@@ -99,13 +97,12 @@ fn limit_orders_only() {
     assert!(!order_updates.is_empty());
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(10495, 1) - fee0 - fee1,
-            position_margin: QuoteCurrency::zero(),
-            order_margin: QuoteCurrency::zero(),
-            total_fees_paid: fee0 + fee1,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(10495, 1) - fee0 - fee1)
+            .position_margin(QuoteCurrency::zero())
+            .order_margin(QuoteCurrency::zero())
+            .total_fees_paid(fee0 + fee1)
+            .build()
     );
     let order_updates = exchange
         .update_state(&Bba {
@@ -119,18 +116,19 @@ fn limit_orders_only() {
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(10495, 1)
-                - QuoteCurrency::new(198, 3)
-                - QuoteCurrency::new(2079, 4),
-            position_margin: QuoteCurrency::zero(),
-            order_margin: QuoteCurrency::zero(),
-            total_fees_paid: QuoteCurrency::new(4059, 4),
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(
+                QuoteCurrency::new(10495, 1)
+                    - QuoteCurrency::new(198, 3)
+                    - QuoteCurrency::new(2079, 4)
+            )
+            .position_margin(QuoteCurrency::zero())
+            .order_margin(QuoteCurrency::zero())
+            .total_fees_paid(QuoteCurrency::new(4059, 4))
+            .build()
     );
     assert_eq!(
-        exchange.balances().total_fees_paid,
+        exchange.balances().total_fees_paid(),
         QuoteCurrency::new(4059, 4)
     );
 }

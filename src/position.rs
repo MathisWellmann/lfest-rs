@@ -88,7 +88,7 @@ where
         match self {
             Position::Neutral => {
                 debug_assert_eq!(
-                    balances.position_margin,
+                    balances.position_margin(),
                     BaseOrQuote::PairedCurrency::zero()
                 );
                 match side {
@@ -144,7 +144,7 @@ where
                         );
                         *self = Position::Neutral;
                         debug_assert_eq!(
-                            balances.position_margin,
+                            balances.position_margin(),
                             BaseOrQuote::PairedCurrency::zero()
                         );
                     }
@@ -160,7 +160,7 @@ where
                         );
                         assert_eq!(inner.quantity(), BaseOrQuote::zero());
                         debug_assert_eq!(
-                            balances.position_margin,
+                            balances.position_margin(),
                             BaseOrQuote::PairedCurrency::zero()
                         );
                         *self = Position::Short(PositionInner::new(
@@ -196,7 +196,7 @@ where
                         );
                         *self = Position::Neutral;
                         debug_assert_eq!(
-                            balances.position_margin,
+                            balances.position_margin(),
                             BaseOrQuote::PairedCurrency::zero()
                         );
                     }
@@ -212,7 +212,7 @@ where
                         );
                         assert_eq!(inner.quantity(), BaseOrQuote::zero());
                         debug_assert_eq!(
-                            balances.position_margin,
+                            balances.position_margin(),
                             BaseOrQuote::PairedCurrency::zero()
                         );
                         *self = Position::Long(PositionInner::new(

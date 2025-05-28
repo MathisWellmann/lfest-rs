@@ -198,11 +198,11 @@ mod tests {
             }
         );
         assert_eq!(
-            balances.position_margin,
+            balances.position_margin(),
             QuoteCurrency::new(50, 0) * init_margin_req
         );
         assert_eq!(
-            balances.available,
+            balances.available(),
             QuoteCurrency::new(1000, 0) - QuoteCurrency::new(50, 0) * init_margin_req - fee
         );
     }
@@ -236,11 +236,11 @@ mod tests {
         );
         assert_eq!(pos.entry_price(), QuoteCurrency::new(125, 0));
         assert_eq!(
-            balances.position_margin,
+            balances.position_margin(),
             QuoteCurrency::new(125, 0) * init_margin_req
         );
         assert_eq!(
-            balances.available,
+            balances.available(),
             QuoteCurrency::new(1000, 0)
                 - QuoteCurrency::new(125, 0) * init_margin_req
                 - fee_0
@@ -278,9 +278,9 @@ mod tests {
         );
         assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
         let margin = QuoteCurrency::new(250, 0) * init_margin_req;
-        assert_eq!(balances.position_margin, margin,);
+        assert_eq!(balances.position_margin(), margin,);
         assert_eq!(
-            balances.available,
+            balances.available(),
             QuoteCurrency::new(1000, 0) - margin - fees * Decimal::try_from_scaled(15, 1).unwrap()
         );
 
@@ -300,10 +300,10 @@ mod tests {
             }
         );
         assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
-        assert_eq!(balances.position_margin, QuoteCurrency::new(0, 0));
-        assert_eq!(balances.order_margin, QuoteCurrency::new(0, 0));
+        assert_eq!(balances.position_margin(), QuoteCurrency::new(0, 0));
+        assert_eq!(balances.order_margin(), QuoteCurrency::new(0, 0));
         assert_eq!(
-            balances.available,
+            balances.available(),
             QuoteCurrency::new(1000, 0) - fees * Decimal::try_from_scaled(2, 0).unwrap()
         );
     }
@@ -343,11 +343,11 @@ mod tests {
         assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
         assert_eq!(pos.total_cost(), QuoteCurrency::new(250, 0));
         let margin = QuoteCurrency::new(250, 0) * init_margin_req;
-        assert_eq!(balances.position_margin, margin);
-        assert_eq!(balances.order_margin, QuoteCurrency::zero());
+        assert_eq!(balances.position_margin(), margin);
+        assert_eq!(balances.order_margin(), QuoteCurrency::zero());
         let profit = QuoteCurrency::new(25 * side_mult as i64, 0);
         assert_eq!(
-            balances.available,
+            balances.available(),
             QuoteCurrency::new(1000, 0) + profit
                 - margin
                 - fees * Decimal::try_from_scaled(15, 1).unwrap()
@@ -389,11 +389,11 @@ mod tests {
         assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
         assert_eq!(pos.total_cost(), QuoteCurrency::new(250, 0));
         let margin = QuoteCurrency::new(250, 0) * init_margin_req;
-        assert_eq!(balances.position_margin, margin);
-        assert_eq!(balances.order_margin, QuoteCurrency::zero());
+        assert_eq!(balances.position_margin(), margin);
+        assert_eq!(balances.order_margin(), QuoteCurrency::zero());
         let loss = QuoteCurrency::new(25 * side_mult as i64, 0);
         assert_eq!(
-            balances.available,
+            balances.available(),
             QuoteCurrency::new(1000, 0)
                 - loss
                 - margin
@@ -428,9 +428,9 @@ mod tests {
         assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
         assert_eq!(pos.total_cost(), BaseCurrency::new(25, 1));
         let margin = BaseCurrency::new(25, 1) * init_margin_req;
-        assert_eq!(balances.position_margin, margin);
+        assert_eq!(balances.position_margin(), margin);
         assert_eq!(
-            balances.available,
+            balances.available(),
             BaseCurrency::new(1125, 2) - margin - fees * Decimal::try_from_scaled(15, 1).unwrap()
         );
     }

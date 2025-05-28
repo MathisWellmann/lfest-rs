@@ -1,28 +1,38 @@
 use std::marker::PhantomData;
 
+use getset::CopyGetters;
 use tracing::trace;
+use typed_builder::TypedBuilder;
 
 use super::{MarginCurrency, Mon};
 
-// TODO: use typed builder and getters.
 /// Contains user balances including margin amounts.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, TypedBuilder, CopyGetters)]
 pub struct Balances<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
     BaseOrQuote: MarginCurrency<I, D>,
 {
     /// The available wallet balance that is used to provide margin for positions and orders.
-    pub available: BaseOrQuote,
+    #[getset(get_copy = "pub")]
+    available: BaseOrQuote,
+
     /// The margin reserved for the position.
-    pub position_margin: BaseOrQuote,
+    #[getset(get_copy = "pub")]
+    position_margin: BaseOrQuote,
+
     /// The margin reserved for the open limit orders.
-    pub order_margin: BaseOrQuote,
+    #[getset(get_copy = "pub")]
+    order_margin: BaseOrQuote,
+
     // TODO: could be removed here and done differently.
     /// The total amount of fees paid or received.
-    pub total_fees_paid: BaseOrQuote,
+    #[getset(get_copy = "pub")]
+    total_fees_paid: BaseOrQuote,
+
     /// A marker type.
-    pub _i: PhantomData<I>,
+    #[builder(default)]
+    _i: PhantomData<I>,
 }
 
 impl<I, const D: u8, BaseOrQuote> std::fmt::Display for Balances<I, D, BaseOrQuote>

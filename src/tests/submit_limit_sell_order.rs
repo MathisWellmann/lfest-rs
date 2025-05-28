@@ -62,13 +62,12 @@ fn submit_limit_sell_order_no_position() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(100, 0),
-            position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(100, 0))
+            .position_margin(QuoteCurrency::new(900, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee)
+            .build()
     );
 
     // close the position again
@@ -99,13 +98,12 @@ fn submit_limit_sell_order_no_position() {
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(1000, 0) - fee - fee,
-            position_margin: QuoteCurrency::new(0, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(1000, 0) - fee - fee)
+            .position_margin(QuoteCurrency::new(0, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee)
+            .build()
     );
 }
 

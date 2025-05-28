@@ -25,13 +25,12 @@ fn submit_limit_buy_order_no_position() {
     let fee = QuoteCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(510, 0),
-            position_margin: QuoteCurrency::new(0, 0),
-            order_margin: QuoteCurrency::new(490, 0),
-            total_fees_paid: fee,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(510, 0))
+            .position_margin(QuoteCurrency::new(0, 0))
+            .order_margin(QuoteCurrency::new(490, 0))
+            .total_fees_paid(fee)
+            .build()
     );
 
     // Now fill the order
@@ -76,13 +75,12 @@ fn submit_limit_buy_order_no_position() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(510, 0),
-            position_margin: QuoteCurrency::new(490, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(510, 0))
+            .position_margin(QuoteCurrency::new(490, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee)
+            .build()
     );
 
     // close the position again with a limit order.
@@ -223,13 +221,12 @@ fn submit_limit_buy_order_with_long() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(100, 0),
-            position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(100, 0))
+            .position_margin(QuoteCurrency::new(900, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee)
+            .build()
     );
 
     assert_eq!(
@@ -317,13 +314,12 @@ fn submit_limit_buy_order_with_short() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(100, 0),
-            position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(100, 0))
+            .position_margin(QuoteCurrency::new(900, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee)
+            .build()
     );
 
     // Another sell limit order should not work

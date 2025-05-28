@@ -60,13 +60,12 @@ fn submit_market_buy_order_no_position() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(495, 0) - fee,
-            position_margin: QuoteCurrency::new(505, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(495, 0) - fee)
+            .position_margin(QuoteCurrency::new(505, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee)
+            .build()
     );
 }
 
@@ -106,13 +105,12 @@ fn submit_market_buy_order_with_long_position() {
     assert_eq!(exchange.active_limit_orders(), &ActiveLimitOrders::new(10));
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(500, 0),
-            position_margin: QuoteCurrency::new(500, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(500, 0))
+            .position_margin(QuoteCurrency::new(500, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee0)
+            .build()
     );
 
     // Buy again
@@ -121,13 +119,12 @@ fn submit_market_buy_order_with_long_position() {
     let fee1 = QuoteCurrency::new(24, 2);
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(100, 0),
-            position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee1,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(100, 0))
+            .position_margin(QuoteCurrency::new(900, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee1)
+            .build()
     );
     let fees = fee0 + fee1;
     assert_eq!(
@@ -166,13 +163,12 @@ fn submit_market_buy_order_with_short_position() {
     let fee0 = QuoteCurrency::new(54, 2);
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(100, 0),
-            position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(100, 0))
+            .position_margin(QuoteCurrency::new(900, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee0)
+            .build()
     );
     assert_eq!(
         exchange.position().clone(),
@@ -194,13 +190,12 @@ fn submit_market_buy_order_with_short_position() {
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(1000, 0) - fee0 - fee1 - QuoteCurrency::new(9, 0),
-            position_margin: QuoteCurrency::new(0, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee0 + fee1,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(1000, 0) - fee0 - fee1 - QuoteCurrency::new(9, 0))
+            .position_margin(QuoteCurrency::new(0, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee0 + fee1)
+            .build()
     );
 }
 
@@ -242,13 +237,12 @@ fn submit_market_buy_order_turnaround_short() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(109, 0) - fee_0,
-            position_margin: QuoteCurrency::new(891, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee_0,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(109, 0) - fee_0)
+            .position_margin(QuoteCurrency::new(891, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee_0)
+            .build()
     );
 
     // Close the entire position and buy some more
@@ -270,15 +264,16 @@ fn submit_market_buy_order_turnaround_short() {
 
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(100, 0)
-                - QuoteCurrency::new(5346, 4)
-                - QuoteCurrency::new(108, 2)
-                - QuoteCurrency::new(9, 0),
-            position_margin: QuoteCurrency::new(900, 0),
-            order_margin: QuoteCurrency::new(0, 0),
-            total_fees_paid: fee_0 + fee_1,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(
+                QuoteCurrency::new(100, 0)
+                    - QuoteCurrency::new(5346, 4)
+                    - QuoteCurrency::new(108, 2)
+                    - QuoteCurrency::new(9, 0)
+            )
+            .position_margin(QuoteCurrency::new(900, 0))
+            .order_margin(QuoteCurrency::new(0, 0))
+            .total_fees_paid(fee_0 + fee_1)
+            .build()
     );
 }

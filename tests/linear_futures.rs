@@ -16,7 +16,7 @@ fn lin_long_market_win_full() {
             timestamp_exchange_ns: 0.into(),
         })
         .unwrap();
-    assert_eq!(exchange.balances().total_fees_paid, QuoteCurrency::zero());
+    assert_eq!(exchange.balances().total_fees_paid(), QuoteCurrency::zero());
 
     let qty = BaseCurrency::new(5, 0);
     exchange
@@ -50,13 +50,12 @@ fn lin_long_market_win_full() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(500, 0),
-            position_margin: QuoteCurrency::new(500, 0),
-            order_margin: QuoteCurrency::zero(),
-            total_fees_paid: fees,
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(500, 0))
+            .position_margin(QuoteCurrency::new(500, 0))
+            .order_margin(QuoteCurrency::zero())
+            .total_fees_paid(fees)
+            .build()
     );
 
     let bid = QuoteCurrency::new(200, 0);
@@ -89,16 +88,15 @@ fn lin_long_market_win_full() {
     );
     assert_eq!(
         exchange.balances(),
-        &Balances {
-            available: QuoteCurrency::new(14991, 1),
-            position_margin: QuoteCurrency::zero(),
-            order_margin: QuoteCurrency::zero(),
-            total_fees_paid: QuoteCurrency::new(9, 1),
-            _i: std::marker::PhantomData
-        }
+        &Balances::builder()
+            .available(QuoteCurrency::new(14991, 1))
+            .position_margin(QuoteCurrency::zero())
+            .order_margin(QuoteCurrency::zero())
+            .total_fees_paid(QuoteCurrency::new(9, 1))
+            .build()
     );
     assert_eq!(
-        exchange.balances().total_fees_paid,
+        exchange.balances().total_fees_paid(),
         QuoteCurrency::new(9, 1)
     );
 }
