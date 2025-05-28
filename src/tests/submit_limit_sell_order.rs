@@ -4,8 +4,6 @@ use crate::{mock_exchange_linear, prelude::*, test_fee_maker};
 #[tracing_test::traced_test]
 fn submit_limit_sell_order_no_position() {
     let mut exchange = mock_exchange_linear();
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(
         exchange
             .update_state(&Bba {
@@ -52,13 +50,7 @@ fn submit_limit_sell_order_no_position() {
     let fee = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_maker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Short(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            fee,
-            &mut balances,
-        ))
+        Position::Short(PositionInner::new(qty, entry_price,))
     );
     assert_eq!(
         exchange.balances(),

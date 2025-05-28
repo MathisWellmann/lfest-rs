@@ -279,13 +279,7 @@ mod tests {
         let init_margin = notional * init_margin_req;
         assert!(balances.try_reserve_order_margin(init_margin));
 
-        let position = Position::Long(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            QuoteCurrency::new(0, 0),
-            &mut balances,
-        ));
+        let position = Position::Long(PositionInner::new(qty, entry_price));
 
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
@@ -310,13 +304,7 @@ mod tests {
         let init_margin = notional * init_margin_req;
         assert!(balances.try_reserve_order_margin(init_margin));
 
-        let position = Position::Short(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            QuoteCurrency::new(0, 0),
-            &mut balances,
-        ));
+        let position = Position::Short(PositionInner::new(qty, entry_price));
 
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
@@ -470,26 +458,9 @@ mod tests {
 
         let pos_entry_price = QuoteCurrency::new(pos_entry_price, 0);
 
-        let mut balances = Balances::new(QuoteCurrency::new(10000, 0));
-        let init_margin = QuoteCurrency::convert_from(qty, pos_entry_price) * init_margin_req;
-        assert!(balances.try_reserve_order_margin(init_margin));
-
-        let fees = QuoteCurrency::convert_from(qty, limit_price);
         let position = match side {
-            Side::Buy => Position::Short(PositionInner::new(
-                qty,
-                pos_entry_price,
-                init_margin_req,
-                fees,
-                &mut balances,
-            )),
-            Side::Sell => Position::Long(PositionInner::new(
-                qty,
-                pos_entry_price,
-                init_margin_req,
-                fees,
-                &mut balances,
-            )),
+            Side::Buy => Position::Short(PositionInner::new(qty, pos_entry_price)),
+            Side::Sell => Position::Long(PositionInner::new(qty, pos_entry_price)),
         };
 
         assert_eq!(
@@ -598,24 +569,11 @@ mod tests {
     #[tracing_test::traced_test]
     fn order_margin_with_long() {
         let mut order_margin = OrderMargin::new(10);
-        let init_margin_req = Decimal::one();
 
-        let qty = BaseCurrency::new(1, 0);
+        let qty = BaseCurrency::<i64, 5>::new(1, 0);
         let entry_price = QuoteCurrency::new(100, 0);
-        let notional = QuoteCurrency::convert_from(qty, entry_price);
-        let fee = notional * *test_fee_maker().as_ref();
 
-        let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
-        let init_margin = notional * init_margin_req;
-        assert!(balances.try_reserve_order_margin(init_margin));
-
-        let position = Position::Long(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            fee,
-            &mut balances,
-        ));
+        let position = Position::Long(PositionInner::new(qty, entry_price));
         let init_margin_req = Decimal::one();
 
         assert_eq!(
@@ -669,24 +627,11 @@ mod tests {
     #[tracing_test::traced_test]
     fn order_margin_with_short() {
         let mut order_margin = OrderMargin::<i64, 5, _, NoUserOrderId>::new(10);
-        let init_margin_req = Decimal::one();
 
         let qty = BaseCurrency::<i64, DECIMALS>::one();
         let entry_price = QuoteCurrency::new(100, 0);
-        let notional = QuoteCurrency::convert_from(qty, entry_price);
-        let fee = notional * *test_fee_maker().as_ref();
 
-        let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
-        let init_margin = notional * init_margin_req;
-        assert!(balances.try_reserve_order_margin(init_margin));
-
-        let position = Position::Short(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            fee,
-            &mut balances,
-        ));
+        let position = Position::Short(PositionInner::new(qty, entry_price));
         let init_margin_req = Decimal::one();
 
         assert_eq!(

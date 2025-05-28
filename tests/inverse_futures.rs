@@ -7,8 +7,6 @@ use num_traits::{One, Zero};
 #[tracing_test::traced_test]
 fn inv_long_market_win_full() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::new(1, 0));
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
         .update_state(&Bba {
             bid: QuoteCurrency::new(999, 0),
@@ -39,13 +37,7 @@ fn inv_long_market_win_full() {
     let fees = BaseCurrency::convert_from(size, bid) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Long(PositionInner::new(
-            size,
-            bid,
-            init_margin_req,
-            fees,
-            &mut balances,
-        ))
+        Position::Long(PositionInner::new(size, bid,))
     );
     assert_eq!(
         exchange.position().unrealized_pnl(bid, ask),
@@ -107,8 +99,6 @@ fn inv_long_market_win_full() {
 #[tracing_test::traced_test]
 fn inv_long_market_loss_full() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(999, 0);
     let ask = QuoteCurrency::new(1000, 0);
     let order_updates = exchange
@@ -128,13 +118,7 @@ fn inv_long_market_loss_full() {
     let fees = BaseCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Long(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            fees,
-            &mut balances,
-        ))
+        Position::Long(PositionInner::new(qty, entry_price,))
     );
     assert_eq!(
         exchange
@@ -201,8 +185,6 @@ fn inv_long_market_loss_full() {
 #[tracing_test::traced_test]
 fn inv_short_market_win_full() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(1000, 0);
     assert!(
         exchange
@@ -223,13 +205,7 @@ fn inv_short_market_win_full() {
     let fees = BaseCurrency::convert_from(qty, bid) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Short(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            fees,
-            &mut balances,
-        ))
+        Position::Short(PositionInner::new(qty, entry_price,))
     );
     assert_eq!(
         exchange.balances(),
@@ -302,8 +278,6 @@ fn inv_short_market_win_full() {
 #[tracing_test::traced_test]
 fn inv_short_market_loss_full() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(
         exchange
             .update_state(&Bba {
@@ -336,13 +310,7 @@ fn inv_short_market_loss_full() {
     let fees = BaseCurrency::convert_from(size, ask) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Short(PositionInner::new(
-            size,
-            ask,
-            init_margin_req,
-            fees,
-            &mut balances,
-        ))
+        Position::Short(PositionInner::new(size, ask,))
     );
     assert_eq!(
         exchange
@@ -385,8 +353,6 @@ fn inv_short_market_loss_full() {
 #[tracing_test::traced_test]
 fn inv_long_market_win_partial() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let order_updates = exchange
         .update_state(&Bba {
             bid: QuoteCurrency::new(999, 0),
@@ -415,13 +381,7 @@ fn inv_long_market_win_partial() {
     let fee_0 = BaseCurrency::convert_from(size, bid) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Long(PositionInner::new(
-            size,
-            bid,
-            init_margin_req,
-            fee_0,
-            &mut balances,
-        ))
+        Position::Long(PositionInner::new(size, bid,))
     );
     assert_eq!(
         exchange.position().unrealized_pnl(bid, ask),
@@ -498,8 +458,6 @@ fn inv_long_market_win_partial() {
 #[tracing_test::traced_test]
 fn inv_long_market_loss_partial() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(999, 0);
     let ask = QuoteCurrency::new(1000, 0);
     let order_updates = exchange
@@ -529,13 +487,7 @@ fn inv_long_market_loss_partial() {
     let fee = BaseCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Long(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            fee,
-            &mut balances,
-        ))
+        Position::Long(PositionInner::new(qty, entry_price,))
     );
 
     let bid = QuoteCurrency::new(800, 0);
@@ -597,8 +549,6 @@ fn inv_long_market_loss_partial() {
 #[tracing_test::traced_test]
 fn inv_short_market_win_partial() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(1000, 0);
     let _ = exchange
         .update_state(&Bba {
@@ -625,13 +575,7 @@ fn inv_short_market_win_partial() {
 
     assert_eq!(
         exchange.position().clone(),
-        Position::Short(PositionInner::new(
-            qty,
-            QuoteCurrency::new(1000, 0),
-            init_margin_req,
-            fee_0,
-            &mut balances,
-        ))
+        Position::Short(PositionInner::new(qty, QuoteCurrency::new(1000, 0),))
     );
     assert_eq!(
         exchange.position().unrealized_pnl(bid, ask),
@@ -684,9 +628,6 @@ fn inv_short_market_win_partial() {
         Position::Short(PositionInner::new(
             QuoteCurrency::new(400, 0),
             QuoteCurrency::new(1000, 0),
-            init_margin_req,
-            BaseCurrency::zero(),
-            &mut balances,
         ))
     );
     assert_eq!(
@@ -710,8 +651,6 @@ fn inv_short_market_win_partial() {
 #[tracing_test::traced_test]
 fn inv_short_market_loss_partial() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let order_updates = exchange
         .update_state(&Bba {
             bid: QuoteCurrency::new(1000, 0),
@@ -743,13 +682,7 @@ fn inv_short_market_loss_partial() {
 
     assert_eq!(
         exchange.position().clone(),
-        Position::Short(PositionInner::new(
-            size,
-            ask,
-            init_margin_req,
-            fee_base1,
-            &mut balances,
-        ))
+        Position::Short(PositionInner::new(size, ask,))
     );
     assert_eq!(
         exchange.position().unrealized_pnl(bid, ask),
@@ -844,8 +777,6 @@ fn inv_test_market_roundtrip() {
 #[tracing_test::traced_test]
 fn inv_execute_limit() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(1000, 0);
     let ask = QuoteCurrency::new(1001, 0);
     let _ = exchange
@@ -897,13 +828,7 @@ fn inv_execute_limit() {
     assert_eq!(exchange.active_limit_orders().len(), 0);
     assert_eq!(
         exchange.position().clone(),
-        Position::Long(PositionInner::new(
-            qty,
-            limit_price,
-            init_margin_req,
-            fee_0,
-            &mut balances,
-        ))
+        Position::Long(PositionInner::new(qty, limit_price,))
     );
     assert_eq!(
         exchange.balances(),
@@ -981,13 +906,7 @@ fn inv_execute_limit() {
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange.position().clone(),
-        Position::Short(PositionInner::new(
-            qty,
-            limit_price,
-            init_margin_req,
-            fee_2,
-            &mut balances,
-        ))
+        Position::Short(PositionInner::new(qty, limit_price,))
     );
     assert_eq!(
         exchange.balances(),

@@ -1,7 +1,9 @@
 use std::{cmp::Ordering, ops::Neg};
 
 use const_decimal::Decimal;
+use num::One;
 use num_traits::Zero;
+use tracing::trace;
 
 use crate::{
     position_inner::PositionInner,
@@ -77,164 +79,147 @@ where
         filled_qty: BaseOrQuote,
         fill_price: QuoteCurrency<I, D>,
         side: Side,
-        init_margin_req: Decimal<I, D>,
-        fees: BaseOrQuote::PairedCurrency,
         balances: &mut Balances<I, D, BaseOrQuote::PairedCurrency>,
+        init_margin_req: Decimal<I, D>,
     ) {
+        use Position::*;
+        use Side::*;
+
+        trace!("change_position {self}, {side} {filled_qty} @ {fill_price}, balances: {balances}");
         assert2::debug_assert!(
             filled_qty > BaseOrQuote::zero(),
             "The filled_qty must be greater than zero"
         );
+        assert2::debug_assert!(init_margin_req <= Decimal::one());
+        assert2::debug_assert!(init_margin_req >= Decimal::zero());
+        let position_margin = self.total_cost() * init_margin_req;
+        debug_assert_eq!(balances.position_margin(), position_margin);
+
         match self {
-            Position::Neutral => {
-                debug_assert_eq!(
-                    balances.position_margin(),
-                    BaseOrQuote::PairedCurrency::zero()
-                );
-                match side {
-                    Side::Buy => {
-                        *self = Position::Long(PositionInner::new(
-                            filled_qty,
-                            fill_price,
-                            init_margin_req,
-                            fees,
-                            balances,
-                        ))
-                    }
-                    Side::Sell => {
-                        *self = Position::Short(PositionInner::new(
-                            filled_qty,
-                            fill_price,
-                            init_margin_req,
-                            fees,
-                            balances,
-                        ))
-                    }
-                }
-            }
-            Position::Long(inner) => match side {
-                Side::Buy => {
-                    inner.increase_contracts(
-                        filled_qty,
-                        fill_price,
-                        init_margin_req,
-                        fees,
-                        balances,
+            Neutral => match side {
+                Buy => {
+                    let margin = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price)
+                        * init_margin_req;
+                    debug_assert!(
+                        balances.try_reserve_position_margin(margin),
+                        "Can reserve position margin"
                     );
+                    *self = Long(PositionInner::new(filled_qty, fill_price));
                 }
-                Side::Sell => match filled_qty.cmp(&inner.quantity()) {
+                Sell => {
+                    let margin = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price)
+                        * init_margin_req;
+                    debug_assert!(
+                        balances.try_reserve_position_margin(margin),
+                        "Can reserve position margin"
+                    );
+                    *self = Short(PositionInner::new(filled_qty, fill_price));
+                }
+            },
+            Long(inner) => match side {
+                Buy => {
+                    let margin = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price)
+                        * init_margin_req;
+                    debug_assert!(
+                        balances.try_reserve_position_margin(margin),
+                        "Can reserve position margin"
+                    );
+                    inner.increase_contracts(filled_qty, fill_price);
+                }
+                Sell => match filled_qty.cmp(&inner.quantity()) {
                     Ordering::Less => {
-                        inner.decrease_contracts(
+                        let pnl = inner.decrease_contracts(filled_qty, fill_price, true);
+                        balances.apply_pnl(pnl);
+                        let margin = BaseOrQuote::PairedCurrency::convert_from(
                             filled_qty,
-                            fill_price,
-                            init_margin_req,
-                            1,
-                            fees,
-                            balances,
-                        );
+                            inner.entry_price(),
+                        ) * init_margin_req;
+                        balances.free_position_margin(margin);
                     }
                     Ordering::Equal => {
-                        inner.decrease_contracts(
+                        let pnl = inner.decrease_contracts(filled_qty, fill_price, true);
+                        balances.apply_pnl(pnl);
+                        let margin = BaseOrQuote::PairedCurrency::convert_from(
                             filled_qty,
-                            fill_price,
-                            init_margin_req,
-                            1,
-                            fees,
-                            balances,
-                        );
-                        *self = Position::Neutral;
-                        debug_assert_eq!(
-                            balances.position_margin(),
-                            BaseOrQuote::PairedCurrency::zero()
-                        );
+                            inner.entry_price(),
+                        ) * init_margin_req;
+                        balances.free_position_margin(margin);
+                        *self = Neutral;
+                        debug_assert_eq!(balances.position_margin(), Zero::zero());
                     }
                     Ordering::Greater => {
                         let new_short_qty = filled_qty - inner.quantity();
-                        inner.decrease_contracts(
-                            inner.quantity(),
-                            fill_price,
-                            init_margin_req,
-                            1,
-                            fees,
-                            balances,
+                        let pnl = inner.decrease_contracts(inner.quantity(), fill_price, true);
+                        balances.apply_pnl(pnl);
+                        debug_assert_eq!(inner.quantity(), BaseOrQuote::zero());
+                        debug_assert_eq!(balances.position_margin(), Zero::zero());
+                        *self = Short(PositionInner::new(new_short_qty, fill_price));
+                        let margin =
+                            BaseOrQuote::PairedCurrency::convert_from(new_short_qty, fill_price)
+                                * init_margin_req;
+                        debug_assert!(
+                            balances.try_reserve_position_margin(margin),
+                            "Can reserve position margin"
                         );
-                        assert_eq!(inner.quantity(), BaseOrQuote::zero());
-                        debug_assert_eq!(
-                            balances.position_margin(),
-                            BaseOrQuote::PairedCurrency::zero()
-                        );
-                        *self = Position::Short(PositionInner::new(
-                            new_short_qty,
-                            fill_price,
-                            init_margin_req,
-                            BaseOrQuote::PairedCurrency::zero(),
-                            balances,
-                        ));
                     }
                 },
             },
-            Position::Short(inner) => match side {
-                Side::Buy => match filled_qty.cmp(&inner.quantity()) {
+            Short(inner) => match side {
+                Buy => match filled_qty.cmp(&inner.quantity()) {
                     Ordering::Less => {
-                        inner.decrease_contracts(
+                        let pnl = inner.decrease_contracts(filled_qty, fill_price, false);
+                        balances.apply_pnl(pnl);
+                        let margin = BaseOrQuote::PairedCurrency::convert_from(
                             filled_qty,
-                            fill_price,
-                            init_margin_req,
-                            -1,
-                            fees,
-                            balances,
-                        );
+                            inner.entry_price(),
+                        ) * init_margin_req;
+                        balances.free_position_margin(margin);
                     }
                     Ordering::Equal => {
-                        inner.decrease_contracts(
+                        let pnl = inner.decrease_contracts(filled_qty, fill_price, false);
+                        balances.apply_pnl(pnl);
+                        let margin = BaseOrQuote::PairedCurrency::convert_from(
                             filled_qty,
-                            fill_price,
-                            init_margin_req,
-                            -1,
-                            fees,
-                            balances,
-                        );
-                        *self = Position::Neutral;
-                        debug_assert_eq!(
-                            balances.position_margin(),
-                            BaseOrQuote::PairedCurrency::zero()
-                        );
+                            inner.entry_price(),
+                        ) * init_margin_req;
+                        balances.free_position_margin(margin);
+                        *self = Neutral;
+                        debug_assert_eq!(balances.position_margin(), Zero::zero());
                     }
                     Ordering::Greater => {
                         let new_long_qty = filled_qty - inner.quantity();
-                        inner.decrease_contracts(
-                            inner.quantity(),
-                            fill_price,
-                            init_margin_req,
-                            -1,
-                            fees,
-                            balances,
+                        let pnl = inner.decrease_contracts(inner.quantity(), fill_price, false);
+                        balances.apply_pnl(pnl);
+                        debug_assert_eq!(inner.quantity(), BaseOrQuote::zero());
+                        let margin = BaseOrQuote::PairedCurrency::convert_from(
+                            filled_qty,
+                            inner.entry_price(),
+                        ) * init_margin_req;
+                        balances.free_position_margin(margin);
+
+                        *self = Long(PositionInner::new(new_long_qty, fill_price));
+                        let margin =
+                            BaseOrQuote::PairedCurrency::convert_from(new_long_qty, fill_price)
+                                * init_margin_req;
+                        debug_assert!(
+                            balances.try_reserve_position_margin(margin),
+                            "Can reserve position margin"
                         );
-                        assert_eq!(inner.quantity(), BaseOrQuote::zero());
-                        debug_assert_eq!(
-                            balances.position_margin(),
-                            BaseOrQuote::PairedCurrency::zero()
-                        );
-                        *self = Position::Long(PositionInner::new(
-                            new_long_qty,
-                            fill_price,
-                            init_margin_req,
-                            BaseOrQuote::PairedCurrency::zero(),
-                            balances,
-                        ));
                     }
                 },
-                Side::Sell => {
-                    inner.increase_contracts(
-                        filled_qty,
-                        fill_price,
-                        init_margin_req,
-                        fees,
-                        balances,
+                Sell => {
+                    inner.increase_contracts(filled_qty, fill_price);
+                    let margin = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price)
+                        * init_margin_req;
+                    debug_assert!(
+                        balances.try_reserve_position_margin(margin),
+                        "Can reserve position margin"
                     );
                 }
             },
         };
+        let position_margin = self.total_cost() * init_margin_req;
+        debug_assert_eq!(balances.position_margin(), position_margin);
     }
 }
 
@@ -259,6 +244,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use const_decimal::Decimal;
+
     use super::*;
     use crate::prelude::*;
 
@@ -271,57 +258,51 @@ mod tests {
         assert_eq!(&pos.to_string(), "Short 0.31700 Base @ 9584.23665 Quote");
     }
 
-    #[test]
     #[tracing_test::traced_test]
-    fn position_change_position() {
+    #[test_case::test_matrix([1, 2, 3, 5, 10])]
+    fn position_change_position(leverage: u8) {
         let qty = BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(317, 3).unwrap());
-        let entry_price = QuoteCurrency::from(Decimal::try_from_scaled(958423665, 5).unwrap());
-        let notional = QuoteCurrency::convert_from(qty, entry_price);
-        let init_margin_req = Decimal::ONE;
-        let fees = QuoteCurrency::zero();
+        let entry_price = QuoteCurrency::from(Decimal::try_from_scaled(9584_23, 2).unwrap());
 
+        let notional = QuoteCurrency::convert_from(qty, entry_price);
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
         let mut balances = Balances::new(QuoteCurrency::new(10000, 0));
         let init_margin = notional * init_margin_req;
-        assert!(balances.try_reserve_order_margin(init_margin));
+        assert!(balances.try_reserve_position_margin(init_margin));
 
-        let mut pos = Position::Short(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            fees,
-            &mut balances,
-        ));
+        let mut pos = Position::Short(PositionInner::new(qty, entry_price));
 
-        pos.change_position(
-            BaseCurrency::new(317, 3),
-            QuoteCurrency::new(3020427, 2),
-            Side::Buy,
-            init_margin_req,
-            fees,
-            &mut balances,
+        let exit_price = QuoteCurrency::new(30204_27, 2);
+        pos.change_position(qty, exit_price, Side::Buy, &mut balances, init_margin_req);
+        assert_eq!(
+            balances,
+            Balances::builder()
+                .available(QuoteCurrency::new(10_000, 0) - QuoteCurrency::new(6536_55268,5))
+                .position_margin(Zero::zero())
+                .order_margin(Zero::zero())
+                .total_fees_paid(Zero::zero())
+                .build()
         );
     }
 
-    #[test]
+    #[test_case::test_matrix([1, 2, 5, 10])]
     #[tracing_test::traced_test]
     #[ignore]
-    fn position_change_position_2() {
+    fn position_change_position_2(leverage: u8) {
         let mut pos = Position::Long(PositionInner::from_parts(
             BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(16800, 5).unwrap()),
             QuoteCurrency::from(Decimal::try_from_scaled(5949354994, 5).unwrap()),
         ));
-        let fee = QuoteCurrency::from(Decimal::try_from_scaled(600056, 5).unwrap());
         let filled_qty = BaseCurrency::new(16800, 5);
         let fill_price = QuoteCurrency::new(6001260000, 5);
-        let init_margin_req = Decimal::ONE;
         let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
         pos.change_position(
             filled_qty,
             fill_price,
             Side::Sell,
-            init_margin_req,
-            fee,
             &mut balances,
+            init_margin_req,
         );
     }
 
@@ -330,6 +311,10 @@ mod tests {
         assert_eq!(
             std::mem::size_of::<Position<i64, 5, BaseCurrency<_, 5>>>(),
             24
+        );
+        assert_eq!(
+            std::mem::size_of::<Position<i32, 4, BaseCurrency<_, 4>>>(),
+            12
         );
     }
 }

@@ -7,8 +7,6 @@ use lfest::{mock_exchange_linear_with_account_tracker, prelude::*, test_fee_take
 fn lin_long_market_win_full() {
     let starting_balance = QuoteCurrency::new(1000, 0);
     let mut exchange = mock_exchange_linear_with_account_tracker(starting_balance);
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
         .update_state(&Bba {
             bid: QuoteCurrency::new(99, 0),
@@ -36,13 +34,7 @@ fn lin_long_market_win_full() {
     let fees = QuoteCurrency::convert_from(qty, bid) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Long(PositionInner::new(
-            qty,
-            bid,
-            init_margin_req,
-            fees,
-            &mut balances,
-        ))
+        Position::Long(PositionInner::new(qty, bid,))
     );
     assert_eq!(
         exchange.position().unrealized_pnl(bid, ask),

@@ -66,7 +66,7 @@ where
     }
 
     /// Sum of all balances.
-    #[inline]
+    #[inline(always)]
     pub fn sum(&self) -> BaseOrQuote {
         self.available + self.position_margin + self.order_margin
     }
@@ -78,64 +78,76 @@ where
     }
 
     /// If `fee` is negative then we receive balance.
-    #[inline]
+    #[inline(always)]
     pub fn account_for_fee(&mut self, fee: BaseOrQuote) {
+        trace!("account_for_fee: {fee}");
         self.debug_assert_state();
 
         self.available -= fee;
+        assert2::debug_assert!(self.available >= BaseOrQuote::zero());
+
         self.total_fees_paid += fee;
     }
 
-    /// Placing an order requires locking margin balance.
-    #[inline]
+    /// Try to reserve some order margin from available balance.
+    #[inline(always)]
     #[must_use]
     pub fn try_reserve_order_margin(&mut self, init_margin: BaseOrQuote) -> bool {
         trace!("try_reserve_order_margin {init_margin} on self: {self}");
-        assert2::assert!(init_margin > BaseOrQuote::zero());
+        assert2::debug_assert!(init_margin > BaseOrQuote::zero());
         self.debug_assert_state();
 
         if init_margin > self.available {
             return false;
         }
 
-        self.available = self.available - init_margin;
-        self.order_margin = self.order_margin + init_margin;
+        self.available -= init_margin;
+        assert2::debug_assert!(self.available >= BaseOrQuote::zero());
+        self.order_margin += init_margin;
         true
     }
 
-    /// Filling an order requires moving order margin to position margin.
-    #[inline]
-    pub fn fill_order(&mut self, margin: BaseOrQuote) {
-        assert2::assert!(margin > BaseOrQuote::zero());
-        self.debug_assert_state();
-        assert2::assert!(self.order_margin >= margin);
-
-        self.order_margin -= margin;
-        self.position_margin += margin;
-    }
-
     /// Cancelling an order requires freeing the locked margin balance.
-    #[inline]
+    #[inline(always)]
     pub fn free_order_margin(&mut self, margin: BaseOrQuote) {
         trace!("free_order_margin: {margin} on self: {self}");
-        assert2::assert!(margin > BaseOrQuote::zero());
+        assert2::debug_assert!(margin > BaseOrQuote::zero());
         self.debug_assert_state();
-        assert2::assert!(self.order_margin >= margin);
+        assert2::debug_assert!(self.order_margin >= margin);
 
         self.order_margin -= margin;
+        assert2::debug_assert!(self.order_margin >= BaseOrQuote::zero());
         self.available += margin;
     }
 
     /// Closing a position frees the position margin.
-    #[inline]
+    #[inline(always)]
     pub fn free_position_margin(&mut self, margin: BaseOrQuote) {
         trace!("free_position_margin: {margin} on self: {self}");
-        assert2::assert!(margin > BaseOrQuote::zero());
+        assert2::debug_assert!(margin > BaseOrQuote::zero());
         self.debug_assert_state();
-        assert2::assert!(self.position_margin >= margin);
+        assert2::debug_assert!(self.position_margin >= margin);
 
         self.position_margin -= margin;
+        assert2::debug_assert!(self.position_margin >= BaseOrQuote::zero());
         self.available += margin;
+    }
+
+    /// Try to reserve some position margin from available balance.
+    #[inline(always)]
+    pub fn try_reserve_position_margin(&mut self, margin: BaseOrQuote) -> bool {
+        trace!("try_reserve_position_margin {margin} on self: {self}");
+        assert2::debug_assert!(margin > BaseOrQuote::zero());
+        self.debug_assert_state();
+
+        if margin > self.available {
+            return false;
+        }
+
+        self.available -= margin;
+        assert2::debug_assert!(self.available >= BaseOrQuote::zero());
+        self.position_margin += margin;
+        true
     }
 
     /// Profit and loss are applied to the available balance.
@@ -143,6 +155,7 @@ where
     pub fn apply_pnl(&mut self, pnl: BaseOrQuote) {
         trace!("apply_pnl: {pnl}, self: {self}");
         self.available += pnl;
+        assert2::debug_assert!(self.available >= BaseOrQuote::zero());
     }
 }
 

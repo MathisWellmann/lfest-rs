@@ -24,6 +24,7 @@ impl<I, const D: u8> Leverage<I, D>
 where
     I: Mon<D>,
 {
+    // TODO: use `NonZeroU8`
     /// Create a new instance from a `Decimal` value
     pub fn new(val: u8) -> Result<Self, ConfigError> {
         if val < 1 {

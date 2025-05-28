@@ -1,0 +1,14 @@
+dictionaries = ["en_us", "en_gb"]
+words = [
+  "bba",
+  "bnh",
+  "codebook",
+  "drawdown",
+  "drawdowns",
+  "roi",
+  "rois",
+  "rpnl",
+  "pnl",
+]
+ignore_paths = ["target/**/*", "**/*.json", ".git/**/*"]
+ignore_patterns = ["^[ATCG]+$", '\d{3}-\d{2}-\d{4}']

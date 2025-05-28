@@ -1,5 +1,3 @@
-use const_decimal::Decimal;
-
 use crate::{mock_exchange_linear, prelude::*, test_fee_maker, test_fee_taker};
 
 #[test]
@@ -29,7 +27,7 @@ fn submit_limit_buy_order_no_position() {
             .available(QuoteCurrency::new(510, 0))
             .position_margin(QuoteCurrency::new(0, 0))
             .order_margin(QuoteCurrency::new(490, 0))
-            .total_fees_paid(fee)
+            .total_fees_paid(Zero::zero())
             .build()
     );
 
@@ -61,27 +59,20 @@ fn submit_limit_buy_order_no_position() {
             .unwrap()
             .is_empty()
     );
-    let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
-    let init_margin_req = Decimal::one();
     assert_eq!(
         exchange.position(),
-        &Position::Long(PositionInner::new(
-            qty,
-            limit_price,
-            init_margin_req,
-            fee,
-            &mut balances,
-        ))
+        &Position::Long(PositionInner::new(qty, limit_price))
     );
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(510, 0))
+            .available(QuoteCurrency::new(510, 0) - fee)
             .position_margin(QuoteCurrency::new(490, 0))
             .order_margin(QuoteCurrency::new(0, 0))
             .total_fees_paid(fee)
             .build()
     );
+    assert!(exchange.active_limit_orders().is_empty());
 
     // close the position again with a limit order.
     let order = LimitOrder::new(
@@ -91,6 +82,19 @@ fn submit_limit_buy_order_no_position() {
     )
     .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
+    assert_eq!(
+        exchange.position(),
+        &Position::Long(PositionInner::new(qty, limit_price))
+    );
+    assert_eq!(
+        exchange.balances(),
+        &Balances::builder()
+            .available(QuoteCurrency::new(510, 0) - fee)
+            .position_margin(QuoteCurrency::new(490, 0))
+            .order_margin(QuoteCurrency::new(0, 0)) // TODO: zero or 490 ?
+            .total_fees_paid(fee)
+            .build()
+    );
 
     assert!(
         exchange
@@ -120,6 +124,16 @@ fn submit_limit_buy_order_no_position() {
         &vec![expected_order_update]
     );
     assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(
+        exchange.balances(),
+        &Balances::builder()
+            .available(QuoteCurrency::new(1000, 0) - fee - fee)
+            .position_margin(Zero::zero())
+            .order_margin(Zero::zero())
+            .total_fees_paid(fee + fee)
+            .build()
+    );
+    assert!(exchange.active_limit_orders().is_empty());
 }
 
 // Test there is a maximum quantity of buy orders the account can post.
@@ -190,8 +204,6 @@ fn submit_limit_buy_order_no_position_max() {
 #[tracing_test::traced_test]
 fn submit_limit_buy_order_with_long() {
     let mut exchange = mock_exchange_linear();
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(99, 0);
     let ask = QuoteCurrency::new(100, 0);
     assert!(
@@ -214,9 +226,6 @@ fn submit_limit_buy_order_with_long() {
         Position::Long(PositionInner::new(
             BaseCurrency::new(9, 0),
             QuoteCurrency::new(100, 0),
-            init_margin_req,
-            fee,
-            &mut balances,
         )),
     );
     assert_eq!(
@@ -284,8 +293,6 @@ fn submit_limit_buy_order_with_long() {
 #[test]
 fn submit_limit_buy_order_with_short() {
     let mut exchange = mock_exchange_linear();
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(
         exchange
             .update_state(&Bba {
@@ -304,13 +311,7 @@ fn submit_limit_buy_order_with_short() {
     let fee = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Short(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            fee,
-            &mut balances,
-        ))
+        Position::Short(PositionInner::new(qty, entry_price,))
     );
     assert_eq!(
         exchange.balances(),

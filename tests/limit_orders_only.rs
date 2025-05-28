@@ -7,9 +7,6 @@ use num_traits::Zero;
 #[tracing_test::traced_test]
 fn limit_orders_only() {
     let mut exchange = mock_exchange_linear_with_account_tracker(QuoteCurrency::new(1000, 0));
-    let mut balances = exchange.balances().clone();
-
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let fee_maker = exchange.config().contract_spec().fee_maker();
 
     let bid = QuoteCurrency::new(100, 0);
@@ -57,13 +54,7 @@ fn limit_orders_only() {
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange.position().clone(),
-        Position::Long(PositionInner::new(
-            qty,
-            QuoteCurrency::new(100, 0),
-            init_margin_req,
-            fee0,
-            &mut balances,
-        ))
+        Position::Long(PositionInner::new(qty, QuoteCurrency::new(100, 0),))
     );
     assert_eq!(
         exchange

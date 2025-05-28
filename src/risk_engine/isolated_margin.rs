@@ -136,7 +136,7 @@ where
                 assert!(
                     balances.try_reserve_order_margin(init_margin),
                     "Can reserve order margin"
-                )
+                );
             }
             Position::Short(pos_inner) => {
                 if order.quantity() <= pos_inner.quantity() {
@@ -145,7 +145,6 @@ where
                 }
                 // The order reduces the short and puts on a long
                 let released_from_old_pos = balances.position_margin();
-                balances.free_position_margin(released_from_old_pos);
 
                 let new_long_size = Self::quantity_minus_position(order.quantity(), pos_inner);
                 assert2::debug_assert!(new_long_size > BaseOrQuote::zero());
@@ -168,7 +167,7 @@ where
                 assert!(
                     balances.try_reserve_order_margin(new_init_margin),
                     "Can reserve order margin"
-                )
+                );
             }
         }
 
@@ -200,7 +199,7 @@ where
                 assert!(
                     balances.try_reserve_order_margin(init_margin),
                     "Can reserve order margin"
-                )
+                );
             }
             Position::Long(pos_inner) => {
                 // Else its a long position which needs to be reduced
@@ -210,7 +209,6 @@ where
                 }
                 // The order reduces the long position and opens a short.
                 let released_from_old_pos = balances.position_margin();
-                balances.free_position_margin(released_from_old_pos);
 
                 let new_short_size = Self::quantity_minus_position(order.quantity(), pos_inner);
                 assert2::debug_assert!(new_short_size > BaseOrQuote::zero());
@@ -233,7 +231,7 @@ where
                 assert!(
                     balances.try_reserve_order_margin(new_init_margin),
                     "Can reserve order margin"
-                )
+                );
             }
         }
         Ok(())
@@ -344,19 +342,12 @@ mod tests {
         let qty = BaseCurrency::new(1, 0);
         let entry_price = QuoteCurrency::new(100, 0);
         let notional = QuoteCurrency::convert_from(qty, entry_price);
-        let fees = notional * *test_fee_maker().as_ref();
 
         let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
         let init_margin = notional * init_margin_req;
         assert!(balances.try_reserve_order_margin(init_margin));
 
-        let position = Position::Long(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            fees,
-            &mut balances,
-        ));
+        let position = Position::Long(PositionInner::new(qty, entry_price));
         RiskEngine::<_, DECIMALS, _, NoUserOrderId>::check_maintenance_margin(
             &re,
             &market_state,
@@ -364,16 +355,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
-        let init_margin = notional * init_margin_req;
-        assert!(balances.try_reserve_order_margin(init_margin));
-        let position = Position::Long(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            fees,
-            &mut balances,
-        ));
+        let position = Position::Long(PositionInner::new(qty, entry_price));
         let market_state = MarketState::from_components(
             QuoteCurrency::new(200, 0),
             QuoteCurrency::new(201, 0),
@@ -423,7 +405,6 @@ mod tests {
             test_fee_taker(),
         )
         .unwrap();
-        let init_margin_req = contract_spec.init_margin_req();
         let re =
             IsolatedMarginRiskEngine::<_, DECIMALS, BaseCurrency<_, DECIMALS>>::new(contract_spec);
         let market_state = MarketState::from_components(
@@ -434,21 +415,9 @@ mod tests {
             0,
         );
 
-        let qty = BaseCurrency::one();
-        let entry_price = QuoteCurrency::new(100, 0);
-        let notional = QuoteCurrency::convert_from(qty, entry_price);
-        let fees = notional * *test_fee_maker().as_ref();
-
-        let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
-        let init_margin = notional * init_margin_req;
-        assert!(balances.try_reserve_order_margin(init_margin));
-
         let position = Position::Short(PositionInner::new(
             BaseCurrency::one(),
             QuoteCurrency::new(100, 0),
-            init_margin_req,
-            fees,
-            &mut balances,
         ));
         RiskEngine::<i64, DECIMALS, _, NoUserOrderId>::check_maintenance_margin(
             &re,

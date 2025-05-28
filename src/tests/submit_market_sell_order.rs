@@ -24,7 +24,6 @@ fn submit_market_sell_order_reject() {
 #[test]
 fn submit_market_sell_order() {
     let mut exchange = mock_exchange_linear();
-    let mut balances = exchange.balances().clone();
     assert_eq!(
         exchange
             .update_state(&Bba {
@@ -38,24 +37,15 @@ fn submit_market_sell_order() {
 
     let qty = BaseCurrency::new(5, 0);
     let order = MarketOrder::new(Side::Sell, qty).unwrap();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
 
     exchange.submit_market_order(order).unwrap();
     // make sure its executed immediately
     let entry_price = QuoteCurrency::new(100, 0);
     let notional = QuoteCurrency::convert_from(qty, entry_price);
-    let init_margin = notional * init_margin_req;
-    assert!(balances.try_reserve_order_margin(init_margin));
     let fees = notional * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Short(PositionInner::new(
-            qty,
-            entry_price,
-            init_margin_req,
-            fees,
-            &mut balances,
-        ))
+        Position::Short(PositionInner::new(qty, entry_price,))
     );
     assert_eq!(
         exchange.balances(),
@@ -71,8 +61,6 @@ fn submit_market_sell_order() {
 #[test]
 fn submit_market_sell_order_with_short_position() {
     let mut exchange = mock_exchange_linear();
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
             .update_state(&Bba {
@@ -102,9 +90,6 @@ fn submit_market_sell_order_with_short_position() {
         Position::Short(PositionInner::new(
             BaseCurrency::new(5, 0),
             QuoteCurrency::new(100, 0),
-            init_margin_req,
-            fee0,
-            &mut balances,
         ))
     );
     assert_eq!(exchange.active_limit_orders(), &ActiveLimitOrders::new(10));
@@ -127,9 +112,6 @@ fn submit_market_sell_order_with_short_position() {
         Position::Short(PositionInner::new(
             BaseCurrency::new(9, 0),
             QuoteCurrency::new(100, 0),
-            init_margin_req,
-            fee0 + fee1,
-            &mut balances,
         ))
     );
     assert_eq!(exchange.active_limit_orders(), &ActiveLimitOrders::new(10));
@@ -180,7 +162,6 @@ fn submit_market_sell_order_with_long_position() {
 fn submit_market_sell_order_turnaround_long() {
     let mut exchange = mock_exchange_linear();
     let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(
         exchange
             .update_state(&Bba {
@@ -212,9 +193,6 @@ fn submit_market_sell_order_turnaround_long() {
         Position::Long(PositionInner::new(
             BaseCurrency::new(9, 0),
             QuoteCurrency::new(100, 0),
-            init_margin_req,
-            fee0,
-            &mut balances,
         ))
     );
     assert_eq!(exchange.active_limit_orders(), &ActiveLimitOrders::new(10));
@@ -239,9 +217,6 @@ fn submit_market_sell_order_turnaround_long() {
         Position::Short(PositionInner::new(
             BaseCurrency::new(9, 0),
             QuoteCurrency::new(99, 0),
-            init_margin_req,
-            QuoteCurrency::new(0, 0),
-            &mut balances,
         ))
     );
     assert_eq!(exchange.active_limit_orders(), &ActiveLimitOrders::new(10));

@@ -195,11 +195,11 @@ where
         fee: BaseOrQuote::PairedCurrency,
         ts_ns: TimestampNs,
     ) -> LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT> {
-        debug_assert!(
+        assert2::debug_assert!(
             filled_quantity <= self.remaining_quantity,
             "The filled quantity can not be greater than the limit order quantity"
         );
-        debug_assert!(
+        assert2::debug_assert!(
             filled_quantity > BaseOrQuote::zero(),
             "Filled quantity must be greater than zero."
         );
