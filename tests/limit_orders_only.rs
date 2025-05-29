@@ -145,6 +145,16 @@ fn limit_orders_2() {
     )
     .unwrap();
     exchange.submit_limit_order(o).unwrap();
+    assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(
+        exchange.balances(),
+        &Balances::builder()
+            .available(QuoteCurrency::new(92425, 2))
+            .position_margin(Zero::zero())
+            .order_margin(QuoteCurrency::new(7575, 2))
+            .total_fees_paid(Zero::zero())
+            .build()
+    );
 
     let o = LimitOrder::new(
         Side::Buy,
@@ -153,6 +163,16 @@ fn limit_orders_2() {
     )
     .unwrap();
     exchange.submit_limit_order(o).unwrap();
+    assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(
+        exchange.balances(),
+        &Balances::builder()
+            .available(QuoteCurrency::new(500, 0))
+            .position_margin(Zero::zero())
+            .order_margin(QuoteCurrency::new(500, 0))
+            .total_fees_paid(Zero::zero())
+            .build()
+    );
 
     let exec_orders = exchange
         .update_state(&Trade {
@@ -163,6 +183,22 @@ fn limit_orders_2() {
         })
         .unwrap()
         .clone();
+    assert_eq!(
+        exchange.position(),
+        &Position::Long(PositionInner::new(
+            BaseCurrency::new(2, 0),
+            QuoteCurrency::new(98, 0)
+        ))
+    );
+    assert_eq!(
+        exchange.balances(),
+        &Balances::builder()
+            .available(QuoteCurrency::new(92425, 2))
+            .position_margin(QuoteCurrency::new(196, 0))
+            .order_margin(QuoteCurrency::new(7575, 2))
+            .total_fees_paid(Zero::zero())
+            .build()
+    );
     let _ = exchange
         .update_state(&Bba {
             bid: QuoteCurrency::new(98, 0),

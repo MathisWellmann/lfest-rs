@@ -47,18 +47,18 @@ fn submit_limit_sell_order_no_position() {
         .unwrap();
     let qty = BaseCurrency::new(9, 0);
     let entry_price = QuoteCurrency::new(100, 0);
-    let fee = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_maker().as_ref();
+    let fee0 = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_maker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Short(PositionInner::new(qty, entry_price,))
+        Position::Short(PositionInner::new(qty, entry_price))
     );
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(100, 0))
+            .available(QuoteCurrency::new(100, 0) - fee0)
             .position_margin(QuoteCurrency::new(900, 0))
             .order_margin(QuoteCurrency::new(0, 0))
-            .total_fees_paid(fee)
+            .total_fees_paid(fee0)
             .build()
     );
 
@@ -73,9 +73,9 @@ fn submit_limit_sell_order_no_position() {
 
     let meta = ExchangeOrderMeta::new(1.into(), 2.into());
     let mut order = order.into_pending(meta);
-    let fee = QuoteCurrency::convert_from(order.remaining_quantity(), order.limit_price())
+    let fee1 = QuoteCurrency::convert_from(order.remaining_quantity(), order.limit_price())
         * *test_fee_maker().as_ref();
-    let expected_order_update = order.fill(order.remaining_quantity(), fee, 3.into());
+    let expected_order_update = order.fill(order.remaining_quantity(), fee1, 3.into());
     assert_eq!(
         exchange
             .update_state(&Trade {
@@ -91,10 +91,10 @@ fn submit_limit_sell_order_no_position() {
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(1000, 0) - fee - fee)
+            .available(QuoteCurrency::new(1000, 0) - fee0 - fee1)
             .position_margin(QuoteCurrency::new(0, 0))
             .order_margin(QuoteCurrency::new(0, 0))
-            .total_fees_paid(fee)
+            .total_fees_paid(fee0 + fee1)
             .build()
     );
 }

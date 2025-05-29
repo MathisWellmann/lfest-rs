@@ -54,21 +54,20 @@ where
         &self,
         position: &Position<I, D, BaseOrQuote>,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        available_wallet_balance: BaseOrQuote::PairedCurrency,
-        order_margin_online: &OrderMargin<I, D, BaseOrQuote, UserOrderIdT>,
+        available_balance: BaseOrQuote::PairedCurrency,
+        order_margin: &OrderMargin<I, D, BaseOrQuote, UserOrderIdT>,
     ) -> Result<(), RiskError> {
-        let order_margin =
-            order_margin_online.order_margin(self.contract_spec.init_margin_req(), position);
-        let new_order_margin = order_margin_online.order_margin_with_order(
+        let om = order_margin.order_margin(self.contract_spec.init_margin_req(), position);
+        let new_order_margin = order_margin.order_margin_with_order(
             order,
             self.contract_spec.init_margin_req(),
             position,
         );
 
         trace!(
-            "order_margin: {order_margin:?}, new_order_margin: {new_order_margin:?}, available_wallet_balance: {available_wallet_balance:?}"
+            "order_margin: {om:?}, new_order_margin: {new_order_margin:?}, available_balance: {available_balance:?}"
         );
-        if new_order_margin > available_wallet_balance + order_margin {
+        if new_order_margin > available_balance + om {
             return Err(RiskError::NotEnoughAvailableBalance);
         }
 

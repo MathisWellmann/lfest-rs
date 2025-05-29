@@ -518,7 +518,7 @@ where
             &self.active_limit_orders
         );
 
-        // TODO: peek at the first order, either buy or sell.
+        // TODO: peek at the first sorted order, either buy or sell.
         for order in self.active_limit_orders.values_mut() {
             // TODO: if some quantity was filled, mutate `market_update` to reflect the reduced liquidity so it does not fill more orders than possible.
             if let Some(filled_qty) = market_update.limit_order_filled(order) {

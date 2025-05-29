@@ -231,7 +231,7 @@ fn submit_limit_buy_order_with_long() {
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(100, 0))
+            .available(QuoteCurrency::new(100, 0) - fee)
             .position_margin(QuoteCurrency::new(900, 0))
             .order_margin(QuoteCurrency::new(0, 0))
             .total_fees_paid(fee)
@@ -316,7 +316,7 @@ fn submit_limit_buy_order_with_short() {
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(100, 0))
+            .available(QuoteCurrency::new(100, 0) - fee)
             .position_margin(QuoteCurrency::new(900, 0))
             .order_margin(QuoteCurrency::new(0, 0))
             .total_fees_paid(fee)
