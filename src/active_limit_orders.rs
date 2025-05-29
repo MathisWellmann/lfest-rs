@@ -140,7 +140,9 @@ where
             .arena
             .iter_mut()
             .position(|order| order.id() == order_id)?;
-        Some(self.arena.swap_remove(pos))
+        let removed = self.arena.swap_remove(pos);
+        trace!("removed order {removed}");
+        Some(removed)
     }
 
     /// Remove an active `LimitOrder` based on its `UserOrderId`.

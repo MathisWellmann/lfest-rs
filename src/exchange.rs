@@ -549,6 +549,19 @@ where
                 );
             }
         }
+        let new_order_margin = self.order_margin.order_margin(
+            self.config.contract_spec().init_margin_req(),
+            &self.position,
+        );
+        assert2::debug_assert!(
+            new_order_margin <= self.balances.order_margin(),
+            "The order margin does not increase with a filled limit order event."
+        );
+        if new_order_margin < self.balances.order_margin() {
+            let margin_delta = self.balances.order_margin() - new_order_margin;
+            assert2::debug_assert!(margin_delta > Zero::zero());
+            self.balances.free_order_margin(margin_delta);
+        }
 
         assert2::debug_assert!(if self.active_limit_orders().is_empty() {
             self.balances.order_margin().is_zero()

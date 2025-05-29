@@ -1,6 +1,8 @@
 //! Test if a pure limit order strategy works correctly
 
-use lfest::{mock_exchange_linear, mock_exchange_linear_with_account_tracker, prelude::*};
+use lfest::{
+    mock_exchange_linear, mock_exchange_linear_with_account_tracker, prelude::*, test_fee_maker,
+};
 use num_traits::Zero;
 
 #[test]
@@ -30,10 +32,9 @@ fn limit_orders_only() {
             .available(QuoteCurrency::new(10, 0))
             .position_margin(QuoteCurrency::zero())
             .order_margin(QuoteCurrency::new(990, 0))
-            .total_fees_paid(fee0)
+            .total_fees_paid(Zero::zero())
             .build()
     );
-    assert_eq!(exchange.balances().total_fees_paid(), QuoteCurrency::zero());
 
     let order_updates = exchange
         .update_state(&Trade {
@@ -65,7 +66,7 @@ fn limit_orders_only() {
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(10, 0))
+            .available(QuoteCurrency::new(10, 0) - fee0)
             .position_margin(QuoteCurrency::new(990, 0))
             .order_margin(QuoteCurrency::zero())
             .total_fees_paid(fee0)
@@ -162,14 +163,16 @@ fn limit_orders_2() {
         BaseCurrency::new(5, 1),
     )
     .unwrap();
+    let fee = QuoteCurrency::convert_from(o.remaining_quantity(), o.limit_price())
+        * *test_fee_maker().as_ref();
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(500, 0))
+            .available(QuoteCurrency::new(1000, 0) - QuoteCurrency::new(7575, 2))
             .position_margin(Zero::zero())
-            .order_margin(QuoteCurrency::new(500, 0))
+            .order_margin(QuoteCurrency::new(7575, 2))
             .total_fees_paid(Zero::zero())
             .build()
     );
@@ -186,17 +189,17 @@ fn limit_orders_2() {
     assert_eq!(
         exchange.position(),
         &Position::Long(PositionInner::new(
-            BaseCurrency::new(2, 0),
-            QuoteCurrency::new(98, 0)
+            BaseCurrency::new(5, 1),
+            QuoteCurrency::new(100, 0)
         ))
     );
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(92425, 2))
-            .position_margin(QuoteCurrency::new(196, 0))
-            .order_margin(QuoteCurrency::new(7575, 2))
-            .total_fees_paid(Zero::zero())
+            .available(QuoteCurrency::new(92475, 2) - fee)
+            .position_margin(QuoteCurrency::new(50, 0))
+            .order_margin(QuoteCurrency::new(2525, 2))
+            .total_fees_paid(fee)
             .build()
     );
     let _ = exchange

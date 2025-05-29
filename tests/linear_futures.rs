@@ -31,10 +31,10 @@ fn lin_long_market_win_full() {
         .unwrap();
     assert!(order_updates.is_empty());
 
-    let fees = QuoteCurrency::convert_from(qty, bid) * *test_fee_taker().as_ref();
+    let fee = QuoteCurrency::convert_from(qty, bid) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Long(PositionInner::new(qty, bid,))
+        Position::Long(PositionInner::new(qty, bid))
     );
     assert_eq!(
         exchange.position().unrealized_pnl(bid, ask),
@@ -43,10 +43,10 @@ fn lin_long_market_win_full() {
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(500, 0))
+            .available(QuoteCurrency::new(500, 0) - fee)
             .position_margin(QuoteCurrency::new(500, 0))
             .order_margin(QuoteCurrency::zero())
-            .total_fees_paid(fees)
+            .total_fees_paid(fee)
             .build()
     );
 

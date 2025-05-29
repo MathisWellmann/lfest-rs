@@ -184,6 +184,7 @@ where
             sell_value += BaseOrQuote::PairedCurrency::convert_from(*qty, *price)
         });
 
+        trace!("buy_value {buy_value}, sell_value: {sell_value}");
         let om = max(buy_value, sell_value) * init_margin_req;
         trace!("required order_margin: {om}");
         om
