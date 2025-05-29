@@ -128,31 +128,41 @@ where
                 }
                 Sell => match filled_qty.cmp(&inner.quantity()) {
                     Ordering::Less => {
-                        let pnl = inner.decrease_contracts(filled_qty, fill_price, true);
-                        balances.apply_pnl(pnl);
                         let margin = BaseOrQuote::PairedCurrency::convert_from(
                             filled_qty,
                             inner.entry_price(),
                         ) * init_margin_req;
                         balances.free_position_margin(margin);
+
+                        let pnl = inner.decrease_contracts(filled_qty, fill_price, true);
+                        balances.apply_pnl(pnl);
                     }
                     Ordering::Equal => {
-                        let pnl = inner.decrease_contracts(filled_qty, fill_price, true);
-                        balances.apply_pnl(pnl);
                         let margin = BaseOrQuote::PairedCurrency::convert_from(
                             filled_qty,
                             inner.entry_price(),
                         ) * init_margin_req;
                         balances.free_position_margin(margin);
+
+                        let pnl = inner.decrease_contracts(filled_qty, fill_price, true);
+                        balances.apply_pnl(pnl);
+
                         *self = Neutral;
                         debug_assert_eq!(balances.position_margin(), Zero::zero());
                     }
                     Ordering::Greater => {
+                        let margin = BaseOrQuote::PairedCurrency::convert_from(
+                            inner.quantity(),
+                            inner.entry_price(),
+                        ) * init_margin_req;
+                        balances.free_position_margin(margin);
+
                         let new_short_qty = filled_qty - inner.quantity();
                         let pnl = inner.decrease_contracts(inner.quantity(), fill_price, true);
                         balances.apply_pnl(pnl);
                         debug_assert_eq!(inner.quantity(), BaseOrQuote::zero());
                         debug_assert_eq!(balances.position_margin(), Zero::zero());
+
                         *self = Short(PositionInner::new(new_short_qty, fill_price));
                         let margin =
                             BaseOrQuote::PairedCurrency::convert_from(new_short_qty, fill_price)
@@ -167,35 +177,40 @@ where
             Short(inner) => match side {
                 Buy => match filled_qty.cmp(&inner.quantity()) {
                     Ordering::Less => {
-                        let pnl = inner.decrease_contracts(filled_qty, fill_price, false);
-                        balances.apply_pnl(pnl);
                         let margin = BaseOrQuote::PairedCurrency::convert_from(
                             filled_qty,
                             inner.entry_price(),
                         ) * init_margin_req;
                         balances.free_position_margin(margin);
+
+                        let pnl = inner.decrease_contracts(filled_qty, fill_price, false);
+                        balances.apply_pnl(pnl);
                     }
                     Ordering::Equal => {
-                        let pnl = inner.decrease_contracts(filled_qty, fill_price, false);
-                        balances.apply_pnl(pnl);
                         let margin = BaseOrQuote::PairedCurrency::convert_from(
                             filled_qty,
                             inner.entry_price(),
                         ) * init_margin_req;
                         balances.free_position_margin(margin);
+
+                        let pnl = inner.decrease_contracts(filled_qty, fill_price, false);
+                        balances.apply_pnl(pnl);
+
                         *self = Neutral;
                         debug_assert_eq!(balances.position_margin(), Zero::zero());
                     }
                     Ordering::Greater => {
+                        let margin = BaseOrQuote::PairedCurrency::convert_from(
+                            inner.quantity(),
+                            inner.entry_price(),
+                        ) * init_margin_req;
+                        balances.free_position_margin(margin);
+
                         let new_long_qty = filled_qty - inner.quantity();
                         let pnl = inner.decrease_contracts(inner.quantity(), fill_price, false);
                         balances.apply_pnl(pnl);
                         debug_assert_eq!(inner.quantity(), BaseOrQuote::zero());
-                        let margin = BaseOrQuote::PairedCurrency::convert_from(
-                            filled_qty,
-                            inner.entry_price(),
-                        ) * init_margin_req;
-                        balances.free_position_margin(margin);
+                        debug_assert_eq!(balances.position_margin(), Zero::zero());
 
                         *self = Long(PositionInner::new(new_long_qty, fill_price));
                         let margin =
@@ -277,7 +292,7 @@ mod tests {
         assert_eq!(
             balances,
             Balances::builder()
-                .available(QuoteCurrency::new(10_000, 0) - QuoteCurrency::new(6536_55268,5))
+                .available(QuoteCurrency::new(10_000, 0) - QuoteCurrency::new(6536_55268, 5))
                 .position_margin(Zero::zero())
                 .order_margin(Zero::zero())
                 .total_fees_paid(Zero::zero())

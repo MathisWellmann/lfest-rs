@@ -31,7 +31,7 @@ where
         position: &Position<I, D, BaseOrQuote>,
         order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
-        balances: &mut Balances<I, D, BaseOrQuote::PairedCurrency>,
+        balances: &Balances<I, D, BaseOrQuote::PairedCurrency>,
     ) -> Result<(), RiskError>;
 
     /// Checks if the account it able to satisfy the margin requirements for a new limit order.

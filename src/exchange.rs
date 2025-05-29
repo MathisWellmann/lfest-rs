@@ -233,12 +233,8 @@ where
             Side::Buy => self.market_state.ask(),
             Side::Sell => self.market_state.bid(),
         };
-        self.risk_engine.check_market_order(
-            &self.position,
-            &order,
-            fill_price,
-            &mut self.balances,
-        )?;
+        self.risk_engine
+            .check_market_order(&self.position, &order, fill_price, &self.balances)?;
 
         let filled_order = order.into_filled(fill_price, self.market_state.current_timestamp_ns());
         self.settle_filled_market_order(filled_order.clone());
@@ -251,9 +247,9 @@ where
         order: MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>,
     ) {
         let filled_qty = order.quantity();
-        assert!(filled_qty > BaseOrQuote::zero());
+        assert2::debug_assert!(filled_qty > BaseOrQuote::zero());
         let fill_price = order.state().avg_fill_price();
-        assert!(fill_price > QuoteCurrency::zero());
+        assert2::debug_assert!(fill_price > QuoteCurrency::zero());
 
         let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price);
         let fee = notional * *self.config.contract_spec().fee_taker().as_ref();

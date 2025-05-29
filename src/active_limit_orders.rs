@@ -3,7 +3,6 @@ use crate::types::{
 };
 
 /// The datatype that holds the active limit orders of a user.
-/// faster than `hashbrown::HashMap` and optimized for small number of active orders.
 ///
 /// Generics:
 /// - `I`: The numeric data type of currencies.

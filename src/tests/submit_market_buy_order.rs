@@ -88,11 +88,11 @@ fn submit_market_buy_order_with_long_position() {
         exchange.position().clone(),
         Position::Long(PositionInner::new(qty, entry_price,))
     );
-    assert_eq!(exchange.active_limit_orders(), &ActiveLimitOrders::new(10));
+    assert!(exchange.active_limit_orders().is_empty());
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(500, 0))
+            .available(QuoteCurrency::new(500, 0) - fee0)
             .position_margin(QuoteCurrency::new(500, 0))
             .order_margin(QuoteCurrency::new(0, 0))
             .total_fees_paid(fee0)
@@ -106,10 +106,10 @@ fn submit_market_buy_order_with_long_position() {
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(100, 0))
+            .available(QuoteCurrency::new(100, 0) - fee0 - fee1)
             .position_margin(QuoteCurrency::new(900, 0))
             .order_margin(QuoteCurrency::new(0, 0))
-            .total_fees_paid(fee1)
+            .total_fees_paid(fee0 + fee1)
             .build()
     );
     assert_eq!(
@@ -119,7 +119,7 @@ fn submit_market_buy_order_with_long_position() {
             QuoteCurrency::new(100, 0),
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &ActiveLimitOrders::new(10));
+    assert!(exchange.active_limit_orders().is_empty());
 }
 
 #[test]
@@ -144,7 +144,7 @@ fn submit_market_buy_order_with_short_position() {
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(100, 0))
+            .available(QuoteCurrency::new(100, 0) - fee0)
             .position_margin(QuoteCurrency::new(900, 0))
             .order_margin(QuoteCurrency::new(0, 0))
             .total_fees_paid(fee0)
@@ -180,8 +180,6 @@ fn submit_market_buy_order_with_short_position() {
 #[tracing_test::traced_test]
 fn submit_market_buy_order_turnaround_short() {
     let mut exchange = mock_exchange_linear();
-    let mut balances = exchange.balances().clone();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
             .update_state(&Bba {
@@ -199,19 +197,18 @@ fn submit_market_buy_order_turnaround_short() {
     exchange.submit_market_order(order).unwrap();
     let entry_price = QuoteCurrency::new(99, 0);
     let notional = QuoteCurrency::convert_from(qty, entry_price);
-    let init_margin = notional * init_margin_req;
-    assert!(balances.try_reserve_order_margin(init_margin));
     let fee_0 = notional * *test_fee_taker().as_ref();
+    assert!(exchange.active_limit_orders().is_empty());
     assert_eq!(
         exchange.position().clone(),
-        Position::Short(PositionInner::new(qty, entry_price,))
+        Position::Short(PositionInner::new(qty, entry_price))
     );
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(109, 0) - fee_0)
             .position_margin(QuoteCurrency::new(891, 0))
-            .order_margin(QuoteCurrency::new(0, 0))
+            .order_margin(Zero::zero())
             .total_fees_paid(fee_0)
             .build()
     );
@@ -221,12 +218,12 @@ fn submit_market_buy_order_turnaround_short() {
     let order = MarketOrder::new(Side::Buy, qty).unwrap();
     exchange.submit_market_order(order).unwrap();
     let entry_price = QuoteCurrency::new(100, 0);
-    let fee_1 = QuoteCurrency::convert_from(qty, entry_price);
+    let fee_1 = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
+    assert!(exchange.active_limit_orders().is_empty());
     assert_eq!(
         exchange.position().clone(),
-        Position::Long(PositionInner::new(BaseCurrency::new(9, 0), entry_price,))
+        Position::Long(PositionInner::new(BaseCurrency::new(9, 0), entry_price))
     );
-
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
@@ -237,7 +234,7 @@ fn submit_market_buy_order_turnaround_short() {
                     - QuoteCurrency::new(9, 0)
             )
             .position_margin(QuoteCurrency::new(900, 0))
-            .order_margin(QuoteCurrency::new(0, 0))
+            .order_margin(Zero::zero())
             .total_fees_paid(fee_0 + fee_1)
             .build()
     );

@@ -42,7 +42,7 @@ where
         position: &Position<I, D, BaseOrQuote>,
         order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
-        balances: &mut Balances<I, D, BaseOrQuote::PairedCurrency>,
+        balances: &Balances<I, D, BaseOrQuote::PairedCurrency>,
     ) -> Result<(), RiskError> {
         match order.side() {
             Side::Buy => self.check_market_buy_order(position, order, fill_price, balances),
@@ -115,7 +115,7 @@ where
         position: &Position<I, D, BaseOrQuote>,
         order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
-        balances: &mut Balances<I, D, BaseOrQuote::PairedCurrency>,
+        balances: &Balances<I, D, BaseOrQuote::PairedCurrency>,
     ) -> Result<(), RiskError>
     where
         UserOrderIdT: UserOrderId,
@@ -133,10 +133,6 @@ where
                 if init_margin + fee > balances.available() {
                     return Err(RiskError::NotEnoughAvailableBalance);
                 }
-                assert!(
-                    balances.try_reserve_order_margin(init_margin),
-                    "Can reserve order margin"
-                );
             }
             Position::Short(pos_inner) => {
                 if order.quantity() <= pos_inner.quantity() {
@@ -164,10 +160,6 @@ where
                 ) {
                     return Err(RiskError::NotEnoughAvailableBalance);
                 }
-                assert!(
-                    balances.try_reserve_order_margin(new_init_margin),
-                    "Can reserve order margin"
-                );
             }
         }
 
@@ -179,7 +171,7 @@ where
         position: &Position<I, D, BaseOrQuote>,
         order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
-        balances: &mut Balances<I, D, BaseOrQuote::PairedCurrency>,
+        balances: &Balances<I, D, BaseOrQuote::PairedCurrency>,
     ) -> Result<(), RiskError>
     where
         UserOrderIdT: UserOrderId,
@@ -196,10 +188,6 @@ where
                 if init_margin + fee > balances.available() {
                     return Err(RiskError::NotEnoughAvailableBalance);
                 }
-                assert!(
-                    balances.try_reserve_order_margin(init_margin),
-                    "Can reserve order margin"
-                );
             }
             Position::Long(pos_inner) => {
                 // Else its a long position which needs to be reduced
@@ -228,10 +216,6 @@ where
                 ) {
                     return Err(RiskError::NotEnoughAvailableBalance);
                 }
-                assert!(
-                    balances.try_reserve_order_margin(new_init_margin),
-                    "Can reserve order margin"
-                );
             }
         }
         Ok(())
