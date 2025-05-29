@@ -1,3 +1,5 @@
+use tracing::trace;
+
 use crate::types::{
     Currency, Error, LimitOrder, MarginCurrency, Mon, OrderId, Pending, UserOrderId,
 };
@@ -118,6 +120,14 @@ where
         self.arena.iter_mut().find(|order| order.id() == order_id)
     }
 
+    #[inline]
+    pub(crate) fn get(
+        &self,
+        idx: usize,
+    ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+        self.arena.get(idx)
+    }
+
     /// Remove an active `LimitOrder` based on its `OrderId`.
     /// Optimized for small number of active orders.
     #[inline]
@@ -125,6 +135,7 @@ where
         &mut self,
         order_id: OrderId,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+        trace!("remove_by_order_id {order_id}");
         let pos = self
             .arena
             .iter_mut()
@@ -153,14 +164,6 @@ where
     ) -> impl Iterator<Item = &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>
     {
         self.arena.iter()
-    }
-
-    #[inline]
-    pub(crate) fn values_mut(
-        &mut self,
-    ) -> impl Iterator<Item = &mut LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>
-    {
-        self.arena.iter_mut()
     }
 }
 

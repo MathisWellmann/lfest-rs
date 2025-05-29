@@ -1,7 +1,7 @@
 use assert2::assert;
 use getset::{Getters, MutGetters};
 use num_traits::Zero;
-use tracing::{debug, info, trace, warn};
+use tracing::{info, trace, warn};
 
 use crate::{
     config::Config,
@@ -80,16 +80,10 @@ where
     #[cfg_attr(test, getset(get_mut = "pub(crate)"))]
     position: Position<I, D, BaseOrQuote>,
 
-    /// Active limit orders of the user.
-    /// Maps the order `id` to the actual `Order`.
-    #[getset(get = "pub")]
-    active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
-
     order_margin: OrderMargin<I, D, BaseOrQuote, UserOrderIdT>,
 
     // To avoid allocations in hot-paths
     limit_order_updates: Vec<LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT>>,
-    ids_to_remove: Vec<OrderId>,
 
     order_rate_limiter: OrderRateLimiter,
 }
@@ -118,19 +112,22 @@ where
             next_order_id: OrderId::default(),
             balances,
             position: Position::default(),
-            // TODO: two such structs, one for buys, the other for sells.
-            active_limit_orders: ActiveLimitOrders::new(10_000),
             order_margin: OrderMargin::new(max_active_orders),
             limit_order_updates: Vec::with_capacity(max_active_orders),
-            ids_to_remove: Vec::with_capacity(max_active_orders),
             order_rate_limiter,
         }
+    }
+
+    /// The the users currently active limit orders.
+    #[inline]
+    pub fn active_limit_orders(&self) -> &ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT> {
+        self.order_margin.active_limit_orders()
     }
 
     /// Get information about the `Account`
     pub fn account(&self) -> Account<I, D, BaseOrQuote, UserOrderIdT> {
         Account {
-            active_limit_orders: &self.active_limit_orders,
+            active_limit_orders: self.active_limit_orders(),
             position: &self.position,
             balances: self.balances(),
         }
@@ -348,7 +345,7 @@ where
         self.order_rate_limiter
             .aquire(self.market_state.current_ts_ns())?;
         let existing_order = self
-            .active_limit_orders
+            .active_limit_orders()
             .get_by_id(existing_order_id)
             .ok_or_else(|| {
                 if existing_order_id < self.next_order_id {
@@ -391,34 +388,31 @@ where
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         marketable: bool,
     ) -> Result<()> {
-        debug!("append_limit_order: order: {order}, marketable: {marketable}");
-        debug!(
+        trace!("append_limit_order: order: {order}, marketable: {marketable}");
+        trace!(
             "active_limit_orders: {}, market_state: {}, position: {}",
-            self.active_limit_orders, self.market_state, self.position,
+            self.active_limit_orders(),
+            self.market_state,
+            self.position,
         );
 
-        self.order_margin.update(&order)?;
-        self.active_limit_orders.insert(order)?;
+        self.order_margin.update(order)?;
         let new_order_margin = self.order_margin.order_margin(
             self.config.contract_spec().init_margin_req(),
             &self.position,
         );
 
-        assert!(new_order_margin >= self.balances.order_margin());
+        assert2::debug_assert!(new_order_margin >= self.balances.order_margin());
         let margin = new_order_margin - self.balances.order_margin();
-        debug_assert!(margin >= BaseOrQuote::PairedCurrency::zero());
+        assert2::debug_assert!(margin >= BaseOrQuote::PairedCurrency::zero());
         if margin > BaseOrQuote::PairedCurrency::zero() {
-            assert!(
+            debug_assert!(
                 self.balances.try_reserve_order_margin(margin),
                 "Can place order"
             );
         }
 
-        debug_assert_eq!(
-            self.order_margin.active_limit_orders(),
-            &self.active_limit_orders
-        );
-        debug_assert!(if self.active_limit_orders.is_empty() {
+        debug_assert!(if self.active_limit_orders().is_empty() {
             self.balances.order_margin().is_zero()
         } else {
             true
@@ -444,60 +438,30 @@ where
                 &self.position,
             )
         );
-        let removed_order = match cancel_by {
-            CancelBy::OrderId(order_id) => self
-                .active_limit_orders
-                .remove_by_order_id(order_id)
-                .ok_or_else(|| {
-                    if order_id < self.next_order_id {
-                        Error::OrderNoLongerActive
-                    } else {
-                        Error::OrderIdNotFound { order_id }
-                    }
-                })?,
-            CancelBy::UserOrderId(user_order_id) => self
-                .active_limit_orders
-                .remove_by_user_order_id(user_order_id)
-                .ok_or(Error::UserOrderIdNotFound)?,
-        };
-        self.order_margin.remove(cancel_by);
+        let removed_order = self.order_margin.remove(cancel_by)?;
 
         let new_order_margin = self.order_margin.order_margin(
             self.config.contract_spec().init_margin_req(),
             &self.position,
         );
 
-        debug_assert!(
+        assert2::debug_assert!(
             new_order_margin <= self.balances.order_margin(),
             "When cancelling a limit order, the new order margin is smaller or equal the old order margin"
         );
         let margin = self.balances.order_margin() - new_order_margin;
-        self.balances.free_order_margin(margin);
+        assert2::debug_assert!(margin >= Zero::zero());
+        if margin > Zero::zero() {
+            self.balances.free_order_margin(margin);
+        }
 
-        assert_eq!(
-            self.order_margin.active_limit_orders(),
-            &self.active_limit_orders
-        );
-        assert!(if self.active_limit_orders.is_empty() {
+        assert!(if self.active_limit_orders().is_empty() {
             self.balances.order_margin().is_zero()
         } else {
             true
         });
 
         Ok(removed_order)
-    }
-
-    /// Removes an executed limit order from the list of active ones.
-    /// order margin updates are handled separately.
-    #[inline]
-    pub(crate) fn remove_executed_order_from_active(
-        order_id: OrderId,
-        active_limit_orders: &mut ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
-    ) {
-        let order = active_limit_orders
-            .remove_by_order_id(order_id)
-            .expect("The order must have been active; qed");
-        debug_assert_eq!(order.id(), order_id);
     }
 
     /// Checks for the execution of active limit orders in the account.
@@ -513,15 +477,16 @@ where
             return;
         }
 
-        debug_assert_eq!(
-            self.order_margin.active_limit_orders(),
-            &self.active_limit_orders
-        );
-
         // TODO: peek at the first sorted order, either buy or sell.
-        for order in self.active_limit_orders.values_mut() {
+        for i in 0..self.active_limit_orders().len() {
+            let mut order = self
+                .active_limit_orders()
+                .get(i)
+                .cloned()
+                .expect("Can get order");
+
             // TODO: if some quantity was filled, mutate `market_update` to reflect the reduced liquidity so it does not fill more orders than possible.
-            if let Some(filled_qty) = market_update.limit_order_filled(order) {
+            if let Some(filled_qty) = market_update.limit_order_filled(&order) {
                 trace!(
                     "filled limit {} order {}: {filled_qty}/{} @ {}",
                     order.side(),
@@ -541,16 +506,18 @@ where
                     )
                 );
 
-                let notional =
-                    BaseOrQuote::PairedCurrency::convert_from(filled_qty, order.limit_price());
+                let side = order.side();
+                let limit_price = order.limit_price();
+                let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, limit_price);
                 let fee = notional * *self.config.contract_spec().fee_maker().as_ref();
                 self.balances.account_for_fee(fee);
 
                 let limit_order_update =
                     order.fill(filled_qty, fee, market_update.timestamp_exchange_ns());
                 if let LimitOrderFill::FullyFilled { .. } = limit_order_update {
-                    self.ids_to_remove.push(order.state().meta().id());
-                    self.order_margin.remove(CancelBy::OrderId(order.id()));
+                    self.order_margin
+                        .remove(CancelBy::OrderId(order.id()))
+                        .expect("Can remove order as its an internal call");
                 } else {
                     assert2::debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
                     self.order_margin
@@ -575,27 +542,15 @@ where
 
                 self.position.change_position(
                     filled_qty,
-                    order.limit_price(),
-                    order.side(),
+                    limit_price,
+                    side,
                     &mut self.balances,
                     self.config.contract_spec().init_margin_req(),
                 );
             }
         }
-        self.ids_to_remove.iter().for_each(|id| {
-            Self::remove_executed_order_from_active(*id, &mut self.active_limit_orders)
-        });
-        self.ids_to_remove.clear();
-        debug_assert_eq!(
-            self.ids_to_remove.capacity(),
-            self.config.max_num_open_orders()
-        );
 
-        debug_assert_eq!(
-            self.order_margin.active_limit_orders(),
-            &self.active_limit_orders
-        );
-        assert2::debug_assert!(if self.active_limit_orders.is_empty() {
+        assert2::debug_assert!(if self.active_limit_orders().is_empty() {
             self.balances.order_margin().is_zero()
         } else {
             true
