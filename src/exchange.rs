@@ -396,7 +396,7 @@ where
             self.position,
         );
 
-        self.order_margin.update(order)?;
+        self.order_margin.try_insert(order)?;
         let new_order_margin = self.order_margin.order_margin(
             self.config.contract_spec().init_margin_req(),
             &self.position,
@@ -564,9 +564,7 @@ where
                 .expect("Can remove order as its an internal call");
         } else {
             assert2::debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
-            self.order_margin
-                .update(order)
-                .expect("Can update an existing order");
+            self.order_margin.update(order)
         }
         self.limit_order_updates.push(limit_order_update);
 

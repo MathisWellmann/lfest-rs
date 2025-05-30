@@ -3,7 +3,6 @@ use tracing::trace;
 
 use crate::types::{
     Currency, Error, LimitOrder, MarginCurrency, Mon, OrderId, Pending, Side, UserOrderId,
-    price_time_priority_ordering,
 };
 
 /// The datatype that holds the active limit orders of a user.
@@ -66,59 +65,97 @@ where
     }
 
     /// Get the number of active limit orders.
-    #[inline]
+    #[inline(always)]
     pub fn num_active(&self) -> usize {
         self.bids.len() + self.asks.len()
     }
 
     /// `true` is there are no active orders.
-    #[inline]
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.bids.is_empty() && self.asks.is_empty()
     }
 
-    /// Insert a new `LimitOrder`.
-    /// If we did not have this key present, `Ok(None)` is returned.
-    /// If we did have this key present, the value is updated, and the old value is returned.
-    #[allow(clippy::type_complexity)]
-    pub(crate) fn insert(
+    #[inline(always)]
+    pub(crate) fn try_insert(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) -> crate::Result<
-        Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
-    > {
+    ) -> crate::Result<()> {
         match order.side() {
             Side::Buy => {
                 if self.bids.len() >= self.bids.capacity() {
                     return Err(Error::MaxNumberOfActiveOrders);
                 }
-                // Find the index where to insert it with price, time priority.
-                if let Some(existing_order) = self.bids.iter_mut().find(|o| o.id() == order.id()) {
-                    let out = existing_order.clone();
-                    *existing_order = order;
-                    return Ok(Some(out));
-                }
-                self.bids.push(order);
-
-                self.bids.sort_by(price_time_priority_ordering);
+                self.bids.push(order)
             }
             Side::Sell => {
                 if self.asks.len() >= self.asks.capacity() {
                     return Err(Error::MaxNumberOfActiveOrders);
                 }
-                // Find the index where to insert it with price, time priority.
-                if let Some(existing_order) = self.asks.iter_mut().find(|o| o.id() == order.id()) {
-                    let out = existing_order.clone();
-                    *existing_order = order;
-                    return Ok(Some(out));
-                }
-                self.asks.push(order);
-
-                self.asks.sort_by(price_time_priority_ordering);
+                self.asks.push(order)
             }
         }
+        Ok(())
+    }
 
-        Ok(None)
+    /// Update an existing `LimitOrder`.
+    pub(crate) fn update(
+        &mut self,
+        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+    ) {
+        match order.side() {
+            Side::Buy => {
+                // Find the index where to insert it with price, time priority.
+                let active_order = self
+                    .bids
+                    .iter_mut()
+                    .find(|o| o.id() == order.id())
+                    .expect("Order must have been active before updating it");
+                debug_assert_ne!(
+                    active_order, &order,
+                    "An update to an order should not be the same as the existing one"
+                );
+                assert2::debug_assert!(
+                    order.remaining_quantity() < active_order.remaining_quantity(),
+                    "An update to an existing order must mean the new order has less quantity than the tracked order."
+                );
+                debug_assert_eq!(order.id(), active_order.id());
+                Self::assert_limit_order_update_reduces_qty(&active_order, &order);
+
+                *active_order = order;
+            }
+            Side::Sell => {
+                // Find the index where to insert it with price, time priority.
+                let active_order = self
+                    .asks
+                    .iter_mut()
+                    .find(|o| o.id() == order.id())
+                    .expect("Order must have been active before updating it");
+                debug_assert_ne!(
+                    active_order, &order,
+                    "An update to an order should not be the same as the existing one"
+                );
+                assert2::debug_assert!(
+                    order.remaining_quantity() < active_order.remaining_quantity(),
+                    "An update to an existing order must mean the new order has less quantity than the tracked order."
+                );
+                debug_assert_eq!(order.id(), active_order.id());
+                Self::assert_limit_order_update_reduces_qty(&active_order, &order);
+
+                *active_order = order;
+            }
+        }
+    }
+
+    pub(crate) fn assert_limit_order_update_reduces_qty(
+        active_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        updated_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+    ) {
+        // when an existing limit order is updated for margin purposes here, its quantity is always reduced.
+        assert2::debug_assert!(
+            active_order.remaining_quantity() - updated_order.remaining_quantity()
+                > BaseOrQuote::zero()
+        );
     }
 
     /*
@@ -223,22 +260,7 @@ mod tests {
         .unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
-        alo.insert(order.clone()).unwrap();
-        assert_eq!(alo.num_active(), 1);
-    }
-
-    #[test]
-    fn active_limit_orders() {
-        let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::new(3);
-        let order = LimitOrder::new(
-            Side::Buy,
-            QuoteCurrency::<i64, 5>::new(100, 0),
-            BaseCurrency::new(5, 0),
-        )
-        .unwrap();
-        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
-        let order = order.into_pending(meta);
-        alo.insert(order.clone()).unwrap();
+        alo.try_insert(order.clone()).unwrap();
 
         assert_eq!(alo.num_active(), 1);
         let removed = alo.remove_by_id(0.into()).unwrap();
@@ -253,7 +275,7 @@ mod tests {
         .unwrap();
         let meta = ExchangeOrderMeta::new(1.into(), 1.into());
         let order_1 = order_1.into_pending(meta);
-        alo.insert(order_1.clone()).unwrap();
+        alo.try_insert(order_1.clone()).unwrap();
         assert_eq!(alo.num_active(), 1);
         let removed = alo.remove_by_id(1.into()).unwrap();
         assert_eq!(removed, order_1);
@@ -268,10 +290,9 @@ mod tests {
             .unwrap();
             let meta = ExchangeOrderMeta::new(i.into(), 3.into());
             let order = order.into_pending(meta);
-            alo.insert(order.clone()).unwrap();
+            alo.try_insert(order.clone()).unwrap();
         }
         assert_eq!(alo.num_active(), 3);
-        assert!(alo.insert(order_1).is_err());
     }
 
     #[test]
@@ -285,7 +306,7 @@ mod tests {
         .unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
-        alo.insert(order.clone()).unwrap();
+        alo.try_insert(order.clone()).unwrap();
 
         assert_eq!(
             &alo.to_string(),

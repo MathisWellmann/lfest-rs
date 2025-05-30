@@ -17,7 +17,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     .unwrap();
 
     for n in [1, 2, 3, 5, 10, 100] {
-        group.bench_function(&format!("update_{n}"), |b| {
+        group.bench_function(&format!("insert_{n}"), |b| {
             let orders = Vec::from_iter((0..n).map(|i| {
                 let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)
@@ -27,8 +27,28 @@ fn criterion_benchmark(c: &mut Criterion) {
                 |mut order_margin| {
                     for order in orders.iter() {
                         order_margin
-                            .update(black_box(order.clone()))
-                            .expect("Can insert");
+                            .try_insert(black_box(order.clone()))
+                            .expect("Can insert")
+                    }
+                },
+            )
+        });
+        group.bench_function(&format!("update_{n}"), |b| {
+            let orders = Vec::from_iter((0..n).map(|i| {
+                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
+                order.clone().into_pending(meta)
+            }));
+            b.iter_with_setup(
+                || {
+                    let mut om = OrderMargin::new(n);
+                    for order in orders.iter() {
+                        om.try_insert(order.clone()).expect("Can insert");
+                    }
+                    om
+                },
+                |mut order_margin| {
+                    for order in orders.iter() {
+                        order_margin.update(black_box(order.clone()))
                     }
                 },
             )
@@ -42,9 +62,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 || {
                     let mut order_margin = OrderMargin::new(n);
                     for order in orders.iter() {
-                        order_margin
-                            .update(black_box(order.clone()))
-                            .expect("Can insert");
+                        order_margin.try_insert(black_box(order.clone())).unwrap()
                     }
                     order_margin
                 },
@@ -68,9 +86,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 || {
                     let mut order_margin = OrderMargin::new(n);
                     for order in orders.iter() {
-                        order_margin
-                            .update(black_box(order.clone()))
-                            .expect("Can insert");
+                        order_margin.try_insert(black_box(order.clone())).unwrap()
                     }
                     order_margin
                 },
@@ -93,9 +109,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 || {
                     let mut order_margin = OrderMargin::new(n);
                     for order in orders.iter() {
-                        order_margin
-                            .update(black_box(order.clone()))
-                            .expect("Can insert");
+                        order_margin.try_insert(black_box(order.clone())).unwrap()
                     }
                     order_margin
                 },
@@ -118,9 +132,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 || {
                     let mut order_margin = OrderMargin::new(n);
                     for order in orders.iter() {
-                        order_margin
-                            .update(black_box(order.clone()))
-                            .expect("Can insert");
+                        order_margin.try_insert(black_box(order.clone())).unwrap()
                     }
                     order_margin
                 },
