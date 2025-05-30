@@ -1,7 +1,9 @@
+use getset::Getters;
 use tracing::trace;
 
 use crate::types::{
-    Currency, Error, LimitOrder, MarginCurrency, Mon, OrderId, Pending, UserOrderId,
+    Currency, Error, LimitOrder, MarginCurrency, Mon, OrderId, Pending, Side, UserOrderId,
+    price_time_priority_ordering,
 };
 
 /// The datatype that holds the active limit orders of a user.
@@ -10,16 +12,23 @@ use crate::types::{
 /// - `I`: The numeric data type of currencies.
 /// - `D`: The constant decimal precision of the currency.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
-/// - `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// - `UserOrderIdT`: The type of user order id to use. Set to `()` if you don't need one.
+#[derive(Debug, Clone, PartialEq, Eq, Getters)]
 pub struct ActiveLimitOrders<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     UserOrderIdT: UserOrderId,
 {
-    // Stores all the active orders.
-    arena: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
+    /// Stores all the active buy orders in ascending price, time priority.
+    /// Best bid is the last element.
+    #[getset(get = "pub")]
+    bids: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
+
+    /// Stores all the active sell orders in ascending price, time priority.
+    /// Best ask is the first element.
+    #[getset(get = "pub")]
+    asks: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> std::fmt::Display
@@ -31,7 +40,10 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "ActiveLimitOrders:")?;
-        for order in self.arena.iter() {
+        for order in self.bids.iter() {
+            writeln!(f, "{order}")?;
+        }
+        for order in self.asks.iter() {
             writeln!(f, "{order}")?;
         }
         Ok(())
@@ -48,27 +60,26 @@ where
     #[inline]
     pub(crate) fn new(max_active_orders: usize) -> Self {
         Self {
-            arena: Vec::with_capacity(max_active_orders),
+            bids: Vec::with_capacity(max_active_orders),
+            asks: Vec::with_capacity(max_active_orders),
         }
     }
 
     /// Get the number of active limit orders.
     #[inline]
-    pub fn len(&self) -> usize {
-        self.arena.len()
+    pub fn num_active(&self) -> usize {
+        self.bids.len() + self.asks.len()
     }
 
     /// `true` is there are no active orders.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.arena.is_empty()
+        self.bids.is_empty() && self.asks.is_empty()
     }
 
     /// Insert a new `LimitOrder`.
-    /// Optimized for small number of active orders.
     /// If we did not have this key present, `Ok(None)` is returned.
     /// If we did have this key present, the value is updated, and the old value is returned.
-    #[inline]
     #[allow(clippy::type_complexity)]
     pub(crate) fn insert(
         &mut self,
@@ -76,29 +87,57 @@ where
     ) -> crate::Result<
         Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
     > {
-        // check if it exists
-        if let Some(existing_order) = self.get_mut_by_id(order.id()) {
-            let out = existing_order.clone();
-            // update the value and return the one that existed.
-            *existing_order = order;
-            return Ok(Some(out));
-        }
+        match order.side() {
+            Side::Buy => {
+                if self.bids.len() >= self.bids.capacity() {
+                    return Err(Error::MaxNumberOfActiveOrders);
+                }
+                // Find the index where to insert it with price, time priority.
+                if let Some(existing_order) = self.bids.iter_mut().find(|o| o.id() == order.id()) {
+                    let out = existing_order.clone();
+                    *existing_order = order;
+                    return Ok(Some(out));
+                }
+                self.bids.push(order);
 
-        if self.arena.len() >= self.arena.capacity() {
-            return Err(Error::MaxNumberOfActiveOrders);
+                self.bids.sort_by(price_time_priority_ordering);
+            }
+            Side::Sell => {
+                if self.asks.len() >= self.asks.capacity() {
+                    return Err(Error::MaxNumberOfActiveOrders);
+                }
+                // Find the index where to insert it with price, time priority.
+                if let Some(existing_order) = self.asks.iter_mut().find(|o| o.id() == order.id()) {
+                    let out = existing_order.clone();
+                    *existing_order = order;
+                    return Ok(Some(out));
+                }
+                self.asks.push(order);
+
+                self.asks.sort_by(price_time_priority_ordering);
+            }
         }
-        self.arena.push(order);
 
         Ok(None)
     }
 
-    /// Get the first stored limit order, if any.
+    /*
+    /// The best bid (highest price of all buy orders) if any.
     #[inline(always)]
-    pub fn get_first(
+    pub(crate) fn best_bid(
         &self,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        self.arena.first()
+        self.bids.last()
     }
+
+    /// The best ask (lowest price of all sell orders) if any.
+    #[inline(always)]
+    pub(crate) fn best_ask(
+        &self,
+    ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+        self.asks.get(0)
+    }
+    */
 
     /// Get a `LimitOrder` by the given `OrderId` if any.
     /// Optimized to be fast for small number of active limit orders.
@@ -106,66 +145,55 @@ where
     pub fn get_by_id(
         &self,
         order_id: OrderId,
+        side: Side,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        self.arena.iter().find(|order| order.id() == order_id)
+        match side {
+            Side::Buy => self.bids.iter().find(|order| order.id() == order_id),
+            Side::Sell => self.asks.iter().find(|order| order.id() == order_id),
+        }
     }
 
-    /// Get a `LimitOrder` by the given `OrderId` if any.
-    /// Optimized to be fast for small number of active limit orders.
+    /// Remove an active `LimitOrder` based on its order id.
     #[inline]
-    pub(crate) fn get_mut_by_id(
+    pub(crate) fn remove_by_id(
         &mut self,
-        order_id: OrderId,
-    ) -> Option<&mut LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        self.arena.iter_mut().find(|order| order.id() == order_id)
-    }
-
-    #[inline]
-    pub(crate) fn get(
-        &self,
-        idx: usize,
-    ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        self.arena.get(idx)
-    }
-
-    /// Remove an active `LimitOrder` based on its `OrderId`.
-    /// Optimized for small number of active orders.
-    #[inline]
-    pub(crate) fn remove_by_order_id(
-        &mut self,
-        order_id: OrderId,
+        id: OrderId,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        trace!("remove_by_order_id {order_id}");
-        let pos = self
-            .arena
-            .iter_mut()
-            .position(|order| order.id() == order_id)?;
-        let removed = self.arena.swap_remove(pos);
-        trace!("removed order {removed}");
-        Some(removed)
+        if let Some(pos) = self.bids.iter_mut().position(|order| order.id() == id) {
+            let removed = self.bids.swap_remove(pos);
+            trace!("removed bid {removed}");
+            return Some(removed);
+        } else {
+            let pos = self.asks.iter_mut().position(|order| order.id() == id)?;
+            let removed = self.asks.swap_remove(pos);
+            trace!("removed ask {removed}");
+            Some(removed)
+        }
     }
 
-    /// Remove an active `LimitOrder` based on its `UserOrderId`.
-    /// Optimized for small number of active orders.
+    /// Remove an active `LimitOrder` based on its order id.
     #[inline]
     pub(crate) fn remove_by_user_order_id(
         &mut self,
         user_order_id: UserOrderIdT,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        let pos = self
-            .arena
+        if let Some(pos) = self
+            .bids
             .iter_mut()
-            .position(|order| order.user_order_id() == user_order_id)?;
-        Some(self.arena.swap_remove(pos))
-    }
-
-    /// Get an iterator over the active limit orders.
-    #[inline]
-    pub fn values(
-        &self,
-    ) -> impl Iterator<Item = &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>
-    {
-        self.arena.iter()
+            .position(|order| order.user_order_id() == user_order_id)
+        {
+            let removed = self.bids.swap_remove(pos);
+            trace!("removed bid {removed}");
+            return Some(removed);
+        } else {
+            let pos = self
+                .asks
+                .iter_mut()
+                .position(|order| order.user_order_id() == user_order_id)?;
+            let removed = self.asks.swap_remove(pos);
+            trace!("removed ask {removed}");
+            Some(removed)
+        }
     }
 }
 
@@ -185,6 +213,21 @@ mod tests {
     }
 
     #[test]
+    fn active_limit_orders_insert() {
+        let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::new(3);
+        let order = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let order = order.into_pending(meta);
+        alo.insert(order.clone()).unwrap();
+        assert_eq!(alo.num_active(), 1);
+    }
+
+    #[test]
     fn active_limit_orders() {
         let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::new(3);
         let order = LimitOrder::new(
@@ -194,14 +237,11 @@ mod tests {
         )
         .unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
-        let mut order = order.into_pending(meta);
+        let order = order.into_pending(meta);
         alo.insert(order.clone()).unwrap();
 
-        assert_eq!(alo.len(), 1);
-        assert_eq!(alo.arena[0], order);
-        assert_eq!(alo.get_by_id(0.into()), Some(&order));
-        assert_eq!(alo.get_mut_by_id(0.into()), Some(&mut order));
-        let removed = alo.remove_by_order_id(0.into()).unwrap();
+        assert_eq!(alo.num_active(), 1);
+        let removed = alo.remove_by_id(0.into()).unwrap();
         assert_eq!(removed, order);
         assert!(alo.is_empty());
 
@@ -212,15 +252,10 @@ mod tests {
         )
         .unwrap();
         let meta = ExchangeOrderMeta::new(1.into(), 1.into());
-        let mut order_1 = order_1.into_pending(meta);
+        let order_1 = order_1.into_pending(meta);
         alo.insert(order_1.clone()).unwrap();
-        assert_eq!(alo.len(), 1);
-        assert_eq!(alo.arena[0], order_1);
-        assert!(alo.get_by_id(0.into()).is_none());
-        assert!(alo.get_mut_by_id(0.into()).is_none());
-        assert_eq!(alo.get_by_id(1.into()), Some(&order_1));
-        assert_eq!(alo.get_mut_by_id(1.into()), Some(&mut order_1));
-        let removed = alo.remove_by_order_id(1.into()).unwrap();
+        assert_eq!(alo.num_active(), 1);
+        let removed = alo.remove_by_id(1.into()).unwrap();
         assert_eq!(removed, order_1);
         assert!(alo.is_empty());
 
@@ -235,7 +270,7 @@ mod tests {
             let order = order.into_pending(meta);
             alo.insert(order.clone()).unwrap();
         }
-        assert_eq!(alo.len(), 3);
+        assert_eq!(alo.num_active(), 3);
         assert!(alo.insert(order_1).is_err());
     }
 

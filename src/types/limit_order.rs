@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use getset::{CopyGetters, Getters, Setters};
 use num_traits::Zero;
 
@@ -10,6 +12,35 @@ use crate::{
     types::{OrderError, Side},
     utils::NoUserOrderId,
 };
+
+/// Price time priority ordering
+pub fn price_time_priority_ordering<I, const D: u8, BaseOrQuote, UserOrderIdT>(
+    o0: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+    o1: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+) -> Ordering
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    use Ordering::*;
+    match o0.limit_price().cmp(&o1.limit_price()) {
+        Less => Less,
+        Equal => {
+            match o0
+                .state()
+                .meta()
+                .ts_ns_exchange_received()
+                .cmp(&o1.state().meta().ts_ns_exchange_received())
+            {
+                Less => Less,
+                Equal => Equal,
+                Greater => Greater,
+            }
+        }
+        Greater => Ordering::Greater,
+    }
+}
 
 /// Defines a limit order.
 ///

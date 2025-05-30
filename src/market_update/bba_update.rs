@@ -85,6 +85,16 @@ where
     fn timestamp_exchange_ns(&self) -> TimestampNs {
         self.timestamp_exchange_ns
     }
+
+    #[inline(always)]
+    fn can_fill_bids(&self) -> bool {
+        false
+    }
+
+    #[inline(always)]
+    fn can_fill_asks(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

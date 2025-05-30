@@ -15,7 +15,7 @@ use crate::{
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     types::{
         Balances, Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderFill, MarginCurrency,
-        MarketOrder, NewOrder, OrderId, Pending, Result, Side, UserOrderId,
+        MarketOrder, NewOrder, OrderId, Pending, Result, Side, TimestampNs, UserOrderId,
     },
 };
 
@@ -346,7 +346,7 @@ where
             .aquire(self.market_state.current_ts_ns())?;
         let existing_order = self
             .active_limit_orders()
-            .get_by_id(existing_order_id)
+            .get_by_id(existing_order_id, new_order.side()) // Its assumed that `new_order` has the same side as existing order.
             .ok_or_else(|| {
                 if existing_order_id < self.next_order_id {
                     Error::OrderNoLongerActive
@@ -477,88 +477,36 @@ where
             return;
         }
 
-        // TODO: peek at the first sorted order, either buy or sell.
-        for i in 0..self.active_limit_orders().len() {
-            let mut order = self
-                .active_limit_orders()
-                .get(i)
-                .cloned()
-                .expect("Can get order");
+        if market_update.can_fill_bids() {
+            // TODO: peek at the first sorted order, either buy or sell.
+            for i in 0..self.active_limit_orders().bids().len() {
+                let order = self
+                    .active_limit_orders()
+                    .bids()
+                    .get(i)
+                    .cloned()
+                    .expect("Can get order");
 
-            // TODO: if some quantity was filled, mutate `market_update` to reflect the reduced liquidity so it does not fill more orders than possible.
-            if let Some(filled_qty) = market_update.limit_order_filled(&order) {
-                trace!(
-                    "filled limit {} order {}: {filled_qty}/{} @ {}",
-                    order.side(),
-                    order.id(),
-                    order.remaining_quantity(),
-                    order.limit_price()
-                );
-                assert2::debug_assert!(
-                    filled_qty > BaseOrQuote::zero(),
-                    "The filled_qty must be greater than zero"
-                );
-                debug_assert_eq!(
-                    self.balances.order_margin(),
-                    self.order_margin.order_margin(
-                        self.config.contract_spec().init_margin_req(),
-                        &self.position
-                    )
-                );
-
-                let side = order.side();
-                let limit_price = order.limit_price();
-                let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, limit_price);
-                let fee = notional * *self.config.contract_spec().fee_maker().as_ref();
-                self.balances.account_for_fee(fee);
-
-                let limit_order_update =
-                    order.fill(filled_qty, fee, market_update.timestamp_exchange_ns());
-                if let LimitOrderFill::FullyFilled { .. } = limit_order_update {
-                    self.order_margin
-                        .remove(CancelBy::OrderId(order.id()))
-                        .expect("Can remove order as its an internal call");
-                } else {
-                    assert2::debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
-                    self.order_margin
-                        .update(order)
-                        .expect("Can update an existing order");
+                // TODO: if some quantity was filled, mutate `market_update` to reflect the reduced liquidity so it does not fill more orders than possible.
+                if let Some(filled_qty) = market_update.limit_order_filled(&order) {
+                    self.fill_limit_order(order, filled_qty, market_update.timestamp_exchange_ns())
                 }
-                self.limit_order_updates.push(limit_order_update);
+            }
+        }
 
-                let new_order_margin = self.order_margin.order_margin(
-                    self.config.contract_spec().init_margin_req(),
-                    &self.position,
-                );
-                assert2::debug_assert!(
-                    new_order_margin <= self.balances.order_margin(),
-                    "The order margin does not increase with a filled limit order event."
-                );
-                if new_order_margin < self.balances.order_margin() {
-                    let margin_delta = self.balances.order_margin() - new_order_margin;
-                    assert2::debug_assert!(margin_delta > Zero::zero());
-                    self.balances.free_order_margin(margin_delta);
-                }
+        if market_update.can_fill_asks() {
+            // TODO: peek at the first sorted order, either buy or sell.
+            for i in 0..self.active_limit_orders().asks().len() {
+                let order = self
+                    .active_limit_orders()
+                    .asks()
+                    .get(i)
+                    .cloned()
+                    .expect("Can get order");
 
-                self.position.change_position(
-                    filled_qty,
-                    limit_price,
-                    side,
-                    &mut self.balances,
-                    self.config.contract_spec().init_margin_req(),
-                );
-                let new_order_margin = self.order_margin.order_margin(
-                    self.config.contract_spec().init_margin_req(),
-                    &self.position,
-                );
-                assert2::debug_assert!(
-                    new_order_margin <= self.balances.order_margin(),
-                    "The order margin does not increase with a filled limit order event."
-                );
-                if new_order_margin < self.balances.order_margin() {
-                    let margin_delta = self.balances.order_margin() - new_order_margin;
-                    assert2::debug_assert!(margin_delta > Zero::zero());
-                    self.balances.free_order_margin(margin_delta);
+                // TODO: if some quantity was filled, mutate `market_update` to reflect the reduced liquidity so it does not fill more orders than possible.
+                if let Some(filled_qty) = market_update.limit_order_filled(&order) {
+                    self.fill_limit_order(order, filled_qty, market_update.timestamp_exchange_ns())
                 }
             }
         }
@@ -576,5 +524,85 @@ where
             )
         );
         self.balances.debug_assert_state();
+    }
+
+    fn fill_limit_order(
+        &mut self,
+        mut order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        filled_qty: BaseOrQuote,
+        ts_ns: TimestampNs,
+    ) {
+        trace!(
+            "filled limit {} order {}: {filled_qty}/{} @ {}",
+            order.side(),
+            order.id(),
+            order.remaining_quantity(),
+            order.limit_price()
+        );
+        assert2::debug_assert!(
+            filled_qty > BaseOrQuote::zero(),
+            "The filled_qty must be greater than zero"
+        );
+        debug_assert_eq!(
+            self.balances.order_margin(),
+            self.order_margin.order_margin(
+                self.config.contract_spec().init_margin_req(),
+                &self.position
+            )
+        );
+
+        let side = order.side();
+        let limit_price = order.limit_price();
+        let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, limit_price);
+        let fee = notional * *self.config.contract_spec().fee_maker().as_ref();
+        self.balances.account_for_fee(fee);
+
+        let limit_order_update = order.fill(filled_qty, fee, ts_ns);
+        if let LimitOrderFill::FullyFilled { .. } = limit_order_update {
+            self.order_margin
+                .remove(CancelBy::OrderId(order.id()))
+                .expect("Can remove order as its an internal call");
+        } else {
+            assert2::debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
+            self.order_margin
+                .update(order)
+                .expect("Can update an existing order");
+        }
+        self.limit_order_updates.push(limit_order_update);
+
+        let new_order_margin = self.order_margin.order_margin(
+            self.config.contract_spec().init_margin_req(),
+            &self.position,
+        );
+        assert2::debug_assert!(
+            new_order_margin <= self.balances.order_margin(),
+            "The order margin does not increase with a filled limit order event."
+        );
+        if new_order_margin < self.balances.order_margin() {
+            let margin_delta = self.balances.order_margin() - new_order_margin;
+            assert2::debug_assert!(margin_delta > Zero::zero());
+            self.balances.free_order_margin(margin_delta);
+        }
+
+        self.position.change_position(
+            filled_qty,
+            limit_price,
+            side,
+            &mut self.balances,
+            self.config.contract_spec().init_margin_req(),
+        );
+        let new_order_margin = self.order_margin.order_margin(
+            self.config.contract_spec().init_margin_req(),
+            &self.position,
+        );
+        assert2::debug_assert!(
+            new_order_margin <= self.balances.order_margin(),
+            "The order margin does not increase with a filled limit order event."
+        );
+        if new_order_margin < self.balances.order_margin() {
+            let margin_delta = self.balances.order_margin() - new_order_margin;
+            assert2::debug_assert!(margin_delta > Zero::zero());
+            self.balances.free_order_margin(margin_delta);
+        }
     }
 }

@@ -13,6 +13,12 @@ where
     /// performance optimization to speed up hot-path, when we don't need to check limit order fills for `Bba` updates.
     const CAN_FILL_LIMIT_ORDERS: bool;
 
+    /// If `true`, the `MarketUpdate` can fill bids.
+    fn can_fill_bids(&self) -> bool;
+
+    /// If `true`, the `MarketUpdate` can fill asks.
+    fn can_fill_asks(&self) -> bool;
+
     /// Checks if this market update triggered a specific limit order,
     /// and if so, then how much.
     fn limit_order_filled<UserOrderIdT: UserOrderId>(

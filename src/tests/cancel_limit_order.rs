@@ -21,9 +21,12 @@ fn cancel_limit_order() {
     let meta = ExchangeOrderMeta::new(order_id, 0.into());
     let expected_order = order.into_pending(meta);
 
-    assert_eq!(exchange.active_limit_orders().len(), 1);
+    assert_eq!(exchange.active_limit_orders().num_active(), 1);
     assert_eq!(
-        exchange.active_limit_orders().get_by_id(order_id).unwrap(),
+        exchange
+            .active_limit_orders()
+            .get_by_id(order_id, Side::Buy)
+            .unwrap(),
         &expected_order
     );
     assert_eq!(

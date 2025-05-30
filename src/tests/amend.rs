@@ -24,7 +24,7 @@ fn amend_limit_order_qty(new_qty: BaseCurrency<i64, DECIMALS>) {
     )
     .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
-    assert_eq!(exchange.active_limit_orders().len(), 1);
+    assert_eq!(exchange.active_limit_orders().num_active(), 1);
 
     let new_order = LimitOrder::new(Side::Buy, QuoteCurrency::new(100, 0), new_qty).unwrap();
     let existing_id: OrderId = 0.into();
@@ -32,7 +32,10 @@ fn amend_limit_order_qty(new_qty: BaseCurrency<i64, DECIMALS>) {
         .amend_limit_order(existing_id, new_order.clone())
         .unwrap();
     let new_id: OrderId = 1.into();
-    let replaced_order = exchange.active_limit_orders().get_by_id(new_id).unwrap();
+    let replaced_order = exchange
+        .active_limit_orders()
+        .get_by_id(new_id, Side::Buy)
+        .unwrap();
     assert_eq!(replaced_order.limit_price(), new_order.limit_price());
     assert_eq!(
         replaced_order.remaining_quantity(),
@@ -63,7 +66,7 @@ fn amend_limit_order_qty_with_partial_fill_leading_to_cancel(new_qty: BaseCurren
     )
     .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
-    assert_eq!(exchange.active_limit_orders().len(), 1);
+    assert_eq!(exchange.active_limit_orders().num_active(), 1);
 
     exchange
         .update_state(&Trade {
@@ -78,7 +81,7 @@ fn amend_limit_order_qty_with_partial_fill_leading_to_cancel(new_qty: BaseCurren
     assert_eq!(
         exchange
             .active_limit_orders()
-            .get_by_id(existing_id)
+            .get_by_id(existing_id, Side::Buy)
             .unwrap()
             .remaining_quantity(),
         BaseCurrency::new(2, 0)
@@ -113,7 +116,7 @@ fn amend_limit_order_qty_with_partial_fill(new_qty: BaseCurrency<i64, DECIMALS>)
     )
     .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
-    assert_eq!(exchange.active_limit_orders().len(), 1);
+    assert_eq!(exchange.active_limit_orders().num_active(), 1);
 
     exchange
         .update_state(&Trade {
@@ -128,7 +131,7 @@ fn amend_limit_order_qty_with_partial_fill(new_qty: BaseCurrency<i64, DECIMALS>)
     assert_eq!(
         exchange
             .active_limit_orders()
-            .get_by_id(existing_id)
+            .get_by_id(existing_id, Side::Buy)
             .unwrap()
             .remaining_quantity(),
         BaseCurrency::new(2, 0)
@@ -139,7 +142,10 @@ fn amend_limit_order_qty_with_partial_fill(new_qty: BaseCurrency<i64, DECIMALS>)
         .amend_limit_order(existing_id, new_order.clone())
         .unwrap();
     let new_id: OrderId = 1.into();
-    let replaced_order = exchange.active_limit_orders().get_by_id(new_id).unwrap();
+    let replaced_order = exchange
+        .active_limit_orders()
+        .get_by_id(new_id, Side::Buy)
+        .unwrap();
     assert_eq!(replaced_order.limit_price(), new_order.limit_price());
     assert_eq!(replaced_order.side(), new_order.side());
     let delta = new_qty - BaseCurrency::new(5, 0);

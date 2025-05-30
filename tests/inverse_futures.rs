@@ -782,7 +782,7 @@ fn inv_execute_limit() {
     let fee_0 = BaseCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     let o = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.active_limit_orders().len(), 1);
+    assert_eq!(exchange.active_limit_orders().num_active(), 1);
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
@@ -815,7 +815,7 @@ fn inv_execute_limit() {
 
     assert_eq!(exchange.market_state().bid(), QuoteCurrency::new(750, 0));
     assert_eq!(exchange.market_state().ask(), QuoteCurrency::new(751, 0));
-    assert_eq!(exchange.active_limit_orders().len(), 0);
+    assert_eq!(exchange.active_limit_orders().num_active(), 0);
     assert_eq!(
         exchange.position().clone(),
         Position::Long(PositionInner::new(qty, limit_price))
@@ -834,7 +834,7 @@ fn inv_execute_limit() {
     let fee_1 = BaseCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     let o = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.active_limit_orders().len(), 1);
+    assert_eq!(exchange.active_limit_orders().num_active(), 1);
 
     let order_updates = exchange
         .update_state(&Trade {
@@ -856,7 +856,7 @@ fn inv_execute_limit() {
         .unwrap();
     assert!(order_updates.is_empty());
 
-    assert_eq!(exchange.active_limit_orders().len(), 0);
+    assert_eq!(exchange.active_limit_orders().num_active(), 0);
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         exchange.balances(),
@@ -873,7 +873,7 @@ fn inv_execute_limit() {
     let fee_2 = BaseCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     let o = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.active_limit_orders().len(), 1);
+    assert_eq!(exchange.active_limit_orders().num_active(), 1);
     assert_eq!(exchange.position(), &Position::Neutral);
     assert_eq!(
         exchange.balances(),

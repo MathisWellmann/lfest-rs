@@ -78,7 +78,7 @@ where
         Ok(match by {
             CancelBy::OrderId(order_id) => self
                 .active_limit_orders
-                .remove_by_order_id(order_id)
+                .remove_by_id(order_id)
                 .ok_or(Error::OrderIdNotFound { order_id })?,
             CancelBy::UserOrderId(user_order_id) => self
                 .active_limit_orders
@@ -105,8 +105,8 @@ where
             &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         >,
     ) -> BaseOrQuote::PairedCurrency {
-        debug_assert!(init_margin_req > Decimal::zero());
-        debug_assert!(init_margin_req <= Decimal::one());
+        assert2::debug_assert!(init_margin_req > Decimal::zero());
+        assert2::debug_assert!(init_margin_req <= Decimal::one());
 
         trace!(
             "order_margin_internal: position: {position:?}, active_limit_orders: {active_limit_orders:?}"
@@ -114,15 +114,15 @@ where
 
         let mut buy_orders = Vec::from_iter(
             active_limit_orders
-                .values()
-                .filter(|order| matches!(order.side(), Side::Buy))
+                .bids()
+                .iter()
                 .map(|order| (order.limit_price(), order.remaining_quantity())),
         );
 
         let mut sell_orders = Vec::from_iter(
             active_limit_orders
-                .values()
-                .filter(|order| matches!(order.side(), Side::Sell))
+                .asks()
+                .iter()
                 .map(|order| (order.limit_price(), order.remaining_quantity())),
         );
         if let Some(new_order) = opt_new_order {
@@ -480,6 +480,7 @@ mod tests {
         [70, 90, 110],
         [1, 2, 3]
     )]
+    #[tracing_test::traced_test]
     fn order_margin_neutral_update_partial_fills(
         leverage: u8,
         side: Side,
@@ -487,9 +488,7 @@ mod tests {
         qty: i64,
     ) {
         let mut order_margin = OrderMargin::<_, DECIMALS, _, NoUserOrderId>::new(10);
-
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
-
         let qty = BaseCurrency::new(qty, 0);
         let limit_price = QuoteCurrency::new(limit_price, 0);
 
@@ -497,6 +496,7 @@ mod tests {
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let mut order = order.into_pending(meta);
         order_margin.update(order.clone()).unwrap();
+        assert_eq!(order_margin.active_limit_orders.num_active(), 1);
 
         // Now partially fill the order
         let filled_qty = qty / BaseCurrency::new(2, 0);
@@ -516,7 +516,7 @@ mod tests {
         }
         let remaining_qty = order.remaining_quantity();
         order_margin.update(order).unwrap();
-
+        assert_eq!(order_margin.active_limit_orders.num_active(), 1);
         assert_eq!(remaining_qty, filled_qty);
         assert_eq!(
             order_margin.order_margin(init_margin_req, &Position::Neutral),

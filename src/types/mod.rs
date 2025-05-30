@@ -18,7 +18,7 @@ pub use balances::Balances;
 pub use errors::*;
 pub use fee::{Fee, Maker, Taker};
 pub use leverage::Leverage;
-pub use limit_order::LimitOrder;
+pub use limit_order::{LimitOrder, price_time_priority_ordering};
 pub use limits::OrderRateLimits;
 pub use market_order::MarketOrder;
 pub use order_id::OrderId;

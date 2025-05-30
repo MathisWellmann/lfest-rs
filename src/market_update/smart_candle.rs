@@ -7,7 +7,7 @@ use crate::{
     utils::min,
 };
 
-/// A datastructure for aggregated trades with the ability to approximate realistic taker fill flow.
+/// A data structure for aggregated trades with the ability to approximate realistic taker fill flow.
 /// Basically a `Candle` buy one that does not blindly fill active limit orders with taker flow that does not exist.
 #[derive(Debug, Clone, Eq, PartialEq, Getters, CopyGetters)]
 pub struct SmartCandle<I, const D: u8, BaseOrQuote>
@@ -204,6 +204,16 @@ where
     #[inline(always)]
     fn timestamp_exchange_ns(&self) -> crate::prelude::TimestampNs {
         self.last_timestamp_exchange_ns
+    }
+
+    #[inline(always)]
+    fn can_fill_bids(&self) -> bool {
+        true
+    }
+
+    #[inline(always)]
+    fn can_fill_asks(&self) -> bool {
+        true
     }
 }
 

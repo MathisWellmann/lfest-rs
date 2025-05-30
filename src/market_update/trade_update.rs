@@ -106,6 +106,22 @@ where
     fn timestamp_exchange_ns(&self) -> TimestampNs {
         self.timestamp_exchange_ns
     }
+
+    #[inline(always)]
+    fn can_fill_bids(&self) -> bool {
+        match self.side {
+            Side::Buy => false,
+            Side::Sell => true,
+        }
+    }
+
+    #[inline(always)]
+    fn can_fill_asks(&self) -> bool {
+        match self.side {
+            Side::Buy => true,
+            Side::Sell => false,
+        }
+    }
 }
 
 #[cfg(test)]
