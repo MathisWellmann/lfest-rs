@@ -9,7 +9,6 @@ use lfest::prelude::*;
 const DECIMALS: u8 = 5;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    // Technically the setup code should not be benchmarked.
     let starting_balance = BaseCurrency::new(100000, 0);
     let contract_spec = ContractSpecification::new(
         leverage!(1),

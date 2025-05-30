@@ -85,3 +85,7 @@ harness = false
 [[bench]]
 name = "smart_candle"
 harness = false
+
+[[bench]]
+name = "order_margin"
+harness = false

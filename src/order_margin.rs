@@ -15,7 +15,7 @@ use crate::{
 
 /// An implementation for computing the order margin online, aka with every change to the active orders.
 #[derive(Debug, Clone, CopyGetters, Getters, MutGetters)]
-pub(crate) struct OrderMargin<I, const D: u8, BaseOrQuote, UserOrderIdT>
+pub struct OrderMargin<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
@@ -32,13 +32,15 @@ where
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderIdT: UserOrderId,
 {
-    pub(crate) fn new(max_active_orders: usize) -> Self {
+    /// Create a new instance with a maximum capacity of `max_active_orders`.
+    pub fn new(max_active_orders: usize) -> Self {
         Self {
             active_limit_orders: ActiveLimitOrders::new(max_active_orders),
         }
     }
 
-    pub(crate) fn update(
+    /// Insert or update an order.
+    pub fn update(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Result<()> {
@@ -69,7 +71,7 @@ where
     }
 
     /// Remove an order from being tracked for margin purposes.
-    pub(crate) fn remove(
+    pub fn remove(
         &mut self,
         by: CancelBy<UserOrderIdT>,
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
@@ -86,7 +88,7 @@ where
     }
 
     /// The margin requirement for all the tracked orders.
-    pub(crate) fn order_margin(
+    pub fn order_margin(
         &self,
         init_margin_req: Decimal<I, D>,
         position: &Position<I, D, BaseOrQuote>,

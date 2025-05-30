@@ -44,6 +44,7 @@ pub mod prelude {
         market_state::MarketState,
         market_update::*,
         order_filters::{PriceFilter, QuantityFilter},
+        order_margin::OrderMargin,
         position::Position,
         position_inner::PositionInner,
         types::*,
