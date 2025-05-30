@@ -19,9 +19,6 @@ The exchange can be configured using `Config` and `ContractSpecification`.
 [`Leverage`](https://docs.rs/lfest/latest/lfest/prelude/struct.Leverage.html).      
 This makes it impossible to mistakenly input for example a `USD` denoted value into a function that expects a `BTC` denoted value.    
 - :satellite: Flexible market data integration through the [`MarketUpdate`](https://docs.rs/lfest/latest/lfest/prelude/enum.MarketUpdate.html) trait.
-- :chart: Integrated performance tracking.    
-Use the existing [`FullAccountTracker`](https://docs.rs/lfest/latest/lfest/account_tracker/struct.FullAccountTracker.html)  
-or implement your own using the [`AccountTracker`](https://docs.rs/lfest/latest/lfest/account_tracker/trait.AccountTracker.html) trait.
 - :heavy_check_mark: good test coverage and heavy use of assertions, to ensure correctness.
 - :page_with_curl: Supports both `linear` and `inverse` futures contracts, 
 by simply setting the margin currency to either `QuoteCurrency` (linear) or `BaseCurrency` (inverse)
@@ -29,7 +26,6 @@ by simply setting the margin currency to either `QuoteCurrency` (linear) or `Bas
 [`PriceFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.PriceFilter.html)     
 [`QuantityFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuantityFilter.html)    
 - `IsolatedMarginRiskEngine`
-- Double-Entry Bookkeeping is used to ensure the accounting-equation always holds.
 - Rate limiting for order submissions, cancellations.
 
 ### Order Types
