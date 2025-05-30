@@ -29,7 +29,7 @@ ClosePosition(amount) ==
 
 (* Define the next-state relation *)
 Next == 
-    \A amount \in 0..1000 => PlaceOrder(amount) \/ FillOrder(amount) \/ ClosePosition(amount)
+    \A amount \in (1..1000): PlaceOrder(amount) \/ FillOrder(amount) \/ ClosePosition(amount)
 
 (* Safety: Ensure all balances are non-negat ive *)
 Safety == balances.available >= 0 /\ balances.positionMargin >= 0 /\ balances.orderMargin >= 0
@@ -38,6 +38,6 @@ Safety == balances.available >= 0 /\ balances.positionMargin >= 0 /\ balances.or
 Spec == Init /\ [][Next]_balances /\ Safety
 =============================================================================
 \* Modification History
-\* Last modified Tue May 27 16:25:31 CEST 2025 by magewe
+\* Last modified Fri May 30 11:24:59 CEST 2025 by magewe
 \* Created Tue May 27 13:42:49 CEST 2025 by magewe
     
