@@ -16,7 +16,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     )
     .unwrap();
 
-    for n in [1, 2, 3, 5, 10, 100] {
+    for n in [1, 5, 10, 100] {
         group.bench_function(&format!("insert_{n}"), |b| {
             let orders = Vec::from_iter((0..n).map(|i| {
                 let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());

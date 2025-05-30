@@ -62,9 +62,9 @@ where
         }
     }
 
-    /// The cost of the position.
+    /// The value of the position at its entry price.
     #[inline(always)]
-    pub fn total_cost(&self) -> BaseOrQuote::PairedCurrency {
+    pub fn notional(&self) -> BaseOrQuote::PairedCurrency {
         BaseOrQuote::PairedCurrency::convert_from(self.quantity, self.entry_price)
     }
 
@@ -217,7 +217,7 @@ mod tests {
         }
         assert_eq!(pos.quantity(), BaseCurrency::new(25, 1));
         assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
-        assert_eq!(pos.total_cost(), QuoteCurrency::new(250, 0));
+        assert_eq!(pos.notional(), QuoteCurrency::new(250, 0));
     }
 
     #[test_case::test_matrix(
@@ -240,7 +240,7 @@ mod tests {
         }
         assert_eq!(pos.quantity(), BaseCurrency::new(25, 1));
         assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
-        assert_eq!(pos.total_cost(), QuoteCurrency::new(250, 0));
+        assert_eq!(pos.notional(), QuoteCurrency::new(250, 0));
     }
 
     #[tracing_test::traced_test]
@@ -257,7 +257,7 @@ mod tests {
         assert_eq!(pnl, BaseCurrency::new(125, 2));
         assert_eq!(pos.quantity(), QuoteCurrency::new(250, 0));
         assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
-        assert_eq!(pos.total_cost(), BaseCurrency::new(25, 1));
+        assert_eq!(pos.notional(), BaseCurrency::new(25, 1));
     }
 
     #[test_case::test_matrix([1, 2, 5, 9])]

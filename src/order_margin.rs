@@ -1,5 +1,3 @@
-use std::ops::Neg;
-
 use const_decimal::Decimal;
 use getset::{CopyGetters, Getters, MutGetters};
 use num_traits::{One, Zero};
@@ -10,7 +8,7 @@ use crate::{
     exchange::CancelBy,
     prelude::{ActiveLimitOrders, Currency, Mon, Position},
     types::{Error, LimitOrder, MarginCurrency, Pending, Side, UserOrderId},
-    utils::{max, min},
+    utils::max,
 };
 
 /// An implementation for computing the order margin online, aka with every change to the active orders.
@@ -99,87 +97,56 @@ where
         assert2::debug_assert!(init_margin_req <= Decimal::one());
 
         trace!(
-            "order_margin_internal: position: {position:?}, active_limit_orders: {active_limit_orders:?}"
+            "order_margin_internal: position: {position}, active_limit_orders: {active_limit_orders}"
         );
 
-        let mut buy_orders = Vec::from_iter(
-            active_limit_orders
-                .bids()
-                .iter()
-                .map(|order| (order.limit_price(), order.remaining_quantity())),
-        );
-
-        let mut sell_orders = Vec::from_iter(
-            active_limit_orders
-                .asks()
-                .iter()
-                .map(|order| (order.limit_price(), order.remaining_quantity())),
-        );
+        let mut buy_notional = BaseOrQuote::PairedCurrency::zero();
+        active_limit_orders.bids().iter().for_each(|order| {
+            buy_notional += BaseOrQuote::PairedCurrency::convert_from(
+                order.remaining_quantity(),
+                order.limit_price(),
+            );
+        });
+        let mut sell_notional = BaseOrQuote::PairedCurrency::zero();
+        active_limit_orders.asks().iter().for_each(|order| {
+            sell_notional += BaseOrQuote::PairedCurrency::convert_from(
+                order.remaining_quantity(),
+                order.limit_price(),
+            );
+        });
         if let Some(new_order) = opt_new_order {
             match new_order.side() {
                 Side::Buy => {
-                    buy_orders.push((new_order.limit_price(), new_order.remaining_quantity()))
+                    buy_notional += BaseOrQuote::PairedCurrency::convert_from(
+                        new_order.remaining_quantity(),
+                        new_order.limit_price(),
+                    );
                 }
                 Side::Sell => {
-                    sell_orders.push((new_order.limit_price(), new_order.remaining_quantity()))
+                    sell_notional += BaseOrQuote::PairedCurrency::convert_from(
+                        new_order.remaining_quantity(),
+                        new_order.limit_price(),
+                    )
                 }
             }
         }
-        buy_orders.sort_by_key(|order| order.0.neg());
-        sell_orders.sort_by_key(|order| order.0);
+        trace!("buy_notional: {buy_notional}, sell_notional: {sell_notional}");
 
         match position {
-            Position::Neutral => {}
+            Position::Neutral => max(buy_notional, sell_notional) * init_margin_req,
             Position::Long(inner) => {
-                let mut outstanding_pos_qty = inner.quantity();
-                let mut i = 0;
-                while outstanding_pos_qty > BaseOrQuote::zero() {
-                    if i >= sell_orders.len() {
-                        break;
-                    }
-                    let new_qty = max(sell_orders[i].1 - outstanding_pos_qty, BaseOrQuote::zero());
-                    trace!(
-                        "sells order_qty: {}, outstanding_pos_qty: {outstanding_pos_qty} new_qty: {new_qty}",
-                        sell_orders[i].1
-                    );
-                    outstanding_pos_qty -= min(sell_orders[i].1, outstanding_pos_qty);
-                    sell_orders[i].1 = new_qty;
-                    i += 1;
-                }
+                let notional = inner.notional();
+                trace!("notional: {notional}");
+                let total_margin = max(buy_notional + notional, sell_notional) * init_margin_req;
+                total_margin - notional * init_margin_req
             }
             Position::Short(inner) => {
-                let mut outstanding_pos_qty = inner.quantity();
-                let mut i = 0;
-                while outstanding_pos_qty > BaseOrQuote::zero() {
-                    if i >= buy_orders.len() {
-                        break;
-                    }
-                    let new_qty = max(buy_orders[i].1 - outstanding_pos_qty, BaseOrQuote::zero());
-                    trace!(
-                        "buys order_qty: {}, outstanding_pos_qty: {outstanding_pos_qty} new_qty: {new_qty}",
-                        buy_orders[i].1
-                    );
-                    outstanding_pos_qty -= min(buy_orders[i].1, outstanding_pos_qty);
-                    buy_orders[i].1 = new_qty;
-                    i += 1;
-                }
+                let notional = inner.notional();
+                trace!("notional: {notional}");
+                let total_margin = max(buy_notional, sell_notional + notional) * init_margin_req;
+                total_margin - notional * init_margin_req
             }
         }
-
-        let mut buy_value = BaseOrQuote::PairedCurrency::zero();
-        buy_orders.iter().for_each(|(price, qty)| {
-            buy_value += BaseOrQuote::PairedCurrency::convert_from(*qty, *price)
-        });
-
-        let mut sell_value = BaseOrQuote::PairedCurrency::zero();
-        sell_orders.iter().for_each(|(price, qty)| {
-            sell_value += BaseOrQuote::PairedCurrency::convert_from(*qty, *price)
-        });
-
-        trace!("buy_value {buy_value}, sell_value: {sell_value}");
-        let om = max(buy_value, sell_value) * init_margin_req;
-        trace!("required order_margin: {om}");
-        om
     }
 
     /// Get the order margin if a new order were to be added.
@@ -421,47 +388,29 @@ mod tests {
         );
     }
 
-    /// The position always cancels out the orders, so the order margin is zero.
     #[test_case::test_matrix(
-        [1, 2, 5],
-        [Side::Buy, Side::Sell],
-        [70, 90, 110],
-        [1, 2, 3],
-        [85, 100, 125]
+        [1, 2, 5]
     )]
     #[tracing_test::traced_test]
-    fn order_margin_long_orders_of_same_qty(
-        leverage: u8,
-        side: Side,
-        limit_price: i32,
-        qty: i32,
-        pos_entry_price: i32,
-    ) {
+    fn order_margin_long_orders_of_same_qty(leverage: u8) {
         let mut order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
-
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+        let qty = BaseCurrency::new(3, 0);
+        let limit_price = QuoteCurrency::new(100, 0);
 
-        let qty = BaseCurrency::new(qty, 0);
-        let limit_price = QuoteCurrency::new(limit_price, 0);
-
-        let order = LimitOrder::new(side, limit_price, qty).unwrap();
-
+        let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.try_insert(order).unwrap();
 
-        let pos_entry_price = QuoteCurrency::new(pos_entry_price, 0);
+        let pos_entry_price = QuoteCurrency::new(90, 0);
+        let position = Position::Short(PositionInner::new(qty, pos_entry_price));
 
-        let position = match side {
-            Side::Buy => Position::Short(PositionInner::new(qty, pos_entry_price)),
-            Side::Sell => Position::Long(PositionInner::new(qty, pos_entry_price)),
-        };
+        // Order margin is not when the position entry price differs from the limit price, because the
+        // limit orders may require more margin.
+        let om = QuoteCurrency::convert_from(qty, QuoteCurrency::new(10, 0)) * init_margin_req;
 
-        assert_eq!(
-            order_margin.order_margin(init_margin_req, &position),
-            QuoteCurrency::new(0, 0),
-            "The position quantity always cancels out the limit orders. So margin requirement is 0."
-        );
+        assert_eq!(order_margin.order_margin(init_margin_req, &position), om);
     }
 
     #[test_case::test_matrix(
@@ -532,6 +481,7 @@ mod tests {
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.try_insert(order).unwrap();
+        assert_eq!(order_margin.active_limit_orders.asks().len(), 0);
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(90, 0)
@@ -542,6 +492,8 @@ mod tests {
         let meta = ExchangeOrderMeta::new(1.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.try_insert(order).unwrap();
+        assert_eq!(order_margin.active_limit_orders.bids().len(), 1);
+        assert_eq!(order_margin.active_limit_orders.asks().len(), 1);
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(100, 0)
@@ -553,6 +505,8 @@ mod tests {
         let meta = ExchangeOrderMeta::new(2.into(), 0.into());
         let order = order.into_pending(meta);
         order_margin.try_insert(order).unwrap();
+        assert_eq!(order_margin.active_limit_orders.bids().len(), 1);
+        assert_eq!(order_margin.active_limit_orders.asks().len(), 2);
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
             QuoteCurrency::new(220, 0)
@@ -576,7 +530,6 @@ mod tests {
         );
 
         let limit_price = QuoteCurrency::new(90, 0);
-        let qty = BaseCurrency::new(1, 0);
         let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);

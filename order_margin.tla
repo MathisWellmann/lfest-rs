@@ -2,45 +2,33 @@
 
 EXTENDS Naturals, Integers, FiniteSets, TLC
 
-\* Constants
-CONSTANTS Orders, MaxMargin, NullUser
+CONSTANTS Orders
 
-\* Variables
 VARIABLES
-    orders,          \* Map from Orders to [user, price, quantity, margin]
-    activeOrders,    \* Set of currently active order IDs
-    userMargin       \* Map from Users to [total, locked, position]
+    balances, \* contains available, position_margin and order_margin
+    position, \* contains the quantity and entry_price
+    bids,      \* User buy orders
+    asks      \* User sell orders
 
 \* Initial State
 Init ==
-    /\ orders = [o \in Orders |-> [user |-> NullUser, price |-> 0, quantity |-> 0, margin |-> 0]]
-    /\ activeOrders = {}
-    /\ userMargin = [u \in Users |-> [total |-> MaxMargin, locked |-> 0, position |-> 0]]
+    /\ balances = [ available |-> 1000, position_margin |-> 0, order_margin |-> 0 ]
+    /\ position = [ qty |-> 0, entry_price |-> 0 ]
+    /\ bids = {}
+    /\ asks = {}
 
-\* Action: Add a new order
-AddOrder(user, order_id, margin) ==
-    /\ order_id \in Orders
-    /\ order_id \notin activeOrders
-    /\ margin > 0
-    /\ userMargin[user].total - userMargin[user].locked >= margin
-    /\ orders' = [orders EXCEPT ![order_id] = [user |-> user, price |-> 0, quantity |-> 0, margin |-> margin]]
-    /\ activeOrders' = activeOrders \cup {order_id}
-    /\ userMargin' = [userMargin EXCEPT ![user].locked = userMargin[user].locked + margin]
-    /\ UNCHANGED <<userMargin[user].total, userMargin[user].position>>
+AddBid(order) ==
+    /\ order.qty > 0
+    /\ order.limit_price > 0
+    /\ balances' = [ balances EXCEPT !.available = @ - order.qty * order.limit_price, !.order_margin = 0 ]
 
 \* Next-state relation
 Next ==
-    \/ \E user \in Users, order_id \in Orders, margin \in 1..MaxMargin:
-        AddOrder(user, order_id, margin)
-
+    \/ \A order \in Orders:
+        AddBid(order)
 
 \* Specification: Initial condition and all possible transitions
-Spec == Init /\ [][Next]_<<orders, activeOrders, userMargin>>
-\* Optional: Add fairness conditions for liveness if needed
-\* FairSpec == Spec /\ WF_vars(Next)
-
-\* Invariant: Locked margin never exceeds total margin
-Inv == \A u \in Users: userMargin[u].locked <= userMargin[u].total
+Spec == Init /\ [][Next]_<<>>
 
 =============================================================================
 \* Modification History

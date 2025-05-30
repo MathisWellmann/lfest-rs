@@ -22,16 +22,16 @@ fn limit_orders_only() {
         .unwrap();
     assert_eq!(exec_orders.len(), 0);
 
-    let qty = BaseCurrency::new(99, 1);
+    let qty = BaseCurrency::new(95, 1);
     let fee0 = QuoteCurrency::convert_from(qty, bid) * *fee_maker.as_ref();
     let o = LimitOrder::new(Side::Buy, bid, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(10, 0))
+            .available(QuoteCurrency::new(50, 0))
             .position_margin(QuoteCurrency::zero())
-            .order_margin(QuoteCurrency::new(990, 0))
+            .order_margin(QuoteCurrency::new(950, 0))
             .total_fees_paid(Zero::zero())
             .build()
     );
@@ -61,13 +61,13 @@ fn limit_orders_only() {
         exchange
             .position()
             .unrealized_pnl(exchange.market_state().bid(), exchange.market_state().ask()),
-        QuoteCurrency::new(-198, 1)
+        QuoteCurrency::new(-190, 1)
     );
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(10, 0) - fee0)
-            .position_margin(QuoteCurrency::new(990, 0))
+            .available(QuoteCurrency::new(50, 0) - fee0)
+            .position_margin(QuoteCurrency::new(950, 0))
             .order_margin(QuoteCurrency::zero())
             .total_fees_paid(fee0)
             .build()
@@ -90,7 +90,7 @@ fn limit_orders_only() {
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(10495, 1) - fee0 - fee1)
+            .available(QuoteCurrency::new(10475, 1) - fee0 - fee1)
             .position_margin(QuoteCurrency::zero())
             .order_margin(QuoteCurrency::zero())
             .total_fees_paid(fee0 + fee1)
@@ -109,19 +109,11 @@ fn limit_orders_only() {
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(
-                QuoteCurrency::new(10495, 1)
-                    - QuoteCurrency::new(198, 3)
-                    - QuoteCurrency::new(2079, 4)
-            )
+            .available(QuoteCurrency::new(104711050, 5))
             .position_margin(QuoteCurrency::zero())
             .order_margin(QuoteCurrency::zero())
-            .total_fees_paid(QuoteCurrency::new(4059, 4))
+            .total_fees_paid(QuoteCurrency::new(3895, 4))
             .build()
-    );
-    assert_eq!(
-        exchange.balances().total_fees_paid(),
-        QuoteCurrency::new(4059, 4)
     );
 }
 
@@ -196,9 +188,9 @@ fn limit_orders_2() {
     assert_eq!(
         exchange.balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(92475, 2) - fee)
+            .available(QuoteCurrency::new(92424, 2))
             .position_margin(QuoteCurrency::new(50, 0))
-            .order_margin(QuoteCurrency::new(2525, 2))
+            .order_margin(QuoteCurrency::new(2575, 2))
             .total_fees_paid(fee)
             .build()
     );

@@ -68,8 +68,8 @@ where
     pub fn total_cost(&self) -> BaseOrQuote::PairedCurrency {
         match self {
             Position::Neutral => BaseOrQuote::PairedCurrency::zero(),
-            Position::Long(inner) => inner.total_cost(),
-            Position::Short(inner) => inner.total_cost(),
+            Position::Long(inner) => inner.notional(),
+            Position::Short(inner) => inner.notional(),
         }
     }
 
