@@ -37,36 +37,11 @@ The supported order types are:
 - `LimitOrder`: passively place an order into the orderbook, with support for partial executions.
 - `MarketOrder`: aggressively execute against the best bid / ask. Not accounting for available volume or full order book for now.
 
-### Performance Metrics:
-The following performance metrics are available when using the `FullTrack` `AccountTracker`,   
-but you may define any performance metric by implementing the `AccountTracker` trait.
-- `win_ratio`: wins / total_trades
-- `profit_loss_ratio`: avg_win_amnt / avg_loss_amnt
-- `total_rpnl`: Total realized profit and loss
-- `sharpe`: The annualized sharpe ratio
-- `sortino`: The annualized sortino ratio
-- `cumulative fees`: Sum total of fees payed to the exchange
-- `max_drawdown_wallet_balance`: Maximum fraction the wallet balance has decreased from its high.
-- `max_drawdown_total`: Drawdown including unrealized profit and loss
-- `max_drawdown_duration`: The duration of the longest drawdown
-- `num_trades`: The total number of trades executed
-- `turnover`: The total quantity executed 
-- `trade_percentage`: trades / total_trade_opportunities
-- `buy_ratio`: buys / total_trades
-- `limit_order_fill_ratio`
-- `limit_order_cancellation_ratio`
-- `historical_value_at_risk`
-- `cornish_fisher_value_at_risk`
-- `d_ratio`
-
-There probably are some more metrics that I missed.
-Some of these metric may behave differently from what you would expect, so make sure to take a look at the code.
-
 ### How to use
 To use this crate in your project, add the following to your Cargo.toml:
 ```ignore
 [dependencies]
-lfest = { git = https://github.com/MathisWellmann/lfest-rs, rev = "DESIRED-REVISION", version = "0.83"} # Probably pin the revision because main is changing quickly
+lfest = { git = https://github.com/MathisWellmann/lfest-rs } # Probably pin the version because main is changing quickly
 ```
 
 Then proceed to use it in your code.
