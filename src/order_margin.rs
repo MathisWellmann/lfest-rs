@@ -21,6 +21,8 @@ where
 {
     #[getset(get = "pub(crate)", get_mut = "pub(crate)")]
     active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
+    bids_notional: BaseOrQuote::PairedCurrency,
+    asks_notional: BaseOrQuote::PairedCurrency,
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> OrderMargin<I, D, BaseOrQuote, UserOrderIdT>
@@ -34,6 +36,8 @@ where
     pub fn new(max_active_orders: usize) -> Self {
         Self {
             active_limit_orders: ActiveLimitOrders::new(max_active_orders),
+            bids_notional: Zero::zero(),
+            asks_notional: Zero::zero(),
         }
     }
 
@@ -44,7 +48,12 @@ where
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Result<()> {
         trace!("OrderMargin insert: {order:?}");
-        self.active_limit_orders.try_insert(order)
+        self.active_limit_orders.try_insert(order.clone())?;
+        match order.side() {
+            Side::Buy => self.bids_notional += order.notional(),
+            Side::Sell => self.asks_notional += order.notional(),
+        }
+        Ok(())
     }
 
     /// update an existing limit order.
@@ -55,7 +64,19 @@ where
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) {
         trace!("OrderMargin update: {order:?}");
-        self.active_limit_orders.update(order);
+        let notional = order.notional();
+        let old_order = self.active_limit_orders.update(order);
+        let notional_delta = notional - old_order.notional();
+        match old_order.side() {
+            Side::Buy => {
+                self.bids_notional += notional_delta;
+                assert2::debug_assert!(self.bids_notional >= Zero::zero());
+            }
+            Side::Sell => {
+                self.asks_notional += notional_delta;
+                assert2::debug_assert!(self.asks_notional >= Zero::zero());
+            }
+        }
     }
 
     /// Remove an order from being tracked for margin purposes.
@@ -63,7 +84,7 @@ where
         &mut self,
         by: CancelBy<UserOrderIdT>,
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        Ok(match by {
+        let removed_order = match by {
             CancelBy::OrderId(order_id) => self
                 .active_limit_orders
                 .remove_by_id(order_id)
@@ -72,7 +93,19 @@ where
                 .active_limit_orders
                 .remove_by_user_order_id(user_order_id)
                 .ok_or(Error::UserOrderIdNotFound)?,
-        })
+        };
+
+        match removed_order.side() {
+            Side::Buy => {
+                self.bids_notional -= removed_order.notional();
+                assert2::debug_assert!(self.bids_notional >= Zero::zero());
+            }
+            Side::Sell => {
+                self.asks_notional -= removed_order.notional();
+                assert2::debug_assert!(self.asks_notional >= Zero::zero());
+            }
+        }
+        Ok(removed_order)
     }
 
     /// The margin requirement for all the tracked orders.
@@ -81,70 +114,16 @@ where
         init_margin_req: Decimal<I, D>,
         position: &Position<I, D, BaseOrQuote>,
     ) -> BaseOrQuote::PairedCurrency {
-        Self::order_margin_internal(&self.active_limit_orders, init_margin_req, position, None)
-    }
-
-    /// The margin requirement for all the tracked orders.
-    fn order_margin_internal(
-        active_limit_orders: &ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
-        init_margin_req: Decimal<I, D>,
-        position: &Position<I, D, BaseOrQuote>,
-        opt_new_order: Option<
-            &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        >,
-    ) -> BaseOrQuote::PairedCurrency {
         assert2::debug_assert!(init_margin_req > Decimal::zero());
         assert2::debug_assert!(init_margin_req <= Decimal::one());
 
-        trace!(
-            "order_margin_internal: position: {position}, active_limit_orders: {active_limit_orders}"
-        );
-
-        let mut buy_notional = BaseOrQuote::PairedCurrency::zero();
-        active_limit_orders.bids().iter().for_each(|order| {
-            buy_notional += BaseOrQuote::PairedCurrency::convert_from(
-                order.remaining_quantity(),
-                order.limit_price(),
-            );
-        });
-        let mut sell_notional = BaseOrQuote::PairedCurrency::zero();
-        active_limit_orders.asks().iter().for_each(|order| {
-            sell_notional += BaseOrQuote::PairedCurrency::convert_from(
-                order.remaining_quantity(),
-                order.limit_price(),
-            );
-        });
-        if let Some(new_order) = opt_new_order {
-            match new_order.side() {
-                Side::Buy => {
-                    buy_notional += BaseOrQuote::PairedCurrency::convert_from(
-                        new_order.remaining_quantity(),
-                        new_order.limit_price(),
-                    );
-                }
-                Side::Sell => {
-                    sell_notional += BaseOrQuote::PairedCurrency::convert_from(
-                        new_order.remaining_quantity(),
-                        new_order.limit_price(),
-                    )
-                }
-            }
-        }
-        trace!("buy_notional: {buy_notional}, sell_notional: {sell_notional}");
-
         match position {
-            Position::Neutral => max(buy_notional, sell_notional) * init_margin_req,
+            Position::Neutral => max(self.bids_notional, self.asks_notional) * init_margin_req,
             Position::Long(inner) => {
-                let notional = inner.notional();
-                trace!("notional: {notional}");
-                let total_margin = max(buy_notional + notional, sell_notional) * init_margin_req;
-                total_margin - notional * init_margin_req
+                max(self.bids_notional, self.asks_notional - inner.notional()) * init_margin_req
             }
             Position::Short(inner) => {
-                let notional = inner.notional();
-                trace!("notional: {notional}");
-                let total_margin = max(buy_notional, sell_notional + notional) * init_margin_req;
-                total_margin - notional * init_margin_req
+                max(self.bids_notional - inner.notional(), self.asks_notional) * init_margin_req
             }
         }
     }
@@ -152,16 +131,34 @@ where
     /// Get the order margin if a new order were to be added.
     pub(crate) fn order_margin_with_order(
         &self,
-        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        new_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         init_margin_req: Decimal<I, D>,
         position: &Position<I, D, BaseOrQuote>,
     ) -> BaseOrQuote::PairedCurrency {
-        Self::order_margin_internal(
-            &self.active_limit_orders,
-            init_margin_req,
-            position,
-            Some(order),
-        )
+        assert2::debug_assert!(init_margin_req > Decimal::zero());
+        assert2::debug_assert!(init_margin_req <= Decimal::one());
+
+        let mut buy_notional = self.bids_notional;
+        let mut sell_notional = self.asks_notional;
+        let new_notional = new_order.notional();
+        match new_order.side() {
+            Side::Buy => buy_notional += new_notional,
+            Side::Sell => sell_notional += new_notional,
+        }
+
+        match position {
+            Position::Neutral => max(buy_notional, sell_notional) * init_margin_req,
+            Position::Long(inner) => {
+                let notional = inner.notional();
+                trace!("notional: {notional}");
+                max(buy_notional, sell_notional - notional) * init_margin_req
+            }
+            Position::Short(inner) => {
+                let notional = inner.notional();
+                trace!("notional: {notional}");
+                max(buy_notional - notional, sell_notional) * init_margin_req
+            }
+        }
     }
 }
 

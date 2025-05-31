@@ -341,7 +341,7 @@ where
 
     /// The notional value is related to the quantity and its limit price.
     #[inline]
-    pub fn notional_value(&self) -> BaseOrQuote::PairedCurrency {
+    pub fn notional(&self) -> BaseOrQuote::PairedCurrency {
         BaseOrQuote::PairedCurrency::convert_from(self.remaining_quantity, self.limit_price)
     }
 }

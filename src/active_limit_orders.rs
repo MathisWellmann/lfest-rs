@@ -99,52 +99,39 @@ where
     }
 
     /// Update an existing `LimitOrder`.
+    /// Returns the old order
+    #[must_use]
     pub(crate) fn update(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) {
-        match order.side() {
-            Side::Buy => {
-                // Find the index where to insert it with price, time priority.
-                let active_order = self
-                    .bids
-                    .iter_mut()
-                    .find(|o| o.id() == order.id())
-                    .expect("Order must have been active before updating it");
-                debug_assert_ne!(
-                    active_order, &order,
-                    "An update to an order should not be the same as the existing one"
-                );
-                assert2::debug_assert!(
-                    order.remaining_quantity() < active_order.remaining_quantity(),
-                    "An update to an existing order must mean the new order has less quantity than the tracked order."
-                );
-                debug_assert_eq!(order.id(), active_order.id());
-                Self::assert_limit_order_update_reduces_qty(&active_order, &order);
+    ) -> LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>> {
+        let active_order = match order.side() {
+            Side::Buy => self
+                .bids
+                .iter_mut()
+                .find(|o| o.id() == order.id())
+                .expect("Order must have been active before updating it"),
+            Side::Sell => self
+                .asks
+                .iter_mut()
+                .find(|o| o.id() == order.id())
+                .expect("Order must have been active before updating it"),
+        };
+        debug_assert_ne!(
+            active_order, &order,
+            "An update to an order should not be the same as the existing one"
+        );
+        assert2::debug_assert!(
+            order.remaining_quantity() < active_order.remaining_quantity(),
+            "An update to an existing order must mean the new order has less quantity than the tracked order."
+        );
+        debug_assert_eq!(order.id(), active_order.id());
+        Self::assert_limit_order_update_reduces_qty(&active_order, &order);
 
-                *active_order = order;
-            }
-            Side::Sell => {
-                // Find the index where to insert it with price, time priority.
-                let active_order = self
-                    .asks
-                    .iter_mut()
-                    .find(|o| o.id() == order.id())
-                    .expect("Order must have been active before updating it");
-                debug_assert_ne!(
-                    active_order, &order,
-                    "An update to an order should not be the same as the existing one"
-                );
-                assert2::debug_assert!(
-                    order.remaining_quantity() < active_order.remaining_quantity(),
-                    "An update to an existing order must mean the new order has less quantity than the tracked order."
-                );
-                debug_assert_eq!(order.id(), active_order.id());
-                Self::assert_limit_order_update_reduces_qty(&active_order, &order);
+        let old_order = active_order.clone();
+        *active_order = order;
 
-                *active_order = order;
-            }
-        }
+        old_order
     }
 
     pub(crate) fn assert_limit_order_update_reduces_qty(
