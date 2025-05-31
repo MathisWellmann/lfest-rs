@@ -40,6 +40,26 @@ pub fn decimal_from_f64<I: Mon<D>, const D: u8>(val: f64) -> Result<Decimal<I, D
         .ok_or(Error::UnableToCreateDecimal)
 }
 
+/// Scales the value from one range into another
+///
+/// # Arguments:
+/// `from_min`: The minimum value of the origin range
+/// `from_max`: The maximum value of the origin range
+/// `to_min`: The minimum value of the target range
+/// `to_max`: The maximum value of the target range
+/// `value`: The value to translate from one range into the other
+///
+/// # Returns:
+/// The scaled value
+///
+/// Used in benchmarks
+#[inline(always)]
+pub fn scale<F: num::Float>(from_min: F, from_max: F, to_min: F, to_max: F, value: F) -> F {
+    assert2::debug_assert!(from_min <= from_max);
+    assert2::debug_assert!(to_min <= to_max);
+    to_min + ((value - from_min) * (to_max - to_min)) / (from_max - from_min)
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use const_decimal::Decimal;

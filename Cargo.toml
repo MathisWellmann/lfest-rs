@@ -89,3 +89,7 @@ harness = false
 [[bench]]
 name = "order_margin"
 harness = false
+
+[[bench]]
+name = "position"
+harness = false

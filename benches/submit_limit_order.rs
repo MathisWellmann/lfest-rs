@@ -88,22 +88,3 @@ fn criterion_benchmark(c: &mut Criterion) {
 
 criterion_group!(benches, criterion_benchmark);
 criterion_main!(benches);
-
-/// Scales the value from one range into another
-///
-/// # Arguments:
-/// `from_min`: The minimum value of the origin range
-/// `from_max`: The maximum value of the origin range
-/// `to_min`: The minimum value of the target range
-/// `to_max`: The maximum value of the target range
-/// `value`: The value to translate from one range into the other
-///
-/// # Returns:
-/// The scaled value
-///
-#[inline(always)]
-fn scale<F: num::Float>(from_min: F, from_max: F, to_min: F, to_max: F, value: F) -> F {
-    assert2::debug_assert!(from_min <= from_max);
-    assert2::debug_assert!(to_min <= to_max);
-    to_min + ((value - from_min) * (to_max - to_min)) / (from_max - from_min)
-}

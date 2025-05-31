@@ -48,6 +48,6 @@ pub mod prelude {
         position::Position,
         position_inner::PositionInner,
         types::*,
-        utils::{NoUserOrderId, decimal_from_f64},
+        utils::{NoUserOrderId, decimal_from_f64, scale},
     };
 }
