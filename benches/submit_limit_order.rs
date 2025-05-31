@@ -5,14 +5,13 @@ use std::hint::black_box;
 use const_decimal::Decimal;
 use criterion::{Criterion, criterion_group, criterion_main};
 use lfest::prelude::*;
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 const DECIMALS: u8 = 5;
 
-fn submit_limit_orders<U>(
-    order: &LimitOrder<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>, NoUserOrderId, NewOrder>,
-    n: usize,
-) {
-    // Technically the setup code should not be benchmarked.
+type ThisExchange = Exchange<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>, NoUserOrderId>;
+
+fn setup_exchange() -> ThisExchange {
     let starting_balance = BaseCurrency::new(100000, 0);
     let contract_spec = ContractSpecification::new(
         leverage!(1),
@@ -34,7 +33,7 @@ fn submit_limit_orders<U>(
         starting_balance,
         200,
         contract_spec,
-        OrderRateLimits::new(n as _).unwrap(),
+        OrderRateLimits::new(u16::MAX).unwrap(),
     )
     .unwrap();
     let mut exchange = Exchange::<i64, 5, QuoteCurrency<i64, 5>, NoUserOrderId>::new(config);
@@ -45,55 +44,66 @@ fn submit_limit_orders<U>(
             timestamp_exchange_ns: 0.into(),
         })
         .expect("is valid market update");
-    for _ in 0..n {
-        exchange
-            .submit_limit_order(order.clone())
-            .expect("Can submit market order");
-    }
+    exchange
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let order = LimitOrder::new(
-        Side::Buy,
-        QuoteCurrency::new(100, 0),
-        QuoteCurrency::new(1, 1),
-    )
-    .unwrap();
     let mut group = c.benchmark_group("submit_limit_order");
 
-    let n: usize = 1;
-    group.throughput(criterion::Throughput::Elements(n as u64));
-    group.bench_function(&format!("submit_limit_order_{n}"), |b| {
-        b.iter(|| {
-            submit_limit_orders::<Trade<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>>(
-                black_box(&order),
-                n,
-            )
-        })
-    });
+    let mut rng = SmallRng::seed_from_u64(0);
 
-    let n: usize = 10;
-    group.throughput(criterion::Throughput::Elements(n as u64));
-    group.bench_function(&format!("submit_limit_order_{n}"), |b| {
-        b.iter(|| {
-            submit_limit_orders::<Trade<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>>(
-                black_box(&order),
-                n,
+    for n in [1, 10, 100] {
+        let orders = Vec::from_iter((0..n).map(|_| {
+            if rng.random() {
+                LimitOrder::new(
+                    Side::Buy,
+                    QuoteCurrency::new(scale(0.0, 1.0, 60.0, 90.0, rng.random()) as i64, 0),
+                    QuoteCurrency::new(scale(0.0, 1.0, 1.0, 1000.0, rng.random()) as i64, 0),
+                )
+                .unwrap()
+            } else {
+                LimitOrder::new(
+                    Side::Sell,
+                    QuoteCurrency::new(scale(0.0, 1.0, 110.0, 150.0, rng.random()) as i64, 0),
+                    QuoteCurrency::new(scale(0.0, 1.0, 1.0, 1000.0, rng.random()) as i64, 0),
+                )
+                .unwrap()
+            }
+        }));
+        group.throughput(criterion::Throughput::Elements(n as u64));
+        group.bench_function(&format!("submit_limit_order_{n}"), |b| {
+            b.iter_with_setup(
+                || setup_exchange(),
+                |mut exchange| {
+                    for order in orders.iter() {
+                        exchange
+                            .submit_limit_order(black_box(order.clone()))
+                            .expect("Can submit market order");
+                    }
+                },
             )
-        })
-    });
-
-    let n: usize = 100;
-    group.throughput(criterion::Throughput::Elements(n as u64));
-    group.bench_function(&format!("submit_limit_order_{n}"), |b| {
-        b.iter(|| {
-            submit_limit_orders::<Trade<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>>(
-                black_box(&order),
-                n,
-            )
-        })
-    });
+        });
+    }
 }
 
 criterion_group!(benches, criterion_benchmark);
 criterion_main!(benches);
+
+/// Scales the value from one range into another
+///
+/// # Arguments:
+/// `from_min`: The minimum value of the origin range
+/// `from_max`: The maximum value of the origin range
+/// `to_min`: The minimum value of the target range
+/// `to_max`: The maximum value of the target range
+/// `value`: The value to translate from one range into the other
+///
+/// # Returns:
+/// The scaled value
+///
+#[inline(always)]
+fn scale<F: num::Float>(from_min: F, from_max: F, to_min: F, to_max: F, value: F) -> F {
+    assert2::debug_assert!(from_min <= from_max);
+    assert2::debug_assert!(to_min <= to_max);
+    to_min + ((value - from_min) * (to_max - to_min)) / (from_max - from_min)
+}
