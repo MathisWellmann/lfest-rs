@@ -52,7 +52,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let mut rng = SmallRng::seed_from_u64(0);
 
-    for n in [1, 10, 100] {
+    for n in (1..100).step_by(5) {
         let orders = Vec::from_iter((0..n).map(|_| {
             if rng.random() {
                 LimitOrder::new(
