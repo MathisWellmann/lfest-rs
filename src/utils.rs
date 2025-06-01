@@ -64,7 +64,6 @@ pub fn scale<F: num::Float>(from_min: F, from_max: F, to_min: F, to_max: F, valu
 pub(crate) mod tests {
     use const_decimal::Decimal;
 
-    use super::scale;
     use crate::utils::decimal_from_f64;
 
     #[test]
@@ -103,16 +102,5 @@ pub(crate) mod tests {
             decimal_from_f64(3.14159).unwrap(),
             Decimal::<i64, 5>::try_from_scaled(314159, 5).unwrap()
         );
-    }
-
-    #[kani::proof]
-    fn kani_scale() {
-        let from_min = kani::any();
-        let from_max = kani::any();
-        let to_min = kani::any();
-        let to_max = kani::any();
-        let v = kani::any();
-
-        let _ = scale::<f64>(from_min, from_max, to_min, to_max, v);
     }
 }

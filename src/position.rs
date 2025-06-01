@@ -262,6 +262,7 @@ where
 #[cfg(test)]
 mod tests {
     use const_decimal::Decimal;
+    use proptest::prelude::*;
 
     use super::*;
     use crate::prelude::*;
@@ -336,15 +337,70 @@ mod tests {
         );
     }
 
-    // #[kani::proof]
-    // fn kani_position_change() {
-    //     // Create a nondeterministic input
-    //     let input: Position<i64, 5, BaseCurrency<i64, 5>> = kani::any();
+    proptest! {
+        #[test]
+        fn proptest_position_change_neutral(qty in 1..100_i64, fill_price in 1..100_i64, leverage in 1..10_u8) {
+            let filled_qty = BaseCurrency::<i64, 5>::new(qty, 0);
+            let fill_price = QuoteCurrency::new(fill_price, 0);
+            let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
-    //     // // Call the function under verification
-    //     // let output = function_under_test(input);
+            let mut position = Position::Neutral;
+            let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
 
-    //     // // Check that it meets the specification
-    //     // assert!(meets_specification(input, output));
-    // }
+            position.change(
+                filled_qty,
+                fill_price,
+                Side::Buy,
+                &mut balances,
+                init_margin_req,
+            );
+            assert_eq!(position, Position::Long(PositionInner::new(filled_qty, fill_price)));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn proptest_position_change_long(qty in 1..100_i64, fill_price in 1..100_i64, leverage in 1..10_u8) {
+            let filled_qty = BaseCurrency::<i64, 5>::new(qty, 0);
+            let fill_price = QuoteCurrency::new(fill_price, 0);
+            let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+
+            let mut position = Position::Long(PositionInner::new(filled_qty, fill_price));
+            let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+            let margin = QuoteCurrency::convert_from(filled_qty, fill_price) * init_margin_req;
+            assert!(balances.try_reserve_position_margin(margin));
+
+            position.change(
+                filled_qty,
+                fill_price,
+                Side::Sell,
+                &mut balances,
+                init_margin_req,
+            );
+            assert_eq!(position, Position::Neutral);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn proptest_position_change_short(qty in 1..100_i64, fill_price in 1..100_i64, leverage in 1..10_u8) {
+            let filled_qty = BaseCurrency::<i64, 5>::new(qty, 0);
+            let fill_price = QuoteCurrency::new(fill_price, 0);
+            let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+
+            let mut position = Position::Short(PositionInner::new(filled_qty, fill_price));
+            let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+            let margin = QuoteCurrency::convert_from(filled_qty, fill_price) * init_margin_req;
+            assert!(balances.try_reserve_position_margin(margin));
+
+            position.change(
+                filled_qty,
+                fill_price,
+                Side::Buy,
+                &mut balances,
+                init_margin_req,
+            );
+            assert_eq!(position, Position::Neutral);
+        }
+    }
 }

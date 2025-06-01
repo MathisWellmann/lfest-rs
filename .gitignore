@@ -5,3 +5,5 @@
 /mutants.out.old
 .idea
 .nvimlog
+*.toolbox
+proptest-regressions

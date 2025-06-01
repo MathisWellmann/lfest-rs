@@ -58,7 +58,7 @@ fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs"
   "num-traits",
 ] }
 trade_aggregation = "12"
-kani = { git = "https://github.com/model-checking/kani", version = "0.62"}
+proptest = "1.6"
 
 [features]
 trade_aggregation = ["dep:trade_aggregation"]
