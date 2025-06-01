@@ -162,6 +162,7 @@ where
 #[cfg(test)]
 mod test {
     use num::Zero;
+    use proptest::prelude::*;
 
     use super::*;
     use crate::types::QuoteCurrency;
@@ -176,5 +177,106 @@ mod test {
             _i: PhantomData,
         };
         assert_eq!(balances.sum(), QuoteCurrency::new(1300, 0));
+    }
+
+    proptest! {
+        #[test]
+        fn proptest_balances_account_for_fee(fee in 0..1000_i64) {
+            let mut balances = Balances::new(QuoteCurrency::<i64, 5>::new(10_000, 0));
+            let fee = QuoteCurrency::new(fee, 0);
+            balances.account_for_fee(fee);
+            balances.debug_assert_state();
+            assert_eq!(balances, Balances::builder()
+                .available(QuoteCurrency::new(10_000, 0) - fee)
+                .position_margin(Zero::zero())
+                .order_margin(Zero::zero())
+                .total_fees_paid(fee)
+                .build()
+            );
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn proptest_balances_try_reserve_order_margin(margin in 1..1000_i64) {
+            let margin = QuoteCurrency::new(margin, 0);
+            let mut balances = Balances::new(QuoteCurrency::<i64, 5>::new(1000, 0));
+            assert!(balances.try_reserve_order_margin(margin));
+            balances.debug_assert_state();
+            assert_eq!(balances, Balances::builder()
+                .available(QuoteCurrency::new(1000, 0) - margin)
+                .position_margin(Zero::zero())
+                .order_margin(margin)
+                .total_fees_paid(Zero::zero())
+                .build()
+            );
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn proptest_balances_free_order_margin(margin in 1..1000_i64) {
+            let margin = QuoteCurrency::new(margin, 0);
+            let mut balances = Balances::new(QuoteCurrency::<i64, 5>::new(1000, 0));
+            assert!(balances.try_reserve_order_margin(margin));
+            balances.free_order_margin(margin);
+            balances.debug_assert_state();
+            assert_eq!(balances, Balances::builder()
+                .available(QuoteCurrency::new(1000, 0))
+                .position_margin(Zero::zero())
+                .order_margin(Zero::zero())
+                .total_fees_paid(Zero::zero())
+                .build()
+            );
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn balances_free_order_margin_panic() {
+        let mut balances = Balances::new(QuoteCurrency::<i64, 5>::new(1000, 0));
+        balances.free_order_margin(QuoteCurrency::new(100, 0));
+    }
+
+    proptest! {
+        #[test]
+        fn proptest_balances_try_reserve_position_margin(margin in 1..1000_i64) {
+            let margin = QuoteCurrency::new(margin, 0);
+            let mut balances = Balances::new(QuoteCurrency::<i64, 5>::new(1000, 0));
+            assert!(balances.try_reserve_position_margin(margin));
+            balances.debug_assert_state();
+            assert_eq!(balances, Balances::builder()
+                .available(QuoteCurrency::new(1000, 0) - margin)
+                .position_margin(margin)
+                .order_margin(Zero::zero())
+                .total_fees_paid(Zero::zero())
+                .build()
+            );
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn proptest_balances_free_position_margin(margin in 1..1000_i64) {
+            let margin = QuoteCurrency::new(margin, 0);
+            let mut balances = Balances::new(QuoteCurrency::<i64, 5>::new(1000, 0));
+            assert!(balances.try_reserve_position_margin(margin));
+            balances.free_position_margin(margin);
+            balances.debug_assert_state();
+            assert_eq!(balances, Balances::builder()
+                .available(QuoteCurrency::new(1000, 0))
+                .position_margin(Zero::zero())
+                .order_margin(Zero::zero())
+                .total_fees_paid(Zero::zero())
+                .build()
+            );
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn balances_free_position_margin_panic() {
+        let mut balances = Balances::new(QuoteCurrency::<i64, 5>::new(1000, 0));
+        balances.free_position_margin(QuoteCurrency::new(100, 0));
     }
 }
