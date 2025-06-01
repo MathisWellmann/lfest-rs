@@ -39,6 +39,8 @@ where
         bid: QuoteCurrency<I, D>,
         ask: QuoteCurrency<I, D>,
     ) -> BaseOrQuote::PairedCurrency {
+        assert2::debug_assert!(bid > Zero::zero());
+        assert2::debug_assert!(ask > Zero::zero());
         match self {
             Position::Neutral => BaseOrQuote::PairedCurrency::zero(),
             Position::Long(inner) => inner.unrealized_pnl(bid),
@@ -74,7 +76,7 @@ where
     }
 
     /// Change a position while doing proper accounting and balance transfers.
-    pub fn change_position(
+    pub fn change(
         &mut self,
         filled_qty: BaseOrQuote,
         fill_price: QuoteCurrency<I, D>,
@@ -288,7 +290,8 @@ mod tests {
         let mut pos = Position::Short(PositionInner::new(qty, entry_price));
 
         let exit_price = QuoteCurrency::new(30204_27, 2);
-        pos.change_position(qty, exit_price, Side::Buy, &mut balances, init_margin_req);
+        pos.change(qty, exit_price, Side::Buy, &mut balances, init_margin_req);
+        assert_eq!(pos, Position::Neutral);
         assert_eq!(
             balances,
             Balances::builder()
@@ -312,7 +315,7 @@ mod tests {
         let fill_price = QuoteCurrency::new(6001260000, 5);
         let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
-        pos.change_position(
+        pos.change(
             filled_qty,
             fill_price,
             Side::Sell,
@@ -332,4 +335,16 @@ mod tests {
             12
         );
     }
+
+    // #[kani::proof]
+    // fn kani_position_change() {
+    //     // Create a nondeterministic input
+    //     let input: Position<i64, 5, BaseCurrency<i64, 5>> = kani::any();
+
+    //     // // Call the function under verification
+    //     // let output = function_under_test(input);
+
+    //     // // Check that it meets the specification
+    //     // assert!(meets_specification(input, output));
+    // }
 }

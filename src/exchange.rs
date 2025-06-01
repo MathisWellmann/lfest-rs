@@ -251,7 +251,7 @@ where
         let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price);
         let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
 
-        self.position.change_position(
+        self.position.change(
             filled_qty,
             fill_price,
             order.side(),
@@ -582,7 +582,7 @@ where
             self.balances.free_order_margin(margin_delta);
         }
 
-        self.position.change_position(
+        self.position.change(
             filled_qty,
             limit_price,
             side,

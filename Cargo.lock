@@ -767,6 +767,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "kani"
+version = "0.62.0"
+source = "git+https://github.com/model-checking/kani#d57fbf420fd24180b019e3e049a44483acd21fbe"
+dependencies = [
+ "kani_core",
+ "kani_macros",
+]
+
+[[package]]
+name = "kani_core"
+version = "0.62.0"
+source = "git+https://github.com/model-checking/kani#d57fbf420fd24180b019e3e049a44483acd21fbe"
+dependencies = [
+ "kani_macros",
+]
+
+[[package]]
+name = "kani_macros"
+version = "0.62.0"
+source = "git+https://github.com/model-checking/kani#d57fbf420fd24180b019e3e049a44483acd21fbe"
+dependencies = [
+ "proc-macro-error2",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -774,7 +802,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lfest"
-version = "0.114.0"
+version = "0.115.0"
 dependencies = [
  "assert2",
  "const-decimal",
@@ -786,6 +814,7 @@ dependencies = [
  "getset",
  "glidesort",
  "hashbrown",
+ "kani",
  "num",
  "num-traits",
  "rand 0.9.1",

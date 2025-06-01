@@ -39,7 +39,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     || (pos.clone(), Balances::new(QuoteCurrency::new(1000, 0))),
                     |(mut position, mut balances)| {
                         for (filled_qty, fill_price) in random_changes.iter() {
-                            black_box(position.change_position(
+                            black_box(position.change(
                                 *filled_qty,
                                 *fill_price,
                                 side,

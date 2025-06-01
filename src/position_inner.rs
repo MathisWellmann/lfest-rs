@@ -65,6 +65,8 @@ where
     /// The value of the position at its entry price.
     #[inline(always)]
     pub fn notional(&self) -> BaseOrQuote::PairedCurrency {
+        assert2::debug_assert!(self.entry_price > Zero::zero());
+        assert2::debug_assert!(self.quantity >= Zero::zero());
         BaseOrQuote::PairedCurrency::convert_from(self.quantity, self.entry_price)
     }
 
@@ -76,6 +78,7 @@ where
         &self,
         mark_to_market_price: QuoteCurrency<I, D>,
     ) -> BaseOrQuote::PairedCurrency {
+        assert2::debug_assert!(mark_to_market_price > Zero::zero());
         BaseOrQuote::PairedCurrency::pnl(self.entry_price(), mark_to_market_price, self.quantity)
     }
 
@@ -121,7 +124,11 @@ where
         self.quantity -= qty;
         assert2::debug_assert!(self.quantity >= BaseOrQuote::zero());
 
-        BaseOrQuote::PairedCurrency::pnl(entry_price, exit_price, if is_long { qty } else { -qty })
+        if is_long {
+            BaseOrQuote::PairedCurrency::pnl(entry_price, exit_price, qty)
+        } else {
+            -BaseOrQuote::PairedCurrency::pnl(entry_price, exit_price, qty)
+        }
     }
 }
 

@@ -20,13 +20,13 @@
           inherit system overlays;
         };
         rust = (
-          pkgs.rust-bin.stable.latest.default.override {
+          pkgs.rust-bin.selectLatestNightlyWith(toolchain: toolchain.default.override {
             extensions = [
               "rust-src"
               "rust-analyzer"
             ];
             targets = ["x86_64-unknown-linux-gnu"];
-          }
+          })
         );
         cargo_upgrades = pkgs.rustPlatform.buildRustPackage {
           name = "cargo-upgrades";

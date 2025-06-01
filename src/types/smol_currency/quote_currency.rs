@@ -101,6 +101,8 @@ where
     type PairedCurrency = BaseCurrency<I, D>;
 
     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self {
+        assert2::debug_assert!(units >= Zero::zero());
+        assert2::debug_assert!(price_per_unit > Zero::zero());
         QuoteCurrency(*units.as_ref() * *price_per_unit.as_ref())
     }
 }
@@ -120,9 +122,8 @@ where
         exit_price: QuoteCurrency<I, D>,
         quantity: BaseCurrency<I, D>,
     ) -> QuoteCurrency<I, D> {
-        if quantity.is_zero() {
-            return QuoteCurrency::zero();
-        }
+        assert2::debug_assert!(entry_price > Zero::zero());
+        assert2::debug_assert!(exit_price > Zero::zero());
         QuoteCurrency::convert_from(quantity, exit_price)
             - QuoteCurrency::convert_from(quantity, entry_price)
     }
