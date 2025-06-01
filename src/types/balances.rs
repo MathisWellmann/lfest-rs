@@ -151,7 +151,7 @@ where
     }
 
     /// Profit and loss are applied to the available balance.
-    #[inline]
+    #[inline(always)]
     pub fn apply_pnl(&mut self, pnl: BaseOrQuote) {
         trace!("apply_pnl: {pnl}, self: {self}");
         self.available += pnl;
@@ -255,6 +255,12 @@ mod test {
         }
     }
 
+    #[test]
+    fn balances_try_reserve_position_margin_false() {
+        let mut balances = Balances::new(QuoteCurrency::<i64, 5>::new(1000, 0));
+        assert!(!balances.try_reserve_position_margin(QuoteCurrency::new(1001, 0)));
+    }
+
     proptest! {
         #[test]
         fn proptest_balances_free_position_margin(margin in 1..1000_i64) {
@@ -278,5 +284,55 @@ mod test {
     fn balances_free_position_margin_panic() {
         let mut balances = Balances::new(QuoteCurrency::<i64, 5>::new(1000, 0));
         balances.free_position_margin(QuoteCurrency::new(100, 0));
+    }
+
+    #[test]
+    #[should_panic]
+    fn balances_debug_assert_state_available() {
+        let balances = Balances::builder()
+            .available(QuoteCurrency::<i64, 5>::new(-1, 0))
+            .position_margin(Zero::zero())
+            .order_margin(Zero::zero())
+            .total_fees_paid(Zero::zero())
+            .build();
+        balances.debug_assert_state();
+    }
+
+    #[test]
+    #[should_panic]
+    fn balances_debug_assert_state_position_margin() {
+        let balances = Balances::builder()
+            .available(Zero::zero())
+            .position_margin(QuoteCurrency::<i64, 5>::new(-1, 0))
+            .order_margin(Zero::zero())
+            .total_fees_paid(Zero::zero())
+            .build();
+        balances.debug_assert_state();
+    }
+
+    #[test]
+    #[should_panic]
+    fn balances_debug_assert_state_order_margin() {
+        let balances = Balances::builder()
+            .available(Zero::zero())
+            .position_margin(Zero::zero())
+            .order_margin(QuoteCurrency::<i64, 5>::new(-1, 0))
+            .total_fees_paid(Zero::zero())
+            .build();
+        balances.debug_assert_state();
+    }
+
+    #[test]
+    fn balances_display() {
+        let balances = Balances::builder()
+            .available(QuoteCurrency::<i64, 5>::new(1000, 0))
+            .position_margin(QuoteCurrency::new(50, 0))
+            .order_margin(QuoteCurrency::new(100, 0))
+            .total_fees_paid(QuoteCurrency::new(5, 0))
+            .build();
+        assert_eq!(
+            balances.to_string(),
+            "available: 1000.00000 Quote, position_margin: 50.00000 Quote, order_margin: 100.00000 Quote"
+        );
     }
 }

@@ -17,11 +17,11 @@ Invariant ==
     /\ entry_price >= 0
  
  Next == 
-    \A quantity \in (1..100): Increase(quantity, 100)
+    \/ \A quantity \in (1..100): Increase(quantity, 100)
  
  THEOREM Spec == Init /\ [][Next]_qty
  
 =============================================================================
 \* Modification History
-\* Last modified Sun Jun 01 16:12:07 CEST 2025 by magewe
+\* Last modified Sun Jun 01 17:40:52 CEST 2025 by magewe
 \* Created Sun Jun 01 14:52:16 CEST 2025 by magewe
