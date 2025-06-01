@@ -115,7 +115,7 @@ fn inv_long_market_loss_full() {
     let fee0 = BaseCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.position().clone(),
-        Position::Long(PositionInner::new(qty, entry_price,))
+        Position::Long(PositionInner::new(qty, entry_price))
     );
     assert_eq!(
         exchange
@@ -150,14 +150,13 @@ fn inv_long_market_loss_full() {
         BaseCurrency::new(-2, 1)
     );
 
-    let size = QuoteCurrency::new(800, 0);
-    let o = MarketOrder::new(Side::Sell, size).unwrap();
+    let o = MarketOrder::new(Side::Sell, qty).unwrap();
     exchange.submit_market_order(o).unwrap();
 
-    let fee_quote0 = size * *exchange.config().contract_spec().fee_taker().as_ref();
+    let fee_quote0 = qty * *exchange.config().contract_spec().fee_taker().as_ref();
     let fee_base0 = BaseCurrency::convert_from(fee_quote0, QuoteCurrency::new(1000, 0));
 
-    let fee_quote1 = size * *exchange.config().contract_spec().fee_taker().as_ref();
+    let fee_quote1 = qty * *exchange.config().contract_spec().fee_taker().as_ref();
     let fee_base1 = BaseCurrency::convert_from(fee_quote1, QuoteCurrency::new(800, 0));
 
     let fee_combined = fee_base0 + fee_base1;

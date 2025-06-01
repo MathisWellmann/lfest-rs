@@ -1,6 +1,6 @@
 use getset::{CopyGetters, Getters};
 use num_traits::Zero;
-use tracing::trace;
+use tracing::{debug, trace};
 
 use crate::{
     prelude::{Currency, Mon, QuoteCurrency},
@@ -89,7 +89,7 @@ where
         qty: BaseOrQuote,
         entry_price: QuoteCurrency<I, D>,
     ) {
-        trace!("increase_contracts: {qty} @ {entry_price}; self: {}", self);
+        debug!("increase_contracts: {qty} @ {entry_price}; self: {}", self);
         assert2::debug_assert!(qty > BaseOrQuote::zero());
         assert2::debug_assert!(entry_price > QuoteCurrency::zero());
 
@@ -114,7 +114,7 @@ where
         exit_price: QuoteCurrency<I, D>,
         is_long: bool,
     ) -> BaseOrQuote::PairedCurrency {
-        trace!("decrease_contracts: {qty} @ {exit_price}; self: {}", self);
+        debug!("decrease_contracts: {qty} @ {exit_price}; self: {}", self);
         assert2::debug_assert!(qty > BaseOrQuote::zero());
         assert2::debug_assert!(qty <= self.quantity);
 

@@ -3,7 +3,7 @@
 /.direnv
 /mutants.out
 /mutants.out.old
+/position.toolbox
+/proptest-regressions
 .idea
 .nvimlog
-*.toolbox
-proptest-regressions
