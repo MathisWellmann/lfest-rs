@@ -17,6 +17,8 @@ procs:
     shell: "cargo doc"
   cargo-mutants:
     shell: "cargo mutants"
+  cargo-miri:
+    shell: "MIRIFLAGS=-Zmiri-disable-isolation cargo miri nextest run -j 20"
   cargo-tarpaulin:
     shell: "cargo tarpaulin --target-dir target/tarpaulin"
   taplo:

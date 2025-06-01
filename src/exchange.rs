@@ -1,5 +1,6 @@
 use assert2::assert;
 use getset::{Getters, MutGetters};
+use std::cmp::Ordering;
 use num_traits::Zero;
 use tracing::{info, trace, warn};
 
@@ -593,14 +594,18 @@ where
             self.config.contract_spec().init_margin_req(),
             &self.position,
         );
-        assert2::debug_assert!(
-            new_order_margin <= self.balances.order_margin(),
-            "The order margin does not increase with a filled limit order event."
-        );
-        if new_order_margin < self.balances.order_margin() {
-            let margin_delta = self.balances.order_margin() - new_order_margin;
-            assert2::debug_assert!(margin_delta > Zero::zero());
-            self.balances.free_order_margin(margin_delta);
+        match new_order_margin.cmp(&self.balances.order_margin()) {
+            Ordering::Less => {
+                let margin_delta = self.balances.order_margin() - new_order_margin;
+                assert2::debug_assert!(margin_delta > Zero::zero());
+                self.balances.free_order_margin(margin_delta);
+            },
+            Ordering::Equal => {},
+            Ordering::Greater => {
+                let margin_delta = new_order_margin - self.balances.order_margin();
+                assert2::debug_assert!(margin_delta > Zero::zero());
+                assert!(self.balances.try_reserve_order_margin(margin_delta));
+            },
         }
     }
 }

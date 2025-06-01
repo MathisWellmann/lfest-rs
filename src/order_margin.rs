@@ -47,7 +47,6 @@ where
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Result<()> {
-        trace!("OrderMargin insert: {order:?}");
         self.active_limit_orders.try_insert(order.clone())?;
         match order.side() {
             Side::Buy => self.bids_notional += order.notional(),
@@ -63,8 +62,8 @@ where
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) {
-        trace!("OrderMargin update: {order:?}");
         let notional = order.notional();
+        assert2::debug_assert!(notional > Zero::zero());
         let old_order = self.active_limit_orders.update(order);
         let notional_delta = notional - old_order.notional();
         match old_order.side() {
@@ -388,7 +387,6 @@ mod tests {
     #[test_case::test_matrix(
         [1, 2, 5]
     )]
-    #[tracing_test::traced_test]
     fn order_margin_long_orders_of_same_qty(leverage: u8) {
         let mut order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
