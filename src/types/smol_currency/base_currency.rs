@@ -110,14 +110,6 @@ where
         BaseCurrency::convert_from(quantity, entry_price)
             - BaseCurrency::convert_from(quantity, exit_price)
     }
-
-    #[inline]
-    fn price_paid_for_qty(total_cost: Self, quantity: Decimal<I, D>) -> QuoteCurrency<I, D> {
-        if total_cost.is_zero() {
-            return QuoteCurrency::zero();
-        }
-        QuoteCurrency::from(quantity / *total_cost.as_ref())
-    }
 }
 
 impl<I, const D: u8> Zero for BaseCurrency<I, D>
@@ -282,16 +274,5 @@ mod test {
         let v = BaseCurrency::<i64, 5>::new(8, 0);
         assert_eq!(v.rem(BaseCurrency::new(5, 0)), BaseCurrency::new(3, 0));
         assert_eq!(v.div(BaseCurrency::new(2, 0)), BaseCurrency::new(4, 0));
-    }
-
-    #[test]
-    fn base_currency_price_paid_for_qty() {
-        assert_eq!(
-            BaseCurrency::price_paid_for_qty(
-                BaseCurrency::<i64, 5>::new(5, 0),
-                Decimal::try_from_scaled(1000, 0).unwrap()
-            ),
-            QuoteCurrency::new(200, 0)
-        );
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.115.0"
+version = "0.116.0"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2024"
 license-file = "LICENSE"
@@ -51,7 +51,7 @@ rand_distr = "0.5"
 test-case = "3"
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
 ron = "0.10"
-criterion = { version = "0.6", features = ["html_reports"]}
+criterion = { version = "0.6", features = ["html_reports"] }
 # fpdec = { version = "0.10", features = ["serde-as-str", "num-traits"] }
 fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs", rev = "40cf802", features = [
   "serde-as-str",

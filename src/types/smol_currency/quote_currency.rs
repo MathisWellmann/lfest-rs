@@ -45,16 +45,19 @@ where
     // TODO: return `Result`
     /// Create a new instance from an `integer` and a `scale`.
     pub fn new(integer: I, scale: u8) -> Self {
+        assert2::debug_assert!(scale <= D);
         Self(Decimal::try_from_scaled(integer, scale).expect("Make sure the inputs are correct."))
     }
 
     #[inline]
     pub(crate) fn liquidation_price_long(&self, maint_margin_req: Decimal<I, D>) -> Self {
+        assert2::debug_assert!(maint_margin_req <= Decimal::ONE);
         Self(self.0 * (Decimal::one() - maint_margin_req))
     }
 
     #[inline]
     pub(crate) fn liquidation_price_short(&self, maint_margin_req: Decimal<I, D>) -> Self {
+        assert2::debug_assert!(maint_margin_req <= Decimal::ONE);
         Self(self.0 * (Decimal::one() + maint_margin_req))
     }
 
@@ -64,6 +67,10 @@ where
         price_1: Self,
         weight_1: Decimal<I, D>,
     ) -> Self {
+        assert2::debug_assert!(price_0 >= Zero::zero());
+        assert2::debug_assert!(weight_0 > Zero::zero());
+        assert2::debug_assert!(price_1 >= Zero::zero());
+        assert2::debug_assert!(weight_1 > Zero::zero());
         let total_weight = weight_0 + weight_1;
         (price_0 * weight_0 + price_1 * weight_1) / total_weight
     }
@@ -126,14 +133,6 @@ where
         assert2::debug_assert!(exit_price > Zero::zero());
         QuoteCurrency::convert_from(quantity, exit_price)
             - QuoteCurrency::convert_from(quantity, entry_price)
-    }
-
-    fn price_paid_for_qty(total_cost: Self, quantity: Decimal<I, D>) -> QuoteCurrency<I, D> {
-        if quantity.is_zero() {
-            return QuoteCurrency::zero();
-        }
-
-        QuoteCurrency(*total_cost.as_ref() / quantity)
     }
 }
 
@@ -299,16 +298,5 @@ mod test {
         let v = QuoteCurrency::<i64, 5>::new(8, 0);
         assert_eq!(v.rem(QuoteCurrency::new(5, 0)), QuoteCurrency::new(3, 0));
         assert_eq!(v.div(QuoteCurrency::new(2, 0)), QuoteCurrency::new(4, 0));
-    }
-
-    #[test]
-    fn quote_currency_price_paid_for_qty() {
-        assert_eq!(
-            QuoteCurrency::price_paid_for_qty(
-                QuoteCurrency::<i64, 5>::new(1000, 0),
-                Decimal::try_from_scaled(5, 0).unwrap()
-            ),
-            QuoteCurrency::new(200, 0)
-        );
     }
 }
