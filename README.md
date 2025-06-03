@@ -1,30 +1,31 @@
 # Leveraged Futures Exchange for Simulated Trading (LFEST)
 
 `lfest-rs` is a simulated perpetual futures exchange capable of leveraged positions.
-Its optimized for speed and can simulate more than 100 million trade and quote events per second along with plenty of order submissions.
-You feed in external market data using `Bba` or `Trade` to update the `MarketState`, 
-which triggers order executions when appropriate.
+Its optimizes correctness, performance and simplicity in that order.
+It can simulate more than 350M trade and 1250M BBa updates per second along with 25M limit order submissions per second (Run `cargo bench` to see it for your system).
+You feed in external market data using `Bba`, `Trade`, `Candle` or `SmartCandle` to update the `MarketState`, 
+which triggers limit order executions when appropriate.
 For simplicity's sake (and performance) the exchange does not use an order book, nor does it account for slippage of `MarkerOrder`.
-It is advised to use `LimitOrder` most of the time which supports partial executions.
+Using `LimitOrder` supports partial executions.
 The exchange can be configured using `Config` and `ContractSpecification`.
 
 :radioactive: This is a personal project, use a your own risk. :bangbang:
 
 ### Features:
 - :currency_exchange: Fixed point arithmetic using [`const-decimal`](https://github.com/OliverNChalk/const-decimal) crate, for super fast and precise numeric calculations.
-- :brain: Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct types at function boundaries, e.g:
-[`BaseCurrency`](https://docs.rs/lfest/latest/lfest/prelude/struct.BaseCurrency.html),   
-[`QuoteCurrency`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuoteCurrency.html),   
-[`Fee`](https://docs.rs/lfest/latest/lfest/prelude/struct.Fee.html),    
-[`Leverage`](https://docs.rs/lfest/latest/lfest/prelude/struct.Leverage.html).      
-This makes it impossible to mistakenly input for example a `USD` denoted value into a function that expects a `BTC` denoted value.    
+- :brain: Use of [newtype pattern](https://doc.rust-lang.org/book/ch19-04-advanced-types.html) to enforce the correct types at function boundaries.
+This makes it impossible to mistakenly input for example a `USD` denoted value into a function that expects a `BTC` denoted value. E.g.:
+  [`BaseCurrency`](https://docs.rs/lfest/latest/lfest/prelude/struct.BaseCurrency.html),   
+  [`QuoteCurrency`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuoteCurrency.html),   
+  [`Fee`](https://docs.rs/lfest/latest/lfest/prelude/struct.Fee.html),    
+  [`Leverage`](https://docs.rs/lfest/latest/lfest/prelude/struct.Leverage.html).      
 - :satellite: Flexible market data integration through the [`MarketUpdate`](https://docs.rs/lfest/latest/lfest/prelude/enum.MarketUpdate.html) trait.
 - :heavy_check_mark: good test coverage and heavy use of assertions, to ensure correctness.
 - :page_with_curl: Supports both `linear` and `inverse` futures contracts, 
 by simply setting the margin currency to either `QuoteCurrency` (linear) or `BaseCurrency` (inverse)
 - :no_entry: Order filtering to make sure the price and quantity follow certain rules. See:    
-[`PriceFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.PriceFilter.html)     
-[`QuantityFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuantityFilter.html)    
+  [`PriceFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.PriceFilter.html)     
+  [`QuantityFilter`](https://docs.rs/lfest/latest/lfest/prelude/struct.QuantityFilter.html)    
 - `IsolatedMarginRiskEngine`
 - Rate limiting for order submissions, cancellations.
 

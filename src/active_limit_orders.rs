@@ -126,7 +126,7 @@ where
             "An update to an existing order must mean the new order has less quantity than the tracked order."
         );
         debug_assert_eq!(order.id(), active_order.id());
-        Self::assert_limit_order_update_reduces_qty(&active_order, &order);
+        Self::assert_limit_order_update_reduces_qty(active_order, &order);
 
         let old_order = active_order.clone();
         *active_order = order;
@@ -186,7 +186,7 @@ where
         if let Some(pos) = self.bids.iter_mut().position(|order| order.id() == id) {
             let removed = self.bids.swap_remove(pos);
             trace!("removed bid {removed}");
-            return Some(removed);
+            Some(removed)
         } else {
             let pos = self.asks.iter_mut().position(|order| order.id() == id)?;
             let removed = self.asks.swap_remove(pos);
@@ -208,7 +208,7 @@ where
         {
             let removed = self.bids.swap_remove(pos);
             trace!("removed bid {removed}");
-            return Some(removed);
+            Some(removed)
         } else {
             let pos = self
                 .asks

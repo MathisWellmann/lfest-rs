@@ -86,8 +86,7 @@ where
                 avg_price,
             } => write!(
                 f,
-                "Filled( cumulative_qty: {}, avg_price: {})",
-                cumulative_qty, avg_price
+                "Filled( cumulative_qty: {cumulative_qty}, avg_price: {avg_price})"
             ),
         }
     }
