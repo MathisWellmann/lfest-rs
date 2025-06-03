@@ -3,27 +3,44 @@ procs:
     shell: "cargo check"
   cargo-check-trade_aggregation:
     shell: "cargo check --features trade_aggregation"
+
+  # Testing
   cargo-test:
     shell: "cargo test"
   cargo-test-trade_aggregation:
     shell: "cargo test --features trade_aggregation"
+
   cargo-bench:
     shell: "cargo bench"
-  cargo-fmt:
-    shell: "cargo fmt"
   cargo-clippy:
     shell: "cargo clippy"
   cargo-doc:
     shell: "cargo doc"
-  cargo-mutants:
-    shell: "cargo mutants"
-  cargo-miri:
-    shell: "MIRIFLAGS=-Zmiri-disable-isolation cargo miri nextest run -j 20"
-  cargo-tarpaulin:
-    shell: "cargo tarpaulin --target-dir target/tarpaulin"
+
+  # Formatting
   taplo:
     shell: "taplo fmt"
+  cargo-fmt:
+    shell: "cargo fmt"
+
+
+  # Code Coverage
+  cargo-tarpaulin:
+    shell: "cargo tarpaulin --target-dir target/tarpaulin"
+  # Mutation testing
+  cargo-mutants:
+    shell: "cargo mutants"
+
+  # Security
+  cargo-audit:
+    shell: "cargo audit"
+  # Undefined behaviour checking
+  cargo-miri:
+    shell: "MIRIFLAGS=-Zmiri-disable-isolation cargo miri nextest run -j 20"
+
+  # Semantic version check
   semver-checks:
     shell: "cargo semver-checks"
+
   basic-example:
     shell: "cargo run --example basic"

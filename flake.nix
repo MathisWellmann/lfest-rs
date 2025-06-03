@@ -79,7 +79,9 @@
               cargo-mutants
               cargo_upgrades
               cargo-tarpaulin # Code coverage
+              cargo-audit
               taplo
+              mprocs # Run multiple commands in parallel from `mprocs.yml`, acting essentially as a local CI system.
               # creusot
             ];
             RUST_BACKTRACE = "1";
