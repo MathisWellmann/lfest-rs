@@ -262,6 +262,7 @@ where
                     };
                 } else {
                     self.remaining_quantity -= filled_quantity;
+                    assert2::debug_assert!(self.remaining_quantity > Zero::zero());
                 }
             }
             FilledQuantity::Filled {
@@ -326,7 +327,7 @@ where
                 avg_price: _,
             } => self.remaining_quantity + cumulative_qty,
         };
-        assert!(
+        assert2::debug_assert!(
             q > BaseOrQuote::zero(),
             "total quantity must always be > zero"
         );
@@ -357,7 +358,7 @@ where
     /// Get the total quantity that this order is for.
     pub fn total_quantity(&self) -> BaseOrQuote {
         let q = self.state.filled_qty();
-        assert!(
+        assert2::debug_assert!(
             q > BaseOrQuote::zero(),
             "total quantity must always be > zero"
         );

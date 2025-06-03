@@ -310,6 +310,13 @@ mod test {
             ),
             1.into()
         );
+
+        let mut state = MarketState::<i64, 5>::default();
+        <Candle<i64, 5> as MarketUpdate<i64, 5, BaseCurrency<i64, 5>>>::update_market_state(
+            &candle, &mut state,
+        );
+        assert_eq!(state.bid(), QuoteCurrency::new(100, 0));
+        assert_eq!(state.ask(), QuoteCurrency::new(101, 0));
     }
 
     #[test]

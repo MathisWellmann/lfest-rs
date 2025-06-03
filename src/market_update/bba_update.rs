@@ -100,11 +100,30 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::BaseCurrency;
 
     #[test]
     fn size_of_bba() {
         assert_eq!(std::mem::size_of::<Bba<i32, 4>>(), 16);
         assert_eq!(std::mem::size_of::<Bba<i64, 4>>(), 24);
+    }
+
+    #[test]
+    fn bba_update() {
+        let bba = Bba {
+            bid: QuoteCurrency::<i64, 1>::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 1.into(),
+        };
+        assert_eq!(bba.mid_price(), QuoteCurrency::new(1005, 1));
+        assert_eq!(
+            <Bba<i64, 1> as MarketUpdate<i64, 1, BaseCurrency<i64, 1>>>::can_fill_bids(&bba),
+            false
+        );
+        assert_eq!(
+            <Bba<i64, 1> as MarketUpdate<i64, 1, BaseCurrency<i64, 1>>>::can_fill_asks(&bba),
+            false
+        );
     }
 
     #[test]

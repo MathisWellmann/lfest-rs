@@ -129,6 +129,18 @@ mod tests {
     use super::*;
     use crate::prelude::*;
 
+    #[test_case::test_case(Side::Buy, false, true)]
+    fn trade_update_can_fill_bids_asks(side: Side, can_fill_bid: bool, can_fill_ask: bool) {
+        let trade = Trade {
+            price: QuoteCurrency::<i64, 1>::new(100, 0),
+            quantity: BaseCurrency::new(5, 0),
+            side,
+            timestamp_exchange_ns: 0.into(),
+        };
+        assert_eq!(trade.can_fill_bids(), can_fill_bid);
+        assert_eq!(trade.can_fill_asks(), can_fill_ask);
+    }
+
     // A buy trade can never fill a buy limit order.
     #[test_case::test_matrix([90, 95, 100, 105, 110])]
     fn trade_update_fills_buy_order_never(price: i64) {
@@ -266,6 +278,20 @@ mod tests {
         let mut state = MarketState::default();
         trade.update_market_state(&mut state);
         assert_eq!(state.last_trade_price(), QuoteCurrency::new(100, 0));
+    }
+
+    #[test]
+    fn trade_update_display() {
+        let trade = Trade {
+            price: QuoteCurrency::<i64, 5>::new(100, 0),
+            quantity: BaseCurrency::new(5, 0),
+            side: Side::Buy,
+            timestamp_exchange_ns: 0.into(),
+        };
+        assert_eq!(
+            &trade.to_string(),
+            "price 100.00000 Quote, quantity: 5.00000 Base, side: Buy"
+        );
     }
 
     #[test_case::test_matrix(

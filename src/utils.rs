@@ -8,7 +8,7 @@ pub struct NoUserOrderId;
 
 impl std::fmt::Display for NoUserOrderId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "")
+        write!(f, "NoUserId")
     }
 }
 
@@ -63,8 +63,25 @@ pub fn scale<F: num::Float>(from_min: F, from_max: F, to_min: F, to_max: F, valu
 #[cfg(test)]
 pub(crate) mod tests {
     use const_decimal::Decimal;
+    use proptest::prelude::*;
 
-    use crate::utils::decimal_from_f64;
+    use super::*;
+
+    proptest! {
+        #[test]
+        fn scale_proptest(a in 0..100) {
+            assert_eq!(scale(0.0, 1.0, 0.0, 100.0, a as f64), a as f64 * 100.0);
+            assert_eq!(scale(0.0, 100.0, 0.0, 1.0, a as f64), a as f64 / 100.0);
+        }
+
+    }
+
+    #[test]
+    fn scale_test() {
+        assert_eq!(scale(-1.0, 1.0, 0.0, 1.0, 0.5), 0.75);
+        assert_eq!(scale(-1.0, 1.0, 0.0, 1.0, -0.5), 0.25);
+        assert_eq!(scale(-1.0, 1.0, -1.0, 1.0, 0.5), 0.5);
+    }
 
     #[test]
     fn test_convert_decimals() {
@@ -102,5 +119,10 @@ pub(crate) mod tests {
             decimal_from_f64(3.14159).unwrap(),
             Decimal::<i64, 5>::try_from_scaled(314159, 5).unwrap()
         );
+    }
+
+    #[test]
+    fn no_user_order_id_display() {
+        assert_eq!(&NoUserOrderId.to_string(), "NoUserId");
     }
 }

@@ -72,7 +72,9 @@ where
         assert2::debug_assert!(price_1 >= Zero::zero());
         assert2::debug_assert!(weight_1 > Zero::zero());
         let total_weight = weight_0 + weight_1;
-        (price_0 * weight_0 + price_1 * weight_1) / total_weight
+        let weighted_price = (price_0 * weight_0 + price_1 * weight_1) / total_weight;
+        assert2::debug_assert!(weighted_price > Zero::zero());
+        weighted_price
     }
 
     /// Round a number to a multiple of a given `quantum` toward zero.
@@ -282,8 +284,13 @@ mod test {
     use super::*;
 
     #[test]
-    fn base_currency() {
+    fn quote_currency() {
         let v = QuoteCurrency::<i64, 5>::new(100, 0);
+        assert_eq!(v.abs_sub(&QuoteCurrency::new(105, 0)), Zero::zero());
+        assert_eq!(
+            v.abs_sub(&QuoteCurrency::new(95, 0)),
+            QuoteCurrency::new(5, 0)
+        );
         assert!(v.is_positive());
         assert!(!v.is_negative());
         let v = QuoteCurrency::<i64, 5>::new(-100, 0);

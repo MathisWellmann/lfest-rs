@@ -39,7 +39,7 @@ where
         let quantity = row[SIZE_COL]
             .parse::<Decimal<I, D>>()
             .expect("Can parse size");
-        assert_ne!(quantity, Decimal::zero());
+        debug_assert_ne!(quantity, Decimal::zero());
         let side = if quantity < Decimal::ZERO {
             Side::Sell
         } else {

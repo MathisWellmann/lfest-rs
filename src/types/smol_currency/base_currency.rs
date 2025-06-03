@@ -262,6 +262,11 @@ mod test {
         let v = BaseCurrency::<i64, 5>::new(100, 0);
         assert!(v.is_positive());
         assert!(!v.is_negative());
+        assert_eq!(v.abs_sub(&BaseCurrency::new(105, 0)), Zero::zero());
+        assert_eq!(
+            v.abs_sub(&BaseCurrency::new(95, 0)),
+            BaseCurrency::new(5, 0)
+        );
         let v = BaseCurrency::<i64, 5>::new(-100, 0);
         assert!(!v.is_positive());
         assert!(v.is_negative());
