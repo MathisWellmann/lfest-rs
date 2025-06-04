@@ -36,6 +36,7 @@ pub enum CancelBy<UserOrderIdT: UserOrderId> {
 /// - `D`: The constant decimal precision of the currencies.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 /// - `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
+#[derive(Debug)]
 pub struct Account<'a, I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -408,10 +409,8 @@ where
         let margin = new_order_margin - self.balances.order_margin();
         assert2::debug_assert!(margin >= BaseOrQuote::PairedCurrency::zero());
         if margin > BaseOrQuote::PairedCurrency::zero() {
-            debug_assert!(
-                self.balances.try_reserve_order_margin(margin),
-                "Can place order"
-            );
+            let success = self.balances.try_reserve_order_margin(margin);
+            debug_assert!(success, "Can place order");
         }
 
         debug_assert!(if self.active_limit_orders().is_empty() {
