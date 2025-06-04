@@ -522,16 +522,39 @@ mod tests {
             fee in 0..100_i64,
             ts in 0..10_i64,
         ) {
-            let order = LimitOrder::new(Side::Buy, QuoteCurrency::<i64, 5>::new(100, 0), BaseCurrency::new(5000, 4)).unwrap();
+            let init_qty = BaseCurrency::new(5000, 4);
+            let limit_price = QuoteCurrency::<i64, 5>::new(100, 0);
+            let order =
+                LimitOrder::new(Side::Buy, QuoteCurrency::<i64, 5>::new(100, 0), init_qty).unwrap();
             let meta = ExchangeOrderMeta::new(0.into(), 0.into());
-            let mut order = order.into_pending(meta);
+            let mut order = order.into_pending(meta.clone());
 
-            let filled_qty = BaseCurrency::new(filled_qty, 4);
+            let filled_quantity = BaseCurrency::new(filled_qty, 4);
             let fee = QuoteCurrency::new(fee, 4);
-            let update = order.fill(filled_qty, fee, ts.into());
-            assert!(matches!(update, LimitOrderFill::PartiallyFilled { filled_quantity, fee, order_after_fill }));
-            // TODO:
+            let update = order.fill(filled_quantity, fee, ts.into());
+            assert_eq!(
+                update,
+                LimitOrderFill::PartiallyFilled {
+                    filled_quantity,
+                    fee,
+                    order_after_fill: LimitOrder {
+                        user_order_id: NoUserOrderId,
+                        side: Side::Buy,
+                        limit_price,
+                        remaining_quantity: init_qty - filled_quantity,
+                        re_pricing: RePricing::GoodTilCrossing,
+                        state: Pending::builder()
+                            .meta(meta)
+                            .filled_quantity(FilledQuantity::Filled {
+                                cumulative_qty: filled_quantity,
+                                avg_price: limit_price
+                            })
+                            .build(),
+                    }
+                }
+            );
+            assert_eq!(order.remaining_quantity, init_qty - filled_quantity);
+            assert_eq!(order.total_quantity(), init_qty);
         }
-
     }
 }

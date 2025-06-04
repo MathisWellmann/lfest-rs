@@ -76,5 +76,13 @@ mod test {
             std::mem::size_of::<LimitOrderFill<i64, 5, BaseCurrency<i64, 5>, NoUserOrderId>>(),
             88
         );
+        assert_eq!(
+            std::mem::size_of::<LimitOrderFill<i32, 5, BaseCurrency<i32, 5>, i64>>(),
+            72
+        );
+        assert_eq!(
+            std::mem::size_of::<LimitOrderFill<i64, 5, BaseCurrency<i64, 5>, i64>>(),
+            96
+        );
     }
 }
