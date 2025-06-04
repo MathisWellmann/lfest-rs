@@ -437,12 +437,10 @@ mod tests {
         let fee = QuoteCurrency::convert_from(filled_qty, limit_price) * *test_fee_maker().as_ref();
         match order.fill(filled_qty, fee, 0.into()) {
             LimitOrderFill::PartiallyFilled {
-                fill_price,
                 filled_quantity,
                 fee: f,
                 order_after_fill: _,
             } => {
-                assert_eq!(fill_price, limit_price);
                 assert_eq!(filled_quantity, filled_qty);
                 assert_eq!(f, fee);
             }

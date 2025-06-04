@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use super::{Currency, Filled, LimitOrder, Mon, Pending, QuoteCurrency, UserOrderId};
+use super::{Currency, Filled, LimitOrder, Mon, Pending, UserOrderId};
 
 /// Contains the possible updates to limit orders.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -11,9 +11,8 @@ where
     UserOrderIdT: UserOrderId + Display,
 {
     /// The limit order was partially filled.
+    /// The fill price is always the limit price.
     PartiallyFilled {
-        /// The fill price of the event.
-        fill_price: QuoteCurrency<I, D>,
         /// The quantity that was filled in the event.
         filled_quantity: BaseOrQuote,
         /// The fee is proportional to the traded quantity and the price.
@@ -22,9 +21,8 @@ where
         order_after_fill: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     },
     /// The limit order was fully filled.
+    /// The fill price is always the limit price.
     FullyFilled {
-        /// The fill price of the event.
-        fill_price: QuoteCurrency<I, D>,
         /// The quantity that was filled in the event.
         filled_quantity: BaseOrQuote,
         /// The fee is proportional to the traded quantity and the price.
@@ -44,23 +42,39 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LimitOrderFill::PartiallyFilled {
-                fill_price,
                 filled_quantity,
                 fee,
                 order_after_fill,
             } => write!(
                 f,
-                "PartiallyFilled( fill_price: {fill_price}, filled_quantity: {filled_quantity}, fee: {fee}, order_after_fill: {order_after_fill})"
+                "PartiallyFilled( filled_quantity: {filled_quantity}, fee: {fee}, order_after_fill: {order_after_fill})"
             ),
             LimitOrderFill::FullyFilled {
-                fill_price,
                 filled_quantity,
                 fee,
                 order_after_fill,
             } => write!(
                 f,
-                "FullyFilled( fill_price: {fill_price}, filled_quantity: {filled_quantity}, fee: {fee}, order_after_fill: {order_after_fill})"
+                "FullyFilled( filled_quantity: {filled_quantity}, fee: {fee}, order_after_fill: {order_after_fill})"
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{types::BaseCurrency, utils::NoUserOrderId};
+
+    #[test]
+    fn limit_order_fill_size() {
+        assert_eq!(
+            std::mem::size_of::<LimitOrderFill<i32, 5, BaseCurrency<i32, 5>, NoUserOrderId>>(),
+            64
+        );
+        assert_eq!(
+            std::mem::size_of::<LimitOrderFill<i64, 5, BaseCurrency<i64, 5>, NoUserOrderId>>(),
+            88
+        );
     }
 }

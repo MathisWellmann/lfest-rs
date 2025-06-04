@@ -48,7 +48,6 @@ fn partial_limit_order_fill(
         LimitOrderFill::PartiallyFilled { .. }
     ));
     let expected_order_update = LimitOrderFill::PartiallyFilled {
-        fill_price: limit_price,
         filled_quantity: qty / BaseCurrency::new(2, 0),
         fee: f,
         order_after_fill: order,
