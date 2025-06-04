@@ -12,6 +12,7 @@ pub struct NewOrder;
 /// - `D`: The constant decimal precision of the currencies.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 #[derive(Debug, Clone, Eq, PartialEq, Getters)]
+#[cfg_attr(test, derive(typed_builder::TypedBuilder))]
 pub struct Pending<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,

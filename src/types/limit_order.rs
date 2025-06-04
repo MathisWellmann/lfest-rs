@@ -235,75 +235,60 @@ where
             "Filled quantity must be greater than zero."
         );
         let fill_price = self.limit_price();
-        let meta = self.state.meta().clone();
 
-        match &mut self.state.filled_quantity {
+        self.remaining_quantity -= filled_quantity;
+        debug_assert!(
+            self.remaining_quantity >= Zero::zero(),
+            "Quantity must be positive"
+        );
+
+        let (cumulative_qty, avg_price) = match &mut self.state.filled_quantity {
             FilledQuantity::Unfilled => {
                 self.state.filled_quantity = FilledQuantity::Filled {
                     cumulative_qty: filled_quantity,
                     avg_price: fill_price,
                 };
-                if filled_quantity == self.remaining_quantity {
-                    // Order fills in one go.
-                    self.remaining_quantity -= filled_quantity;
-                    let order_after_fill = LimitOrder {
-                        user_order_id: self.user_order_id,
-                        state: Filled::new(meta, ts_ns, fill_price, filled_quantity),
-                        limit_price: self.limit_price,
-                        remaining_quantity: BaseOrQuote::zero(),
-                        side: self.side,
-                        re_pricing: self.re_pricing,
-                    };
-                    return LimitOrderFill::FullyFilled {
-                        fill_price,
-                        filled_quantity,
-                        fee,
-                        order_after_fill,
-                    };
-                } else {
-                    self.remaining_quantity -= filled_quantity;
-                    assert2::debug_assert!(self.remaining_quantity > Zero::zero());
-                }
+
+                (filled_quantity, fill_price)
             }
             FilledQuantity::Filled {
                 cumulative_qty,
                 avg_price,
             } => {
-                let new_qty = *cumulative_qty + filled_quantity;
+                *cumulative_qty += filled_quantity;
                 *avg_price = QuoteCurrency::new_weighted_price(
                     *avg_price,
                     *cumulative_qty.as_ref(),
                     fill_price,
                     *filled_quantity.as_ref(),
                 );
-                *cumulative_qty = new_qty;
-
-                self.remaining_quantity -= filled_quantity;
-
-                if self.remaining_quantity.is_zero() {
-                    let order_after_fill = LimitOrder {
-                        user_order_id: self.user_order_id,
-                        state: Filled::new(meta, ts_ns, fill_price, *cumulative_qty),
-                        limit_price: self.limit_price,
-                        remaining_quantity: BaseOrQuote::zero(),
-                        side: self.side,
-                        re_pricing: self.re_pricing,
-                    };
-                    return LimitOrderFill::FullyFilled {
-                        fill_price,
-                        filled_quantity,
-                        fee,
-                        order_after_fill,
-                    };
-                }
+                (*cumulative_qty, *avg_price)
             }
         };
 
-        LimitOrderFill::PartiallyFilled {
-            fill_price,
-            filled_quantity,
-            fee,
-            order_after_fill: self.clone(),
+        if self.remaining_quantity.is_zero() {
+            let order_after_fill = LimitOrder {
+                user_order_id: self.user_order_id,
+                state: Filled::new(self.state.meta().clone(), ts_ns, avg_price, cumulative_qty),
+                limit_price: self.limit_price,
+                remaining_quantity: BaseOrQuote::zero(),
+                side: self.side,
+                re_pricing: self.re_pricing,
+            };
+
+            LimitOrderFill::FullyFilled {
+                fill_price,
+                filled_quantity,
+                fee,
+                order_after_fill,
+            }
+        } else {
+            LimitOrderFill::PartiallyFilled {
+                fill_price,
+                filled_quantity,
+                fee,
+                order_after_fill: self.clone(),
+            }
         }
     }
 
@@ -425,7 +410,7 @@ mod tests {
             fill_price,
             filled_quantity,
             fee,
-            order_after_fill: _,
+            order_after_fill,
         } = order.fill(qty, f, 0.into())
         else {
             panic!("Expected `PartiallyFilled`");
@@ -433,31 +418,70 @@ mod tests {
         assert_eq!(fill_price, limit_price);
         assert_eq!(filled_quantity, qty);
         assert_eq!(fee, f);
+        assert_eq!(
+            order_after_fill,
+            LimitOrder {
+                user_order_id: NoUserOrderId,
+                side,
+                limit_price,
+                remaining_quantity: qty,
+                re_pricing: RePricing::GoodTilCrossing,
+                state: Pending::builder()
+                    .meta(meta.clone())
+                    .filled_quantity(FilledQuantity::Filled {
+                        cumulative_qty: qty,
+                        avg_price: fill_price
+                    })
+                    .build()
+            }
+        );
 
-        let mut expected_state = Pending::new(meta);
-        expected_state.filled_quantity = FilledQuantity::Filled {
-            cumulative_qty: qty,
-            avg_price: limit_price,
-        };
+        let expected_state = Pending::builder()
+            .meta(meta.clone())
+            .filled_quantity(FilledQuantity::Filled {
+                cumulative_qty: qty,
+                avg_price: limit_price,
+            })
+            .build();
         assert_eq!(order.state(), &expected_state);
+
+        // Now fully fill
+        let fill = order.fill(qty, f, 1.into());
+        assert_eq!(
+            fill,
+            LimitOrderFill::FullyFilled {
+                fill_price,
+                filled_quantity,
+                fee,
+                order_after_fill: LimitOrder {
+                    user_order_id: NoUserOrderId,
+                    side,
+                    limit_price,
+                    remaining_quantity: Zero::zero(),
+                    re_pricing: RePricing::GoodTilCrossing,
+                    state: Filled::new(meta, 1.into(), fill_price, quantity)
+                }
+            }
+        )
     }
 
     #[test]
     fn size_of_limit_order() {
+        use std::mem::size_of;
         assert_eq!(
-            std::mem::size_of::<LimitOrder<i64, 5, BaseCurrency<i64, 5>, i64, NewOrder>>(),
+            size_of::<LimitOrder<i64, 5, BaseCurrency<i64, 5>, i64, NewOrder>>(),
             32
         );
         assert_eq!(
-            std::mem::size_of::<LimitOrder<i32, 2, BaseCurrency<i32, 2>, i64, NewOrder>>(),
+            size_of::<LimitOrder<i32, 2, BaseCurrency<i32, 2>, i64, NewOrder>>(),
             24
         );
         assert_eq!(
-            std::mem::size_of::<LimitOrder<i32, 2, BaseCurrency<i32, 2>, i32, NewOrder>>(),
+            size_of::<LimitOrder<i32, 2, BaseCurrency<i32, 2>, i32, NewOrder>>(),
             16
         );
         assert_eq!(
-            std::mem::size_of::<
+            size_of::<
                 LimitOrder<
                     i64,
                     2,
