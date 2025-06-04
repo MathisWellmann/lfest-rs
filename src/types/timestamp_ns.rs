@@ -61,5 +61,6 @@ mod test {
 
         let ts = TimestampNs::from(1742475657135330098);
         assert_eq!(ts.floor_to_nearest_second(), 1742475657000000000.into());
+        assert_eq!(i64::from(ts), 1742475657135330098)
     }
 }

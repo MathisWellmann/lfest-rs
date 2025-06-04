@@ -126,6 +126,7 @@ where
     I: Mon<D>,
 {
     /// This represents a linear futures contract pnl calculation
+    #[inline]
     fn pnl(
         entry_price: QuoteCurrency<I, D>,
         exit_price: QuoteCurrency<I, D>,
@@ -144,7 +145,7 @@ where
 {
     #[inline]
     fn zero() -> Self {
-        Self(Decimal::<I, D>::try_from_scaled(I::zero(), 0).unwrap())
+        Self(Decimal::zero())
     }
 
     #[inline]
@@ -296,6 +297,7 @@ mod test {
         let v = QuoteCurrency::<i64, 5>::new(-100, 0);
         assert!(!v.is_positive());
         assert!(v.is_negative());
+        assert_eq!(v.abs(), QuoteCurrency::new(100, 0));
         let v = QuoteCurrency::<i64, 5>::new(0, 0);
         assert!(v.is_zero());
         assert!(!v.is_one());
@@ -304,6 +306,14 @@ mod test {
         assert_eq!(Into::<f64>::into(v), 1_f64);
         let v = QuoteCurrency::<i64, 5>::new(8, 0);
         assert_eq!(v.rem(QuoteCurrency::new(5, 0)), QuoteCurrency::new(3, 0));
+        assert_eq!(v % QuoteCurrency::new(5, 0), QuoteCurrency::new(3, 0));
         assert_eq!(v.div(QuoteCurrency::new(2, 0)), QuoteCurrency::new(4, 0));
+        assert_eq!(v / QuoteCurrency::new(2, 0), QuoteCurrency::new(4, 0));
+
+        let mut result = QuoteCurrency::from_str_radix("27", 10).unwrap();
+        assert_eq!(result, QuoteCurrency::<i64, 5>::new(27, 0));
+        result.set_one();
+        assert_eq!(result, QuoteCurrency::one());
+        assert_eq!(QuoteCurrency::zero(), QuoteCurrency::<i64, 5>::new(0, 0));
     }
 }

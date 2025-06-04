@@ -208,18 +208,6 @@ where
     }
 }
 
-impl<I, const D: u8> std::ops::Div<Decimal<I, D>> for BaseCurrency<I, D>
-where
-    I: Mon<D>,
-{
-    type Output = Self;
-
-    #[inline]
-    fn div(self, rhs: Decimal<I, D>) -> Self::Output {
-        Self(self.0 / rhs)
-    }
-}
-
 impl<I, const D: u8> std::ops::Rem for BaseCurrency<I, D>
 where
     I: Mon<D>,
@@ -275,9 +263,17 @@ mod test {
         assert!(v.is_zero());
         assert!(!v.is_one());
         let v = BaseCurrency::<i64, 5>::new(1, 0);
+        assert!(!v.is_zero());
         assert!(v.is_one());
         let v = BaseCurrency::<i64, 5>::new(8, 0);
         assert_eq!(v.rem(BaseCurrency::new(5, 0)), BaseCurrency::new(3, 0));
+        assert_eq!(v % BaseCurrency::new(5, 0), BaseCurrency::new(3, 0));
         assert_eq!(v.div(BaseCurrency::new(2, 0)), BaseCurrency::new(4, 0));
+        assert_eq!(v / BaseCurrency::new(2, 0), BaseCurrency::new(4, 0));
+
+        let mut result = BaseCurrency::from_str_radix("27", 10).unwrap();
+        assert_eq!(result, BaseCurrency::<i64, 5>::new(27, 0));
+        result.set_one();
+        assert_eq!(result, BaseCurrency::one());
     }
 }
