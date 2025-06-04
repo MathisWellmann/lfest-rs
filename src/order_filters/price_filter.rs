@@ -86,9 +86,10 @@ where
         multiplier_down: Decimal<I, D>,
     ) -> Result<Self, ConfigError> {
         if let Some(min_qty) = min_price
-            && (min_qty % tick_size) != QuoteCurrency::zero() {
-                return Err(ConfigError::InvalidMinPrice);
-            }
+            && (min_qty % tick_size) != QuoteCurrency::zero()
+        {
+            return Err(ConfigError::InvalidMinPrice);
+        }
 
         if tick_size.is_zero() {
             return Err(ConfigError::InvalidTickSize);

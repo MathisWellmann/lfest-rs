@@ -16,6 +16,8 @@ procs:
     shell: "cargo clippy"
   cargo-doc:
     shell: "cargo doc"
+  cargo-machete:
+    shell: "cargo machete"
 
   # Formatting
   taplo:

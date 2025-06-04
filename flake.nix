@@ -80,6 +80,7 @@
               cargo_upgrades
               cargo-tarpaulin # Code coverage
               cargo-audit
+              cargo-machete
               taplo
               mprocs # Run multiple commands in parallel from `mprocs.yml`, acting essentially as a local CI system.
               # creusot

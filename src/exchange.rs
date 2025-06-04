@@ -1,6 +1,7 @@
+use std::cmp::Ordering;
+
 use assert2::assert;
 use getset::{Getters, MutGetters};
-use std::cmp::Ordering;
 use num_traits::Zero;
 use tracing::{info, trace, warn};
 
@@ -599,13 +600,13 @@ where
                 let margin_delta = self.balances.order_margin() - new_order_margin;
                 assert2::debug_assert!(margin_delta > Zero::zero());
                 self.balances.free_order_margin(margin_delta);
-            },
-            Ordering::Equal => {},
+            }
+            Ordering::Equal => {}
             Ordering::Greater => {
                 let margin_delta = new_order_margin - self.balances.order_margin();
                 assert2::debug_assert!(margin_delta > Zero::zero());
                 assert!(self.balances.try_reserve_order_margin(margin_delta));
-            },
+            }
         }
     }
 }

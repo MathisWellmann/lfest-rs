@@ -483,6 +483,18 @@ mod tests {
         assert_eq!(
             size_of::<
                 LimitOrder<
+                    i32,
+                    2,
+                    BaseCurrency<i32, 2>,
+                    i64,
+                    Pending<i32, 2, BaseCurrency<i32, 2>>,
+                >,
+            >(),
+            56
+        );
+        assert_eq!(
+            size_of::<
+                LimitOrder<
                     i64,
                     2,
                     BaseCurrency<i64, 2>,

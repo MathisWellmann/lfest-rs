@@ -12,12 +12,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "allocator-api2"
-version = "0.2.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
-
-[[package]]
 name = "alloy-rlp"
 version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -534,12 +528,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "distrs"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb3b3318a6ce94bae6f71c71dfbb5c91059ea2afa3c2ac86d8fb9b1f6ea5de83"
-
-[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -606,12 +594,6 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
-
-[[package]]
-name = "foldhash"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
 name = "fpdec"
@@ -710,11 +692,6 @@ name = "hashbrown"
 version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84b26c544d002229e640969970a2e74021aadf6e2f96372b9c58eff97de08eb3"
-dependencies = [
- "allocator-api2",
- "equivalent",
- "foldhash",
-]
 
 [[package]]
 name = "hermit-abi"
@@ -811,18 +788,16 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lfest"
-version = "0.116.0"
+version = "0.116.1"
 dependencies = [
  "assert2",
  "const-decimal",
  "criterion",
  "csv",
  "derive_more",
- "distrs",
  "fpdec",
  "getset",
  "glidesort",
- "hashbrown",
  "num",
  "num-traits",
  "proptest",
@@ -830,11 +805,9 @@ dependencies = [
  "rand_distr",
  "ron",
  "serde",
- "sliding_features",
  "test-case",
  "thiserror 2.0.12",
  "tracing",
- "tracing-subscriber",
  "tracing-test",
  "trade_aggregation",
  "typed-builder",
@@ -1498,16 +1471,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
 dependencies = [
  "lazy_static",
-]
-
-[[package]]
-name = "sliding_features"
-version = "6.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c42ae18122012043a4af38c2428bee16b37b5fe38e21d429ab4bfa566cd79dc"
-dependencies = [
- "getset",
- "num",
 ]
 
 [[package]]

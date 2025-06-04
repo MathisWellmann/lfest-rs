@@ -56,9 +56,10 @@ where
         tick_size: BaseOrQuote,
     ) -> Result<Self, ConfigError> {
         if let Some(min_qty) = min_quantity
-            && (min_qty % tick_size) != BaseOrQuote::zero() {
-                return Err(ConfigError::InvalidMinQuantity);
-            }
+            && (min_qty % tick_size) != BaseOrQuote::zero()
+        {
+            return Err(ConfigError::InvalidMinQuantity);
+        }
         if tick_size == BaseOrQuote::zero() {
             return Err(ConfigError::InvalidTickSize);
         }
@@ -80,9 +81,10 @@ where
         }
 
         if let Some(max_qty) = self.max_quantity
-            && quantity > max_qty {
-                return Err(OrderError::QuantityTooHigh);
-            }
+            && quantity > max_qty
+        {
+            return Err(OrderError::QuantityTooHigh);
+        }
 
         let min_qty = if let Some(min_qty) = self.min_quantity {
             if quantity < min_qty {
