@@ -1,7 +1,7 @@
 use const_decimal::Decimal;
 use getset::{CopyGetters, Getters, MutGetters};
 use num_traits::{One, Zero};
-use tracing::{debug, trace};
+use tracing::trace;
 
 use crate::{
     Result,
@@ -50,7 +50,7 @@ where
         position: &Position<I, D, BaseOrQuote>,
         init_margin_req: Decimal<I, D>,
     ) -> Result<()> {
-        debug!("OrderMargin.try_insert {order:?}");
+        trace!("OrderMargin.try_insert {order:?}");
         self.active_limit_orders.try_insert(order.clone())?;
         match order.side() {
             Side::Buy => self.bids_notional += order.notional(),
@@ -80,7 +80,7 @@ where
         position: &Position<I, D, BaseOrQuote>,
         init_margin_req: Decimal<I, D>,
     ) {
-        debug!("OrderMargin.update {order:?}");
+        trace!("OrderMargin.update {order:?}");
         let notional = order.notional();
         assert2::debug_assert!(notional > Zero::zero());
         let old_order = self.active_limit_orders.update(order);
@@ -117,7 +117,7 @@ where
         position: &Position<I, D, BaseOrQuote>,
         init_margin_req: Decimal<I, D>,
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        debug!("OrderMargin.remove {by:?}");
+        trace!("OrderMargin.remove {by:?}");
         let removed_order = match by {
             CancelBy::OrderId(order_id) => self
                 .active_limit_orders

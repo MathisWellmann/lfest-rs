@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use getset::CopyGetters;
-use tracing::debug;
+use tracing::trace;
 use typed_builder::TypedBuilder;
 
 use super::{MarginCurrency, Mon};
@@ -80,7 +80,7 @@ where
     /// If `fee` is negative then we receive balance.
     #[inline(always)]
     pub fn account_for_fee(&mut self, fee: BaseOrQuote) {
-        debug!("account_for_fee: {fee}");
+        trace!("account_for_fee: {fee}");
         self.debug_assert_state();
 
         self.available -= fee;
@@ -93,7 +93,7 @@ where
     #[inline(always)]
     #[must_use]
     pub fn try_reserve_order_margin(&mut self, init_margin: BaseOrQuote) -> bool {
-        debug!("try_reserve_order_margin {init_margin} on self: {self}");
+        trace!("try_reserve_order_margin {init_margin} on self: {self}");
         assert2::debug_assert!(init_margin > BaseOrQuote::zero());
         self.debug_assert_state();
 
@@ -110,7 +110,7 @@ where
     /// Cancelling an order requires freeing the locked margin balance.
     #[inline(always)]
     pub fn free_order_margin(&mut self, margin: BaseOrQuote) {
-        debug!("free_order_margin: {margin} on self: {self}");
+        trace!("free_order_margin: {margin} on self: {self}");
         assert2::debug_assert!(margin > BaseOrQuote::zero());
         self.debug_assert_state();
         assert2::debug_assert!(self.order_margin >= margin);
@@ -123,7 +123,7 @@ where
     /// Closing a position frees the position margin.
     #[inline(always)]
     pub fn free_position_margin(&mut self, margin: BaseOrQuote) {
-        debug!("free_position_margin: {margin} on self: {self}");
+        trace!("free_position_margin: {margin} on self: {self}");
         assert2::debug_assert!(margin > BaseOrQuote::zero());
         self.debug_assert_state();
         assert2::debug_assert!(self.position_margin >= margin);
@@ -136,7 +136,7 @@ where
     /// Try to reserve some position margin from available balance.
     #[inline(always)]
     pub fn try_reserve_position_margin(&mut self, margin: BaseOrQuote) -> bool {
-        debug!("try_reserve_position_margin {margin} on self: {self}");
+        trace!("try_reserve_position_margin {margin} on self: {self}");
         assert2::debug_assert!(margin > BaseOrQuote::zero());
         self.debug_assert_state();
 
@@ -153,7 +153,7 @@ where
     /// Profit and loss are applied to the available balance.
     #[inline(always)]
     pub fn apply_pnl(&mut self, pnl: BaseOrQuote) {
-        debug!("apply_pnl: {pnl}, self: {self}");
+        trace!("apply_pnl: {pnl}, self: {self}");
         self.available += pnl;
         assert2::debug_assert!(self.available >= BaseOrQuote::zero());
     }
