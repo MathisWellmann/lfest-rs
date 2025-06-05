@@ -60,9 +60,9 @@ where
         // Update balances
         let new_order_margin = self.order_margin(init_margin_req, position);
         assert2::debug_assert!(new_order_margin >= balances.order_margin());
-        let margin = new_order_margin - balances.order_margin();
-        assert2::debug_assert!(margin >= BaseOrQuote::PairedCurrency::zero());
-        if margin > BaseOrQuote::PairedCurrency::zero() {
+        if new_order_margin > balances.order_margin() {
+            let margin = new_order_margin - balances.order_margin();
+            assert2::debug_assert!(margin >= BaseOrQuote::PairedCurrency::zero());
             let success = balances.try_reserve_order_margin(margin);
             debug_assert!(success, "Can place order");
         }
@@ -144,11 +144,11 @@ where
         let new_order_margin = self.order_margin(init_margin_req, position);
         assert2::debug_assert!(
             new_order_margin <= balances.order_margin(),
-            "When cancelling a limit order, the new order margin is smaller or equal the old order margin"
+            "When removing a limit order, the new order margin is smaller or equal the old order margin"
         );
-        let margin = balances.order_margin() - new_order_margin;
-        assert2::debug_assert!(margin >= Zero::zero());
-        if margin > Zero::zero() {
+        if new_order_margin < balances.order_margin() {
+            let margin = balances.order_margin() - new_order_margin;
+            assert2::debug_assert!(margin >= Zero::zero());
             balances.free_order_margin(margin);
         }
 
