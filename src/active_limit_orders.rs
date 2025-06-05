@@ -12,7 +12,7 @@ use crate::types::{
 /// - `D`: The constant decimal precision of the currency.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 /// - `UserOrderIdT`: The type of user order id to use. Set to `()` if you don't need one.
-#[derive(Debug, PartialEq, Eq, Getters)]
+#[derive(Debug, Clone, PartialEq, Eq, Getters)]
 pub struct ActiveLimitOrders<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -28,23 +28,6 @@ where
     /// Best ask is the first element.
     #[getset(get = "pub")]
     asks: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
-}
-
-/// Clone that preserves the capacity of the vectors.
-impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Clone
-    for ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>
-where
-    I: Mon<D>,
-    BaseOrQuote: Currency<I, D>,
-    UserOrderIdT: UserOrderId,
-{
-    fn clone(&self) -> Self {
-        let mut bids = self.bids.clone();
-        bids.reserve_exact(self.bids.capacity() - bids.capacity());
-        let mut asks = self.asks.clone();
-        asks.reserve_exact(self.asks.capacity() - asks.capacity());
-        Self { bids, asks }
-    }
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> std::fmt::Display
