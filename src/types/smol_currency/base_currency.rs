@@ -1,4 +1,4 @@
-use std::ops::Neg;
+use std::{iter::Sum, ops::Neg};
 
 use const_decimal::{Decimal, ParseDecimalError};
 use num_traits::{Num, One, Signed, Zero};
@@ -236,6 +236,17 @@ where
     #[inline]
     fn from(val: BaseCurrency<I, D>) -> Self {
         val.0.to_f64()
+    }
+}
+
+impl<I, const D: u8> Sum for BaseCurrency<I, D>
+where
+    I: Mon<D>,
+{
+    fn sum<T: Iterator<Item = Self>>(iter: T) -> Self {
+        let mut out = Self::zero();
+        iter.for_each(|v| out += v);
+        out
     }
 }
 
