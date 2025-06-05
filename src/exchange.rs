@@ -83,6 +83,8 @@ where
     #[cfg_attr(test, getset(get_mut = "pub(crate)"))]
     position: Position<I, D, BaseOrQuote>,
 
+    /// The order margin state.
+    #[getset(get = "pub")]
     order_margin: OrderMargin<I, D, BaseOrQuote, UserOrderIdT>,
 
     // To avoid allocations in hot-paths

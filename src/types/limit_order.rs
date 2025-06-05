@@ -346,6 +346,12 @@ where
         );
         q
     }
+
+    /// Get the order id assigned by the exchange.
+    #[inline]
+    pub fn id(&self) -> OrderId {
+        self.state().meta().id()
+    }
 }
 
 #[cfg(test)]
