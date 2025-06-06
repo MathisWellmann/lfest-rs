@@ -1,6 +1,6 @@
 //! Benchmark regarding checking of active limit orders.
 
-use std::hint::black_box;
+use std::{hint::black_box, num::NonZeroUsize};
 
 use const_decimal::Decimal;
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
@@ -28,7 +28,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     (
-                        OrderMargin::new(n),
+                        OrderMargin::new(NonZeroUsize::new(n).unwrap()),
                         Balances::new(QuoteCurrency::new(1_000_000, 0)),
                     )
                 },
@@ -53,7 +53,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             }));
             b.iter_with_setup(
                 || {
-                    let mut om = OrderMargin::new(n);
+                    let mut om = OrderMargin::new(NonZeroUsize::new(n).unwrap());
                     let mut balances = Balances::new(QuoteCurrency::new(1_000_000, 0));
                     for order in orders.iter() {
                         om.try_insert(order.clone(), &mut balances, &position, init_margin_req)
@@ -80,7 +80,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             }));
             b.iter_with_setup(
                 || {
-                    let mut order_margin = OrderMargin::new(n);
+                    let mut order_margin = OrderMargin::new(NonZeroUsize::new(n).unwrap());
                     let mut balances = Balances::new(QuoteCurrency::new(1_000_000, 0));
                     for order in orders.iter() {
                         order_margin
@@ -117,7 +117,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             let init_margin_req = Decimal::one();
             b.iter_with_setup(
                 || {
-                    let mut order_margin = OrderMargin::new(n);
+                    let mut order_margin = OrderMargin::new(NonZeroUsize::new(n).unwrap());
                     let mut balances = Balances::new(QuoteCurrency::new(1_000_000, 0));
                     for order in orders.iter() {
                         order_margin
@@ -148,7 +148,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             let init_margin_req = Decimal::one();
             b.iter_with_setup(
                 || {
-                    let mut order_margin = OrderMargin::new(n);
+                    let mut order_margin = OrderMargin::new(NonZeroUsize::new(n).unwrap());
                     let mut balances = Balances::new(QuoteCurrency::new(1_000_000, 0));
                     for order in orders.iter() {
                         order_margin
@@ -179,7 +179,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             let init_margin_req = Decimal::one();
             b.iter_with_setup(
                 || {
-                    let mut order_margin = OrderMargin::new(n);
+                    let mut order_margin = OrderMargin::new(NonZeroUsize::new(n).unwrap());
                     let mut balances = Balances::new(QuoteCurrency::new(1_000_000, 0));
                     for order in orders.iter() {
                         order_margin

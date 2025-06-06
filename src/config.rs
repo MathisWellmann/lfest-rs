@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use getset::{CopyGetters, Getters};
 
 use crate::{
@@ -27,9 +29,9 @@ where
     #[getset(get_copy = "pub")]
     starting_wallet_balance: BaseOrQuote,
 
-    /// The maximum number of open orders the user can have at any given time
+    /// The maximum number of open orders the user can have at any given time.
     #[getset(get_copy = "pub")]
-    max_num_open_orders: usize,
+    max_num_open_orders: NonZeroUsize,
 
     /// The contract specification.
     #[getset(get = "pub")]
@@ -59,13 +61,10 @@ where
     /// Either a valid `Config` or an Error
     pub fn new(
         starting_balance: BaseOrQuote,
-        max_num_open_orders: usize,
+        max_num_open_orders: NonZeroUsize,
         contract_specification: ContractSpecification<I, D, BaseOrQuote::PairedCurrency>,
         order_rate_limits: OrderRateLimits,
     ) -> Result<Self, ConfigError> {
-        if max_num_open_orders == 0 {
-            return Err(ConfigError::InvalidMaxNumOpenOrders);
-        }
         if starting_balance <= BaseOrQuote::zero() {
             return Err(ConfigError::InvalidStartingBalance);
         }

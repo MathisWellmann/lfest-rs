@@ -1,5 +1,7 @@
 //! Benchmark the `SmartCandle`
 
+use std::num::NonZeroUsize;
+
 use const_decimal::Decimal;
 use criterion::{Criterion, criterion_group, criterion_main};
 use lfest::{load_trades_from_csv, prelude::*};
@@ -28,7 +30,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     .expect("works");
     let config = Config::new(
         starting_balance,
-        200,
+        NonZeroUsize::new(200).unwrap(),
         contract_spec,
         OrderRateLimits::default(),
     )

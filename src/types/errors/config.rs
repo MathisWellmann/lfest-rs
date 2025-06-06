@@ -8,9 +8,6 @@ pub enum ConfigError {
     #[error("The provided starting balance must be > 0")]
     InvalidStartingBalance,
 
-    #[error("The max_num_open_orders must be > 0")]
-    InvalidMaxNumOpenOrders,
-
     #[error(
         "The chosen `tick_size` of the quantity filter does not work with the chosen `min_quantity`. `min_quantity` must be a multiple of `step_size`"
     )]

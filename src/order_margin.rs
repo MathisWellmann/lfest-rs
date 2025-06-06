@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use const_decimal::Decimal;
 use getset::{CopyGetters, Getters, MutGetters};
 use num_traits::{One, Zero};
@@ -33,9 +35,9 @@ where
     UserOrderIdT: UserOrderId,
 {
     /// Create a new instance with a maximum capacity of `max_active_orders`.
-    pub fn new(max_active_orders: usize) -> Self {
+    pub fn new(max_active_orders: NonZeroUsize) -> Self {
         Self {
-            active_limit_orders: ActiveLimitOrders::new(max_active_orders),
+            active_limit_orders: ActiveLimitOrders::with_capacity(max_active_orders),
             bids_notional: Zero::zero(),
             asks_notional: Zero::zero(),
         }
@@ -121,7 +123,7 @@ where
         let removed_order = match by {
             CancelBy::OrderId(order_id) => self
                 .active_limit_orders
-                .remove_by_id(order_id)
+                .remove(order_id)
                 .ok_or(Error::OrderIdNotFound { order_id })?,
             CancelBy::UserOrderId(user_order_id) => self
                 .active_limit_orders
@@ -256,7 +258,8 @@ mod tests {
     )]
     #[tracing_test::traced_test]
     fn order_margin_neutral_no_orders(leverage: u8) {
-        let order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
+        let order_margin =
+            OrderMargin::<_, 4, _, NoUserOrderId>::new(NonZeroUsize::new(10).unwrap());
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -273,7 +276,8 @@ mod tests {
         [100, 200, 300]
     )]
     fn order_margin_long_no_orders(leverage: u8, position_qty: i32, entry_price: i32) {
-        let order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
+        let order_margin =
+            OrderMargin::<_, 4, _, NoUserOrderId>::new(NonZeroUsize::new(10).unwrap());
 
         let qty = BaseCurrency::new(position_qty, 0);
         let entry_price = QuoteCurrency::new(entry_price, 0);
@@ -298,7 +302,8 @@ mod tests {
         [100, 200, 300]
     )]
     fn order_margin_short_no_orders(leverage: u8, position_qty: i32, entry_price: i32) {
-        let order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
+        let order_margin =
+            OrderMargin::<_, 4, _, NoUserOrderId>::new(NonZeroUsize::new(10).unwrap());
 
         let qty = BaseCurrency::new(position_qty, 0);
         let entry_price = QuoteCurrency::new(entry_price, 0);
@@ -331,7 +336,8 @@ mod tests {
         qty: i32,
         n: usize,
     ) {
-        let mut order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
+        let mut order_margin =
+            OrderMargin::<_, 4, _, NoUserOrderId>::new(NonZeroUsize::new(10).unwrap());
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -396,7 +402,8 @@ mod tests {
         qty: i32,
         n: usize,
     ) {
-        let mut order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
+        let mut order_margin =
+            OrderMargin::<_, 4, _, NoUserOrderId>::new(NonZeroUsize::new(10).unwrap());
 
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
@@ -470,7 +477,8 @@ mod tests {
         [1, 2, 5]
     )]
     fn order_margin_long_orders_of_same_qty(leverage: u8) {
-        let mut order_margin = OrderMargin::<_, 4, _, NoUserOrderId>::new(10);
+        let mut order_margin =
+            OrderMargin::<_, 4, _, NoUserOrderId>::new(NonZeroUsize::new(10).unwrap());
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
         let qty = BaseCurrency::new(3, 0);
         let limit_price = QuoteCurrency::new(100, 0);
@@ -506,7 +514,8 @@ mod tests {
         limit_price: i64,
         qty: i64,
     ) {
-        let mut order_margin = OrderMargin::<_, DECIMALS, _, NoUserOrderId>::new(10);
+        let mut order_margin =
+            OrderMargin::<_, DECIMALS, _, NoUserOrderId>::new(NonZeroUsize::new(10).unwrap());
         let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
         let qty = BaseCurrency::new(qty, 0);
         let limit_price = QuoteCurrency::new(limit_price, 0);
@@ -554,7 +563,7 @@ mod tests {
     fn order_margin_no_position() {
         let position = Position::default();
         let init_margin_req = Decimal::one();
-        let mut order_margin = OrderMargin::new(10);
+        let mut order_margin = OrderMargin::new(NonZeroUsize::new(10).unwrap());
 
         assert_eq!(
             order_margin.order_margin(init_margin_req, &position),
@@ -608,7 +617,7 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn order_margin_with_long() {
-        let mut order_margin = OrderMargin::new(10);
+        let mut order_margin = OrderMargin::new(NonZeroUsize::new(10).unwrap());
 
         let qty = BaseCurrency::<i64, 5>::new(1, 0);
         let entry_price = QuoteCurrency::new(100, 0);
@@ -670,7 +679,8 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn order_margin_with_short() {
-        let mut order_margin = OrderMargin::<i64, 5, _, NoUserOrderId>::new(10);
+        let mut order_margin =
+            OrderMargin::<i64, 5, _, NoUserOrderId>::new(NonZeroUsize::new(10).unwrap());
 
         let qty = BaseCurrency::<i64, DECIMALS>::one();
         let entry_price = QuoteCurrency::new(100, 0);

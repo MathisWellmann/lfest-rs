@@ -1,6 +1,6 @@
 //! Benchmark regarding checking of active limit orders.
 
-use std::hint::black_box;
+use std::{hint::black_box, num::NonZeroUsize};
 
 use const_decimal::Decimal;
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
@@ -28,7 +28,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     .expect("works");
     let config = Config::new(
         starting_balance,
-        200,
+        NonZeroUsize::new(200).unwrap(),
         contract_spec,
         OrderRateLimits::new(1_000).unwrap(),
     )

@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use getset::Getters;
 use tracing::trace;
 
@@ -6,6 +8,7 @@ use crate::types::{
     price_time_priority_ordering,
 };
 
+// TODO: rename to `OrderBook`
 /// The datatype that holds the active limit orders of a user.
 ///
 /// Generics:
@@ -57,11 +60,12 @@ where
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderIdT: UserOrderId,
 {
-    #[inline]
-    pub(crate) fn new(max_active_orders: usize) -> Self {
+    /// Create a new order book instance with a maximum capacity for bids and asks.
+    /// The `max_active_orders` must be non zero as we need at least space for one limit order.
+    pub fn with_capacity(max_active_orders: NonZeroUsize) -> Self {
         Self {
-            bids: Vec::with_capacity(max_active_orders),
-            asks: Vec::with_capacity(max_active_orders),
+            bids: Vec::with_capacity(max_active_orders.get()),
+            asks: Vec::with_capacity(max_active_orders.get()),
         }
     }
 
@@ -125,8 +129,9 @@ where
         opt_out
     }
 
-    #[inline]
-    pub(crate) fn try_insert(
+    /// Try to insert a new `LimitOrder` into the order book.
+    /// Returns an error if the maximum capacity is reached.
+    pub fn try_insert(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> crate::Result<()> {
@@ -221,7 +226,7 @@ where
 
     /// Remove an active `LimitOrder` based on its order id.
     #[inline]
-    pub(crate) fn remove_by_id(
+    pub(crate) fn remove(
         &mut self,
         id: OrderId,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
@@ -261,6 +266,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
     use rand::Rng;
 
     use super::ActiveLimitOrders;
@@ -282,7 +289,9 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn active_limit_orders_insert() {
-        let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::new(10);
+        let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(
+            NonZeroUsize::new(10).unwrap(),
+        );
         let order = LimitOrder::new(
             Side::Buy,
             QuoteCurrency::<i64, 5>::new(100, 0),
@@ -294,7 +303,7 @@ mod tests {
         alo.try_insert(order.clone()).unwrap();
 
         assert_eq!(alo.num_active(), 1);
-        let removed = alo.remove_by_id(0.into()).unwrap();
+        let removed = alo.remove(0.into()).unwrap();
         assert_eq!(removed, order);
         assert!(alo.is_empty());
 
@@ -308,7 +317,7 @@ mod tests {
         let order_1 = order_1.into_pending(meta);
         alo.try_insert(order_1.clone()).unwrap();
         assert_eq!(alo.num_active(), 1);
-        let removed = alo.remove_by_id(1.into()).unwrap();
+        let removed = alo.remove(1.into()).unwrap();
         assert_eq!(removed, order_1);
         assert!(alo.is_empty());
 
@@ -350,7 +359,9 @@ mod tests {
 
     #[test]
     fn active_limit_orders_display() {
-        let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::new(3);
+        let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(
+            NonZeroUsize::new(3).unwrap(),
+        );
         let order = LimitOrder::new(
             Side::Buy,
             QuoteCurrency::<i64, 5>::new(100, 0),

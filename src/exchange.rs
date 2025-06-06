@@ -118,7 +118,7 @@ where
             balances,
             position: Position::default(),
             order_margin: OrderMargin::new(max_active_orders),
-            limit_order_updates: Vec::with_capacity(max_active_orders),
+            limit_order_updates: Vec::with_capacity(max_active_orders.get()),
             order_rate_limiter,
         }
     }

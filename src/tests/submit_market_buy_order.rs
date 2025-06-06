@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use crate::{mock_exchange_linear, prelude::*, test_fee_taker};
 
 #[test]
@@ -157,7 +159,10 @@ fn submit_market_buy_order_with_short_position() {
             QuoteCurrency::new(100, 0),
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &ActiveLimitOrders::new(10));
+    assert_eq!(
+        exchange.active_limit_orders(),
+        &ActiveLimitOrders::with_capacity(NonZeroUsize::new(10).unwrap())
+    );
 
     // Now close the position with a buy order
     let order = MarketOrder::new(Side::Buy, BaseCurrency::new(9, 0)).unwrap();

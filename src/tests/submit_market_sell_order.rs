@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use crate::{mock_exchange_linear, prelude::*, test_fee_taker};
 
 #[test]
@@ -93,7 +95,10 @@ fn submit_market_sell_order_with_short_position() {
             QuoteCurrency::new(100, 0),
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &ActiveLimitOrders::new(10));
+    assert_eq!(
+        exchange.active_limit_orders(),
+        &ActiveLimitOrders::with_capacity(NonZeroUsize::new(10).unwrap())
+    );
 
     // Sell again
     let order = MarketOrder::new(Side::Sell, BaseCurrency::new(4, 0)).unwrap();
@@ -115,7 +120,10 @@ fn submit_market_sell_order_with_short_position() {
             QuoteCurrency::new(100, 0),
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &ActiveLimitOrders::new(10));
+    assert_eq!(
+        exchange.active_limit_orders(),
+        &ActiveLimitOrders::with_capacity(NonZeroUsize::new(10).unwrap())
+    );
 }
 
 #[test]
@@ -191,7 +199,10 @@ fn submit_market_sell_order_turnaround_long() {
             QuoteCurrency::new(100, 0),
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &ActiveLimitOrders::new(10));
+    assert_eq!(
+        exchange.active_limit_orders(),
+        &ActiveLimitOrders::with_capacity(NonZeroUsize::new(10).unwrap())
+    );
 
     // Now reverse the position
     let qty = BaseCurrency::new(18, 0);
@@ -215,5 +226,8 @@ fn submit_market_sell_order_turnaround_long() {
             QuoteCurrency::new(99, 0),
         ))
     );
-    assert_eq!(exchange.active_limit_orders(), &ActiveLimitOrders::new(10));
+    assert_eq!(
+        exchange.active_limit_orders(),
+        &ActiveLimitOrders::with_capacity(NonZeroUsize::new(10).unwrap())
+    );
 }

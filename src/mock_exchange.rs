@@ -1,4 +1,6 @@
-//! Convenince function used in tests.
+//! Convenience function used in tests.
+
+use std::num::NonZeroUsize;
 
 use const_decimal::Decimal;
 
@@ -19,7 +21,7 @@ pub fn test_fee_taker() -> Fee<i64, DECIMALS, Taker> {
 
 /// Constructs a mock exchange (for linear futures) for testing.
 /// The size is denoted in `BaseCurrency`
-/// and the margin currency is `QuoteCurency`
+/// and the margin currency is `QuoteCurrency`
 pub fn mock_exchange_linear() -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>
 {
     let contract_spec = ContractSpecification::new(
@@ -33,7 +35,7 @@ pub fn mock_exchange_linear() -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIM
     .expect("works");
     let config = Config::new(
         QuoteCurrency::new(1000, 0),
-        10,
+        NonZeroUsize::new(10).unwrap(),
         contract_spec,
         OrderRateLimits::default(),
     )
@@ -58,7 +60,7 @@ pub fn mock_exchange_linear_with_account_tracker(
     .expect("works");
     let config = Config::new(
         starting_balance,
-        200,
+        NonZeroUsize::new(200).unwrap(),
         contract_spec,
         OrderRateLimits::default(),
     )
@@ -81,7 +83,7 @@ pub fn mock_exchange_inverse(
     .expect("works");
     let config = Config::new(
         starting_balance,
-        200,
+        NonZeroUsize::new(200).unwrap(),
         contract_spec,
         OrderRateLimits::default(),
     )

@@ -1,7 +1,7 @@
 //! Example usage of Exchange using external trade data.
 //! A randomly acting agent places market buy / sell orders every 100 candles
 
-use std::time::Instant;
+use std::{num::NonZeroUsize, time::Instant};
 
 use const_decimal::Decimal;
 use lfest::{load_trades_from_csv, prelude::*};
@@ -32,7 +32,7 @@ fn main() {
     .expect("is valid");
     let config = Config::new(
         starting_balance,
-        200,
+        NonZeroUsize::new(200).unwrap(),
         contract_spec,
         OrderRateLimits::default(),
     )
