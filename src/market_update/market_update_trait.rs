@@ -4,8 +4,12 @@ use crate::{
     types::{TimestampNs, UserOrderId},
 };
 
+/// If `true`, the `MarketUpdate` can no longer fill limit orders.
+pub type Exhausted = bool;
+
 /// The interface of what a market update must be able to do.
-pub trait MarketUpdate<I, const D: u8, BaseOrQuote>: std::fmt::Debug + std::fmt::Display
+pub trait MarketUpdate<I, const D: u8, BaseOrQuote>:
+    Clone + std::fmt::Debug + std::fmt::Display
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
@@ -19,12 +23,12 @@ where
     /// If `true`, the `MarketUpdate` can fill asks.
     fn can_fill_asks(&self) -> bool;
 
-    /// Checks if this market update triggered a specific limit order,
-    /// and if so, then how much.
+    /// Checks if this market update fills a limit order,
+    /// If it fills the limit order (even partially), its state is mutate to reflect the liquidity difference.
     fn limit_order_filled<UserOrderIdT: UserOrderId>(
-        &self,
+        &mut self,
         limit_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) -> Option<BaseOrQuote>;
+    ) -> Option<(BaseOrQuote, Exhausted)>;
 
     /// Checks if the market update satisfies the `PriceFilter`.
     fn validate_market_update(&self, price_filter: &PriceFilter<I, D>) -> Result<()>;

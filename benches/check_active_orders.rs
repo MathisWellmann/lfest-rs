@@ -66,7 +66,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 side: Side::Sell,
             };
             b.iter(|| {
-                let _ = black_box(exchange.check_active_orders(black_box(&trade)));
+                let _ = black_box(exchange.check_active_orders(black_box(trade)));
             })
         });
     }

@@ -4,6 +4,7 @@ use typed_builder::TypedBuilder;
 use super::MarketUpdate;
 use crate::{
     Result,
+    market_update::market_update_trait::Exhausted,
     order_filters::{
         enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
     },
@@ -113,20 +114,25 @@ where
 {
     const CAN_FILL_LIMIT_ORDERS: bool = true;
 
+    // In this simplified model, Candles have infinite volume to fill orders.
+    // Candles are not realistic when it comes to fills.
     #[inline]
     fn limit_order_filled<UserOrderIdT: UserOrderId>(
-        &self,
+        &mut self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) -> Option<BaseOrQuote> {
+    ) -> Option<(BaseOrQuote, Exhausted)> {
         debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
 
         // As a simplifying assumption, the order always get executed fully when using candles if the price is right.
         if self.fills_limit_order(order) {
             // Order is executed fully with candles.
-            Some(match order.side() {
-                Side::Buy => order.remaining_quantity(),
-                Side::Sell => order.remaining_quantity(),
-            })
+            Some((
+                match order.side() {
+                    Side::Buy => order.remaining_quantity(),
+                    Side::Sell => order.remaining_quantity(),
+                },
+                false,
+            ))
         } else {
             None
         }
@@ -280,7 +286,7 @@ mod test {
 
     #[test]
     fn candle_update() {
-        let candle = Candle {
+        let mut candle = Candle {
             bid: QuoteCurrency::<i64, 5>::new(100, 0),
             ask: QuoteCurrency::new(101, 0),
             low: QuoteCurrency::new(95, 0),

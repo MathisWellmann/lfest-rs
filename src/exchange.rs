@@ -172,7 +172,7 @@ where
             return Err(e.into());
         };
 
-        self.check_active_orders(market_update);
+        self.check_active_orders(market_update.clone());
         Ok(&self.limit_order_updates)
     }
 
@@ -450,7 +450,7 @@ where
 
     /// Checks for the execution of active limit orders in the account.
     /// NOTE: only public for benchmarking purposes.
-    pub fn check_active_orders<U>(&mut self, market_update: &U)
+    pub fn check_active_orders<U>(&mut self, mut market_update: U)
     where
         U: MarketUpdate<I, D, BaseOrQuote>,
     {
@@ -462,35 +462,40 @@ where
         }
 
         if market_update.can_fill_bids() {
-            // TODO: peek at the first sorted order, either buy or sell.
-            for i in 0..self.active_limit_orders().bids().len() {
-                let order = self
-                    .active_limit_orders()
-                    .bids()
-                    .get(i)
-                    .cloned()
-                    .expect("Can get order");
-
+            // peek at the best bid order.
+            while let Some(order) = self.active_limit_orders().peek_best_bid() {
                 // TODO: if some quantity was filled, mutate `market_update` to reflect the reduced liquidity so it does not fill more orders than possible.
-                if let Some(filled_qty) = market_update.limit_order_filled(&order) {
-                    self.fill_limit_order(order, filled_qty, market_update.timestamp_exchange_ns())
+                if let Some((filled_qty, exhausted)) = market_update.limit_order_filled(&order) {
+                    self.fill_limit_order(
+                        order.clone(),
+                        filled_qty,
+                        market_update.timestamp_exchange_ns(),
+                    );
+                    if exhausted {
+                        return;
+                    }
+                } else {
+                    // We can be sure that no other bid can be filled if this one could not be filled.
+                    break;
                 }
             }
         }
 
         if market_update.can_fill_asks() {
-            // TODO: peek at the first sorted order, either buy or sell.
-            for i in 0..self.active_limit_orders().asks().len() {
-                let order = self
-                    .active_limit_orders()
-                    .asks()
-                    .get(i)
-                    .cloned()
-                    .expect("Can get order");
-
+            while let Some(order) = self.active_limit_orders().peek_best_ask() {
                 // TODO: if some quantity was filled, mutate `market_update` to reflect the reduced liquidity so it does not fill more orders than possible.
-                if let Some(filled_qty) = market_update.limit_order_filled(&order) {
-                    self.fill_limit_order(order, filled_qty, market_update.timestamp_exchange_ns())
+                if let Some((filled_qty, exhausted)) = market_update.limit_order_filled(&order) {
+                    self.fill_limit_order(
+                        order.clone(),
+                        filled_qty,
+                        market_update.timestamp_exchange_ns(),
+                    );
+                    if exhausted {
+                        return;
+                    }
+                } else {
+                    // We can be sure that no other ask can be filled if this one could not be filled.
+                    break;
                 }
             }
         }

@@ -3,6 +3,7 @@ use num::Zero;
 use super::MarketUpdate;
 use crate::{
     Result,
+    market_update::market_update_trait::Exhausted,
     order_filters::{enforce_max_price, enforce_min_price, enforce_step_size},
     prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side},
     types::{TimestampNs, UserOrderId},
@@ -69,9 +70,9 @@ where
 
     #[inline]
     fn limit_order_filled<UserOrderIdT: UserOrderId>(
-        &self,
+        &mut self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) -> Option<BaseOrQuote> {
+    ) -> Option<(BaseOrQuote, Exhausted)> {
         debug_assert!(
             self.quantity > BaseOrQuote::zero(),
             "The trade quantity must be greater than zero."
@@ -83,7 +84,9 @@ where
         if self.fills_order(order) {
             // Execute up to the quantity of the incoming `Trade`.
             let filled_qty = min(self.quantity, order.remaining_quantity());
-            Some(filled_qty)
+            self.quantity -= filled_qty;
+            debug_assert!(self.quantity >= Zero::zero());
+            Some((filled_qty, self.quantity == Zero::zero()))
         } else {
             None
         }
@@ -302,7 +305,7 @@ mod tests {
     fn trade_limit_order_filled_some(price: i32, qty: i32, side: Side) {
         let price = QuoteCurrency::<i32, 2>::new(price, 0);
         let quantity = BaseCurrency::new(qty, 0);
-        let trade = Trade {
+        let mut trade = Trade {
             price,
             quantity,
             side,
@@ -316,7 +319,15 @@ mod tests {
         let limit_order = LimitOrder::new(side.inverted(), price + offset, quantity).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let limit_order = limit_order.into_pending(meta);
-        assert_eq!(trade.limit_order_filled(&limit_order).unwrap(), quantity);
+        assert_eq!(
+            trade.limit_order_filled(&limit_order).unwrap(),
+            (quantity, true)
+        );
+        assert_eq!(
+            trade.quantity,
+            Zero::zero(),
+            "Trade quantity is reduced as well"
+        );
     }
 
     #[test_case::test_matrix(
@@ -327,7 +338,7 @@ mod tests {
     fn trade_limit_order_filled_none(price: i32, qty: i32, side: Side) {
         let price = QuoteCurrency::<i32, 2>::new(price, 0);
         let quantity = BaseCurrency::new(qty, 0);
-        let trade = Trade {
+        let mut trade = Trade {
             price,
             quantity,
             side,
@@ -347,7 +358,12 @@ mod tests {
         let limit_order = limit_order.into_pending(meta);
         assert_eq!(
             trade.limit_order_filled(&limit_order).unwrap(),
-            quantity / BaseCurrency::new(2, 0)
+            (quantity / BaseCurrency::new(2, 0), false)
+        );
+        assert_eq!(
+            trade.quantity,
+            quantity / BaseCurrency::new(2, 0),
+            "Trade quantity is reduced as well"
         );
     }
 

@@ -2,6 +2,7 @@ use getset::{CopyGetters, Getters};
 
 use super::{Bba, MarketUpdate, Trade};
 use crate::{
+    market_update::market_update_trait::Exhausted,
     prelude::PriceFilter,
     types::{Currency, Mon, QuoteCurrency, Side, TimestampNs, UserOrderId},
     utils::min,
@@ -150,9 +151,10 @@ where
     const CAN_FILL_LIMIT_ORDERS: bool = true;
 
     // TODO: benchmark and optimize this.
+    // TODO: reduce the quantity if a limit order is filled.
     #[inline]
     fn limit_order_filled<UserOrderIdT: UserOrderId>(
-        &self,
+        &mut self,
         limit_order: &crate::prelude::LimitOrder<
             I,
             D,
@@ -160,7 +162,7 @@ where
             UserOrderIdT,
             crate::prelude::Pending<I, D, BaseOrQuote>,
         >,
-    ) -> Option<BaseOrQuote> {
+    ) -> Option<(BaseOrQuote, Exhausted)> {
         match limit_order.side() {
             Side::Buy => {
                 if self.low >= limit_order.limit_price() {
@@ -170,7 +172,7 @@ where
                     .iter()
                     .rev()
                     .find(|v| v.0 < limit_order.limit_price())
-                    .map(|v| min(v.1, limit_order.remaining_quantity()))
+                    .map(|v| (min(v.1, limit_order.remaining_quantity()), false))
             }
             Side::Sell => {
                 if self.high <= limit_order.limit_price() {
@@ -180,7 +182,7 @@ where
                     .iter()
                     .rev()
                     .find(|v| v.0 > limit_order.limit_price())
-                    .map(|v| min(v.1, limit_order.remaining_quantity()))
+                    .map(|v| (min(v.1, limit_order.remaining_quantity()), false))
             }
         }
     }
@@ -558,7 +560,7 @@ mod tests {
             Decimal::try_from_scaled(5, 1).unwrap(),
         )
         .unwrap();
-        let smart_candle = SmartCandle::new(trades, bba, &pf);
+        let mut smart_candle = SmartCandle::new(trades, bba, &pf);
 
         assert_eq!(
             smart_candle,
@@ -591,7 +593,7 @@ mod tests {
         let limit_order = limit_buy.into_pending(meta);
         assert_eq!(
             smart_candle.limit_order_filled(&limit_order),
-            Some(BaseCurrency::new(5, 0))
+            Some((BaseCurrency::new(5, 0), false))
         );
 
         let limit_sell = LimitOrder::<i64, 5, _, NoUserOrderId, _>::new(
@@ -604,7 +606,7 @@ mod tests {
         let limit_order = limit_sell.into_pending(meta);
         assert_eq!(
             smart_candle.limit_order_filled(&limit_order),
-            Some(BaseCurrency::new(2, 0))
+            Some((BaseCurrency::new(2, 0), false))
         );
     }
 

@@ -3,6 +3,7 @@ use const_decimal::Decimal;
 use super::MarketUpdate;
 use crate::{
     Result,
+    market_update::market_update_trait::Exhausted,
     order_filters::{
         enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
     },
@@ -56,9 +57,9 @@ where
 
     #[inline(always)]
     fn limit_order_filled<UserOrderIdT: UserOrderId>(
-        &self,
+        &mut self,
         _limit_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) -> Option<BaseOrQuote> {
+    ) -> Option<(BaseOrQuote, Exhausted)> {
         unreachable!(
             "This should never be called, because a best bid and ask update can never fill a limit order."
         );

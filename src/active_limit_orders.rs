@@ -3,6 +3,7 @@ use tracing::trace;
 
 use crate::types::{
     Currency, Error, LimitOrder, MarginCurrency, Mon, OrderId, Pending, Side, UserOrderId,
+    price_time_priority_ordering,
 };
 
 /// The datatype that holds the active limit orders of a user.
@@ -65,34 +66,104 @@ where
     }
 
     /// Get the number of active limit orders.
-    #[inline(always)]
+    #[inline]
     pub fn num_active(&self) -> usize {
         self.bids.len() + self.asks.len()
     }
 
     /// `true` is there are no active orders.
-    #[inline(always)]
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.bids.is_empty() && self.asks.is_empty()
     }
 
-    #[inline(always)]
+    /// Peek at the best bid limit order.
+    #[inline]
+    pub fn peek_best_bid(
+        &self,
+    ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+        // The last element in `bids` has the highest price and oldest timestamp.
+        let opt_out = self.bids().last();
+
+        // Make sure bids are sorted by time and price priority.
+        debug_assert!(
+            if let Some(order) = opt_out {
+                self.bids.iter().all(|bid| {
+                    order.limit_price() >= bid.limit_price()
+                        && order.state().meta().ts_exchange_received()
+                            <= bid.state().meta().ts_exchange_received()
+                })
+            } else {
+                true
+            },
+            "The order must be the best bid in bids {:?}",
+            self.bids
+        );
+
+        opt_out
+    }
+
+    /// Peek at the best ask limit order.
+    #[inline]
+    pub fn peek_best_ask(
+        &self,
+    ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+        // The first element in `asks` has the lowest price and oldest timestamp.
+        let opt_out = self.asks().first();
+
+        // Make sure asks are sorted by time and price priority.
+        debug_assert!(
+            if let Some(order) = opt_out {
+                self.asks.iter().all(|bid| {
+                    order.limit_price() <= bid.limit_price()
+                        && order.state().meta().ts_exchange_received()
+                            <= bid.state().meta().ts_exchange_received()
+                })
+            } else {
+                true
+            },
+            "The order must be the best ask in asks {:?}",
+            self.asks
+        );
+
+        opt_out
+    }
+
+    #[inline]
     pub(crate) fn try_insert(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> crate::Result<()> {
+        use std::cmp::Ordering::*;
         match order.side() {
             Side::Buy => {
                 if self.bids.len() >= self.bids.capacity() {
                     return Err(Error::MaxNumberOfActiveOrders);
                 }
-                self.bids.push(order)
+                // Find location to insert so that bids remain ordered.
+                let idx = self
+                    .bids
+                    .iter()
+                    .position(|bid| {
+                        matches!(price_time_priority_ordering(&order, bid), Less | Equal)
+                    })
+                    .unwrap_or_else(|| self.bids.len());
+                trace!("insert bid {order} at idx {idx}, bids: {:?}", self.bids);
+                self.bids.insert(idx, order)
             }
             Side::Sell => {
                 if self.asks.len() >= self.asks.capacity() {
                     return Err(Error::MaxNumberOfActiveOrders);
                 }
-                self.asks.push(order)
+                let idx = self
+                    .asks
+                    .iter()
+                    .position(|bid| {
+                        matches!(price_time_priority_ordering(&order, bid), Less | Equal)
+                    })
+                    .unwrap_or_else(|| self.asks.len());
+                trace!("insert ask {order} at idx {idx}, asks: {:?}", self.asks);
+                self.asks.insert(idx, order)
             }
         }
         Ok(())
@@ -106,17 +177,10 @@ where
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>> {
         let active_order = match order.side() {
-            Side::Buy => self
-                .bids
-                .iter_mut()
-                .find(|o| o.id() == order.id())
-                .expect("Order must have been active before updating it"),
-            Side::Sell => self
-                .asks
-                .iter_mut()
-                .find(|o| o.id() == order.id())
-                .expect("Order must have been active before updating it"),
-        };
+            Side::Buy => self.bids.iter_mut().find(|o| o.id() == order.id()),
+            Side::Sell => self.asks.iter_mut().find(|o| o.id() == order.id()),
+        }
+        .expect("Order must have been active before updating it");
         debug_assert_ne!(
             active_order, &order,
             "An update to an order should not be the same as the existing one"
@@ -145,24 +209,6 @@ where
         );
     }
 
-    /*
-    /// The best bid (highest price of all buy orders) if any.
-    #[inline(always)]
-    pub(crate) fn best_bid(
-        &self,
-    ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        self.bids.last()
-    }
-
-    /// The best ask (lowest price of all sell orders) if any.
-    #[inline(always)]
-    pub(crate) fn best_ask(
-        &self,
-    ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        self.asks.get(0)
-    }
-    */
-
     /// Get a `LimitOrder` by the given `OrderId` if any.
     /// Optimized to be fast for small number of active limit orders.
     #[inline]
@@ -183,16 +229,14 @@ where
         &mut self,
         id: OrderId,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        if let Some(pos) = self.bids.iter_mut().position(|order| order.id() == id) {
-            let removed = self.bids.swap_remove(pos);
-            trace!("removed bid {removed}");
-            Some(removed)
+        let removed = if let Some(pos) = self.bids.iter_mut().position(|order| order.id() == id) {
+            self.bids.remove(pos)
         } else {
             let pos = self.asks.iter_mut().position(|order| order.id() == id)?;
-            let removed = self.asks.swap_remove(pos);
-            trace!("removed ask {removed}");
-            Some(removed)
-        }
+            self.asks.remove(pos)
+        };
+        trace!("removed {removed}");
+        Some(removed)
     }
 
     /// Remove an active `LimitOrder` based on its order id.
@@ -201,31 +245,34 @@ where
         &mut self,
         user_order_id: UserOrderIdT,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        if let Some(pos) = self
+        let removed = if let Some(pos) = self
             .bids
             .iter_mut()
             .position(|order| order.user_order_id() == user_order_id)
         {
-            let removed = self.bids.swap_remove(pos);
-            trace!("removed bid {removed}");
-            Some(removed)
+            self.bids.remove(pos)
         } else {
             let pos = self
                 .asks
                 .iter_mut()
                 .position(|order| order.user_order_id() == user_order_id)?;
-            let removed = self.asks.swap_remove(pos);
-            trace!("removed ask {removed}");
-            Some(removed)
-        }
+            self.asks.remove(pos)
+        };
+        trace!("removed {removed}");
+        Some(removed)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use rand::Rng;
+
     use super::ActiveLimitOrders;
     use crate::{
-        types::{BaseCurrency, ExchangeOrderMeta, LimitOrder, QuoteCurrency, Side},
+        types::{
+            BaseCurrency, ExchangeOrderMeta, LimitOrder, QuoteCurrency, Side,
+            price_time_priority_ordering,
+        },
         utils::NoUserOrderId,
     };
 
@@ -237,8 +284,9 @@ mod tests {
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn active_limit_orders_insert() {
-        let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::new(3);
+        let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::new(10);
         let order = LimitOrder::new(
             Side::Buy,
             QuoteCurrency::<i64, 5>::new(100, 0),
@@ -268,19 +316,41 @@ mod tests {
         assert_eq!(removed, order_1);
         assert!(alo.is_empty());
 
-        for i in 2..5 {
+        let mut rng = rand::rng();
+        for i in 2..7 {
             let order = LimitOrder::new(
                 Side::Buy,
-                QuoteCurrency::<i64, 5>::new(200, 0),
+                QuoteCurrency::<i64, 5>::new(rng.random_range(100..500), 0),
                 BaseCurrency::new(1, 0),
             )
             .unwrap();
-            let meta = ExchangeOrderMeta::new(i.into(), 3.into());
+            let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
             let order = order.into_pending(meta);
             alo.try_insert(order.clone()).unwrap();
+            let mut sorted = alo.bids.clone();
+            sorted.sort_by(|a, b| price_time_priority_ordering(a, b));
+            assert_eq!(sorted, alo.bids);
         }
-        assert_eq!(alo.num_active(), 3);
+        assert_eq!(alo.num_active(), 5);
+
+        for i in 0..5 {
+            let order = LimitOrder::new(
+                Side::Sell,
+                QuoteCurrency::<i64, 5>::new(rng.random_range(100..500), 0),
+                BaseCurrency::new(1, 0),
+            )
+            .unwrap();
+            let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
+            let order = order.into_pending(meta);
+            alo.try_insert(order.clone()).unwrap();
+            let mut sorted = alo.asks.clone();
+            sorted.sort_by(|a, b| price_time_priority_ordering(a, b));
+            assert_eq!(sorted, alo.asks);
+        }
+        assert_eq!(alo.num_active(), 10);
     }
+
+    // TODO: another manual test to ensure bids and asks are properly ordered regarding prices and timestamps.
 
     #[test]
     fn active_limit_orders_display() {

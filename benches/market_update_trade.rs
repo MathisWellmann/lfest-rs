@@ -24,9 +24,9 @@ fn update_state<I, const D: u8, BaseOrQuote, U>(
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    U: MarketUpdate<I, D, BaseOrQuote>,
+    U: MarketUpdate<I, D, BaseOrQuote> + Clone,
 {
-    for trade in trades.into_iter() {
+    for trade in trades.iter() {
         exchange.update_state(trade).expect("is a valid update");
     }
 }
