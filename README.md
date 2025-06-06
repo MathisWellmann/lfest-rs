@@ -5,8 +5,6 @@ Its optimizes correctness, performance and simplicity in that order.
 It can simulate more than 350M trade and 1250M BBa updates per second along with 25M limit order submissions per second (Run `cargo bench` to see it for your system).
 You feed in external market data using `Bba`, `Trade`, `Candle` or `SmartCandle` to update the `MarketState`, 
 which triggers limit order executions when appropriate.
-For simplicity's sake (and performance) the exchange does not use an order book, nor does it account for slippage of `MarkerOrder`.
-Using `LimitOrder` supports partial executions.
 The exchange can be configured using `Config` and `ContractSpecification`.
 
 :radioactive: This is a personal project, use a your own risk. :bangbang:
@@ -45,9 +43,9 @@ Then proceed to use it in your code.
 For an example see [examples](examples/basic.rs)
 
 ### TODOs:
-- Orderbook support (with `MatchingEngine`) and thus accounting for slippage of `MarkerOrder`
+- Market orders don't account for slippage and are executed against the best bid and ask without regard for the quantity.
 - Funding rate (support `settle_funding_period` in `ClearingHouse`)
-- Support for updating leverage of a position while it is open.
+- Support for updating leverage on the fly.
 
 ### Contributions
 Would love to see you use and contribute to this project. Even just adding more tests is welcome.

@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use assert2::assert;
 use getset::{Getters, MutGetters};
 use num_traits::Zero;
-use tracing::{info, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 use crate::{
     config::Config,
@@ -521,7 +521,7 @@ where
         filled_qty: BaseOrQuote,
         ts_ns: TimestampNs,
     ) {
-        trace!(
+        debug!(
             "filled limit {} order {}: {filled_qty}/{} @ {}",
             order.side(),
             order.id(),

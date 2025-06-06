@@ -88,15 +88,13 @@ where
         // Make sure bids are sorted by time and price priority.
         debug_assert!(
             if let Some(order) = opt_out {
-                self.bids.iter().all(|bid| {
-                    order.limit_price() >= bid.limit_price()
-                        && order.state().meta().ts_exchange_received()
-                            <= bid.state().meta().ts_exchange_received()
-                })
+                self.bids
+                    .iter()
+                    .all(|bid| order.limit_price() >= bid.limit_price())
             } else {
                 true
             },
-            "The order must be the best bid in bids {:?}",
+            "The order {opt_out:?} must be the best bid in bids {:?}",
             self.bids
         );
 
@@ -114,15 +112,13 @@ where
         // Make sure asks are sorted by time and price priority.
         debug_assert!(
             if let Some(order) = opt_out {
-                self.asks.iter().all(|bid| {
-                    order.limit_price() <= bid.limit_price()
-                        && order.state().meta().ts_exchange_received()
-                            <= bid.state().meta().ts_exchange_received()
-                })
+                self.asks
+                    .iter()
+                    .all(|ask| order.limit_price() <= ask.limit_price())
             } else {
                 true
             },
-            "The order must be the best ask in asks {:?}",
+            "The order {opt_out:?} must be the best ask in asks {:?}",
             self.asks
         );
 
