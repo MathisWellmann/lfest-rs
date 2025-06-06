@@ -25,13 +25,13 @@ procs:
   cargo-bench_decimal_comparison:
     shell: "cargo bench decimal_comparison"
   cargo-bench_submit_limit_order:
-    shell: "cargo bench submit_limit_order"
+    shell: "cargo bench Exchange/submit_limit_order"
   cargo-bench_check_active_orders:
-    shell: "cargo bench check_active_orders"
+    shell: "cargo bench Exchange/check_active_orders"
   cargo-bench_update_state:
-    shell: "cargo bench update_state"
+    shell: "cargo bench Exchange/update_state"
   cargo-bench_submit_market_order:
-    shell: "cargo bench submit_market_order"
+    shell: "cargo bench Exchange/submit_market_order"
   cargo-bench_OrderMargin/insert:
     shell: "cargo bench OrderMargin/insert"
   cargo-bench_OrderMargin/fill_order:

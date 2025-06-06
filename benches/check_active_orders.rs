@@ -3,7 +3,7 @@
 use std::hint::black_box;
 
 use const_decimal::Decimal;
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use lfest::prelude::*;
 
 const DECIMALS: u8 = 5;
@@ -34,40 +34,46 @@ fn criterion_benchmark(c: &mut Criterion) {
     )
     .unwrap();
 
-    let mut group = c.benchmark_group("check_active_orders");
+    let mut group = c.benchmark_group("Exchange");
 
-    let mut ts_s = 0;
-    for n in [1, 2, 3, 5, 10, 100] {
-        group.bench_function(&format!("{n}"), |b| {
-            let mut exchange =
-                Exchange::<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>, NoUserOrderId>::new(
-                    config.clone(),
-                );
-            let bba = Bba {
-                bid: QuoteCurrency::new(100, 0),
-                ask: QuoteCurrency::new(101, 0),
-                timestamp_exchange_ns: ts_s.into(),
-            };
-            ts_s += 1;
-            exchange.update_state(&bba).expect("is valid market update");
-            let order = LimitOrder::new(
-                Side::Buy,
-                QuoteCurrency::new(99, 0),
-                QuoteCurrency::new(1, 1),
+    let trade = Trade {
+        timestamp_exchange_ns: 0.into(),
+        price: QuoteCurrency::<i64, 5>::new(100, 0),
+        quantity: QuoteCurrency::new(10, 0),
+        side: Side::Sell,
+    };
+
+    for n in 1..50 {
+        group.bench_with_input(BenchmarkId::new("check_active_orders", n), &n, |b, _n| {
+            b.iter_with_setup(
+                || {
+                    let mut exchange = Exchange::<
+                        i64,
+                        DECIMALS,
+                        QuoteCurrency<i64, DECIMALS>,
+                        NoUserOrderId,
+                    >::new(config.clone());
+                    let bba = Bba {
+                        bid: QuoteCurrency::new(100, 0),
+                        ask: QuoteCurrency::new(101, 0),
+                        timestamp_exchange_ns: 1.into(),
+                    };
+                    exchange.update_state(&bba).expect("is valid market update");
+                    let order = LimitOrder::new(
+                        Side::Buy,
+                        QuoteCurrency::new(99, 0),
+                        QuoteCurrency::new(1, 1),
+                    )
+                    .unwrap();
+                    for _ in 0..n {
+                        exchange.submit_limit_order(order.clone()).unwrap();
+                    }
+                    exchange
+                },
+                |mut exchange| {
+                    let _ = black_box(exchange.check_active_orders(black_box(trade)));
+                },
             )
-            .unwrap();
-            for _ in 0..n {
-                exchange.submit_limit_order(order.clone()).unwrap();
-            }
-            let trade = Trade {
-                timestamp_exchange_ns: 0.into(),
-                price: QuoteCurrency::<i64, 5>::new(100, 0),
-                quantity: QuoteCurrency::new(10, 0),
-                side: Side::Sell,
-            };
-            b.iter(|| {
-                let _ = black_box(exchange.check_active_orders(black_box(trade)));
-            })
         });
     }
 }

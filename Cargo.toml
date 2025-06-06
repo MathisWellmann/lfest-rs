@@ -55,6 +55,7 @@ fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs"
 ] }
 trade_aggregation = "12"
 proptest = "1.6"
+num_cpus = "1"
 
 [features]
 trade_aggregation = ["dep:trade_aggregation"]

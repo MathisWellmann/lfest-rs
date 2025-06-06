@@ -1,6 +1,7 @@
 //! Compare the crates providing decimal implementations.
+use std::hint::black_box;
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use fpdec::{Dec, Decimal};
 use lfest::prelude::*;
 

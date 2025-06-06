@@ -3,7 +3,7 @@
 use std::hint::black_box;
 
 use const_decimal::Decimal;
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use lfest::prelude::*;
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 
@@ -48,7 +48,7 @@ fn setup_exchange() -> ThisExchange {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("submit_limit_order");
+    let mut group = c.benchmark_group("Exchange");
 
     let mut rng = SmallRng::seed_from_u64(0);
 
@@ -71,7 +71,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             }
         }));
         group.throughput(criterion::Throughput::Elements(n as u64));
-        group.bench_function(&format!("submit_limit_order_{n}"), |b| {
+        group.bench_with_input(BenchmarkId::new("submit_limit_order", n), &n, |b, _n| {
             b.iter_with_setup(
                 || setup_exchange(),
                 |mut exchange| {

@@ -3,7 +3,7 @@
 use std::hint::black_box;
 
 use const_decimal::Decimal;
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use lfest::prelude::*;
 
 const DECIMALS: u8 = 5;
@@ -26,10 +26,10 @@ fn submit_market_orders<I, const D: u8, BaseOrQuote, U>(
 
 fn criterion_benchmark(c: &mut Criterion) {
     let order = MarketOrder::new(Side::Buy, QuoteCurrency::new(1, 2)).unwrap();
-    let mut group = c.benchmark_group("submit_market_order");
+    let mut group = c.benchmark_group("Exchange");
     const N: usize = 1_000;
     group.throughput(criterion::Throughput::Elements(N as u64));
-    group.bench_function(&format!("submit_market_order_{N}"), |b| {
+    group.bench_with_input(BenchmarkId::new("submit_market_order", N), &N, |b, _n| {
         b.iter(|| {
             let starting_balance = BaseCurrency::new(100000, 0);
             let contract_spec = ContractSpecification::new(

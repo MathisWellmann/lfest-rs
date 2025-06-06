@@ -3,7 +3,7 @@
 use std::hint::black_box;
 
 use const_decimal::Decimal;
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use lfest::prelude::*;
 
 fn criterion_benchmark(c: &mut Criterion) {
@@ -20,7 +20,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let init_margin_req = Decimal::ONE;
 
     for n in 1..20 {
-        group.bench_function(&format!("insert_{n}"), |b| {
+        group.bench_with_input(BenchmarkId::new("insert", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
                 let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)
@@ -46,7 +46,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 },
             )
         });
-        group.bench_function(&format!("fill_order_{n}"), |b| {
+        group.bench_with_input(BenchmarkId::new("fill_order", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
                 let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)
@@ -73,7 +73,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 },
             )
         });
-        group.bench_function(&format!("remove_{n}"), |b| {
+        group.bench_with_input(BenchmarkId::new("remove", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
                 let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)
@@ -108,7 +108,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 },
             )
         });
-        group.bench_function(&format!("order_margin_neutral_{n}"), |b| {
+        group.bench_with_input(BenchmarkId::new("order_margin_neutral", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
                 let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)
@@ -136,7 +136,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 },
             )
         });
-        group.bench_function(&format!("order_margin_long_{n}"), |b| {
+        group.bench_with_input(BenchmarkId::new("order_margin_long", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
                 let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)
@@ -167,7 +167,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 },
             )
         });
-        group.bench_function(&format!("order_margin_short_{n}"), |b| {
+        group.bench_with_input(BenchmarkId::new("order_margin_short", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
                 let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)

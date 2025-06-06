@@ -1,8 +1,9 @@
 //! Benchmark the `update_state` method of `Exchange` for `TradeEvent`
+//! TODO: rename this file to `update_state`
 use std::hint::black_box;
 
 use const_decimal::Decimal;
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use lfest::{load_trades_from_csv, prelude::*};
 
 const DECIMALS: u8 = 5;
@@ -62,27 +63,35 @@ fn criterion_benchmark(c: &mut Criterion) {
     const COUNT: usize = 1_000_000;
     assert_eq!(trades.len(), COUNT);
 
-    let mut group = c.benchmark_group("update_state");
+    let mut group = c.benchmark_group("Exchange");
     group.throughput(criterion::Throughput::Elements(COUNT as u64));
-    group.bench_function("trades_1_million", |b| {
-        b.iter(|| {
-            update_state::<
-                _,
-                DECIMALS,
-                QuoteCurrency<_, DECIMALS>,
-                Trade<_, DECIMALS, QuoteCurrency<_, DECIMALS>>,
-            >(black_box(&mut exchange), black_box(&trades))
-        })
-    });
+    group.bench_with_input(
+        BenchmarkId::new("update_state_trade", COUNT),
+        &COUNT,
+        |b, _| {
+            b.iter(|| {
+                update_state::<
+                    _,
+                    DECIMALS,
+                    QuoteCurrency<_, DECIMALS>,
+                    Trade<_, DECIMALS, QuoteCurrency<_, DECIMALS>>,
+                >(black_box(&mut exchange), black_box(&trades))
+            })
+        },
+    );
     let bbas = generate_quotes_from_trades(&trades);
-    group.bench_function("quotes_1_million", |b| {
-        b.iter(|| {
-            update_state::<_, DECIMALS, QuoteCurrency<_, DECIMALS>, Bba<_, DECIMALS>>(
-                black_box(&mut exchange),
-                black_box(&bbas),
-            )
-        })
-    });
+    group.bench_with_input(
+        BenchmarkId::new("update_state_quotes", COUNT),
+        &COUNT,
+        |b, _n| {
+            b.iter(|| {
+                update_state::<_, DECIMALS, QuoteCurrency<_, DECIMALS>, Bba<_, DECIMALS>>(
+                    black_box(&mut exchange),
+                    black_box(&bbas),
+                )
+            })
+        },
+    );
 }
 
 criterion_group!(benches, criterion_benchmark);
