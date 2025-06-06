@@ -1,7 +1,7 @@
 use const_decimal::Decimal;
 use getset::{CopyGetters, Getters, MutGetters};
 use num_traits::{One, Zero};
-use tracing::trace;
+use tracing::{debug, trace};
 
 use crate::{
     Result,
@@ -117,7 +117,7 @@ where
         position: &Position<I, D, BaseOrQuote>,
         init_margin_req: Decimal<I, D>,
     ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        trace!("OrderMargin.remove {by:?}");
+        debug!("OrderMargin.remove {by:?}");
         let removed_order = match by {
             CancelBy::OrderId(order_id) => self
                 .active_limit_orders

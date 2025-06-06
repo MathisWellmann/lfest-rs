@@ -12,7 +12,7 @@ pub struct ExchangeOrderMeta {
     /// timestamp in nanoseconds, when the exchange has received the order.
     /// Will be the simulated time, not actual computer (OS) time.
     #[getset(get_copy = "pub")]
-    ts_ns_exchange_received: TimestampNs,
+    ts_exchange_received: TimestampNs,
 }
 
 impl ExchangeOrderMeta {
@@ -20,7 +20,7 @@ impl ExchangeOrderMeta {
     pub fn new(id: OrderId, ts_ns_exchange_received: TimestampNs) -> Self {
         Self {
             id,
-            ts_ns_exchange_received,
+            ts_exchange_received: ts_ns_exchange_received,
         }
     }
 }
@@ -30,7 +30,7 @@ impl std::fmt::Display for ExchangeOrderMeta {
         write!(
             f,
             "ExchangeOrderMeta( id: {}, ts_ns_exchange_received: {})",
-            self.id, self.ts_ns_exchange_received
+            self.id, self.ts_exchange_received
         )
     }
 }

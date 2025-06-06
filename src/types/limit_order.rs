@@ -30,8 +30,8 @@ where
             match o0
                 .state()
                 .meta()
-                .ts_ns_exchange_received()
-                .cmp(&o1.state().meta().ts_ns_exchange_received())
+                .ts_exchange_received()
+                .cmp(&o1.state().meta().ts_exchange_received())
             {
                 Less => Less,
                 Equal => Equal,

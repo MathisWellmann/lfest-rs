@@ -297,7 +297,7 @@ mod tests {
 
         assert_eq!(
             &alo.to_string(),
-            "ActiveLimitOrders:\nuser_id: NoUserOrderId, limit Buy 5.00000 Base @ 100.00000 Quote, state: Pending { meta: ExchangeOrderMeta { id: OrderId(0), ts_ns_exchange_received: TimestampNs(0) }, filled_quantity: Unfilled }\n"
+            "ActiveLimitOrders:\nuser_id: NoUserOrderId, limit Buy 5.00000 Base @ 100.00000 Quote, state: Pending { meta: ExchangeOrderMeta { id: OrderId(0), ts_exchange_received: TimestampNs(0) }, filled_quantity: Unfilled }\n"
         );
     }
 }
