@@ -61,7 +61,7 @@ num_cpus = "1"
 trade_aggregation = ["dep:trade_aggregation"]
 
 [[bench]]
-name = "market_update_trade"
+name = "update_state"
 harness = false
 
 [[bench]]
