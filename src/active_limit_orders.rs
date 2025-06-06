@@ -143,7 +143,7 @@ where
                     .position(|bid| {
                         matches!(price_time_priority_ordering(&order, bid), Less | Equal)
                     })
-                    .unwrap_or_else(|| self.bids.len());
+                    .unwrap_or(self.bids.len());
                 trace!("insert bid {order} at idx {idx}, bids: {:?}", self.bids);
                 self.bids.insert(idx, order)
             }
@@ -157,7 +157,7 @@ where
                     .position(|bid| {
                         matches!(price_time_priority_ordering(&order, bid), Less | Equal)
                     })
-                    .unwrap_or_else(|| self.asks.len());
+                    .unwrap_or(self.asks.len());
                 trace!("insert ask {order} at idx {idx}, asks: {:?}", self.asks);
                 self.asks.insert(idx, order)
             }
