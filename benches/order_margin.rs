@@ -1,4 +1,4 @@
-//! Benchmark regarding checking of active limit orders.
+//! Benchmark regarding `OrderMargin`
 
 use std::{hint::black_box, num::NonZeroUsize};
 

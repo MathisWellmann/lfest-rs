@@ -57,6 +57,9 @@ procs:
   cargo-bench_OrderMargin/order_margin_short:
     shell: "cargo bench OrderMargin/order_margin_short"
     autostart: false
+  cargo-bench_OrderBook/try_insert:
+    shell: "cargo bench OrderBook/try_insert"
+    autostart: false
 
 
   # Formatting
