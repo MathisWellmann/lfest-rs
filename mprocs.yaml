@@ -20,30 +20,43 @@ procs:
   # Benchmarking
   cargo-bench_Position:
     shell: "cargo bench Position"
+    autostart: false
   cargo-bench_SmartCandle:
     shell: "cargo bench SmartCandle"
+    autostart: false
   cargo-bench_decimal_comparison:
     shell: "cargo bench decimal_comparison"
+    autostart: false
   cargo-bench_submit_limit_order:
     shell: "cargo bench Exchange/submit_limit_order"
+    autostart: false
   cargo-bench_check_active_orders:
     shell: "cargo bench Exchange/check_active_orders"
+    autostart: false
   cargo-bench_update_state:
     shell: "cargo bench Exchange/update_state"
+    autostart: false
   cargo-bench_submit_market_order:
     shell: "cargo bench Exchange/submit_market_order"
+    autostart: false
   cargo-bench_OrderMargin/insert:
     shell: "cargo bench OrderMargin/insert"
+    autostart: false
   cargo-bench_OrderMargin/fill_order:
     shell: "cargo bench OrderMargin/fill_order"
+    autostart: false
   cargo-bench_OrderMargin/remove:
     shell: "cargo bench OrderMargin/remove"
+    autostart: false
   cargo-bench_OrderMargin/order_margin_neutral:
     shell: "cargo bench OrderMargin/order_margin_neutral"
+    autostart: false
   cargo-bench_OrderMargin/order_margin_long:
     shell: "cargo bench OrderMargin/order_margin_long"
+    autostart: false
   cargo-bench_OrderMargin/order_margin_short:
     shell: "cargo bench OrderMargin/order_margin_short"
+    autostart: false
 
 
   # Formatting
@@ -59,13 +72,15 @@ procs:
   # Mutation testing
   cargo-mutants:
     shell: "cargo mutants"
+    autostart: false
 
   # Security
   cargo-audit:
     shell: "cargo audit"
   # Undefined behaviour checking
   cargo-miri:
-    shell: "MIRIFLAGS=-Zmiri-disable-isolation cargo miri nextest run -j 20"
+    shell: "MIRIFLAGS=-Zmiri-disable-isolation cargo miri nextest run -j 4"
+    autostart: false
 
   # Semantic version check
   semver-checks:
