@@ -86,7 +86,7 @@ where
             let filled_qty = min(self.quantity, order.remaining_quantity());
             self.quantity -= filled_qty;
             debug_assert!(self.quantity >= Zero::zero());
-            Some((filled_qty, self.quantity == Zero::zero()))
+            Some((filled_qty, self.quantity <= Zero::zero()))
         } else {
             None
         }
