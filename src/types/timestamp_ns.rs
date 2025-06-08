@@ -19,6 +19,12 @@ impl TimestampNs {
     pub fn floor_to_nearest_second(self) -> Self {
         (self.0 - self.0 % NANOS_PER_SECOND).into()
     }
+
+    /// Get the inner value
+    #[inline(always)]
+    pub fn get(&self) -> i64 {
+        self.0
+    }
 }
 
 impl From<i64> for TimestampNs {
@@ -38,13 +44,6 @@ impl From<TimestampNs> for i64 {
 impl Display for TimestampNs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
-    }
-}
-
-impl AsRef<i64> for TimestampNs {
-    #[inline(always)]
-    fn as_ref(&self) -> &i64 {
-        &self.0
     }
 }
 

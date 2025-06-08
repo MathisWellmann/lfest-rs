@@ -10,6 +10,7 @@ use crate::{
     utils::min,
 };
 
+// TODO: use `Getters`
 /// A taker trade that consumes liquidity in the book.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Trade<I, const D: u8, BaseOrQuote>

@@ -9,7 +9,7 @@ where
 {
     #[inline(always)]
     fn timestamp(&self) -> i64 {
-        *self.timestamp_exchange_ns.as_ref()
+        self.timestamp_exchange_ns.get()
     }
 
     #[inline(always)]
@@ -34,7 +34,7 @@ where
     #[inline]
     fn into(self) -> trade_aggregation::Trade {
         trade_aggregation::Trade {
-            timestamp: *self.timestamp_exchange_ns.as_ref(),
+            timestamp: self.timestamp_exchange_ns.get(),
             price: self.price.into(),
             size: <Trade<I, D, BaseOrQuote> as TakerTrade>::size(&self),
         }
