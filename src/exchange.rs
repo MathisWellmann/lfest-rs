@@ -6,6 +6,7 @@ use num_traits::Zero;
 use tracing::{debug, info, trace, warn};
 
 use crate::{
+    EXPECT_CAPACITY,
     config::Config,
     market_state::MarketState,
     order_margin::OrderMargin,
@@ -200,7 +201,7 @@ where
         };
         self.submit_market_order(order)
             .expect("Must be able to submit liquidation order");
-        info!("balances after liquidation: {:?}", self.balances());
+        info!("balances after liquidation: {}", self.balances());
     }
 
     /// Submit a new `MarketOrder` to the exchange.
@@ -562,7 +563,9 @@ where
             self.order_margin
                 .fill_order(order, &mut self.balances, &self.position, init_margin_req)
         }
-        self.limit_order_updates.push(limit_order_update);
+        self.limit_order_updates
+            .push_within_capacity(limit_order_update)
+            .expect(EXPECT_CAPACITY);
 
         self.position.change(
             filled_qty,

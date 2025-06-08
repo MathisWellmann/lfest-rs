@@ -1,0 +1,6 @@
+disallowed-methods = [
+  # Call `Vec::push_within_capacity` instead as it avoid the footgun of allocations in hot-paths.
+  "std::vec::Vec::push",
+  # Call `Vec::with_capacity` instead, to avoid re-allocations down the line
+  "std::vec::Vec::new"
+]

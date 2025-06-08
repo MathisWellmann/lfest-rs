@@ -19,6 +19,7 @@ unsafe_code = "deny"
 
 [lints.clippy]
 all = "deny"
+disallowed_methods = "deny"
 
 [dependencies]
 tracing = { version = "0.1", features = ["release_max_level_info"] }

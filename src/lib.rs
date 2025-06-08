@@ -1,4 +1,5 @@
 #![doc = include_str!("../README.md")]
+#![feature(vec_push_within_capacity)]
 
 //! lfest - leveraged futures exchange for simulated trading
 
@@ -29,6 +30,8 @@ mod utils;
 pub use load_trades_from_csv::load_trades_from_csv;
 pub use mock_exchange::*;
 pub use types::Result;
+
+pub const EXPECT_CAPACITY: &str = "There is enough capacity";
 
 /// Exports common types
 pub mod prelude {
