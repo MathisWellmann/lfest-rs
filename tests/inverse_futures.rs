@@ -324,7 +324,7 @@ fn inv_short_market_loss_full() {
             ask,
             timestamp_exchange_ns: 2.into()
         }),
-        Err(Error::RiskError(RiskError::Liquidate))
+        Err(RiskError::Liquidate)
     );
     let liq_fee = BaseCurrency::convert_from(qty, ask) * *test_fee_taker().as_ref();
 
@@ -694,7 +694,7 @@ fn inv_short_market_loss_partial() {
             ask,
             timestamp_exchange_ns: 2.into()
         }),
-        Err(Error::RiskError(RiskError::Liquidate))
+        Err(RiskError::Liquidate)
     );
     let liq_fee = BaseCurrency::convert_from(qty, ask) * *test_fee_taker().as_ref();
     assert_eq!(exchange.position(), &Position::Neutral);

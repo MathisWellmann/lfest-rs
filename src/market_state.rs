@@ -3,7 +3,7 @@ use getset::{CopyGetters, Getters, Setters};
 
 use crate::{
     prelude::{Currency, MarketUpdate, Mon, PriceFilter, QuoteCurrency},
-    types::{Result, TimestampNs},
+    types::TimestampNs,
 };
 
 /// Some information regarding the state of the market.
@@ -60,8 +60,7 @@ where
         &mut self,
         market_update: &U,
         price_filter: &PriceFilter<I, D>,
-    ) -> Result<()>
-    where
+    ) where
         U: MarketUpdate<I, D, BaseOrQuote>,
         BaseOrQuote: Currency<I, D>,
     {
@@ -71,8 +70,6 @@ where
 
         self.current_ts_ns = market_update.timestamp_exchange_ns();
         self.step += 1;
-
-        Ok(())
     }
 
     /// Get the mid price
@@ -124,16 +121,14 @@ mod test {
     fn market_state_mid_price() {
         let mut state = MarketState::<i64, 1>::default();
         let pf = PriceFilter::default();
-        state
-            .update_state::<_, BaseCurrency<_, 1>>(
-                &Bba {
-                    bid: QuoteCurrency::<i64, 1>::new(100, 0),
-                    ask: QuoteCurrency::new(101, 0),
-                    timestamp_exchange_ns: 1.into(),
-                },
-                &pf,
-            )
-            .unwrap();
+        state.update_state::<_, BaseCurrency<_, 1>>(
+            &Bba {
+                bid: QuoteCurrency::<i64, 1>::new(100, 0),
+                ask: QuoteCurrency::new(101, 0),
+                timestamp_exchange_ns: 1.into(),
+            },
+            &pf,
+        );
         assert_eq!(state.mid_price(), QuoteCurrency::new(1005, 1));
     }
 }

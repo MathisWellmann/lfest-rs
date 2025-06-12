@@ -17,7 +17,7 @@ use crate::{
     risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
     types::{
         Balances, Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderFill, MarginCurrency,
-        MarketOrder, NewOrder, OrderId, Pending, Result, Side, TimestampNs, UserOrderId,
+        MarketOrder, NewOrder, OrderId, Pending, Result, RiskError, Side, TimestampNs, UserOrderId,
     },
 };
 
@@ -151,14 +151,14 @@ where
     pub fn update_state<U>(
         &mut self,
         market_update: &U,
-    ) -> Result<&Vec<LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT>>>
+    ) -> std::result::Result<&Vec<LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT>>, RiskError>
     where
         U: MarketUpdate<I, D, BaseOrQuote>,
     {
         trace!("update_state: market_update: {market_update}");
 
         self.market_state
-            .update_state(market_update, self.config.contract_spec().price_filter())?;
+            .update_state(market_update, self.config.contract_spec().price_filter());
 
         if let Err(e) = <IsolatedMarginRiskEngine<I, D, BaseOrQuote> as RiskEngine<
             I,
@@ -169,7 +169,7 @@ where
             &self.risk_engine, &self.market_state, &self.position
         ) {
             self.liquidate();
-            return Err(e.into());
+            return Err(e);
         };
 
         self.check_active_orders(market_update.clone());
