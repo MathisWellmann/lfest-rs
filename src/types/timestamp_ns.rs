@@ -6,7 +6,21 @@ pub(crate) const NANOS_PER_SECOND: i64 = 1_000_000_000;
 
 /// The type of a timestamp that is measured in nanoseconds.
 #[derive(
-    Default, Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Add, Sub, Div, AddAssign, Mul,
+    Default,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    Eq,
+    Add,
+    Sub,
+    Div,
+    AddAssign,
+    Mul,
+    Serialize,
+    Deserialize,
 )]
 #[div(forward)]
 #[mul(forward)]
