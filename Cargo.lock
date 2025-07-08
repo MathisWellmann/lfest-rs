@@ -788,7 +788,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lfest"
-version = "0.123.0"
+version = "0.123.1"
 dependencies = [
  "assert2",
  "const-decimal",
@@ -1731,9 +1731,9 @@ dependencies = [
 
 [[package]]
 name = "trade_aggregation"
-version = "12.0.3"
+version = "13.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "712b205c73928643ca29e27a32cd3f1467d4b9da67370308e75ea6b719609580"
+checksum = "6cd2d69564f457199ebd72fda4dde9763373104574aa922cb7b806d882ca22d8"
 dependencies = [
  "csv",
  "thiserror 1.0.69",

@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.123.0"
+version = "0.123.1"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2024"
 license-file = "LICENSE"
@@ -39,7 +39,7 @@ num = "0.4"
 glidesort = "0.1"
 csv = "1"
 
-trade_aggregation = { version = "12", optional = true }
+trade_aggregation = { version = "13", optional = true }
 
 [dev-dependencies]
 rand = "0.9"
@@ -53,7 +53,6 @@ fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs"
   "serde-as-str",
   "num-traits",
 ] }
-trade_aggregation = "12"
 proptest = "1.6"
 num_cpus = "1"
 
