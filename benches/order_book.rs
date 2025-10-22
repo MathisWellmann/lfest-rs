@@ -1,5 +1,11 @@
 //! Benchmark regarding order book implementation.
 
+#![allow(
+    unused_crate_dependencies,
+    missing_docs,
+    reason = "Benchmarks don't use all dev-dependencies"
+)]
+
 use std::{
     hint::black_box,
     num::NonZeroUsize,
@@ -27,7 +33,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         group.throughput(Throughput::Elements(n));
         group.bench_with_input(BenchmarkId::new("try_insert", n), &n, |b, _| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
                 let order = LimitOrder::new(
                     Side::Buy,
                     QuoteCurrency::<i64, 5>::new(rng.random_range(50..200), 0),

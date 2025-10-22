@@ -43,8 +43,8 @@ mod tests {
 
     #[test]
     fn size_of_fee() {
-        assert_eq!(std::mem::size_of::<Fee<i32, 5, Maker>>(), 4);
-        assert_eq!(std::mem::size_of::<Fee<i32, 5, Taker>>(), 4);
-        assert_eq!(std::mem::size_of::<Fee<i64, 5, Maker>>(), 8);
+        assert_eq!(size_of::<Fee<i32, 5, Maker>>(), 4);
+        assert_eq!(size_of::<Fee<i32, 5, Taker>>(), 4);
+        assert_eq!(size_of::<Fee<i64, 5, Maker>>(), 8);
     }
 }

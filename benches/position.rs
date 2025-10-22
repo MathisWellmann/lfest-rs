@@ -1,5 +1,11 @@
 //! Benchmark regarding checking of active limit orders.
 
+#![allow(
+    unused_crate_dependencies,
+    missing_docs,
+    reason = "Benchmarks don't use all dev-dependencies"
+)]
+
 use std::hint::black_box;
 
 use const_decimal::Decimal;

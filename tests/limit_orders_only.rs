@@ -1,5 +1,10 @@
 //! Test if a pure limit order strategy works correctly
 
+#![allow(
+    unused_crate_dependencies,
+    reason = "Integration tests don't use all dev dependencies"
+)]
+
 use lfest::{
     mock_exchange_linear,
     mock_exchange_linear_with_account_tracker,

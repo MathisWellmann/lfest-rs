@@ -39,7 +39,7 @@ pub trait Currency<I, const D: u8>:
     + Default
     + std::fmt::Debug
     + std::fmt::Display
-    + std::cmp::PartialOrd
+    + PartialOrd
     + Eq
     + Ord
     + std::ops::AddAssign

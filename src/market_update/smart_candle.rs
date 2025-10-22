@@ -202,10 +202,7 @@ where
     }
 
     #[inline(always)]
-    fn validate_market_update(
-        &self,
-        _price_filter: &crate::prelude::PriceFilter<I, D>,
-    ) -> crate::Result<()> {
+    fn validate_market_update(&self, _price_filter: &PriceFilter<I, D>) -> crate::Result<()> {
         // The constructor checks the validity when debug assertions are enabled.
         Ok(())
     }
@@ -218,7 +215,7 @@ where
     }
 
     #[inline(always)]
-    fn timestamp_exchange_ns(&self) -> crate::prelude::TimestampNs {
+    fn timestamp_exchange_ns(&self) -> TimestampNs {
         self.last_timestamp_exchange_ns
     }
 
@@ -630,13 +627,7 @@ mod tests {
 
     #[test]
     fn size_of_smart_candle() {
-        assert_eq!(
-            std::mem::size_of::<SmartCandle<i64, 4, BaseCurrency<i64, 4>>>(),
-            96
-        );
-        assert_eq!(
-            std::mem::size_of::<SmartCandle<i32, 4, BaseCurrency<i32, 4>>>(),
-            80
-        );
+        assert_eq!(size_of::<SmartCandle<i64, 4, BaseCurrency<i64, 4>>>(), 96);
+        assert_eq!(size_of::<SmartCandle<i32, 4, BaseCurrency<i32, 4>>>(), 80);
     }
 }

@@ -277,14 +277,8 @@ mod tests {
 
     #[test]
     fn size_of_position() {
-        assert_eq!(
-            std::mem::size_of::<Position<i64, 5, BaseCurrency<_, 5>>>(),
-            24
-        );
-        assert_eq!(
-            std::mem::size_of::<Position<i32, 4, BaseCurrency<_, 4>>>(),
-            12
-        );
+        assert_eq!(size_of::<Position<i64, 5, BaseCurrency<_, 5>>>(), 24);
+        assert_eq!(size_of::<Position<i32, 4, BaseCurrency<_, 4>>>(), 12);
     }
 
     proptest! {

@@ -1,5 +1,10 @@
 //! Test file for the linear futures mode of the exchange
 
+#![allow(
+    unused_crate_dependencies,
+    reason = "Integration tests don't use all dev dependencies"
+)]
+
 use lfest::{
     mock_exchange_linear_with_account_tracker,
     prelude::*,

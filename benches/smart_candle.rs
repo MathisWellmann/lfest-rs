@@ -1,5 +1,11 @@
 //! Benchmark the `SmartCandle`
 
+#![allow(
+    unused_crate_dependencies,
+    missing_docs,
+    reason = "Benchmarks don't use all dev-dependencies"
+)]
+
 use std::num::NonZeroUsize;
 
 use const_decimal::Decimal;

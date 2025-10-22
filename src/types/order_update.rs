@@ -39,7 +39,7 @@ where
     },
 }
 
-impl<I, const D: u8, BaseOrQuote, UserOrderIdT> std::fmt::Display
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Display
     for LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D> + Display,
@@ -79,19 +79,19 @@ mod test {
     #[test]
     fn limit_order_fill_size() {
         assert_eq!(
-            std::mem::size_of::<LimitOrderFill<i32, 5, BaseCurrency<i32, 5>, NoUserOrderId>>(),
+            size_of::<LimitOrderFill<i32, 5, BaseCurrency<i32, 5>, NoUserOrderId>>(),
             64
         );
         assert_eq!(
-            std::mem::size_of::<LimitOrderFill<i64, 5, BaseCurrency<i64, 5>, NoUserOrderId>>(),
+            size_of::<LimitOrderFill<i64, 5, BaseCurrency<i64, 5>, NoUserOrderId>>(),
             88
         );
         assert_eq!(
-            std::mem::size_of::<LimitOrderFill<i32, 5, BaseCurrency<i32, 5>, i64>>(),
+            size_of::<LimitOrderFill<i32, 5, BaseCurrency<i32, 5>, i64>>(),
             72
         );
         assert_eq!(
-            std::mem::size_of::<LimitOrderFill<i64, 5, BaseCurrency<i64, 5>, i64>>(),
+            size_of::<LimitOrderFill<i64, 5, BaseCurrency<i64, 5>, i64>>(),
             96
         );
     }

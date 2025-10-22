@@ -54,8 +54,8 @@ mod tests {
 
     #[test]
     fn size_of_leverage() {
-        assert_eq!(std::mem::size_of::<Leverage<i32, 0>>(), 4);
-        assert_eq!(std::mem::size_of::<Leverage<i64, 0>>(), 8);
+        assert_eq!(size_of::<Leverage<i32, 0>>(), 4);
+        assert_eq!(size_of::<Leverage<i64, 0>>(), 8);
     }
 
     #[test]

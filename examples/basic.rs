@@ -1,6 +1,11 @@
 //! Example usage of Exchange using external trade data.
 //! A randomly acting agent places market buy / sell orders every 100 candles
 
+#![allow(
+    unused_crate_dependencies,
+    reason = "Examples don't use all dep dependencies"
+)]
+
 use std::{
     num::NonZeroUsize,
     time::Instant,

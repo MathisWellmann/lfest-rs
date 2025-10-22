@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn size_of_price_filter() {
-        assert_eq!(std::mem::size_of::<PriceFilter<i64, 5>>(), 56);
+        assert_eq!(size_of::<PriceFilter<i64, 5>>(), 56);
     }
 
     #[test]

@@ -119,8 +119,8 @@ mod tests {
 
     #[test]
     fn size_of_bba() {
-        assert_eq!(std::mem::size_of::<Bba<i32, 4>>(), 16);
-        assert_eq!(std::mem::size_of::<Bba<i64, 4>>(), 24);
+        assert_eq!(size_of::<Bba<i32, 4>>(), 16);
+        assert_eq!(size_of::<Bba<i64, 4>>(), 24);
     }
 
     #[test]

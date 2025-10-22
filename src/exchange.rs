@@ -162,7 +162,7 @@ where
     }
 
     /// Get information about the `Account`
-    pub fn account(&self) -> Account<I, D, BaseOrQuote, UserOrderIdT> {
+    pub fn account(&self) -> Account<'_, I, D, BaseOrQuote, UserOrderIdT> {
         Account {
             active_limit_orders: self.active_limit_orders(),
             position: &self.position,

@@ -12,14 +12,105 @@ categories = ["finance", "simulation"]
 exclude = ["/img", "/data", "/.idea", "/vendor", "/.direnv"]
 
 [lints.rust]
-missing_docs = "warn"
+# checks for cases that are confusing between a negative literal and a negation that's not part of the literal.
+# E.g.: denies this: `-1i32.abs();` // equals -1, while `(-1i32).abs()` equals 1
+ambiguous_negative_literals = "deny"
+# closure returning async block can be made into an async closure
+# Using an async closure is preferable over a closure that returns an async block, since async closures are less restrictive in how its captures are allowed to be used.
+# E.g.:
+# - let c = |x: &str| async {};
+# + let c = async |x: &str| {};
+closure_returning_async_block = "deny"
+# Not that someone would use precise capturing anyways.
+# e.g.: unnessesary `use<...>` here:
+# `fn test<'a>(x: &'a i32) -> impl Sized + use<'a> { x }`
+impl_trait_redundant_captures = "deny"
+# The macro_use attribute on an extern crate item
+# causes macros in that external crate to be brought into the prelude of the crate,
+# making the macros in scope everywhere.
+# To bring macros from extern crates into scope,
+# it is recommended to use a use import.
+# E.g.:
+# `use tracing::info`.
+macro_use_extern_crate = "deny"
+# detects non-ASCII identifiers like `let föö = 1;` and denies them.
+non_ascii_idents = "deny"
+# Trivial casts should be removed. E.g.: `let v = 10_f64 as f64;`
+trivial_numeric_casts = "deny"
+# detects cases where bindings are useless because they have the unit type () as their inferred type
+# Creating a local binding with the unit type () does not do much and can be a sign of a user error,
+# E.g.:
+# fn main() {
+#     let mut x = [1, 2, 3];
+#     x[0] = 5;
+#     let y = x.sort(); // useless binding as `sort` returns `()` and not the sorted array.
+#     println!("{:?}", y); // prints "()"
+# }
+unit_bindings = "deny"
+unused_lifetimes = "deny"
 unused_imports = "deny"
-dead_code = "deny"
-unsafe_code = "deny"
+unused_crate_dependencies = "deny"
+unused_must_use = "deny"
+unused_assignments = "deny"
+# E.g:
+# let x = 1;
+# let _b = --x;
+# Could be missinterpreted as a decrement operator which exists in other languages.
+double_negations = "deny"
+# Who would even drop copy types?
+dropping_copy_types = "deny"
+# checks for calls to std::mem::drop with a reference instead of an owned value., which does nothing.
+dropping_references = "deny"
+# Detects private dependencies that are exposed in a public interface.
+exported_private_dependencies = "deny"
+# For loops over `Option` or `Result` are better expressed with `if let Some(val) = opt_val` or similar.
+for_loops_over_fallibles = "deny"
+# let x: i32 = 42; // i32 implements Copy
+# std::mem::forget(x); // A copy of x is passed to the function, leaving the original unaffected
+forgetting_copy_types = "deny"
+irrefutable_let_patterns = "deny"
+# E.g.:
+# struct Foo;
+# let foo = &Foo;
+# let clone: &Foo = foo.clone();
+# For instance, Clone is implemented on all &T, but calling clone on a &T where T does not implement clone, actually doesn't do anything as references are copy
+noop_method_call = "deny"
+# This lint could produce:
+# warning: multiple patterns overlap on their endpoints
+#  --> lint_example.rs:5:5
+#   |
+# 4 |     0..=100 => { println!("small"); }
+#   |     ------- this range overlaps on `100_u8`...
+# 5 |     100..=255 => { println!("large"); }
+#   |     ^^^^^^^^^ ... with this range
+#   |
+#   = note: you likely meant to write mutually exclusive ranges
+overlapping_range_endpoints = "deny"
+redundant_semicolons = "deny"
+special_module_name = "deny"
+unused_allocation = "deny"
 
-[lints.clippy]
-all = "deny"
-disallowed_methods = "deny"
+# triggers for pub items not reachable from other crates -
+# that means neither directly accessible, nor reexported (with pub use),
+# nor leaked through things like return types.
+# The intent can only be satisfied, however, if all items which contain this item are also publicly accessible.
+# Thus, this lint serves to identify situations where the intent does not match the reality.
+# If you wish the item to be accessible elsewhere within the crate, but not outside it, the pub(crate) visibility is recommended to be used instead.
+# This more clearly expresses the intent that the item is only visible within its own crate.
+# This makes it easier to spot unused code as well.
+unreachable_pub = "warn"
+unused_variables = "warn"
+dead_code = "warn"
+# Deprecated function calls should be replaced by the new function as soon as possible.
+# Sometimes its just a hassle with large overhead, so it's just `warn`
+deprecated = "warn"
+# This won't be an issue because `cargo fmt` already formats it this way.
+unused_import_braces = "warn"
+# Pendantic AF, so just a warning
+unused_qualifications = "warn"
+redundant_lifetimes = "warn"
+missing_docs = "warn"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)'] }
 
 [dependencies]
 tracing = { version = "0.1", features = ["release_max_level_info"] }
@@ -44,10 +135,8 @@ trade_aggregation = { version = "13", optional = true }
 
 [dev-dependencies]
 rand = "0.9"
-rand_distr = "0.5"
 test-case = "3"
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
-ron = "0.11"
 criterion = { version = "0.7", features = ["html_reports"] }
 # fpdec = { version = "0.10", features = ["serde-as-str", "num-traits"] }
 fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs", rev = "40cf802", features = [
@@ -55,7 +144,6 @@ fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs"
   "num-traits",
 ] }
 proptest = "1.6"
-num_cpus = "1"
 
 [features]
 trade_aggregation = ["dep:trade_aggregation"]

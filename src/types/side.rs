@@ -1,5 +1,10 @@
 use std::fmt::Formatter;
 
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 /// Side of the order
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Side {

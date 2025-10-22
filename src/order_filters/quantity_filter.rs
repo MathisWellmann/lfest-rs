@@ -78,10 +78,7 @@ where
         })
     }
 
-    pub(crate) fn validate_order_quantity(
-        &self,
-        quantity: BaseOrQuote,
-    ) -> std::result::Result<(), OrderError> {
+    pub(crate) fn validate_order_quantity(&self, quantity: BaseOrQuote) -> Result<(), OrderError> {
         if quantity == BaseOrQuote::zero() {
             return Err(OrderError::QuantityTooLow);
         }
@@ -173,7 +170,7 @@ mod tests {
     #[test]
     fn size_of_quantity_filter() {
         assert_eq!(
-            std::mem::size_of::<QuantityFilter<i64, 5, BaseCurrency<i64, 5>>>(),
+            size_of::<QuantityFilter<i64, 5, BaseCurrency<i64, 5>>>(),
             40
         );
     }

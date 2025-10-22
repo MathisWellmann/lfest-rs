@@ -1,5 +1,10 @@
 //! Test file for the inverse futures mode of the exchange
 
+#![allow(
+    unused_crate_dependencies,
+    reason = "Integration tests don't use all dev dependencies"
+)]
+
 use lfest::{
     mock_exchange_inverse,
     prelude::*,

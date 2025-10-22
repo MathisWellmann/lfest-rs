@@ -1,5 +1,11 @@
 //! Benchmark the submission of limit orders.
 
+#![allow(
+    unused_crate_dependencies,
+    missing_docs,
+    reason = "Benchmarks don't use all dev-dependencies"
+)]
+
 use std::{
     hint::black_box,
     num::NonZeroUsize,

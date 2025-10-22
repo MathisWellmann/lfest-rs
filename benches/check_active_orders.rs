@@ -1,5 +1,11 @@
 //! Benchmark regarding checking of active limit orders.
 
+#![allow(
+    unused_crate_dependencies,
+    missing_docs,
+    reason = "Benchmarks don't use all dev-dependencies"
+)]
+
 use std::{
     hint::black_box,
     num::NonZeroUsize,
@@ -79,7 +85,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     exchange
                 },
                 |mut exchange| {
-                    let _ = black_box(exchange.check_active_orders(black_box(trade)));
+                    black_box(exchange.check_active_orders(black_box(trade)));
                 },
             )
         });

@@ -3,9 +3,6 @@
 
 //! lfest - leveraged futures exchange for simulated trading
 
-#[macro_use]
-extern crate serde;
-
 mod active_limit_orders;
 mod config;
 mod contract_specification;
@@ -31,6 +28,7 @@ pub use load_trades_from_csv::load_trades_from_csv;
 pub use mock_exchange::*;
 pub use types::Result;
 
+/// Expect message when pushing to a vector should not exceed its capacity.
 pub const EXPECT_CAPACITY: &str = "There is enough capacity";
 
 /// Exports common types

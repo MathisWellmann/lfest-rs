@@ -292,13 +292,6 @@ mod tests {
     };
 
     #[test]
-    fn size_of_optional_reference() {
-        // 64 bit system
-        assert_eq!(std::mem::size_of::<&i32>(), 8);
-        assert_eq!(std::mem::size_of::<Option<&i32>>(), 8);
-    }
-
-    #[test]
     #[tracing_test::traced_test]
     fn active_limit_orders_insert() {
         let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(

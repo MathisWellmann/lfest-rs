@@ -7,6 +7,10 @@ use derive_more::{
     Mul,
     Sub,
 };
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 pub(crate) const NANOS_PER_SECOND: i64 = 1_000_000_000;
 

@@ -386,13 +386,7 @@ mod tests {
 
     #[test]
     fn size_of_trade() {
-        assert_eq!(
-            std::mem::size_of::<Trade<i32, 2, BaseCurrency<i32, 2>>>(),
-            24
-        );
-        assert_eq!(
-            std::mem::size_of::<Trade<i64, 2, BaseCurrency<i64, 2>>>(),
-            32
-        );
+        assert_eq!(size_of::<Trade<i32, 2, BaseCurrency<i32, 2>>>(), 24);
+        assert_eq!(size_of::<Trade<i64, 2, BaseCurrency<i64, 2>>>(), 32);
     }
 }

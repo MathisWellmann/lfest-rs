@@ -56,7 +56,7 @@ where
                 Greater => Greater,
             }
         }
-        Greater => Ordering::Greater,
+        Greater => Greater,
     }
 }
 

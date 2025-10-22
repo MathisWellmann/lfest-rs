@@ -1,4 +1,8 @@
 use getset::CopyGetters;
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use super::{
     ConfigError,

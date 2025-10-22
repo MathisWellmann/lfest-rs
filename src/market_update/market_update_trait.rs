@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// If `true`, the `MarketUpdate` can no longer fill limit orders.
-pub type Exhausted = bool;
+pub(crate) type Exhausted = bool;
 
 /// The interface of what a market update must be able to do.
 pub trait MarketUpdate<I, const D: u8, BaseOrQuote>:
