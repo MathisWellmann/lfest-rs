@@ -1,15 +1,38 @@
 use std::num::NonZeroUsize;
 
 use const_decimal::Decimal;
-use getset::{CopyGetters, Getters, MutGetters};
-use num_traits::{One, Zero};
-use tracing::{debug, trace};
+use getset::{
+    CopyGetters,
+    Getters,
+    MutGetters,
+};
+use num_traits::{
+    One,
+    Zero,
+};
+use tracing::{
+    debug,
+    trace,
+};
 
 use crate::{
     Result,
     exchange::CancelBy,
-    prelude::{ActiveLimitOrders, Currency, Mon, Position},
-    types::{Balances, Error, LimitOrder, MarginCurrency, Pending, Side, UserOrderId},
+    prelude::{
+        ActiveLimitOrders,
+        Currency,
+        Mon,
+        Position,
+    },
+    types::{
+        Balances,
+        Error,
+        LimitOrder,
+        MarginCurrency,
+        Pending,
+        Side,
+        UserOrderId,
+    },
     utils::max,
 };
 
@@ -214,7 +237,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DECIMALS, prelude::*, test_fee_maker};
+    use crate::{
+        DECIMALS,
+        prelude::*,
+        test_fee_maker,
+    };
 
     #[test]
     fn order_margin_assert_limit_order_reduces_qty() {

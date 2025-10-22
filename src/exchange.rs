@@ -1,9 +1,17 @@
 use std::cmp::Ordering;
 
 use assert2::assert;
-use getset::{Getters, MutGetters};
+use getset::{
+    Getters,
+    MutGetters,
+};
 use num_traits::Zero;
-use tracing::{debug, info, trace, warn};
+use tracing::{
+    debug,
+    info,
+    trace,
+    warn,
+};
 
 use crate::{
     EXPECT_CAPACITY,
@@ -12,13 +20,36 @@ use crate::{
     order_margin::OrderMargin,
     order_rate_limiter::OrderRateLimiter,
     prelude::{
-        ActiveLimitOrders, Currency, MarketUpdate, Mon, OrderError, Position, QuoteCurrency,
+        ActiveLimitOrders,
+        Currency,
+        MarketUpdate,
+        Mon,
+        OrderError,
+        Position,
+        QuoteCurrency,
         RePricing,
     },
-    risk_engine::{IsolatedMarginRiskEngine, RiskEngine},
+    risk_engine::{
+        IsolatedMarginRiskEngine,
+        RiskEngine,
+    },
     types::{
-        Balances, Error, ExchangeOrderMeta, Filled, LimitOrder, LimitOrderFill, MarginCurrency,
-        MarketOrder, NewOrder, OrderId, Pending, Result, RiskError, Side, TimestampNs, UserOrderId,
+        Balances,
+        Error,
+        ExchangeOrderMeta,
+        Filled,
+        LimitOrder,
+        LimitOrderFill,
+        MarginCurrency,
+        MarketOrder,
+        NewOrder,
+        OrderId,
+        Pending,
+        Result,
+        RiskError,
+        Side,
+        TimestampNs,
+        UserOrderId,
     },
 };
 

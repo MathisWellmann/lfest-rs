@@ -1,4 +1,7 @@
-use std::{cmp::Ordering, ops::Neg};
+use std::{
+    cmp::Ordering,
+    ops::Neg,
+};
 
 use const_decimal::Decimal;
 use num::One;
@@ -7,8 +10,16 @@ use tracing::debug;
 
 use crate::{
     position_inner::PositionInner,
-    prelude::{Currency, Mon, QuoteCurrency},
-    types::{Balances, MarginCurrency, Side},
+    prelude::{
+        Currency,
+        Mon,
+        QuoteCurrency,
+    },
+    types::{
+        Balances,
+        MarginCurrency,
+        Side,
+    },
 };
 
 /// A futures position can be one of three variants.

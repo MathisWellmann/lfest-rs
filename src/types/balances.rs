@@ -4,7 +4,10 @@ use getset::CopyGetters;
 use tracing::trace;
 use typed_builder::TypedBuilder;
 
-use super::{MarginCurrency, Mon};
+use super::{
+    MarginCurrency,
+    Mon,
+};
 
 /// Contains user balances including margin amounts.
 #[derive(Debug, Clone, Eq, PartialEq, TypedBuilder, CopyGetters)]

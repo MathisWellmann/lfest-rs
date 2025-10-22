@@ -1,15 +1,33 @@
 use std::cmp::Ordering;
 
-use getset::{CopyGetters, Getters, Setters};
+use getset::{
+    CopyGetters,
+    Getters,
+    Setters,
+};
 use num_traits::Zero;
 
 use super::{
-    Currency, Filled, FilledQuantity, LimitOrderFill, MarginCurrency, Mon, OrderId, Pending,
-    QuoteCurrency, RePricing, TimestampNs, UserOrderId, order_meta::ExchangeOrderMeta,
+    Currency,
+    Filled,
+    FilledQuantity,
+    LimitOrderFill,
+    MarginCurrency,
+    Mon,
+    OrderId,
+    Pending,
+    QuoteCurrency,
+    RePricing,
+    TimestampNs,
+    UserOrderId,
+    order_meta::ExchangeOrderMeta,
     order_status::NewOrder,
 };
 use crate::{
-    types::{OrderError, Side},
+    types::{
+        OrderError,
+        Side,
+    },
     utils::NoUserOrderId,
 };
 
@@ -360,7 +378,12 @@ mod tests {
     use test_case::test_matrix;
 
     use super::*;
-    use crate::{DECIMALS, prelude::QuoteCurrency, test_fee_maker, types::BaseCurrency};
+    use crate::{
+        DECIMALS,
+        prelude::QuoteCurrency,
+        test_fee_maker,
+        types::BaseCurrency,
+    };
 
     #[test_matrix(
         [Side::Buy, Side::Sell],

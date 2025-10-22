@@ -1,6 +1,9 @@
 use getset::CopyGetters;
 
-use super::{OrderId, TimestampNs};
+use super::{
+    OrderId,
+    TimestampNs,
+};
 
 /// Additional data about the order filled in by the exchange.
 #[derive(Debug, Clone, PartialEq, Eq, CopyGetters)]

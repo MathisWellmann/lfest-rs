@@ -1,6 +1,11 @@
 use test_case::test_case;
 
-use crate::{DECIMALS, mock_exchange_linear, prelude::*, test_fee_maker};
+use crate::{
+    DECIMALS,
+    mock_exchange_linear,
+    prelude::*,
+    test_fee_maker,
+};
 
 #[tracing_test::traced_test]
 #[test_case(QuoteCurrency::new(100, 0), BaseCurrency::new(2, 0), Side::Buy, QuoteCurrency::new(99, 0); "With buy order")]

@@ -1,8 +1,21 @@
 use crate::{
     market_state::MarketState,
     order_margin::OrderMargin,
-    prelude::{Currency, Mon, Position, QuoteCurrency, RiskError},
-    types::{Balances, LimitOrder, MarginCurrency, MarketOrder, Pending, UserOrderId},
+    prelude::{
+        Currency,
+        Mon,
+        Position,
+        QuoteCurrency,
+        RiskError,
+    },
+    types::{
+        Balances,
+        LimitOrder,
+        MarginCurrency,
+        MarketOrder,
+        Pending,
+        UserOrderId,
+    },
 };
 
 pub(crate) trait RiskEngine<I, const D: u8, BaseOrQuote, UserOrderIdT>

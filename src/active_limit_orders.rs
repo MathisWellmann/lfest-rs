@@ -4,7 +4,15 @@ use getset::Getters;
 use tracing::trace;
 
 use crate::types::{
-    Currency, Error, LimitOrder, MarginCurrency, Mon, OrderId, Pending, Side, UserOrderId,
+    Currency,
+    Error,
+    LimitOrder,
+    MarginCurrency,
+    Mon,
+    OrderId,
+    Pending,
+    Side,
+    UserOrderId,
     price_time_priority_ordering,
 };
 
@@ -273,7 +281,11 @@ mod tests {
     use super::ActiveLimitOrders;
     use crate::{
         types::{
-            BaseCurrency, ExchangeOrderMeta, LimitOrder, QuoteCurrency, Side,
+            BaseCurrency,
+            ExchangeOrderMeta,
+            LimitOrder,
+            QuoteCurrency,
+            Side,
             price_time_priority_ordering,
         },
         utils::NoUserOrderId,

@@ -1,4 +1,9 @@
-use super::{ConfigError, FilterError, OrderError, RiskError};
+use super::{
+    ConfigError,
+    FilterError,
+    OrderError,
+    RiskError,
+};
 use crate::prelude::OrderId;
 
 /// Describes possible Errors that may occur when calling methods in this crate

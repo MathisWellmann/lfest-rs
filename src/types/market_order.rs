@@ -1,8 +1,20 @@
-use getset::{CopyGetters, Getters};
+use getset::{
+    CopyGetters,
+    Getters,
+};
 
 use super::{
-    Currency, ExchangeOrderMeta, Filled, Mon, OrderError, Pending, QuoteCurrency, Side,
-    TimestampNs, UserOrderId, order_status::NewOrder,
+    Currency,
+    ExchangeOrderMeta,
+    Filled,
+    Mon,
+    OrderError,
+    Pending,
+    QuoteCurrency,
+    Side,
+    TimestampNs,
+    UserOrderId,
+    order_status::NewOrder,
 };
 
 /// Defines an market order aka taker order.
@@ -157,7 +169,10 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{types::BaseCurrency, utils::NoUserOrderId};
+    use crate::{
+        types::BaseCurrency,
+        utils::NoUserOrderId,
+    };
 
     #[test_case::test_matrix([Side::Buy, Side::Sell])]
     fn market_order_new(side: Side) {

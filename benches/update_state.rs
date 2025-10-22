@@ -1,10 +1,21 @@
 //! Benchmark the `update_state` method of `Exchange` for `TradeEvent`
 //! TODO: rename this file to `update_state`
-use std::{hint::black_box, num::NonZeroUsize};
+use std::{
+    hint::black_box,
+    num::NonZeroUsize,
+};
 
 use const_decimal::Decimal;
-use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use lfest::{load_trades_from_csv, prelude::*};
+use criterion::{
+    BenchmarkId,
+    Criterion,
+    criterion_group,
+    criterion_main,
+};
+use lfest::{
+    load_trades_from_csv,
+    prelude::*,
+};
 
 const DECIMALS: u8 = 5;
 

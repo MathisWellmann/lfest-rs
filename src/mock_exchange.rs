@@ -4,7 +4,10 @@ use std::num::NonZeroUsize;
 
 use const_decimal::Decimal;
 
-use crate::{prelude::*, utils::NoUserOrderId};
+use crate::{
+    prelude::*,
+    utils::NoUserOrderId,
+};
 
 /// The constant decimal precision.
 pub const DECIMALS: u8 = 5;

@@ -3,7 +3,11 @@ use num::Zero;
 
 use crate::{
     prelude::Trade,
-    types::{Mon, QuoteCurrency, Side},
+    types::{
+        Mon,
+        QuoteCurrency,
+        Side,
+    },
 };
 
 const TIMESTAMP_COL: usize = 0;

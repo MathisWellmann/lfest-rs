@@ -1,4 +1,7 @@
-use crate::types::{Error, TimestampNs};
+use crate::types::{
+    Error,
+    TimestampNs,
+};
 
 /// Limits the rate at which limit orders can be submitted.
 /// Operates on buckets measured in seconds.

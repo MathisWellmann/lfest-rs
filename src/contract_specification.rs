@@ -1,11 +1,29 @@
 use const_decimal::Decimal;
-use getset::{CopyGetters, Getters, Setters};
-use num_traits::{One, Zero};
+use getset::{
+    CopyGetters,
+    Getters,
+    Setters,
+};
+use num_traits::{
+    One,
+    Zero,
+};
 
 use crate::{
     leverage,
-    prelude::{ConfigError, Currency, Maker, Mon, PriceFilter, QuantityFilter, Taker},
-    types::{Fee, Leverage},
+    prelude::{
+        ConfigError,
+        Currency,
+        Maker,
+        Mon,
+        PriceFilter,
+        QuantityFilter,
+        Taker,
+    },
+    types::{
+        Fee,
+        Leverage,
+    },
 };
 
 /// Specifies the details of the futures contract

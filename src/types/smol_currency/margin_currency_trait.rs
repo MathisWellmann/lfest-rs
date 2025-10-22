@@ -1,4 +1,8 @@
-use super::{Currency, Mon, QuoteCurrency};
+use super::{
+    Currency,
+    Mon,
+    QuoteCurrency,
+};
 
 /// Each Currency that is used as margin has to implement this trait.
 /// The margin currency of an account defines which type of futures contract is

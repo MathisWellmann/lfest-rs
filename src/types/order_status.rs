@@ -1,6 +1,15 @@
-use getset::{CopyGetters, Getters};
+use getset::{
+    CopyGetters,
+    Getters,
+};
 
-use super::{Currency, Mon, QuoteCurrency, TimestampNs, order_meta::ExchangeOrderMeta};
+use super::{
+    Currency,
+    Mon,
+    QuoteCurrency,
+    TimestampNs,
+    order_meta::ExchangeOrderMeta,
+};
 
 /// A new order has not been received by the exchange and has thus some pieces of information not available.
 /// This also means the various filters (e.g `PriceFilter` and `QuantityFilter`) have not been checked.

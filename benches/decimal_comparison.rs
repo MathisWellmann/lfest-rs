@@ -1,8 +1,15 @@
 //! Compare the crates providing decimal implementations.
 use std::hint::black_box;
 
-use criterion::{Criterion, criterion_group, criterion_main};
-use fpdec::{Dec, Decimal};
+use criterion::{
+    Criterion,
+    criterion_group,
+    criterion_main,
+};
+use fpdec::{
+    Dec,
+    Decimal,
+};
 use lfest::prelude::*;
 
 fn criterion_benchmark(c: &mut Criterion) {

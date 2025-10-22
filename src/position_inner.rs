@@ -1,9 +1,19 @@
-use getset::{CopyGetters, Getters};
+use getset::{
+    CopyGetters,
+    Getters,
+};
 use num_traits::Zero;
-use tracing::{debug, trace};
+use tracing::{
+    debug,
+    trace,
+};
 
 use crate::{
-    prelude::{Currency, Mon, QuoteCurrency},
+    prelude::{
+        Currency,
+        Mon,
+        QuoteCurrency,
+    },
     types::MarginCurrency,
 };
 
@@ -138,7 +148,10 @@ mod tests {
     use num_traits::One;
 
     use super::*;
-    use crate::{DECIMALS, prelude::*};
+    use crate::{
+        DECIMALS,
+        prelude::*,
+    };
 
     #[test]
     fn position_inner_new() {

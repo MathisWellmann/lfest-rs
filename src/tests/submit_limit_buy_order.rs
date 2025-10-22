@@ -1,4 +1,9 @@
-use crate::{mock_exchange_linear, prelude::*, test_fee_maker, test_fee_taker};
+use crate::{
+    mock_exchange_linear,
+    prelude::*,
+    test_fee_maker,
+    test_fee_taker,
+};
 
 #[test]
 #[tracing_test::traced_test]

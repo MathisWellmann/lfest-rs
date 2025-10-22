@@ -5,10 +5,24 @@ use crate::{
     Result,
     market_update::market_update_trait::Exhausted,
     order_filters::{
-        enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
+        enforce_bid_ask_spread,
+        enforce_max_price,
+        enforce_min_price,
+        enforce_step_size,
     },
-    prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency},
-    types::{TimestampNs, UserOrderId},
+    prelude::{
+        Currency,
+        LimitOrder,
+        MarketState,
+        Mon,
+        Pending,
+        PriceFilter,
+        QuoteCurrency,
+    },
+    types::{
+        TimestampNs,
+        UserOrderId,
+    },
 };
 
 /// An update to the best bid and ask has occured.

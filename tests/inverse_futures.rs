@@ -1,7 +1,15 @@
 //! Test file for the inverse futures mode of the exchange
 
-use lfest::{mock_exchange_inverse, prelude::*, test_fee_maker, test_fee_taker};
-use num_traits::{One, Zero};
+use lfest::{
+    mock_exchange_inverse,
+    prelude::*,
+    test_fee_maker,
+    test_fee_taker,
+};
+use num_traits::{
+    One,
+    Zero,
+};
 
 #[test]
 #[tracing_test::traced_test]

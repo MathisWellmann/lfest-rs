@@ -1,9 +1,17 @@
 //! Benchmark the submission of limit orders.
 
-use std::{hint::black_box, num::NonZeroUsize};
+use std::{
+    hint::black_box,
+    num::NonZeroUsize,
+};
 
 use const_decimal::Decimal;
-use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use criterion::{
+    BenchmarkId,
+    Criterion,
+    criterion_group,
+    criterion_main,
+};
 use lfest::prelude::*;
 
 const DECIMALS: u8 = 5;

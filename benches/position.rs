@@ -3,9 +3,18 @@
 use std::hint::black_box;
 
 use const_decimal::Decimal;
-use criterion::{Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{
+    Criterion,
+    Throughput,
+    criterion_group,
+    criterion_main,
+};
 use lfest::prelude::*;
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use rand::{
+    Rng,
+    SeedableRng,
+    rngs::SmallRng,
+};
 
 fn criterion_benchmark(c: &mut Criterion) {
     const N: usize = 1000;

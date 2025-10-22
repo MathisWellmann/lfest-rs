@@ -1,6 +1,13 @@
 use std::fmt::Display;
 
-use super::{Currency, Filled, LimitOrder, Mon, Pending, UserOrderId};
+use super::{
+    Currency,
+    Filled,
+    LimitOrder,
+    Mon,
+    Pending,
+    UserOrderId,
+};
 
 /// Contains the possible updates to limit orders.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -64,7 +71,10 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{types::BaseCurrency, utils::NoUserOrderId};
+    use crate::{
+        types::BaseCurrency,
+        utils::NoUserOrderId,
+    };
 
     #[test]
     fn limit_order_fill_size() {

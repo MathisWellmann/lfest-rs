@@ -2,7 +2,10 @@ use const_decimal::Decimal;
 use derive_more::Display;
 use num_traits::One;
 
-use super::{ConfigError, Mon};
+use super::{
+    ConfigError,
+    Mon,
+};
 
 /// Allows the quick construction of `Leverage`
 ///

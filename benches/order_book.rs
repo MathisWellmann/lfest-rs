@@ -1,10 +1,22 @@
 //! Benchmark regarding order book implementation.
 
-use std::{hint::black_box, num::NonZeroUsize};
+use std::{
+    hint::black_box,
+    num::NonZeroUsize,
+};
 
-use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{
+    BenchmarkId,
+    Criterion,
+    Throughput,
+    criterion_group,
+    criterion_main,
+};
 use lfest::prelude::*;
-use rand::{Rng, SeedableRng};
+use rand::{
+    Rng,
+    SeedableRng,
+};
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("OrderBook");

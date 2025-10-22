@@ -16,18 +16,36 @@ mod timestamp_ns;
 
 pub use balances::Balances;
 pub use errors::*;
-pub use fee::{Fee, Maker, Taker};
+pub use fee::{
+    Fee,
+    Maker,
+    Taker,
+};
 pub use leverage::Leverage;
-pub use limit_order::{LimitOrder, price_time_priority_ordering};
+pub use limit_order::{
+    LimitOrder,
+    price_time_priority_ordering,
+};
 pub use limits::OrderRateLimits;
 pub use market_order::MarketOrder;
 pub use order_id::OrderId;
 pub use order_meta::ExchangeOrderMeta;
-pub use order_status::{Filled, FilledQuantity, NewOrder, Pending};
+pub use order_status::{
+    Filled,
+    FilledQuantity,
+    NewOrder,
+    Pending,
+};
 pub use order_update::LimitOrderFill;
 pub use re_pricing::RePricing;
 pub use side::Side;
-pub use smol_currency::{BaseCurrency, Currency, MarginCurrency, Mon, QuoteCurrency};
+pub use smol_currency::{
+    BaseCurrency,
+    Currency,
+    MarginCurrency,
+    Mon,
+    QuoteCurrency,
+};
 pub(crate) use timestamp_ns::NANOS_PER_SECOND;
 pub use timestamp_ns::TimestampNs;
 

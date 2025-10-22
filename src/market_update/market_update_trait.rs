@@ -1,7 +1,17 @@
 use crate::{
     Result,
-    prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter},
-    types::{TimestampNs, UserOrderId},
+    prelude::{
+        Currency,
+        LimitOrder,
+        MarketState,
+        Mon,
+        Pending,
+        PriceFilter,
+    },
+    types::{
+        TimestampNs,
+        UserOrderId,
+    },
 };
 
 /// If `true`, the `MarketUpdate` can no longer fill limit orders.

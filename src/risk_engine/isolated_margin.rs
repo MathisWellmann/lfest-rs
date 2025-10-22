@@ -6,8 +6,23 @@ use crate::{
     contract_specification::ContractSpecification,
     market_state::MarketState,
     order_margin::OrderMargin,
-    prelude::{Currency, Mon, Position, PositionInner, QuoteCurrency, RiskError},
-    types::{Balances, LimitOrder, MarginCurrency, MarketOrder, Pending, Side, UserOrderId},
+    prelude::{
+        Currency,
+        Mon,
+        Position,
+        PositionInner,
+        QuoteCurrency,
+        RiskError,
+    },
+    types::{
+        Balances,
+        LimitOrder,
+        MarginCurrency,
+        MarketOrder,
+        Pending,
+        Side,
+        UserOrderId,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -245,7 +260,12 @@ mod tests {
     use num_traits::One;
 
     use super::*;
-    use crate::{DECIMALS, prelude::*, test_fee_maker, test_fee_taker};
+    use crate::{
+        DECIMALS,
+        prelude::*,
+        test_fee_maker,
+        test_fee_taker,
+    };
 
     #[test]
     fn isolated_margin_exceeds_risk() {

@@ -1,9 +1,25 @@
-use std::{iter::Sum, ops::Neg};
+use std::{
+    iter::Sum,
+    ops::Neg,
+};
 
-use const_decimal::{Decimal, ParseDecimalError};
-use num_traits::{Num, One, Signed, Zero};
+use const_decimal::{
+    Decimal,
+    ParseDecimalError,
+};
+use num_traits::{
+    Num,
+    One,
+    Signed,
+    Zero,
+};
 
-use super::{Currency, MarginCurrency, Mon, QuoteCurrency};
+use super::{
+    Currency,
+    MarginCurrency,
+    Mon,
+    QuoteCurrency,
+};
 
 /// Representation of a Base currency,
 /// e.g in the symbol BTCUSD, the prefix BTC is the `BaseCurrency` and the postfix `USD` is the `QuoteCurrency`.
@@ -251,7 +267,10 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::ops::{Div, Rem};
+    use std::ops::{
+        Div,
+        Rem,
+    };
 
     use super::*;
 

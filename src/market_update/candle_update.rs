@@ -6,10 +6,26 @@ use crate::{
     Result,
     market_update::market_update_trait::Exhausted,
     order_filters::{
-        enforce_bid_ask_spread, enforce_max_price, enforce_min_price, enforce_step_size,
+        enforce_bid_ask_spread,
+        enforce_max_price,
+        enforce_min_price,
+        enforce_step_size,
     },
-    prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side},
-    types::{Error, TimestampNs, UserOrderId},
+    prelude::{
+        Currency,
+        LimitOrder,
+        MarketState,
+        Mon,
+        Pending,
+        PriceFilter,
+        QuoteCurrency,
+        Side,
+    },
+    types::{
+        Error,
+        TimestampNs,
+        UserOrderId,
+    },
 };
 
 /// A new candle has been created.
@@ -194,7 +210,10 @@ macro_rules! candle {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::types::{BaseCurrency, ExchangeOrderMeta};
+    use crate::types::{
+        BaseCurrency,
+        ExchangeOrderMeta,
+    };
 
     #[test_case::test_matrix([
         96, 99, 100, 1000

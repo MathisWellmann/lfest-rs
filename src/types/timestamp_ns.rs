@@ -1,6 +1,12 @@
 use std::fmt::Display;
 
-use derive_more::{Add, AddAssign, Div, Mul, Sub};
+use derive_more::{
+    Add,
+    AddAssign,
+    Div,
+    Mul,
+    Sub,
+};
 
 pub(crate) const NANOS_PER_SECOND: i64 = 1_000_000_000;
 

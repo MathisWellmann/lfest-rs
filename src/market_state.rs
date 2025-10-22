@@ -1,8 +1,18 @@
 use const_decimal::Decimal;
-use getset::{CopyGetters, Getters, Setters};
+use getset::{
+    CopyGetters,
+    Getters,
+    Setters,
+};
 
 use crate::{
-    prelude::{Currency, MarketUpdate, Mon, PriceFilter, QuoteCurrency},
+    prelude::{
+        Currency,
+        MarketUpdate,
+        Mon,
+        PriceFilter,
+        QuoteCurrency,
+    },
     types::TimestampNs,
 };
 
@@ -108,7 +118,10 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{prelude::Bba, types::BaseCurrency};
+    use crate::{
+        prelude::Bba,
+        types::BaseCurrency,
+    };
 
     #[test]
     fn market_state_display() {

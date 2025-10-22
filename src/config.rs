@@ -1,10 +1,17 @@
 use std::num::NonZeroUsize;
 
-use getset::{CopyGetters, Getters};
+use getset::{
+    CopyGetters,
+    Getters,
+};
 
 use crate::{
     contract_specification::ContractSpecification,
-    prelude::{ConfigError, MarginCurrency, Mon},
+    prelude::{
+        ConfigError,
+        MarginCurrency,
+        Mon,
+    },
     types::OrderRateLimits,
 };
 

@@ -1,7 +1,10 @@
 //! Test if a pure limit order strategy works correctly
 
 use lfest::{
-    mock_exchange_linear, mock_exchange_linear_with_account_tracker, prelude::*, test_fee_maker,
+    mock_exchange_linear,
+    mock_exchange_linear_with_account_tracker,
+    prelude::*,
+    test_fee_maker,
 };
 use num_traits::Zero;
 

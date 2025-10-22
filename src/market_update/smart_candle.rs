@@ -1,10 +1,24 @@
-use getset::{CopyGetters, Getters};
+use getset::{
+    CopyGetters,
+    Getters,
+};
 
-use super::{Bba, MarketUpdate, Trade};
+use super::{
+    Bba,
+    MarketUpdate,
+    Trade,
+};
 use crate::{
     market_update::market_update_trait::Exhausted,
     prelude::PriceFilter,
-    types::{Currency, Mon, QuoteCurrency, Side, TimestampNs, UserOrderId},
+    types::{
+        Currency,
+        Mon,
+        QuoteCurrency,
+        Side,
+        TimestampNs,
+        UserOrderId,
+    },
     utils::min,
 };
 
@@ -226,7 +240,11 @@ mod tests {
     use super::*;
     use crate::{
         prelude::MarketState,
-        types::{BaseCurrency, ExchangeOrderMeta, LimitOrder},
+        types::{
+            BaseCurrency,
+            ExchangeOrderMeta,
+            LimitOrder,
+        },
         utils::NoUserOrderId,
     };
 

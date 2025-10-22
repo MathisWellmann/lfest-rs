@@ -1,6 +1,10 @@
 use test_case::test_matrix;
 
-use crate::{DECIMALS, mock_exchange_linear, prelude::*};
+use crate::{
+    DECIMALS,
+    mock_exchange_linear,
+    prelude::*,
+};
 
 #[tracing_test::traced_test]
 #[test_matrix([BaseCurrency::new(1, 0), BaseCurrency::new(3, 0), BaseCurrency::new(5, 0), BaseCurrency::new(10, 0)])]

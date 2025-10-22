@@ -1,6 +1,9 @@
 use getset::CopyGetters;
 
-use super::{ConfigError, Error};
+use super::{
+    ConfigError,
+    Error,
+};
 
 /// Defines the maximum order message rates, e.g.: limits order submission to 10 per second.
 #[derive(Debug, Clone, Copy, CopyGetters, Serialize, Deserialize)]

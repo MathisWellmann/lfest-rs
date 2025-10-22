@@ -1,8 +1,17 @@
 use const_decimal::Decimal;
 use getset::CopyGetters;
-use num_traits::{One, Zero};
+use num_traits::{
+    One,
+    Zero,
+};
 
-use crate::prelude::{ConfigError, FilterError, Mon, OrderError, QuoteCurrency};
+use crate::prelude::{
+    ConfigError,
+    FilterError,
+    Mon,
+    OrderError,
+    QuoteCurrency,
+};
 
 /// The `PriceFilter` defines the price rules for a symbol
 #[derive(Debug, Clone, CopyGetters)]

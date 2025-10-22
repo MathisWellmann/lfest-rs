@@ -4,9 +4,25 @@ use super::MarketUpdate;
 use crate::{
     Result,
     market_update::market_update_trait::Exhausted,
-    order_filters::{enforce_max_price, enforce_min_price, enforce_step_size},
-    prelude::{Currency, LimitOrder, MarketState, Mon, Pending, PriceFilter, QuoteCurrency, Side},
-    types::{TimestampNs, UserOrderId},
+    order_filters::{
+        enforce_max_price,
+        enforce_min_price,
+        enforce_step_size,
+    },
+    prelude::{
+        Currency,
+        LimitOrder,
+        MarketState,
+        Mon,
+        Pending,
+        PriceFilter,
+        QuoteCurrency,
+        Side,
+    },
+    types::{
+        TimestampNs,
+        UserOrderId,
+    },
     utils::min,
 };
 

@@ -2,7 +2,13 @@
 
 use getset::CopyGetters;
 
-use crate::prelude::{ConfigError, Currency, Mon, OrderError, QuoteCurrency};
+use crate::prelude::{
+    ConfigError,
+    Currency,
+    Mon,
+    OrderError,
+    QuoteCurrency,
+};
 
 /// The `SizeFilter` defines the quantity rules that each order needs to follow
 #[derive(Debug, Clone, CopyGetters)]
@@ -104,7 +110,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use num_traits::{One, Zero};
+    use num_traits::{
+        One,
+        Zero,
+    };
 
     use super::*;
     use crate::prelude::*;

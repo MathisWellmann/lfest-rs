@@ -1,6 +1,10 @@
 use std::num::NonZeroUsize;
 
-use crate::{mock_exchange_linear, prelude::*, test_fee_taker};
+use crate::{
+    mock_exchange_linear,
+    prelude::*,
+    test_fee_taker,
+};
 
 #[test]
 fn submit_market_sell_order_reject() {

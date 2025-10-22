@@ -36,21 +36,35 @@ pub const EXPECT_CAPACITY: &str = "There is enough capacity";
 /// Exports common types
 pub mod prelude {
     pub use const_decimal;
-    pub use num_traits::{One, Zero};
+    pub use num_traits::{
+        One,
+        Zero,
+    };
 
     pub use crate::{
         active_limit_orders::ActiveLimitOrders,
         config::Config,
         contract_specification::*,
-        exchange::{Account, CancelBy, Exchange},
+        exchange::{
+            Account,
+            CancelBy,
+            Exchange,
+        },
         leverage,
         market_state::MarketState,
         market_update::*,
-        order_filters::{PriceFilter, QuantityFilter},
+        order_filters::{
+            PriceFilter,
+            QuantityFilter,
+        },
         order_margin::OrderMargin,
         position::Position,
         position_inner::PositionInner,
         types::*,
-        utils::{NoUserOrderId, decimal_from_f64, scale},
+        utils::{
+            NoUserOrderId,
+            decimal_from_f64,
+            scale,
+        },
     };
 }

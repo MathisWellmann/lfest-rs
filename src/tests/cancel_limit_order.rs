@@ -1,4 +1,8 @@
-use crate::{exchange::CancelBy, mock_exchange_linear, prelude::*};
+use crate::{
+    exchange::CancelBy,
+    mock_exchange_linear,
+    prelude::*,
+};
 
 #[test]
 fn cancel_limit_order() {

@@ -3,7 +3,10 @@ mod margin_currency_trait;
 mod quote_currency;
 
 pub use base_currency::BaseCurrency;
-use const_decimal::{Decimal, ScaledInteger};
+use const_decimal::{
+    Decimal,
+    ScaledInteger,
+};
 pub use margin_currency_trait::MarginCurrency;
 pub use quote_currency::QuoteCurrency;
 

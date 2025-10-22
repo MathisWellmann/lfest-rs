@@ -1,11 +1,20 @@
 //! Example usage of Exchange using external trade data.
 //! A randomly acting agent places market buy / sell orders every 100 candles
 
-use std::{num::NonZeroUsize, time::Instant};
+use std::{
+    num::NonZeroUsize,
+    time::Instant,
+};
 
 use const_decimal::Decimal;
-use lfest::{load_trades_from_csv, prelude::*};
-use rand::{Rng, rng};
+use lfest::{
+    load_trades_from_csv,
+    prelude::*,
+};
+use rand::{
+    Rng,
+    rng,
+};
 use tracing::error;
 
 const DECIMALS: u8 = 4;

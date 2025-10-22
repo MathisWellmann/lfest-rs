@@ -1,6 +1,10 @@
 //! Test file for the linear futures mode of the exchange
 
-use lfest::{mock_exchange_linear_with_account_tracker, prelude::*, test_fee_taker};
+use lfest::{
+    mock_exchange_linear_with_account_tracker,
+    prelude::*,
+    test_fee_taker,
+};
 
 #[test]
 #[tracing_test::traced_test]
