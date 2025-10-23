@@ -1,6 +1,8 @@
 use getset::{
     CopyGetters,
     Getters,
+    MutGetters,
+    Setters,
 };
 
 use super::{
@@ -20,7 +22,7 @@ pub struct NewOrder;
 /// - `I`: The numeric data type of currencies.
 /// - `D`: The constant decimal precision of the currencies.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
-#[derive(Debug, Clone, Eq, PartialEq, Getters)]
+#[derive(Debug, Clone, Eq, PartialEq, Getters, Setters, MutGetters)]
 #[cfg_attr(test, derive(typed_builder::TypedBuilder))]
 pub struct Pending<I, const D: u8, BaseOrQuote>
 where
@@ -32,8 +34,8 @@ where
     meta: ExchangeOrderMeta,
 
     /// Information about the filled quantity.
-    #[getset(get = "pub")]
-    pub(crate) filled_quantity: FilledQuantity<I, D, BaseOrQuote>,
+    #[getset(get = "pub", set = "pub(crate)", get_mut = "pub(crate)")]
+    filled_quantity: FilledQuantity<I, D, BaseOrQuote>,
 }
 
 impl<I, const D: u8, BaseOrQuote> Pending<I, D, BaseOrQuote>

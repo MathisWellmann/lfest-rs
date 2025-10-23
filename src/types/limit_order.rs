@@ -260,12 +260,12 @@ where
             "Quantity must be positive"
         );
 
-        let cumulative_qty = match &mut self.state.filled_quantity {
+        let cumulative_qty = match self.state.filled_quantity_mut() {
             FilledQuantity::Unfilled => {
-                self.state.filled_quantity = FilledQuantity::Filled {
+                self.state.set_filled_quantity(FilledQuantity::Filled {
                     cumulative_qty: filled_quantity,
                     avg_price: fill_price,
-                };
+                });
 
                 filled_quantity
             }
@@ -309,23 +309,25 @@ where
 
     /// Get the total filled quantity for this order.
     pub fn filled_quantity(&self) -> BaseOrQuote {
-        match self.state.filled_quantity {
-            FilledQuantity::Unfilled => BaseOrQuote::zero(),
-            FilledQuantity::Filled {
+        use FilledQuantity::*;
+        match self.state.filled_quantity() {
+            Unfilled => BaseOrQuote::zero(),
+            Filled {
                 cumulative_qty,
                 avg_price: _,
-            } => cumulative_qty,
+            } => *cumulative_qty,
         }
     }
 
     /// Get the total quantity that this order is for.
     pub fn total_quantity(&self) -> BaseOrQuote {
-        let q = match self.state.filled_quantity {
-            FilledQuantity::Unfilled => self.remaining_quantity,
-            FilledQuantity::Filled {
+        use FilledQuantity::*;
+        let q = match self.state.filled_quantity() {
+            Unfilled => self.remaining_quantity,
+            Filled {
                 cumulative_qty,
                 avg_price: _,
-            } => self.remaining_quantity + cumulative_qty,
+            } => self.remaining_quantity + *cumulative_qty,
         };
         assert2::debug_assert!(
             q > BaseOrQuote::zero(),

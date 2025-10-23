@@ -83,6 +83,10 @@ where
         for trade in taker_trades {
             // only retain the most important stuff.
             assert2::debug_assert!(trade.quantity > BaseOrQuote::zero());
+            #[allow(
+                clippy::disallowed_methods,
+                reason = "Don't know if we have enough capacity"
+            )]
             match trade.side {
                 Side::Buy => buys.push((trade.price, trade.quantity)),
                 Side::Sell => sells.push((trade.price, trade.quantity)),
@@ -107,11 +111,19 @@ where
             // Largest prices first.
             for (buy_price, buy_qty) in buys {
                 if buy_price != last_buy_price {
+                    #[allow(
+                        clippy::disallowed_methods,
+                        reason = "Don't know if we have enough capacity"
+                    )]
                     aggregate_buy_volume.push((last_buy_price, buy_volume_sum));
                     last_buy_price = buy_price
                 }
                 buy_volume_sum += buy_qty;
             }
+            #[allow(
+                clippy::disallowed_methods,
+                reason = "Don't know if we have enough capacity"
+            )]
             aggregate_buy_volume.push((last_buy_price, buy_volume_sum));
         }
 
@@ -122,11 +134,19 @@ where
             // Smallest prices first
             for (sell_price, sell_qty) in sells {
                 if sell_price != last_sell_price {
+                    #[allow(
+                        clippy::disallowed_methods,
+                        reason = "Don't know if we have enough capacity"
+                    )]
                     aggregate_sell_volume.push((last_sell_price, sell_volume_sum));
                     last_sell_price = sell_price;
                 }
                 sell_volume_sum += sell_qty;
             }
+            #[allow(
+                clippy::disallowed_methods,
+                reason = "Don't know if we have enough capacity"
+            )]
             aggregate_sell_volume.push((last_sell_price, sell_volume_sum));
         }
 

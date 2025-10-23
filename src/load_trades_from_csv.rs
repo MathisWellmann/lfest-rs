@@ -57,6 +57,10 @@ where
             side,
             timestamp_exchange_ns: (ts_ms * 1_000_000).into(),
         };
+        #[allow(
+            clippy::disallowed_methods,
+            reason = "Don't know if we have enough capacity"
+        )]
         out.push(trade);
     }
 
