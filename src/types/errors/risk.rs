@@ -1,6 +1,6 @@
 /// The error that the `RiskEngine` outputs, if any.
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
-#[allow(missing_docs)]
+#[allow(missing_docs, reason = "Self documenting")]
 pub enum RiskError {
     #[error("The `Trader` does not have enough balance.")]
     NotEnoughAvailableBalance,

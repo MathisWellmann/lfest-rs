@@ -175,7 +175,7 @@ where
 {
     #[inline]
     fn one() -> Self {
-        Self(Decimal::<I, D>::try_from_scaled(I::one(), 0).unwrap())
+        Self(Decimal::<I, D>::ONE)
     }
 
     #[inline]

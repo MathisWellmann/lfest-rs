@@ -2,7 +2,7 @@ use super::FilterError;
 
 /// Defines the possible order errors that can occur when submitting a new order
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
-#[allow(missing_docs)]
+#[allow(missing_docs, reason = "Self documenting")]
 pub enum OrderError {
     #[error("The limit order price is lower than the low price multiple.")]
     LimitPriceBelowMultiple,

@@ -5,6 +5,11 @@ use std::num::NonZeroUsize;
 use const_decimal::Decimal;
 
 use crate::{
+    EXPECT_CONFIG,
+    EXPECT_CONTRACT_SPEC,
+    EXPECT_DECIMAL,
+    EXPECT_NON_ZERO,
+    EXPECT_QUANTITY_FILTER,
     prelude::*,
     utils::NoUserOrderId,
 };
@@ -14,12 +19,12 @@ pub const DECIMALS: u8 = 5;
 
 /// The maker fee used in tests.
 pub fn test_fee_maker() -> Fee<i64, DECIMALS, Maker> {
-    Fee::from(Decimal::try_from_scaled(2, 4).unwrap())
+    Fee::from(Decimal::try_from_scaled(2, 4).expect(EXPECT_DECIMAL))
 }
 
 /// The taker fee used in tests.
 pub fn test_fee_taker() -> Fee<i64, DECIMALS, Taker> {
-    Fee::from(Decimal::try_from_scaled(6, 4).unwrap())
+    Fee::from(Decimal::try_from_scaled(6, 4).expect(EXPECT_DECIMAL))
 }
 
 /// Constructs a mock exchange (for linear futures) for testing.
@@ -29,20 +34,20 @@ pub fn mock_exchange_linear() -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIM
 {
     let contract_spec = ContractSpecification::new(
         leverage!(1),
-        Decimal::try_from_scaled(5, 1).unwrap(),
+        Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
         PriceFilter::default(),
-        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).unwrap(),
+        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
         test_fee_maker(),
         test_fee_taker(),
     )
-    .expect("works");
+    .expect(EXPECT_CONTRACT_SPEC);
     let config = Config::new(
         QuoteCurrency::new(1000, 0),
-        NonZeroUsize::new(10).unwrap(),
+        NonZeroUsize::new(10).expect(EXPECT_NON_ZERO),
         contract_spec,
         OrderRateLimits::default(),
     )
-    .unwrap();
+    .expect(EXPECT_CONFIG);
     Exchange::new(config)
 }
 
@@ -54,20 +59,20 @@ pub fn mock_exchange_linear_with_account_tracker(
 ) -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
     let contract_spec = ContractSpecification::new(
         leverage!(1),
-        Decimal::try_from_scaled(5, 1).unwrap(),
+        Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
         PriceFilter::default(),
-        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).unwrap(),
+        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
         test_fee_maker(),
         test_fee_taker(),
     )
-    .expect("works");
+    .expect(EXPECT_CONTRACT_SPEC);
     let config = Config::new(
         starting_balance,
-        NonZeroUsize::new(200).unwrap(),
+        NonZeroUsize::new(200).expect(EXPECT_NON_ZERO),
         contract_spec,
         OrderRateLimits::default(),
     )
-    .unwrap();
+    .expect(EXPECT_CONFIG);
     Exchange::new(config)
 }
 
@@ -77,19 +82,19 @@ pub fn mock_exchange_inverse(
 ) -> Exchange<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>, NoUserOrderId> {
     let contract_spec = ContractSpecification::new(
         leverage!(1),
-        Decimal::try_from_scaled(5, 1).expect("works"),
+        Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
         PriceFilter::default(),
         QuantityFilter::default(),
         test_fee_maker(),
         test_fee_taker(),
     )
-    .expect("works");
+    .expect(EXPECT_CONTRACT_SPEC);
     let config = Config::new(
         starting_balance,
-        NonZeroUsize::new(200).unwrap(),
+        NonZeroUsize::new(200).expect(EXPECT_NON_ZERO),
         contract_spec,
         OrderRateLimits::default(),
     )
-    .unwrap();
+    .expect(EXPECT_CONFIG);
     Exchange::new(config)
 }

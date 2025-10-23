@@ -8,7 +8,7 @@ use crate::prelude::OrderId;
 
 /// Describes possible Errors that may occur when calling methods in this crate
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
-#[allow(missing_docs)]
+#[allow(missing_docs, reason = "Self documenting")]
 pub enum Error {
     #[error(transparent)]
     FilterError(#[from] FilterError),

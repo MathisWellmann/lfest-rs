@@ -10,6 +10,8 @@ use num_traits::{
 };
 
 use crate::{
+    EXPECT_CONVERSION,
+    EXPECT_DECIMAL,
     leverage,
     prelude::{
         ConfigError,
@@ -124,11 +126,17 @@ where
     fn default() -> Self {
         Self::new(
             leverage!(1),
-            Decimal::one() / Decimal::TWO,
+            Decimal::ONE / Decimal::TWO,
             PriceFilter::default(),
             QuantityFilter::default(),
-            Fee::from(Decimal::try_from_scaled(I::from(2).unwrap(), 4).unwrap()),
-            Fee::from(Decimal::try_from_scaled(I::from(6).unwrap(), 4).unwrap()),
+            Fee::from(
+                Decimal::try_from_scaled(I::from(2).expect(EXPECT_CONVERSION), 4)
+                    .expect(EXPECT_DECIMAL),
+            ),
+            Fee::from(
+                Decimal::try_from_scaled(I::from(6).expect(EXPECT_CONVERSION), 4)
+                    .expect(EXPECT_DECIMAL),
+            ),
         )
         .expect("Is valid")
     }
@@ -136,8 +144,7 @@ where
 
 // TODO: actually switch between the methods.
 /// Which price to use in `mark-to-market` calculations
-#[derive(Debug, Clone, Copy)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum MarkMethod {
     /// Take the last mid price of the market.
     MidPrice,
@@ -150,4 +157,3 @@ pub enum MarkMethod {
     /// The system is able to achieve this by setting the Mark Price of the contract to the `FairPrice` instead of the `LastPrice`.
     FairPrice,
 }
-

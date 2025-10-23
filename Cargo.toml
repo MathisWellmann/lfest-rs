@@ -115,7 +115,6 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)'] }
 
 [lints.clippy]
 allow_attributes_without_reason = "deny" # Always include a reason for using `#[allow(...,, reason = "my reason")]`
-disallowed_methods = "deny"
 as_underscore = "deny"                   # This can lead to unintended lossy conversion or into an unwanted type.
 cast_possible_wrap = "deny"              # Wrapping `as` conversion needs to be handled explicitly.
 # In release builds debug_assert! macros are optimized out by the compiler.
@@ -166,6 +165,7 @@ format_push_string = "deny"
 unwrap_used = "deny"        # Always prefer `.expect("Some reason")`
 needless_collect = "deny"
 
+disallowed_methods = "warn"
 # # Calling `.drain(..)`, instead of `.clear()` creates an unnecessary iterator that is dropped immediately.
 clear_with_drain = "warn"
 # Functions with a lot of lines are harder to understand and most likely will not fit on the screen.

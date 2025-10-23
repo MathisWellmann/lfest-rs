@@ -1,6 +1,6 @@
 /// An error related to market filters `PriceFilter` and `QuantityFilter`.
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
-#[allow(missing_docs)]
+#[allow(missing_docs, reason = "Self documenting")]
 pub enum FilterError {
     #[error("Some price in MarketUpdate is too low.")]
     PriceTooLow,
