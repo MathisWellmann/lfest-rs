@@ -49,18 +49,19 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     for pos in starting_positions {
         for side in [Side::Buy, Side::Sell] {
-            group.bench_function(&format!("{pos}_{side}_1000"), |b| {
+            group.bench_function(format!("{pos}_{side}_1000"), |b| {
                 b.iter_with_setup(
                     || (pos.clone(), Balances::new(QuoteCurrency::new(1000, 0))),
                     |(mut position, mut balances)| {
                         for (filled_qty, fill_price) in random_changes.iter() {
-                            black_box(position.change(
+                            let _: () = position.change(
                                 *filled_qty,
                                 *fill_price,
                                 side,
                                 &mut balances,
                                 Decimal::ONE,
-                            ));
+                            );
+                            black_box(());
                         }
                     },
                 )

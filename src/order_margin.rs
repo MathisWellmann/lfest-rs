@@ -385,7 +385,7 @@ mod tests {
                 .unwrap()
         });
 
-        let mult = QuoteCurrency::new(n as _, 0);
+        let mult = QuoteCurrency::new(n as i32, 0);
         let om = mult * QuoteCurrency::convert_from(qty, limit_price) * init_margin_req;
         assert_eq!(
             order_margin.order_margin(
@@ -463,7 +463,7 @@ mod tests {
                 .unwrap();
         });
 
-        let mult = QuoteCurrency::new(n as _, 0);
+        let mult = QuoteCurrency::new(n as i32, 0);
         let om = mult * QuoteCurrency::convert_from(qty, limit_price) * init_margin_req;
         assert_eq!(
             order_margin.order_margin(

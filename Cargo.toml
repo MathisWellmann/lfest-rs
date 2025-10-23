@@ -112,6 +112,88 @@ redundant_lifetimes = "warn"
 missing_docs = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)'] }
 
+
+[lints.clippy]
+allow_attributes_without_reason = "deny" # Always include a reason for using `#[allow(...,, reason = "my reason")]`
+disallowed_methods = "deny"
+as_underscore = "deny"                   # This can lead to unintended lossy conversion or into an unwanted type.
+cast_possible_wrap = "deny"              # Wrapping `as` conversion needs to be handled explicitly.
+# In release builds debug_assert! macros are optimized out by the compiler.
+# Therefore mutating something in a debug_assert! macro results in different behavior between a release and debug build.
+debug_assert_with_mut_call = "deny"
+# Checks for impls of From<..> that contain panic!() or unwrap()
+# TryFrom should be used if there’s a possibility of failure.
+fallible_impl_from = "deny"
+# Checks for usage of _.filter_map(_).next().
+# Readability, this can be written more concisely as _.find_map(_).
+filter_map_next = "deny"
+# Checks for usage of Iterator::flat_map() where filter_map() could be used instead.
+# Example:
+# let nums: Vec<i32> = ["1", "2", "whee!"].iter().flat_map(|x| x.parse().ok()).collect();
+# Use instead:
+# let nums: Vec<i32> = ["1", "2", "whee!"].iter().filter_map(|x| x.parse().ok()).collect();
+flat_map_option = "deny"
+# Checks for usage of .map(|_| format!(..)).collect::<String>().
+# his allocates a new string for every element in the iterator.
+# This can be done more efficiently by creating the String once and appending to it in Iterator::fold,
+# using either the write! macro which supports exactly the same syntax as the format! macro, or concatenating with + in case the iterator yields &str/String.
+# Example
+# fn hex_encode(bytes: &[u8]) -> String {
+#     bytes.iter().map(|b| format!("{b:02X}")).collect()
+# }
+# Use instead:
+# use std::fmt::Write;
+# fn hex_encode(bytes: &[u8]) -> String {
+#     bytes.iter().fold(String::new(), |mut output, b| {
+#         let _ = write!(output, "{b:02X}");
+#         output
+#     })
+# }
+format_collect = "deny"
+# Detects cases where the result of a format! call is appended to an existing String.
+# Introduces an extra, avoidable heap allocation.
+# 
+# Example
+# let mut s = String::new();
+# s += &format!("0x{:X}", 1024);
+# s.push_str(&format!("0x{:X}", 1024));
+# 
+# Use instead:
+# use std::fmt::Write as _; // import without risk of name clashing
+# let mut s = String::new();
+# let _ = write!(s, "0x{:X}", 1024);
+format_push_string = "deny"
+unwrap_used = "deny"        # Always prefer `.expect("Some reason")`
+needless_collect = "deny"
+
+# # Calling `.drain(..)`, instead of `.clear()` creates an unnecessary iterator that is dropped immediately.
+clear_with_drain = "warn"
+# Functions with a lot of lines are harder to understand and most likely will not fit on the screen.
+# Threshold can be set with `too-many-lines-threshold` in `clippy.toml`
+too_many_lines = "warn"
+# Checks for types that derive PartialEq and could implement Eq.
+# If a type T derives PartialEq and all of its members implement Eq, then T can always implement Eq.
+# Implementing Eq allows T to be used in APIs that require Eq types. It also allows structs containing T to derive Eq themselves.
+derive_partial_eq_without_eq = "warn"
+# Scoped visibility modifiers cause a field to be accessible within some scope between public and private,
+# potentially within an entire crate.
+# This allows for fields to be non-private while upholding internal invariants, but can be a code smell.
+# Scoped visibility requires checking a greater area, potentially an entire crate, to verify that an invariant is upheld,
+# and global analysis requires a lot of effort.
+field_scoped_visibility_modifiers = "warn"
+float_cmp_const = "warn"
+fn_params_excessive_bools = "warn"
+branches_sharing_code = "warn"
+needless_continue = "warn"
+# Check if a &mut function argument is actually used mutably.
+# Less mut means less fights with the borrow checker. It can also lead to more opportunities for parallelization.
+needless_pass_by_ref_mut = "warn"
+needless_raw_strings = "warn"
+# Does not make sense to have `Rc<Mutex<..>` because `Rc` cannot be sent to another thread, so `Mutex` synchronization is unnecessary.
+rc_mutex = "warn"
+ref_option_ref = "warn"
+implicit_clone = "warn"
+
 [dependencies]
 tracing = { version = "0.1", features = ["release_max_level_info"] }
 serde = { version = "1", features = ["derive"] }

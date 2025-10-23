@@ -85,7 +85,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                     exchange
                 },
                 |mut exchange| {
-                    black_box(exchange.check_active_orders(black_box(trade)));
+                    let _: () = exchange.check_active_orders(black_box(trade));
+                    black_box(());
                 },
             )
         });

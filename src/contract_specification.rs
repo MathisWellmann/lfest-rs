@@ -137,10 +137,12 @@ where
 // TODO: actually switch between the methods.
 /// Which price to use in `mark-to-market` calculations
 #[derive(Debug, Clone, Copy)]
+#[derive(Default)]
 pub enum MarkMethod {
     /// Take the last mid price of the market.
     MidPrice,
     /// Use the best bid and ask to mark the position to market.
+    #[default]
     BidAsk,
     /// Use Fair Price Marking to avoid unnecessary liquidations in highly leveraged products.
     /// Without this system, unnecessary liquidations may occur if the market is being manipulated,
@@ -149,8 +151,3 @@ pub enum MarkMethod {
     FairPrice,
 }
 
-impl Default for MarkMethod {
-    fn default() -> Self {
-        Self::BidAsk
-    }
-}

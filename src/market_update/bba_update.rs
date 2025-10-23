@@ -131,13 +131,11 @@ mod tests {
             timestamp_exchange_ns: 1.into(),
         };
         assert_eq!(bba.mid_price(), QuoteCurrency::new(1005, 1));
-        assert_eq!(
-            <Bba<i64, 1> as MarketUpdate<i64, 1, BaseCurrency<i64, 1>>>::can_fill_bids(&bba),
-            false
+        assert!(
+            !<Bba<i64, 1> as MarketUpdate<i64, 1, BaseCurrency<i64, 1>>>::can_fill_bids(&bba)
         );
-        assert_eq!(
-            <Bba<i64, 1> as MarketUpdate<i64, 1, BaseCurrency<i64, 1>>>::can_fill_asks(&bba),
-            false
+        assert!(
+            !<Bba<i64, 1> as MarketUpdate<i64, 1, BaseCurrency<i64, 1>>>::can_fill_asks(&bba)
         );
     }
 

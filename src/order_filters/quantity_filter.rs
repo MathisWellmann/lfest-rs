@@ -155,7 +155,7 @@ mod tests {
             min_quantity: None,
             max_quantity: None,
             tick_size: QuoteCurrency::one(),
-            _quote: std::marker::PhantomData::<QuoteCurrency<i32, 2>>::default(),
+            _quote: std::marker::PhantomData::<QuoteCurrency<i32, 2>>,
         };
         assert_eq!(
             filter.validate_order_quantity(QuoteCurrency::zero()),

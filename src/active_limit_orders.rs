@@ -338,7 +338,7 @@ mod tests {
             let order = order.into_pending(meta);
             alo.try_insert(order.clone()).unwrap();
             let mut sorted = alo.bids.clone();
-            sorted.sort_by(|a, b| price_time_priority_ordering(a, b));
+            sorted.sort_by(price_time_priority_ordering);
             assert_eq!(sorted, alo.bids);
         }
         assert_eq!(alo.num_active(), 5);
@@ -354,7 +354,7 @@ mod tests {
             let order = order.into_pending(meta);
             alo.try_insert(order.clone()).unwrap();
             let mut sorted = alo.asks.clone();
-            sorted.sort_by(|a, b| price_time_priority_ordering(a, b));
+            sorted.sort_by(price_time_priority_ordering);
             assert_eq!(sorted, alo.asks);
         }
         assert_eq!(alo.num_active(), 10);

@@ -4,7 +4,7 @@ use super::Mon;
 
 /// Fee as a part per one hundred thousand.
 /// The generic `MarkerTaker` marker indicates to the type system if its a maker or taker fee.
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Fee<I, const D: u8, MakerTaker> {
     value: Decimal<I, D>,
     _fee_type: std::marker::PhantomData<MakerTaker>,
