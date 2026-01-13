@@ -219,7 +219,7 @@ trade_aggregation = { version = "13", optional = true }
 rand = "0.9"
 test-case = "3"
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
-criterion = { version = "0.7", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 # fpdec = { version = "0.10", features = ["serde-as-str", "num-traits"] }
 fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs", rev = "40cf802", features = [
   "serde-as-str",
