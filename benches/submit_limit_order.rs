@@ -90,16 +90,13 @@ fn criterion_benchmark(c: &mut Criterion) {
         }));
         group.throughput(criterion::Throughput::Elements(n as u64));
         group.bench_with_input(BenchmarkId::new("submit_limit_order", n), &n, |b, _n| {
-            b.iter_with_setup(
-                setup_exchange,
-                |mut exchange| {
-                    for order in orders.iter() {
-                        exchange
-                            .submit_limit_order(black_box(order.clone()))
-                            .expect("Can submit market order");
-                    }
-                },
-            )
+            b.iter_with_setup(setup_exchange, |mut exchange| {
+                for order in orders.iter() {
+                    exchange
+                        .submit_limit_order(black_box(order.clone()))
+                        .expect("Can submit market order");
+                }
+            })
         });
     }
 }
