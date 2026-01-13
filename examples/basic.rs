@@ -80,7 +80,7 @@ fn main() {
         if i % 100 == 0 {
             // Trade a fraction of the available wallet balance
             let order_value =
-                exchange.balances().available() * Decimal::try_from_scaled(1, 1).unwrap();
+                exchange.account().balances().available() * Decimal::try_from_scaled(1, 1).unwrap();
             let order_size =
                 QuoteCurrency::convert_from(order_value, exchange.market_state().bid());
             let order = if rng.random() {

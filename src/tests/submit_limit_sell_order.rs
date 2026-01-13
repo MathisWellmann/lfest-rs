@@ -23,7 +23,7 @@ fn submit_limit_sell_order_no_position() {
     let order = LimitOrder::new(Side::Sell, limit_price, BaseCurrency::new(9, 0)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
-    assert_eq!(exchange.position(), &Position::Neutral,);
+    assert_eq!(exchange.account().position(), &Position::Neutral,);
 
     // Now fill the order
     let meta = ExchangeOrderMeta::new(0.into(), 0.into());
@@ -53,11 +53,11 @@ fn submit_limit_sell_order_no_position() {
     let entry_price = QuoteCurrency::new(100, 0);
     let fee0 = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_maker().as_ref();
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Short(PositionInner::new(qty, entry_price))
     );
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(100, 0) - fee0)
             .position_margin(QuoteCurrency::new(900, 0))
@@ -91,9 +91,9 @@ fn submit_limit_sell_order_no_position() {
             .unwrap(),
         &vec![expected_order_update]
     );
-    assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::Neutral);
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(1000, 0) - fee0 - fee1)
             .position_margin(QuoteCurrency::new(0, 0))

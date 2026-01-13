@@ -31,7 +31,7 @@ fn submit_market_buy_order_reject() {
 #[tracing_test::traced_test]
 fn submit_market_buy_order_no_position() {
     let mut exchange = mock_exchange_linear();
-    let mut balances = exchange.balances().clone();
+    let mut balances = exchange.account().balances().clone();
     let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(
         exchange
@@ -55,11 +55,11 @@ fn submit_market_buy_order_no_position() {
     let init_margin = notional * init_margin_req;
     assert!(balances.try_reserve_order_margin(init_margin));
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Long(PositionInner::new(qty, entry_price,))
     );
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(495, 0) - fee)
             .position_margin(QuoteCurrency::new(505, 0))
@@ -91,12 +91,12 @@ fn submit_market_buy_order_with_long_position() {
     let entry_price = QuoteCurrency::new(100, 0);
     let fee0 = QuoteCurrency::new(3, 1);
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Long(PositionInner::new(qty, entry_price,))
     );
     assert!(exchange.active_limit_orders().is_empty());
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(500, 0) - fee0)
             .position_margin(QuoteCurrency::new(500, 0))
@@ -110,7 +110,7 @@ fn submit_market_buy_order_with_long_position() {
     exchange.submit_market_order(order).unwrap();
     let fee1 = QuoteCurrency::new(24, 2);
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(100, 0) - fee0 - fee1)
             .position_margin(QuoteCurrency::new(900, 0))
@@ -119,7 +119,7 @@ fn submit_market_buy_order_with_long_position() {
             .build()
     );
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Long(PositionInner::new(
             BaseCurrency::new(9, 0),
             QuoteCurrency::new(100, 0),
@@ -148,7 +148,7 @@ fn submit_market_buy_order_with_short_position() {
     exchange.submit_market_order(order).unwrap();
     let fee0 = QuoteCurrency::new(54, 2);
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(100, 0) - fee0)
             .position_margin(QuoteCurrency::new(900, 0))
@@ -157,7 +157,7 @@ fn submit_market_buy_order_with_short_position() {
             .build()
     );
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Short(PositionInner::new(
             BaseCurrency::new(9, 0),
             QuoteCurrency::new(100, 0),
@@ -173,9 +173,9 @@ fn submit_market_buy_order_with_short_position() {
     let fee1 = QuoteCurrency::convert_from(order.quantity(), exchange.market_state().ask())
         * *test_fee_taker().as_ref();
     exchange.submit_market_order(order).unwrap();
-    assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::Neutral);
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(1000, 0) - fee0 - fee1 - QuoteCurrency::new(9, 0))
             .position_margin(QuoteCurrency::new(0, 0))
@@ -209,11 +209,11 @@ fn submit_market_buy_order_turnaround_short() {
     let fee_0 = notional * *test_fee_taker().as_ref();
     assert!(exchange.active_limit_orders().is_empty());
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Short(PositionInner::new(qty, entry_price))
     );
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(109, 0) - fee_0)
             .position_margin(QuoteCurrency::new(891, 0))
@@ -230,11 +230,11 @@ fn submit_market_buy_order_turnaround_short() {
     let fee_1 = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
     assert!(exchange.active_limit_orders().is_empty());
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Long(PositionInner::new(BaseCurrency::new(9, 0), entry_price))
     );
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(
                 QuoteCurrency::new(100, 0)

@@ -35,7 +35,7 @@ fn limit_orders_only() {
     let o = LimitOrder::new(Side::Buy, bid, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(50, 0))
             .position_margin(QuoteCurrency::zero())
@@ -62,17 +62,18 @@ fn limit_orders_only() {
         .unwrap();
     assert!(order_updates.is_empty());
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Long(PositionInner::new(qty, QuoteCurrency::new(100, 0),))
     );
     assert_eq!(
         exchange
+            .account()
             .position()
             .unrealized_pnl(exchange.market_state().bid(), exchange.market_state().ask()),
         QuoteCurrency::new(-190, 1)
     );
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(50, 0) - fee0)
             .position_margin(QuoteCurrency::new(950, 0))
@@ -96,7 +97,7 @@ fn limit_orders_only() {
         .unwrap();
     assert!(!order_updates.is_empty());
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(10475, 1) - fee0 - fee1)
             .position_margin(QuoteCurrency::zero())
@@ -113,9 +114,9 @@ fn limit_orders_only() {
         .unwrap();
     assert!(order_updates.is_empty());
 
-    assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::Neutral);
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(104711050, 5))
             .position_margin(QuoteCurrency::zero())
@@ -146,9 +147,9 @@ fn limit_orders_2() {
     )
     .unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::Neutral);
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(92425, 2))
             .position_margin(Zero::zero())
@@ -166,9 +167,9 @@ fn limit_orders_2() {
     let fee = QuoteCurrency::convert_from(o.remaining_quantity(), o.limit_price())
         * *test_fee_maker().as_ref();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::Neutral);
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(1000, 0) - QuoteCurrency::new(7575, 2))
             .position_margin(Zero::zero())
@@ -187,14 +188,14 @@ fn limit_orders_2() {
         .unwrap()
         .clone();
     assert_eq!(
-        exchange.position(),
+        exchange.account().position(),
         &Position::Long(PositionInner::new(
             BaseCurrency::new(5, 1),
             QuoteCurrency::new(100, 0)
         ))
     );
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(92424, 2))
             .position_margin(QuoteCurrency::new(50, 0))

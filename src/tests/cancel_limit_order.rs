@@ -34,7 +34,7 @@ fn cancel_limit_order() {
         &expected_order
     );
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(900, 0))
             .position_margin(QuoteCurrency::zero())
@@ -48,7 +48,7 @@ fn cancel_limit_order() {
         .unwrap();
     assert!(exchange.active_limit_orders().is_empty());
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(1000, 0))
             .position_margin(QuoteCurrency::zero())

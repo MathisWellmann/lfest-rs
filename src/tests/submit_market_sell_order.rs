@@ -50,11 +50,11 @@ fn submit_market_sell_order() {
     let notional = QuoteCurrency::convert_from(qty, entry_price);
     let fees = notional * *test_fee_taker().as_ref();
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Short(PositionInner::new(qty, entry_price,))
     );
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(500, 0) - fees)
             .position_margin(QuoteCurrency::new(500, 0))
@@ -84,7 +84,7 @@ fn submit_market_sell_order_with_short_position() {
         * *test_fee_taker().as_ref();
     exchange.submit_market_order(order).unwrap();
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(500, 0) - fee0)
             .position_margin(QuoteCurrency::new(500, 0))
@@ -93,7 +93,7 @@ fn submit_market_sell_order_with_short_position() {
             .build()
     );
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Short(PositionInner::new(
             BaseCurrency::new(5, 0),
             QuoteCurrency::new(100, 0),
@@ -109,7 +109,7 @@ fn submit_market_sell_order_with_short_position() {
     exchange.submit_market_order(order).unwrap();
     let fee1 = QuoteCurrency::new(24, 2);
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(100, 0) - fee0 - fee1)
             .position_margin(QuoteCurrency::new(900, 0))
@@ -118,7 +118,7 @@ fn submit_market_sell_order_with_short_position() {
             .build()
     );
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Short(PositionInner::new(
             BaseCurrency::new(9, 0),
             QuoteCurrency::new(100, 0),
@@ -155,9 +155,9 @@ fn submit_market_sell_order_with_long_position() {
     let fee_1 = QuoteCurrency::convert_from(order.quantity(), QuoteCurrency::new(99, 0))
         * *test_fee_taker().as_ref();
     exchange.submit_market_order(order).unwrap();
-    assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::Neutral);
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(1000, 0) - QuoteCurrency::new(9, 0) - fee_0 - fee_1)
             .position_margin(QuoteCurrency::new(0, 0))
@@ -188,7 +188,7 @@ fn submit_market_sell_order_turnaround_long() {
     let fee0 = QuoteCurrency::convert_from(qty, exchange.market_state().ask())
         * *test_fee_taker().as_ref();
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(100, 0) - fee0)
             .position_margin(QuoteCurrency::new(900, 0))
@@ -197,7 +197,7 @@ fn submit_market_sell_order_turnaround_long() {
             .build()
     );
     assert_eq!(
-        exchange.position(),
+        exchange.account().position(),
         &Position::Long(PositionInner::new(
             BaseCurrency::new(9, 0),
             QuoteCurrency::new(100, 0),
@@ -215,7 +215,7 @@ fn submit_market_sell_order_turnaround_long() {
     let fee1 =
         QuoteCurrency::convert_from(qty, QuoteCurrency::new(99, 0)) * *test_fee_taker().as_ref();
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(100, 0) - fee0 - fee1)
             .position_margin(QuoteCurrency::new(891, 0))
@@ -224,7 +224,7 @@ fn submit_market_sell_order_turnaround_long() {
             .build()
     );
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Short(PositionInner::new(
             BaseCurrency::new(9, 0),
             QuoteCurrency::new(99, 0),

@@ -23,7 +23,10 @@ fn lin_long_market_win_full() {
             timestamp_exchange_ns: 0.into(),
         })
         .unwrap();
-    assert_eq!(exchange.balances().total_fees_paid(), QuoteCurrency::zero());
+    assert_eq!(
+        exchange.account().balances().total_fees_paid(),
+        QuoteCurrency::zero()
+    );
 
     let qty = BaseCurrency::new(5, 0);
     exchange
@@ -42,15 +45,15 @@ fn lin_long_market_win_full() {
 
     let fee = QuoteCurrency::convert_from(qty, bid) * *test_fee_taker().as_ref();
     assert_eq!(
-        exchange.position().clone(),
+        exchange.account().position().clone(),
         Position::Long(PositionInner::new(qty, bid))
     );
     assert_eq!(
-        exchange.position().unrealized_pnl(bid, ask),
+        exchange.account().position().unrealized_pnl(bid, ask),
         QuoteCurrency::zero()
     );
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(500, 0) - fee)
             .position_margin(QuoteCurrency::new(500, 0))
@@ -71,6 +74,7 @@ fn lin_long_market_win_full() {
     assert!(order_updates.is_empty());
     assert_eq!(
         exchange
+            .account()
             .position()
             .unrealized_pnl(QuoteCurrency::new(200, 0), QuoteCurrency::new(201, 0)),
         QuoteCurrency::new(500, 0)
@@ -80,15 +84,16 @@ fn lin_long_market_win_full() {
         .submit_market_order(MarketOrder::new(Side::Sell, BaseCurrency::new(5, 0)).unwrap())
         .unwrap();
 
-    assert_eq!(exchange.position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::Neutral);
     assert_eq!(
         exchange
+            .account()
             .position()
             .unrealized_pnl(QuoteCurrency::new(200, 0), QuoteCurrency::new(201, 0)),
         QuoteCurrency::zero()
     );
     assert_eq!(
-        exchange.balances(),
+        exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(14991, 1))
             .position_margin(QuoteCurrency::zero())
@@ -97,7 +102,7 @@ fn lin_long_market_win_full() {
             .build()
     );
     assert_eq!(
-        exchange.balances().total_fees_paid(),
+        exchange.account().balances().total_fees_paid(),
         QuoteCurrency::new(9, 1)
     );
 }
