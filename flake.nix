@@ -5,12 +5,14 @@
     nixpks.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
+    hongdown.url = "github:dahlia/hongdown";
   };
 
   outputs = {
     nixpkgs,
     rust-overlay,
     flake-utils,
+    hongdown,
     ...
   }:
     flake-utils.lib.eachDefaultSystem (
@@ -83,6 +85,7 @@
               cargo-machete
               taplo
               mprocs # Run multiple commands in parallel from `mprocs.yml`, acting essentially as a local CI system.
+              hongdown.packages.${system}.hongdown
               # creusot
             ];
             RUST_BACKTRACE = "1";
