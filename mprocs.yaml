@@ -61,13 +61,13 @@ procs:
     shell: "cargo bench OrderBook/try_insert"
     autostart: false
 
-
   # Formatting
   taplo:
     shell: "taplo fmt"
   cargo-fmt:
     shell: "cargo fmt"
-
+  hongdown:
+    shell: "hongdown -w ."
 
   # Code Coverage
   cargo-tarpaulin:
