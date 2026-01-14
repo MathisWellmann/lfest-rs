@@ -42,10 +42,7 @@ pub mod prelude {
         active_limit_orders::ActiveLimitOrders,
         config::Config,
         contract_specification::*,
-        exchange::{
-            Account,
-            Exchange,
-        },
+        exchange::Exchange,
         leverage,
         market_state::MarketState,
         market_update::*,

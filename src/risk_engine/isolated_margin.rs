@@ -52,6 +52,7 @@ where
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderIdT: UserOrderId,
 {
+    // TODO: just pass in `Account` instead of `Position` and `Balances` separately
     fn check_market_order(
         &self,
         position: &Position<I, D, BaseOrQuote>,

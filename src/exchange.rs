@@ -34,6 +34,7 @@ use crate::{
         RiskEngine,
     },
     types::{
+        Account,
         Balances,
         CancelBy,
         Error,
@@ -48,34 +49,11 @@ use crate::{
         Pending,
         Result,
         RiskError,
-        Side,
+        Side::*,
         TimestampNs,
         UserOrderId,
     },
 };
-
-/// Relevant information about the traders account.
-///
-/// Generics:
-/// - `I`: The numeric data type of currencies.
-/// - `D`: The constant decimal precision of the currencies.
-/// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
-/// - `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
-#[derive(Debug, Clone, Getters)]
-pub struct Account<I, const D: u8, BaseOrQuote>
-where
-    I: Mon<D>,
-    BaseOrQuote: Currency<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-{
-    /// The current position of the account.
-    #[getset(get = "pub")]
-    position: Position<I, D, BaseOrQuote>,
-
-    /// The account balances of the account.
-    #[getset(get = "pub")]
-    balances: Balances<I, D, BaseOrQuote::PairedCurrency>,
-}
 
 /// The main leveraged futures exchange for simulated trading
 #[derive(Debug, Clone, Getters, MutGetters)]
@@ -134,10 +112,7 @@ where
             market_state,
             risk_engine,
             next_order_id: OrderId::default(),
-            account: Account {
-                position: Position::Neutral,
-                balances,
-            },
+            account: Account::builder().balances(balances).build(),
             order_margin: OrderMargin::new(max_active_orders),
             limit_order_updates: Vec::with_capacity(max_active_orders.get()),
             order_rate_limiter,
@@ -180,7 +155,7 @@ where
         >>::check_maintenance_margin(
             &self.risk_engine,
             &self.market_state,
-            &self.account.position,
+            self.account.position(),
         ) {
             self.liquidate();
             return Err(e);
@@ -200,17 +175,13 @@ where
 
     // Liquidate the position by closing it with a market order.
     fn liquidate(&mut self) {
-        warn!("liquidating position {}", self.account.position);
+        warn!("liquidating position {}", self.account.position());
         debug_assert!(self.market_state.ask() > QuoteCurrency::zero());
         debug_assert!(self.market_state.bid() > QuoteCurrency::zero());
         use Position::*;
-        let order = match &self.account.position {
-            Long(pos) => {
-                MarketOrder::new(Side::Sell, pos.quantity()).expect("Can create market order.")
-            }
-            Short(pos) => {
-                MarketOrder::new(Side::Buy, pos.quantity()).expect("Can create market order.")
-            }
+        let order = match self.account.position() {
+            Long(pos) => MarketOrder::new(Sell, pos.quantity()).expect("Can create market order."),
+            Short(pos) => MarketOrder::new(Buy, pos.quantity()).expect("Can create market order."),
             Neutral => panic!("A neutral position can not be liquidated"),
         };
         self.submit_market_order(order)
@@ -247,14 +218,14 @@ where
         assert2::debug_assert!(self.market_state.ask() > QuoteCurrency::zero());
         assert2::debug_assert!(self.market_state.bid() > QuoteCurrency::zero());
         let fill_price = match order.side() {
-            Side::Buy => self.market_state.ask(),
-            Side::Sell => self.market_state.bid(),
+            Buy => self.market_state.ask(),
+            Sell => self.market_state.bid(),
         };
         self.risk_engine.check_market_order(
-            &self.account.position,
+            self.account.position(),
             &order,
             fill_price,
-            &self.account.balances,
+            self.account.balances(),
         )?;
 
         let filled_order = order.into_filled(fill_price, self.market_state.current_timestamp_ns());
@@ -275,14 +246,13 @@ where
         let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price);
         let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
 
-        self.account.position.change(
+        self.account.change_position(
             filled_qty,
             fill_price,
             order.side(),
-            &mut self.account.balances,
+            fee,
             self.config.contract_spec().init_margin_req(),
         );
-        self.account.balances.account_for_fee(fee);
     }
 
     #[inline]
@@ -323,16 +293,16 @@ where
         let order = order.into_pending(meta);
 
         self.risk_engine.check_limit_order(
-            &self.account.position,
+            self.account.position(),
             &order,
-            self.account.balances.available(),
+            self.account.balances().available(),
             &self.order_margin,
         )?;
 
         // If a limit order is marketable, it will take liquidity from the book at the `limit_price` price level and pay the taker fee,
         let marketable = match order.side() {
-            Side::Buy => order.limit_price() >= self.market_state.ask(),
-            Side::Sell => order.limit_price() <= self.market_state.bid(),
+            Buy => order.limit_price() >= self.market_state.ask(),
+            Sell => order.limit_price() <= self.market_state.bid(),
         };
         match order.re_pricing() {
             RePricing::GoodTilCrossing => {
@@ -341,8 +311,8 @@ where
                         OrderError::GoodTillCrossingRejectedOrder {
                             limit_price: order.limit_price().to_string(),
                             away_market_quotation_price: match order.side() {
-                                Side::Buy => self.market_state.ask().to_string(),
-                                Side::Sell => self.market_state.bid().to_string(),
+                                Buy => self.market_state.ask().to_string(),
+                                Sell => self.market_state.bid().to_string(),
                             },
                         },
                     ));
@@ -417,22 +387,18 @@ where
             "active_limit_orders: {}, market_state: {}, position: {}",
             self.active_limit_orders(),
             self.market_state,
-            self.account.position,
+            self.account.position(),
         );
 
         let init_margin_req = self.config().contract_spec().init_margin_req();
-        self.order_margin.try_insert(
-            order,
-            &mut self.account.balances,
-            &self.account.position,
-            init_margin_req,
-        )?;
+        self.order_margin
+            .try_insert(order, &mut self.account, init_margin_req)?;
         debug_assert!(if self.active_limit_orders().is_empty() {
-            self.account.balances.order_margin().is_zero()
+            self.account.balances().order_margin().is_zero()
         } else {
             true
         });
-        self.account.balances.debug_assert_state();
+        self.account.balances().debug_assert_state();
 
         Ok(())
     }
@@ -447,23 +413,20 @@ where
         self.order_rate_limiter
             .aquire(self.market_state.current_ts_ns())?;
         debug_assert_eq!(
-            self.account.balances.order_margin(),
+            self.account.balances().order_margin(),
             self.order_margin.order_margin(
                 self.config.contract_spec().init_margin_req(),
-                &self.account.position,
+                self.account.position(),
             )
         );
 
         let init_margin_req = self.config().contract_spec().init_margin_req();
-        let removed_order = self.order_margin.remove(
-            cancel_by,
-            &mut self.account.balances,
-            &self.account.position,
-            init_margin_req,
-        )?;
+        let removed_order =
+            self.order_margin
+                .remove(cancel_by, &mut self.account, init_margin_req)?;
 
         assert!(if self.active_limit_orders().is_empty() {
-            self.account.balances.order_margin().is_zero()
+            self.account.balances().order_margin().is_zero()
         } else {
             true
         });
@@ -524,18 +487,18 @@ where
         }
 
         assert2::debug_assert!(if self.active_limit_orders().is_empty() {
-            self.account.balances.order_margin().is_zero()
+            self.account.balances().order_margin().is_zero()
         } else {
             true
         });
         debug_assert_eq!(
-            self.account.balances.order_margin(),
+            self.account.balances().order_margin(),
             self.order_margin.order_margin(
                 self.config.contract_spec().init_margin_req(),
-                &self.account.position
+                self.account.position()
             )
         );
-        self.account.balances.debug_assert_state();
+        self.account.balances().debug_assert_state();
     }
 
     fn fill_limit_order(
@@ -556,10 +519,10 @@ where
             "The filled_qty must be greater than zero"
         );
         debug_assert_eq!(
-            self.account.balances.order_margin(),
+            self.account.balances().order_margin(),
             self.order_margin.order_margin(
                 self.config.contract_spec().init_margin_req(),
-                &self.account.position
+                self.account.position()
             )
         );
 
@@ -567,7 +530,6 @@ where
         let limit_price = order.limit_price();
         let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, limit_price);
         let fee = notional * *self.config.contract_spec().fee_maker().as_ref();
-        self.account.balances.account_for_fee(fee);
 
         let limit_order_update = order.fill(filled_qty, fee, ts_ns);
         let init_margin_req = self.config().contract_spec().init_margin_req();
@@ -575,49 +537,43 @@ where
             self.order_margin
                 .remove(
                     CancelBy::OrderId(order.id()),
-                    &mut self.account.balances,
-                    &self.account.position,
+                    &mut self.account,
                     init_margin_req,
                 )
                 .expect("Can remove order as its an internal call");
         } else {
             assert2::debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
-            self.order_margin.fill_order(
-                order,
-                &mut self.account.balances,
-                &self.account.position,
-                init_margin_req,
-            )
+            self.order_margin
+                .fill_order(order, &mut self.account, init_margin_req)
         }
         self.limit_order_updates
             .push_within_capacity(limit_order_update)
             .expect(EXPECT_CAPACITY);
 
-        // TODO: make this a method of `Account`
-        self.account.position.change(
+        self.account.change_position(
             filled_qty,
             limit_price,
             side,
-            &mut self.account.balances,
+            fee,
             self.config.contract_spec().init_margin_req(),
         );
 
         let new_order_margin = self.order_margin.order_margin(
             self.config.contract_spec().init_margin_req(),
-            &self.account.position,
+            self.account.position(),
         );
         use Ordering::*;
-        match new_order_margin.cmp(&self.account.balances.order_margin()) {
+        match new_order_margin.cmp(&self.account.balances().order_margin()) {
             Less => {
-                let margin_delta = self.account.balances.order_margin() - new_order_margin;
+                let margin_delta = self.account.balances().order_margin() - new_order_margin;
                 assert2::debug_assert!(margin_delta > Zero::zero());
-                self.account.balances.free_order_margin(margin_delta);
+                self.account.free_order_margin(margin_delta);
             }
             Equal => {}
             Greater => {
-                let margin_delta = new_order_margin - self.account.balances.order_margin();
+                let margin_delta = new_order_margin - self.account.balances().order_margin();
                 assert2::debug_assert!(margin_delta > Zero::zero());
-                let success = self.account.balances.try_reserve_order_margin(margin_delta);
+                let success = self.account.try_reserve_order_margin(margin_delta);
                 assert!(success, "Can reserve order margin");
             }
         }

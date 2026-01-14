@@ -93,20 +93,20 @@ where
     }
 
     /// Try to reserve some order margin from available balance.
-    #[inline(always)]
+    #[inline]
     #[must_use]
-    pub fn try_reserve_order_margin(&mut self, init_margin: BaseOrQuote) -> bool {
-        trace!("try_reserve_order_margin {init_margin} on self: {self}");
-        assert2::debug_assert!(init_margin > BaseOrQuote::zero());
+    pub fn try_reserve_order_margin(&mut self, margin: BaseOrQuote) -> bool {
+        trace!("try_reserve_order_margin {margin} on self: {self}");
+        assert2::debug_assert!(margin > BaseOrQuote::zero());
         self.debug_assert_state();
 
-        if init_margin > self.available {
+        if margin > self.available {
             return false;
         }
 
-        self.available -= init_margin;
+        self.available -= margin;
         assert2::debug_assert!(self.available >= BaseOrQuote::zero());
-        self.order_margin += init_margin;
+        self.order_margin += margin;
         true
     }
 

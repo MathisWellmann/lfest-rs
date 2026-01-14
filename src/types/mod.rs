@@ -1,3 +1,4 @@
+mod account;
 mod balances;
 mod errors;
 mod fee;
@@ -14,6 +15,7 @@ mod side;
 mod smol_currency;
 mod timestamp_ns;
 
+pub use account::Account;
 pub use balances::Balances;
 pub use errors::*;
 pub use fee::{

@@ -30,7 +30,6 @@ fn criterion_benchmark(c: &mut Criterion) {
     )
     .unwrap();
 
-    let position = Position::Neutral;
     let init_margin_req = Decimal::ONE;
 
     for n in 1..20 {
@@ -43,18 +42,15 @@ fn criterion_benchmark(c: &mut Criterion) {
                 || {
                     (
                         OrderMargin::new(NonZeroUsize::new(n).unwrap()),
-                        Balances::new(QuoteCurrency::new(1_000_000, 0)),
+                        Account::builder()
+                            .balances(Balances::new(QuoteCurrency::new(1_000_000, 0)))
+                            .build(),
                     )
                 },
-                |(mut order_margin, mut balances)| {
+                |(mut order_margin, mut account)| {
                     for order in orders.iter() {
                         order_margin
-                            .try_insert(
-                                black_box(order.clone()),
-                                &mut balances,
-                                &position,
-                                init_margin_req,
-                            )
+                            .try_insert(black_box(order.clone()), &mut account, init_margin_req)
                             .expect("Can insert")
                     }
                 },
@@ -68,19 +64,20 @@ fn criterion_benchmark(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut om = OrderMargin::new(NonZeroUsize::new(n).unwrap());
-                    let mut balances = Balances::new(QuoteCurrency::new(1_000_000, 0));
+                    let mut account = Account::builder()
+                        .balances(Balances::new(QuoteCurrency::new(1_000_000, 0)))
+                        .build();
                     for order in orders.iter() {
-                        om.try_insert(order.clone(), &mut balances, &position, init_margin_req)
+                        om.try_insert(order.clone(), &mut account, init_margin_req)
                             .expect("Can insert");
                     }
-                    (om, balances)
+                    (om, account)
                 },
-                |(mut order_margin, mut balances)| {
+                |(mut order_margin, mut account)| {
                     for order in orders.iter() {
                         order_margin.fill_order(
                             black_box(order.clone()),
-                            &mut balances,
-                            &position,
+                            &mut account,
                             init_margin_req,
                         )
                     }
@@ -95,26 +92,22 @@ fn criterion_benchmark(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut order_margin = OrderMargin::new(NonZeroUsize::new(n).unwrap());
-                    let mut balances = Balances::new(QuoteCurrency::new(1_000_000, 0));
+                    let mut account = Account::builder()
+                        .balances(Balances::new(QuoteCurrency::new(1_000_000, 0)))
+                        .build();
                     for order in orders.iter() {
                         order_margin
-                            .try_insert(
-                                black_box(order.clone()),
-                                &mut balances,
-                                &position,
-                                init_margin_req,
-                            )
+                            .try_insert(black_box(order.clone()), &mut account, init_margin_req)
                             .unwrap()
                     }
-                    (order_margin, balances)
+                    (order_margin, account)
                 },
-                |(mut order_margin, mut balances)| {
+                |(mut order_margin, mut account)| {
                     for order in orders.iter() {
                         order_margin
                             .remove(
                                 black_box(CancelBy::OrderId(order.id())),
-                                &mut balances,
-                                &position,
+                                &mut account,
                                 init_margin_req,
                             )
                             .expect("Can insert");
@@ -132,15 +125,12 @@ fn criterion_benchmark(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut order_margin = OrderMargin::new(NonZeroUsize::new(n).unwrap());
-                    let mut balances = Balances::new(QuoteCurrency::new(1_000_000, 0));
+                    let mut account = Account::builder()
+                        .balances(Balances::new(QuoteCurrency::new(1_000_000, 0)))
+                        .build();
                     for order in orders.iter() {
                         order_margin
-                            .try_insert(
-                                black_box(order.clone()),
-                                &mut balances,
-                                &position,
-                                init_margin_req,
-                            )
+                            .try_insert(black_box(order.clone()), &mut account, init_margin_req)
                             .unwrap()
                     }
                     order_margin
@@ -163,15 +153,12 @@ fn criterion_benchmark(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut order_margin = OrderMargin::new(NonZeroUsize::new(n).unwrap());
-                    let mut balances = Balances::new(QuoteCurrency::new(1_000_000, 0));
+                    let mut account = Account::builder()
+                        .balances(Balances::new(QuoteCurrency::new(1_000_000, 0)))
+                        .build();
                     for order in orders.iter() {
                         order_margin
-                            .try_insert(
-                                black_box(order.clone()),
-                                &mut balances,
-                                &position,
-                                init_margin_req,
-                            )
+                            .try_insert(black_box(order.clone()), &mut account, init_margin_req)
                             .unwrap()
                     }
                     order_margin
@@ -194,15 +181,12 @@ fn criterion_benchmark(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut order_margin = OrderMargin::new(NonZeroUsize::new(n).unwrap());
-                    let mut balances = Balances::new(QuoteCurrency::new(1_000_000, 0));
+                    let mut account = Account::builder()
+                        .balances(Balances::new(QuoteCurrency::new(1_000_000, 0)))
+                        .build();
                     for order in orders.iter() {
                         order_margin
-                            .try_insert(
-                                black_box(order.clone()),
-                                &mut balances,
-                                &position,
-                                init_margin_req,
-                            )
+                            .try_insert(black_box(order.clone()), &mut account, init_margin_req)
                             .unwrap()
                     }
                     order_margin
