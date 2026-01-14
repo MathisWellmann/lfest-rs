@@ -45,7 +45,9 @@ where
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
-    pub(crate) fn change_position(
+    /// Change the account position, modifying its balances.
+    /// This method is usually called by `Exchange`, but exposed for advanced use cases.
+    pub fn change_position(
         &mut self,
         filled_qty: BaseOrQuote,
         fill_price: QuoteCurrency<I, D>,
@@ -66,14 +68,26 @@ where
         self.balances.account_for_fee(fee);
     }
 
+    /// Try to reserve some order margin.
+    /// This method is usually called by `Exchange`, but exposed for advanced use cases.
+    ///
+    /// # Panics:
+    /// Will panic when assertions are not upheld.
+    /// The `Exchange` is guaranteed to uphold these conditions, but arbitrary public callers may not.
     #[inline]
     #[must_use]
-    pub(crate) fn try_reserve_order_margin(&mut self, margin: BaseOrQuote::PairedCurrency) -> bool {
+    pub fn try_reserve_order_margin(&mut self, margin: BaseOrQuote::PairedCurrency) -> bool {
         self.balances.try_reserve_order_margin(margin)
     }
 
+    /// Free some order margin from the balance
+    /// This method is usually called by `Exchange`, but exposed for advanced use cases.
+    ///
+    /// # Panics:
+    /// Will panic when assertions are not upheld.
+    /// The `Exchange` is guaranteed to uphold these conditions, but arbitrary public callers may not.
     #[inline]
-    pub(crate) fn free_order_margin(&mut self, margin: BaseOrQuote::PairedCurrency) {
+    pub fn free_order_margin(&mut self, margin: BaseOrQuote::PairedCurrency) {
         self.balances.free_order_margin(margin)
     }
 }
