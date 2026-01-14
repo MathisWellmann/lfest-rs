@@ -23,6 +23,7 @@ use crate::{
         Currency,
         Mon,
         Position,
+        Position::*,
     },
     types::{
         Balances,
@@ -30,7 +31,7 @@ use crate::{
         LimitOrder,
         MarginCurrency,
         Pending,
-        Side,
+        Side::*,
         UserOrderId,
     },
     utils::max,
@@ -77,9 +78,10 @@ where
     ) -> Result<()> {
         trace!("OrderMargin.try_insert {order:?}");
         self.active_limit_orders.try_insert(order.clone())?;
+
         match order.side() {
-            Side::Buy => self.bids_notional += order.notional(),
-            Side::Sell => self.asks_notional += order.notional(),
+            Buy => self.bids_notional += order.notional(),
+            Sell => self.asks_notional += order.notional(),
         }
 
         // Update balances
@@ -110,12 +112,13 @@ where
         assert2::debug_assert!(notional > Zero::zero());
         let old_order = self.active_limit_orders.update(order);
         let notional_delta = notional - old_order.notional();
+
         match old_order.side() {
-            Side::Buy => {
+            Buy => {
                 self.bids_notional += notional_delta;
                 assert2::debug_assert!(self.bids_notional >= Zero::zero());
             }
-            Side::Sell => {
+            Sell => {
                 self.asks_notional += notional_delta;
                 assert2::debug_assert!(self.asks_notional >= Zero::zero());
             }
@@ -155,11 +158,11 @@ where
         };
 
         match removed_order.side() {
-            Side::Buy => {
+            Buy => {
                 self.bids_notional -= removed_order.notional();
                 assert2::debug_assert!(self.bids_notional >= Zero::zero());
             }
-            Side::Sell => {
+            Sell => {
                 self.asks_notional -= removed_order.notional();
                 assert2::debug_assert!(self.asks_notional >= Zero::zero());
             }
@@ -190,11 +193,11 @@ where
         assert2::debug_assert!(init_margin_req <= Decimal::one());
 
         match position {
-            Position::Neutral => max(self.bids_notional, self.asks_notional) * init_margin_req,
-            Position::Long(inner) => {
+            Neutral => max(self.bids_notional, self.asks_notional) * init_margin_req,
+            Long(inner) => {
                 max(self.bids_notional, self.asks_notional - inner.notional()) * init_margin_req
             }
-            Position::Short(inner) => {
+            Short(inner) => {
                 max(self.bids_notional - inner.notional(), self.asks_notional) * init_margin_req
             }
         }
@@ -214,18 +217,18 @@ where
         let mut sell_notional = self.asks_notional;
         let new_notional = new_order.notional();
         match new_order.side() {
-            Side::Buy => buy_notional += new_notional,
-            Side::Sell => sell_notional += new_notional,
+            Buy => buy_notional += new_notional,
+            Sell => sell_notional += new_notional,
         }
 
         match position {
-            Position::Neutral => max(buy_notional, sell_notional) * init_margin_req,
-            Position::Long(inner) => {
+            Neutral => max(buy_notional, sell_notional) * init_margin_req,
+            Long(inner) => {
                 let notional = inner.notional();
                 trace!("notional: {notional}");
                 max(buy_notional, sell_notional - notional) * init_margin_req
             }
-            Position::Short(inner) => {
+            Short(inner) => {
                 let notional = inner.notional();
                 trace!("notional: {notional}");
                 max(buy_notional - notional, sell_notional) * init_margin_req
@@ -246,7 +249,7 @@ mod tests {
     #[test]
     fn order_margin_assert_limit_order_reduces_qty() {
         let new_active_order = LimitOrder::new(
-            Side::Buy,
+            Buy,
             QuoteCurrency::<i64, 5>::new(100, 0),
             BaseCurrency::new(5, 0),
         )
@@ -265,7 +268,7 @@ mod tests {
     #[should_panic]
     fn order_margin_assert_limit_order_reduces_qty_panic() {
         let new_active_order = LimitOrder::new(
-            Side::Buy,
+            Buy,
             QuoteCurrency::<i64, 5>::new(100, 0),
             BaseCurrency::new(5, 0),
         )
