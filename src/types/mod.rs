@@ -63,3 +63,11 @@ impl<T> UserOrderId for T where
     T: Clone + Copy + Eq + PartialEq + std::fmt::Debug + std::fmt::Display + Default
 {
 }
+
+/// Whether to cancel a limit order by its `OrderId` or the `UserOrderId`.
+#[allow(missing_docs, reason = "Self documenting")]
+#[derive(Debug, Clone, Copy)]
+pub enum CancelBy<UserOrderIdT: UserOrderId> {
+    OrderId(OrderId),
+    UserOrderId(UserOrderIdT),
+}

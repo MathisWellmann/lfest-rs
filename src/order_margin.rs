@@ -17,7 +17,6 @@ use tracing::{
 
 use crate::{
     Result,
-    exchange::CancelBy,
     prelude::{
         ActiveLimitOrders,
         Currency,
@@ -27,6 +26,7 @@ use crate::{
     },
     types::{
         Balances,
+        CancelBy,
         Error,
         LimitOrder,
         MarginCurrency,

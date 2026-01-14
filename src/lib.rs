@@ -44,7 +44,6 @@ pub mod prelude {
         contract_specification::*,
         exchange::{
             Account,
-            CancelBy,
             Exchange,
         },
         leverage,

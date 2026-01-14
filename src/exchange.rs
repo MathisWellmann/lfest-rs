@@ -35,6 +35,7 @@ use crate::{
     },
     types::{
         Balances,
+        CancelBy,
         Error,
         ExchangeOrderMeta,
         Filled,
@@ -52,14 +53,6 @@ use crate::{
         UserOrderId,
     },
 };
-
-/// Whether to cancel a limit order by its `OrderId` or the `UserOrderId`.
-#[allow(missing_docs, reason = "Self documenting")]
-#[derive(Debug, Clone, Copy)]
-pub enum CancelBy<UserOrderIdT: UserOrderId> {
-    OrderId(OrderId),
-    UserOrderId(UserOrderIdT),
-}
 
 /// Relevant information about the traders account.
 ///
