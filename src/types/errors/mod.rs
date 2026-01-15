@@ -7,8 +7,8 @@ mod risk;
 pub use config::ConfigError;
 pub use filter::FilterError;
 pub use main::Error;
-pub use order::OrderError;
+pub use order::*;
 pub use risk::RiskError;
 
 /// This is defined as a convenience.
-pub type Result<Inner> = std::result::Result<Inner, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;

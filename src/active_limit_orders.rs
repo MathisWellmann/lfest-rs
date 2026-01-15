@@ -5,9 +5,9 @@ use tracing::trace;
 
 use crate::types::{
     Currency,
-    Error,
     LimitOrder,
     MarginCurrency,
+    MaxNumberOfActiveOrders,
     Mon,
     OrderId,
     Pending,
@@ -142,12 +142,14 @@ where
     pub fn try_insert(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) -> crate::Result<()> {
+    ) -> crate::Result<(), MaxNumberOfActiveOrders> {
         use std::cmp::Ordering::*;
+
+        use Side::*;
         match order.side() {
-            Side::Buy => {
+            Buy => {
                 if self.bids.len() >= self.bids.capacity() {
-                    return Err(Error::MaxNumberOfActiveOrders);
+                    return Err(MaxNumberOfActiveOrders);
                 }
                 // Find location to insert so that bids remain ordered.
                 let idx = self
@@ -160,9 +162,9 @@ where
                 trace!("insert bid {order} at idx {idx}, bids: {:?}", self.bids);
                 self.bids.insert(idx, order)
             }
-            Side::Sell => {
+            Sell => {
                 if self.asks.len() >= self.asks.capacity() {
-                    return Err(Error::MaxNumberOfActiveOrders);
+                    return Err(MaxNumberOfActiveOrders);
                 }
                 let idx = self
                     .asks

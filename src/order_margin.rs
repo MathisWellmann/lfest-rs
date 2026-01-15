@@ -32,6 +32,7 @@ use crate::{
         Error,
         LimitOrder,
         MarginCurrency,
+        MaxNumberOfActiveOrders,
         Pending,
         Side::*,
         UserOrderId,
@@ -75,7 +76,7 @@ where
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         account: &mut Account<I, D, BaseOrQuote>,
         init_margin_req: Decimal<I, D>,
-    ) -> Result<()> {
+    ) -> Result<(), MaxNumberOfActiveOrders> {
         trace!("OrderMargin.try_insert {order:?}");
         self.active_limit_orders.try_insert(order.clone())?;
 
@@ -86,6 +87,7 @@ where
 
         // Update balances
         let new_order_margin = self.order_margin(init_margin_req, account.position());
+        debug!("new_order_margin: {new_order_margin}");
         assert2::debug_assert!(new_order_margin >= account.balances().order_margin());
         if new_order_margin > account.balances().order_margin() {
             let margin = new_order_margin - account.balances().order_margin();

@@ -4,7 +4,11 @@ use super::{
     OrderError,
     RiskError,
 };
-use crate::prelude::OrderId;
+use crate::{
+    order_rate_limiter::RateLimitReached,
+    prelude::OrderId,
+    types::MaxNumberOfActiveOrders,
+};
 
 /// Describes possible Errors that may occur when calling methods in this crate
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
@@ -45,18 +49,28 @@ pub enum Error {
     #[error("The constant decimal precision is incompatible")]
     WrongDecimalPrecision,
 
-    #[error("The maximum number of active orders is reached")]
-    MaxNumberOfActiveOrders,
-
     #[error("Could not convert the in")]
     IntegerConversion,
 
     #[error("Unable to create `Decimal`")]
     UnableToCreateDecimal,
 
-    #[error("The order rate limit was reached for this period.")]
-    RateLimitReached,
-
     #[error("The provided prices for `Candle` don't make sense.")]
     InvalidCandlePrices,
+
+    #[error(transparent)]
+    MaxNumberOfActiveLimitOrders(#[from] MaxNumberOfActiveOrders),
+
+    #[error(transparent)]
+    RateLimitReached(#[from] RateLimitReached),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn size_of_error() {
+        assert_eq!(size_of::<Error>(), 56);
+    }
 }

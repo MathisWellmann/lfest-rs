@@ -1,7 +1,7 @@
-use crate::types::{
-    Error,
-    TimestampNs,
-};
+use crate::types::TimestampNs;
+
+#[derive(Debug, Clone, thiserror::Error, derive_more::Display, Eq, PartialEq)]
+pub struct RateLimitReached;
 
 /// Limits the rate at which limit orders can be submitted.
 /// Operates on buckets measured in seconds.
@@ -44,17 +44,21 @@ impl OrderRateLimiter {
 
     /// Acquire a single permit for a new order related action.
     /// returns `true` if the rate limit has been reached.
-    #[inline(always)]
-    pub(crate) fn aquire(&mut self, current_ts_ns: TimestampNs) -> crate::Result<()> {
+    #[inline]
+    pub(crate) fn aquire(
+        &mut self,
+        current_ts_ns: TimestampNs,
+    ) -> crate::Result<(), RateLimitReached> {
         if !self.is_in_bucket(current_ts_ns) {
             self.new_bucket(current_ts_ns);
             self.remaining -= 1;
             return Ok(());
         }
         if self.remaining == 0 {
-            return Err(Error::RateLimitReached);
+            return Err(RateLimitReached);
         }
         self.remaining -= 1;
+
         Ok(())
     }
 }

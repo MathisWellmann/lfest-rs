@@ -44,6 +44,7 @@ use crate::{
         LimitOrderFill,
         MarginCurrency,
         MarketOrder,
+        MaxNumberOfActiveOrders,
         NewOrder,
         OrderId,
         Pending,
@@ -271,7 +272,10 @@ where
     pub fn submit_limit_order(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
-    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+    ) -> Result<
+        LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        // SubmitLimitOrderError,
+    > {
         trace!("submit_order: {}", order);
 
         self.order_rate_limiter
@@ -381,7 +385,7 @@ where
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         marketable: bool,
-    ) -> Result<()> {
+    ) -> Result<(), MaxNumberOfActiveOrders> {
         trace!("append_limit_order: order: {order}, marketable: {marketable}");
         trace!(
             "active_limit_orders: {}, market_state: {}, position: {}",
