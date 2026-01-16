@@ -14,6 +14,7 @@ use crate::{
     types::{
         Currency,
         Mon,
+        PriceFilterError,
         QuoteCurrency,
         Side,
         TimestampNs,
@@ -222,7 +223,10 @@ where
     }
 
     #[inline(always)]
-    fn validate_market_update(&self, _price_filter: &PriceFilter<I, D>) -> crate::Result<()> {
+    fn validate_market_update(
+        &self,
+        _price_filter: &PriceFilter<I, D>,
+    ) -> Result<(), PriceFilterError> {
         // The constructor checks the validity when debug assertions are enabled.
         Ok(())
     }

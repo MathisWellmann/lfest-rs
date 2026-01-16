@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use crate::types::TimestampNs;
 
 #[derive(Debug, Clone, thiserror::Error, derive_more::Display, Eq, PartialEq)]
@@ -10,13 +12,14 @@ pub(crate) struct OrderRateLimiter {
     /// The start of the rate limiting bucket in seconds.
     bucket_start_ns: TimestampNs,
     /// The maximum number of order actions per second.
-    orders_per_second: u16,
+    orders_per_second: u32,
     /// The number of remaining order actions that can be submitted during the period.
-    remaining: u16,
+    remaining: u32,
 }
 
 impl OrderRateLimiter {
-    pub(crate) fn new(orders_per_second: u16) -> Self {
+    pub(crate) fn new(orders_per_second: NonZeroU32) -> Self {
+        let orders_per_second = orders_per_second.get();
         Self {
             bucket_start_ns: 0.into(),
             orders_per_second,
@@ -45,10 +48,7 @@ impl OrderRateLimiter {
     /// Acquire a single permit for a new order related action.
     /// returns `true` if the rate limit has been reached.
     #[inline]
-    pub(crate) fn aquire(
-        &mut self,
-        current_ts_ns: TimestampNs,
-    ) -> crate::Result<(), RateLimitReached> {
+    pub(crate) fn aquire(&mut self, current_ts_ns: TimestampNs) -> Result<(), RateLimitReached> {
         if !self.is_in_bucket(current_ts_ns) {
             self.new_bucket(current_ts_ns);
             self.remaining -= 1;
@@ -66,10 +66,11 @@ impl OrderRateLimiter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::EXPECT_NON_ZERO;
 
     #[test]
     fn order_rate_limiter() {
-        let mut limiter = OrderRateLimiter::new(5);
+        let mut limiter = OrderRateLimiter::new(NonZeroU32::new(5).expect(EXPECT_NON_ZERO));
         for _i in 0..5 {
             assert!(limiter.aquire(0.into()).is_ok());
         }

@@ -2,7 +2,6 @@ use num::Zero;
 
 use super::MarketUpdate;
 use crate::{
-    Result,
     market_update::market_update_trait::Exhausted,
     order_filters::{
         enforce_max_price,
@@ -20,6 +19,7 @@ use crate::{
         Side,
     },
     types::{
+        PriceFilterError,
         TimestampNs,
         UserOrderId,
     },
@@ -109,7 +109,10 @@ where
         }
     }
 
-    fn validate_market_update(&self, price_filter: &PriceFilter<I, D>) -> Result<()> {
+    fn validate_market_update(
+        &self,
+        price_filter: &PriceFilter<I, D>,
+    ) -> Result<(), PriceFilterError> {
         debug_assert!(self.price > QuoteCurrency::zero());
         enforce_min_price(price_filter.min_price(), self.price)?;
         enforce_max_price(price_filter.max_price(), self.price)?;

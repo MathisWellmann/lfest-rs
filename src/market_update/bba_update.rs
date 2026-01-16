@@ -2,7 +2,6 @@ use const_decimal::Decimal;
 
 use super::MarketUpdate;
 use crate::{
-    Result,
     market_update::market_update_trait::Exhausted,
     order_filters::{
         enforce_bid_ask_spread,
@@ -20,6 +19,7 @@ use crate::{
         QuoteCurrency,
     },
     types::{
+        PriceFilterError,
         TimestampNs,
         UserOrderId,
     },
@@ -79,7 +79,10 @@ where
         );
     }
 
-    fn validate_market_update(&self, price_filter: &PriceFilter<I, D>) -> Result<()> {
+    fn validate_market_update(
+        &self,
+        price_filter: &PriceFilter<I, D>,
+    ) -> Result<(), PriceFilterError> {
         enforce_min_price(price_filter.min_price(), self.bid)?;
         enforce_min_price(price_filter.min_price(), self.ask)?;
         enforce_max_price(price_filter.max_price(), self.bid)?;

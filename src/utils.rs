@@ -33,11 +33,10 @@ where
 /// Create a `Decimal` from an `f64` value.
 // TODO: maybe upstream this impl to `const_decimal`
 #[inline(always)]
-pub fn decimal_from_f64<I: Mon<D>, const D: u8>(val: f64) -> Result<Decimal<I, D>> {
+pub fn decimal_from_f64<I: Mon<D>, const D: u8>(val: f64) -> Option<Decimal<I, D>> {
     let scaling_factor = 10_f64.powi(D as i32);
     let scaled: f64 = (val * scaling_factor).round();
-    Decimal::try_from_scaled(I::from(scaled as i64).ok_or(Error::IntegerConversion)?, D)
-        .ok_or(Error::UnableToCreateDecimal)
+    Decimal::try_from_scaled(I::from(scaled as i64)?, D)
 }
 
 /// Scales the value from one range into another

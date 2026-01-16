@@ -8,7 +8,10 @@
 
 use std::{
     hint::black_box,
-    num::NonZeroUsize,
+    num::{
+        NonZeroU32,
+        NonZeroUsize,
+    },
 };
 
 use const_decimal::Decimal;
@@ -66,7 +69,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 starting_balance,
                 NonZeroUsize::new(200).unwrap(),
                 contract_spec,
-                OrderRateLimits::new(u16::MAX).unwrap(),
+                OrderRateLimits::new(NonZeroU32::MAX),
             )
             .unwrap();
             let mut exchange = Exchange::new(config);

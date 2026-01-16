@@ -2,12 +2,14 @@
 
 use getset::CopyGetters;
 
-use crate::prelude::{
-    ConfigError,
-    Currency,
-    Mon,
-    OrderError,
-    QuoteCurrency,
+use crate::{
+    prelude::{
+        ConfigError,
+        Currency,
+        Mon,
+        QuoteCurrency,
+    },
+    types::ValidateOrderQuantityError,
 };
 
 /// The `SizeFilter` defines the quantity rules that each order needs to follow
@@ -78,20 +80,23 @@ where
         })
     }
 
-    pub(crate) fn validate_order_quantity(&self, quantity: BaseOrQuote) -> Result<(), OrderError> {
+    pub(crate) fn validate_order_quantity(
+        &self,
+        quantity: BaseOrQuote,
+    ) -> Result<(), ValidateOrderQuantityError> {
         if quantity == BaseOrQuote::zero() {
-            return Err(OrderError::QuantityTooLow);
+            return Err(ValidateOrderQuantityError::QuantityTooLow);
         }
 
         if let Some(max_qty) = self.max_quantity
             && quantity > max_qty
         {
-            return Err(OrderError::QuantityTooHigh);
+            return Err(ValidateOrderQuantityError::QuantityTooHigh);
         }
 
         let min_qty = if let Some(min_qty) = self.min_quantity {
             if quantity < min_qty {
-                return Err(OrderError::QuantityTooLow);
+                return Err(ValidateOrderQuantityError::QuantityTooLow);
             }
             min_qty
         } else {
@@ -99,7 +104,7 @@ where
         };
 
         if ((quantity - min_qty) % self.tick_size) != BaseOrQuote::zero() {
-            return Err(OrderError::InvalidQuantityStepSize);
+            return Err(ValidateOrderQuantityError::InvalidQuantityStepSize);
         }
         Ok(())
     }
@@ -126,7 +131,7 @@ mod tests {
 
         assert_eq!(
             filter.validate_order_quantity(QuoteCurrency::zero()),
-            Err(OrderError::QuantityTooLow)
+            Err(ValidateOrderQuantityError::QuantityTooLow)
         );
 
         filter
@@ -135,17 +140,17 @@ mod tests {
 
         assert_eq!(
             filter.validate_order_quantity(QuoteCurrency::new(5, 0)),
-            Err(OrderError::QuantityTooLow)
+            Err(ValidateOrderQuantityError::QuantityTooLow)
         );
 
         assert_eq!(
             filter.validate_order_quantity(QuoteCurrency::new(5000, 0)),
-            Err(OrderError::QuantityTooHigh)
+            Err(ValidateOrderQuantityError::QuantityTooHigh)
         );
 
         assert_eq!(
             filter.validate_order_quantity(QuoteCurrency::new(505, 1)),
-            Err(OrderError::InvalidQuantityStepSize)
+            Err(ValidateOrderQuantityError::InvalidQuantityStepSize)
         );
     }
 
@@ -159,11 +164,11 @@ mod tests {
         };
         assert_eq!(
             filter.validate_order_quantity(QuoteCurrency::zero()),
-            Err(OrderError::QuantityTooLow)
+            Err(ValidateOrderQuantityError::QuantityTooLow)
         );
         assert_eq!(
             filter.validate_order_quantity(QuoteCurrency::new(5, 1)),
-            Err(OrderError::InvalidQuantityStepSize)
+            Err(ValidateOrderQuantityError::InvalidQuantityStepSize)
         );
     }
 

@@ -7,9 +7,8 @@ use num_traits::{
 
 use crate::prelude::{
     ConfigError,
-    FilterError,
     Mon,
-    OrderError,
+    PriceFilterError,
     QuoteCurrency,
 };
 
@@ -126,18 +125,18 @@ where
         &self,
         limit_price: QuoteCurrency<I, D>,
         mark_price: QuoteCurrency<I, D>,
-    ) -> Result<(), OrderError> {
-        enforce_max_price(self.max_price, limit_price).map_err(OrderError::Filter)?;
-        enforce_min_price(self.min_price, limit_price).map_err(OrderError::Filter)?;
-        enforce_step_size(self.tick_size, limit_price).map_err(OrderError::Filter)?;
+    ) -> Result<(), PriceFilterError> {
+        enforce_max_price(self.max_price, limit_price)?;
+        enforce_min_price(self.min_price, limit_price)?;
+        enforce_step_size(self.tick_size, limit_price)?;
 
         if limit_price > mark_price * self.multiplier_up && self.multiplier_up != Decimal::zero() {
-            return Err(OrderError::LimitPriceAboveMultiple);
+            return Err(PriceFilterError::LimitPriceAboveMultiple);
         }
         if limit_price < mark_price * self.multiplier_down
             && self.multiplier_down != Decimal::zero()
         {
-            return Err(OrderError::LimitPriceBelowMultiple);
+            return Err(PriceFilterError::LimitPriceBelowMultiple);
         }
         Ok(())
     }
@@ -147,12 +146,12 @@ where
 pub(crate) fn enforce_bid_ask_spread<I, const D: u8>(
     bid: QuoteCurrency<I, D>,
     ask: QuoteCurrency<I, D>,
-) -> Result<(), FilterError>
+) -> Result<(), PriceFilterError>
 where
     I: Mon<D>,
 {
     if bid >= ask {
-        return Err(FilterError::InvalidBidAskSpread);
+        return Err(PriceFilterError::InvalidBidAskSpread);
     }
     Ok(())
 }
@@ -162,17 +161,17 @@ where
 pub(crate) fn enforce_min_price<I, const D: u8>(
     min_price: Option<QuoteCurrency<I, D>>,
     price: QuoteCurrency<I, D>,
-) -> Result<(), FilterError>
+) -> Result<(), PriceFilterError>
 where
     I: Mon<D>,
 {
     if price <= QuoteCurrency::zero() {
-        return Err(FilterError::PriceTooLow);
+        return Err(PriceFilterError::PriceTooLow);
     }
     if let Some(min_price) = min_price {
         assert2::debug_assert!(min_price != QuoteCurrency::zero());
         if price < min_price {
-            return Err(FilterError::PriceTooLow);
+            return Err(PriceFilterError::PriceTooLow);
         }
     }
     Ok(())
@@ -183,14 +182,14 @@ where
 pub(crate) fn enforce_max_price<I, const D: u8>(
     max_price: Option<QuoteCurrency<I, D>>,
     price: QuoteCurrency<I, D>,
-) -> Result<(), FilterError>
+) -> Result<(), PriceFilterError>
 where
     I: Mon<D>,
 {
     if let Some(max_price) = max_price {
         assert2::debug_assert!(max_price != QuoteCurrency::zero());
         if price > max_price {
-            return Err(FilterError::PriceTooHigh);
+            return Err(PriceFilterError::PriceTooHigh);
         }
     }
     Ok(())
@@ -200,12 +199,12 @@ where
 pub(crate) fn enforce_step_size<I, const D: u8>(
     step_size: QuoteCurrency<I, D>,
     price: QuoteCurrency<I, D>,
-) -> Result<(), FilterError>
+) -> Result<(), PriceFilterError>
 where
     I: Mon<D>,
 {
     if (price % step_size) != QuoteCurrency::zero() {
-        return Err(FilterError::PriceStepSize {
+        return Err(PriceFilterError::PriceStepSize {
             price: price.to_string(),
             step_size: step_size.to_string(),
         });
@@ -240,7 +239,7 @@ mod tests {
                 QuoteCurrency::<i64, 5>::new(bid, 0),
                 QuoteCurrency::new(ask, 0),
             ),
-            Err(FilterError::InvalidBidAskSpread)
+            Err(PriceFilterError::InvalidBidAskSpread)
         );
     }
 
@@ -265,7 +264,7 @@ mod tests {
                 Some(QuoteCurrency::new(5, 1)),
                 QuoteCurrency::<i64, 5>::new(price, 1),
             ),
-            Err(FilterError::PriceTooLow)
+            Err(PriceFilterError::PriceTooLow)
         )
     }
 
@@ -290,7 +289,7 @@ mod tests {
                 Some(QuoteCurrency::new(100, 0)),
                 QuoteCurrency::<i64, 5>::new(price, 0),
             ),
-            Err(FilterError::PriceTooHigh)
+            Err(PriceFilterError::PriceTooHigh)
         );
     }
 
@@ -310,7 +309,7 @@ mod tests {
 
         assert_eq!(
             enforce_step_size(step_size, price),
-            Err(FilterError::PriceStepSize {
+            Err(PriceFilterError::PriceStepSize {
                 price: price.to_string(),
                 step_size: step_size.to_string(),
             })
@@ -338,12 +337,12 @@ mod tests {
         let price = QuoteCurrency::new(5, 2);
         assert_eq!(
             filter.validate_limit_price(price, mark_price),
-            Err(OrderError::Filter(FilterError::PriceTooLow))
+            Err(PriceFilterError::PriceTooLow)
         );
         let price = QuoteCurrency::new(1001, 0);
         assert_eq!(
             filter.validate_limit_price(price, mark_price),
-            Err(OrderError::Filter(FilterError::PriceTooHigh))
+            Err(PriceFilterError::PriceTooHigh)
         );
 
         // Test upper price band
@@ -352,7 +351,7 @@ mod tests {
         let price = QuoteCurrency::new(121, 0);
         assert_eq!(
             filter.validate_limit_price(price, mark_price),
-            Err(OrderError::LimitPriceAboveMultiple)
+            Err(PriceFilterError::LimitPriceAboveMultiple)
         );
 
         // Test lower price band
@@ -361,17 +360,17 @@ mod tests {
         let price = QuoteCurrency::new(79, 0);
         assert_eq!(
             filter.validate_limit_price(price, mark_price),
-            Err(OrderError::LimitPriceBelowMultiple)
+            Err(PriceFilterError::LimitPriceBelowMultiple)
         );
 
         // Test step size
         let price = QuoteCurrency::new(10005, 2);
         assert_eq!(
             filter.validate_limit_price(price, mark_price),
-            Err(OrderError::Filter(FilterError::PriceStepSize {
+            Err(PriceFilterError::PriceStepSize {
                 price: "100.05 Quote".to_string(),
                 step_size: "0.10 Quote".to_string(),
-            }))
+            })
         );
     }
 

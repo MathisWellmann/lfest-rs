@@ -16,7 +16,6 @@ use tracing::{
 };
 
 use crate::{
-    Result,
     prelude::{
         ActiveLimitOrders,
         Currency,
@@ -29,10 +28,10 @@ use crate::{
     types::{
         Account,
         CancelBy,
-        Error,
         LimitOrder,
         MarginCurrency,
         MaxNumberOfActiveOrders,
+        OrderIdNotFound,
         Pending,
         Side::*,
         UserOrderId,
@@ -139,22 +138,27 @@ where
     }
 
     /// Remove an order from being tracked for margin purposes.
+    #[allow(clippy::complexity, reason = "How is this hard to read?")]
     pub fn remove(
         &mut self,
         by: CancelBy<UserOrderIdT>,
         account: &mut Account<I, D, BaseOrQuote>,
         init_margin_req: Decimal<I, D>,
-    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+    ) -> Result<
+        LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        OrderIdNotFound<UserOrderIdT>,
+    > {
         debug!("OrderMargin.remove {by:?}");
+        use CancelBy::*;
         let removed_order = match by {
-            CancelBy::OrderId(order_id) => self
+            OrderId(order_id) => self
                 .active_limit_orders
                 .remove(order_id)
-                .ok_or(Error::OrderIdNotFound { order_id })?,
-            CancelBy::UserOrderId(user_order_id) => self
+                .ok_or(OrderIdNotFound::OrderId(order_id))?,
+            UserOrderId(user_order_id) => self
                 .active_limit_orders
                 .remove_by_user_order_id(user_order_id)
-                .ok_or(Error::UserOrderIdNotFound)?,
+                .ok_or(OrderIdNotFound::UserOrderId(user_order_id))?,
         };
 
         match removed_order.side() {

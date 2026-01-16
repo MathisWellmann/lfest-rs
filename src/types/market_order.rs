@@ -8,7 +8,6 @@ use super::{
     ExchangeOrderMeta,
     Filled,
     Mon,
-    OrderError,
     Pending,
     QuoteCurrency,
     Side,
@@ -16,6 +15,7 @@ use super::{
     UserOrderId,
     order_status::NewOrder,
 };
+use crate::types::OrderQuantityLTEZero;
 
 /// Defines an market order aka taker order.
 /// Generics:
@@ -83,9 +83,9 @@ where
     ///
     /// # Returns:
     /// Either a successfully created instance or an [`OrderError`]
-    pub fn new(side: Side, quantity: BaseOrQuote) -> Result<Self, OrderError> {
+    pub fn new(side: Side, quantity: BaseOrQuote) -> Result<Self, OrderQuantityLTEZero> {
         if quantity <= BaseOrQuote::zero() {
-            return Err(OrderError::OrderQuantityLTEZero);
+            return Err(OrderQuantityLTEZero);
         }
         Ok(MarketOrder {
             user_order_id: UserOrderIdT::default(),
@@ -109,9 +109,9 @@ where
         side: Side,
         quantity: BaseOrQuote,
         user_order_id: UserOrderIdT,
-    ) -> Result<Self, OrderError> {
+    ) -> Result<Self, OrderQuantityLTEZero> {
         if quantity <= BaseOrQuote::zero() {
-            return Err(OrderError::OrderQuantityLTEZero);
+            return Err(OrderQuantityLTEZero);
         }
         Ok(Self {
             user_order_id,
@@ -181,11 +181,11 @@ mod test {
                 .unwrap();
         assert_eq!(
             MarketOrder::<_, 5, _, NoUserOrderId, _>::new(side, BaseCurrency::<i64, 5>::new(0, 0)),
-            Err(OrderError::OrderQuantityLTEZero)
+            Err(OrderQuantityLTEZero)
         );
         assert_eq!(
             MarketOrder::<_, 5, _, NoUserOrderId, _>::new(side, BaseCurrency::<i64, 5>::new(-5, 0)),
-            Err(OrderError::OrderQuantityLTEZero)
+            Err(OrderQuantityLTEZero)
         );
     }
 
@@ -199,11 +199,11 @@ mod test {
         .unwrap();
         assert_eq!(
             MarketOrder::new_with_user_order_id(side, BaseCurrency::<i64, 5>::new(0, 0), 1),
-            Err(OrderError::OrderQuantityLTEZero)
+            Err(OrderQuantityLTEZero)
         );
         assert_eq!(
             MarketOrder::new_with_user_order_id(side, BaseCurrency::<i64, 5>::new(-5, 0), 1),
-            Err(OrderError::OrderQuantityLTEZero)
+            Err(OrderQuantityLTEZero)
         );
     }
 }

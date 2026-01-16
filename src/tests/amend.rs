@@ -94,7 +94,7 @@ fn amend_limit_order_qty_with_partial_fill_leading_to_cancel(new_qty: BaseCurren
     let new_order = LimitOrder::new(Side::Buy, QuoteCurrency::new(100, 0), new_qty).unwrap();
     assert_eq!(
         exchange.amend_limit_order(existing_id, new_order.clone()),
-        Err(Error::AmendQtyAlreadyFilled)
+        Err(AmendLimitOrderError::AmendQtyAlreadyFilled)
     );
 }
 

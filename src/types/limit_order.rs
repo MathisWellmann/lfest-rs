@@ -25,7 +25,8 @@ use super::{
 };
 use crate::{
     types::{
-        OrderError,
+        NewLimitOrderError,
+        OrderQuantityLTEZero,
         Side,
     },
     utils::NoUserOrderId,
@@ -136,12 +137,12 @@ where
         side: Side,
         limit_price: QuoteCurrency<I, D>,
         quantity: BaseOrQuote,
-    ) -> Result<Self, OrderError> {
+    ) -> Result<Self, NewLimitOrderError> {
         if limit_price <= QuoteCurrency::zero() {
-            return Err(OrderError::LimitPriceLTEZero);
+            return Err(NewLimitOrderError::LimitPriceLTEZero);
         }
         if quantity <= BaseOrQuote::zero() {
-            return Err(OrderError::OrderQuantityLTEZero);
+            return Err(OrderQuantityLTEZero.into());
         }
         Ok(Self {
             user_order_id: NoUserOrderId,
@@ -177,12 +178,12 @@ where
         limit_price: QuoteCurrency<I, D>,
         quantity: BaseOrQuote,
         user_order_id: UserOrderIdT,
-    ) -> Result<Self, OrderError> {
+    ) -> Result<Self, NewLimitOrderError> {
         if limit_price <= QuoteCurrency::zero() {
-            return Err(OrderError::LimitPriceLTEZero);
+            return Err(NewLimitOrderError::LimitPriceLTEZero);
         }
         if quantity <= BaseOrQuote::zero() {
-            return Err(OrderError::OrderQuantityLTEZero);
+            return Err(OrderQuantityLTEZero.into());
         }
         Ok(Self {
             user_order_id,

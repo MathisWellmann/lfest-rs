@@ -142,7 +142,7 @@ where
     pub fn try_insert(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) -> crate::Result<(), MaxNumberOfActiveOrders> {
+    ) -> Result<(), MaxNumberOfActiveOrders> {
         use std::cmp::Ordering::*;
 
         use Side::*;

@@ -201,7 +201,7 @@ fn submit_limit_buy_order_no_position_max() {
     .unwrap();
     assert_eq!(
         exchange.submit_limit_order(order.clone()),
-        Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
+        Err(NotEnoughAvailableBalance.into())
     );
 }
 
@@ -263,7 +263,7 @@ fn submit_limit_buy_order_with_long() {
     .unwrap();
     assert_eq!(
         exchange.submit_limit_order(order),
-        Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
+        Err(NotEnoughAvailableBalance.into())
     );
 
     // But sell order should work
@@ -337,7 +337,7 @@ fn submit_limit_buy_order_with_short() {
     .unwrap();
     assert_eq!(
         exchange.submit_limit_order(order),
-        Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
+        Err(NotEnoughAvailableBalance.into())
     );
 
     // But buy order should work
@@ -391,12 +391,10 @@ fn submit_limit_buy_order_above_ask() {
     .unwrap();
     assert_eq!(
         exchange.submit_limit_order(order),
-        Err(Error::OrderError(
-            OrderError::GoodTillCrossingRejectedOrder {
-                limit_price: QuoteCurrency::<i64, 5>::new(100, 0).to_string(),
-                away_market_quotation_price: QuoteCurrency::<i64, 5>::new(100, 0).to_string()
-            }
-        ))
+        Err(SubmitLimitOrderError::GoodTillCrossingRejectedOrder {
+            limit_price: QuoteCurrency::<i64, 5>::new(100, 0).to_string(),
+            away_market_quotation_price: QuoteCurrency::<i64, 5>::new(100, 0).to_string()
+        })
     );
 }
 

@@ -13,6 +13,7 @@ use crate::{
         LimitOrder,
         MarginCurrency,
         MarketOrder,
+        NotEnoughAvailableBalance,
         Pending,
         UserOrderId,
     },
@@ -45,7 +46,7 @@ where
         order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
         balances: &Balances<I, D, BaseOrQuote::PairedCurrency>,
-    ) -> Result<(), RiskError>;
+    ) -> Result<(), NotEnoughAvailableBalance>;
 
     /// Checks if the account it able to satisfy the margin requirements for a new limit order.
     fn check_limit_order(
@@ -54,7 +55,7 @@ where
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         available_wallet_balance: BaseOrQuote::PairedCurrency,
         order_margin: &OrderMargin<I, D, BaseOrQuote, UserOrderIdT>,
-    ) -> Result<(), RiskError>;
+    ) -> Result<(), NotEnoughAvailableBalance>;
 
     /// Ensure the account has enough maintenance margin, to keep the position open.
     /// The maintenance margin is the minimum amount of funds that must be maintained in a trader's account

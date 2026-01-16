@@ -3,7 +3,6 @@ use typed_builder::TypedBuilder;
 
 use super::MarketUpdate;
 use crate::{
-    Result,
     market_update::market_update_trait::Exhausted,
     order_filters::{
         enforce_bid_ask_spread,
@@ -22,11 +21,19 @@ use crate::{
         Side,
     },
     types::{
-        Error,
+        PriceFilterError,
         TimestampNs,
         UserOrderId,
     },
 };
+
+pub enum NewCandleError {
+    BidBelowLow,
+    AskBelowLow,
+    HighBelowLow,
+    BidAboveHigh,
+    AskAboveHigh,
+}
 
 /// A new candle has been created.
 /// Here we can use the `high` and `low` prices to see if our simulated resting orders
@@ -68,21 +75,21 @@ where
         low: QuoteCurrency<I, D>,
         high: QuoteCurrency<I, D>,
         timestamp_exchange_ns: TimestampNs,
-    ) -> Result<Self> {
+    ) -> Result<Self, NewCandleError> {
         if bid < low {
-            return Err(Error::InvalidCandlePrices);
+            return Err(NewCandleError::BidBelowLow);
         }
         if ask < low {
-            return Err(Error::InvalidCandlePrices);
+            return Err(NewCandleError::AskBelowLow);
         }
         if high < low {
-            return Err(Error::InvalidCandlePrices);
+            return Err(NewCandleError::HighBelowLow);
         }
         if bid > high {
-            return Err(Error::InvalidCandlePrices);
+            return Err(NewCandleError::BidAboveHigh);
         }
         if ask > high {
-            return Err(Error::InvalidCandlePrices);
+            return Err(NewCandleError::AskAboveHigh);
         }
 
         Ok(Self {
@@ -154,7 +161,10 @@ where
         }
     }
 
-    fn validate_market_update(&self, price_filter: &PriceFilter<I, D>) -> Result<()> {
+    fn validate_market_update(
+        &self,
+        price_filter: &PriceFilter<I, D>,
+    ) -> Result<(), PriceFilterError> {
         enforce_min_price(price_filter.min_price(), self.bid)?;
         enforce_min_price(price_filter.min_price(), self.ask)?;
         enforce_min_price(price_filter.min_price(), self.low)?;

@@ -163,7 +163,7 @@ fn submit_limit_sell_order_no_position_max() {
     .unwrap();
     assert_eq!(
         exchange.submit_limit_order(order.clone()),
-        Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
+        Err(NotEnoughAvailableBalance.into())
     );
 }
 
@@ -189,12 +189,10 @@ fn submit_limit_sell_order_below_bid() {
     .unwrap();
     assert_eq!(
         exchange.submit_limit_order(order),
-        Err(Error::OrderError(
-            OrderError::GoodTillCrossingRejectedOrder {
-                limit_price: QuoteCurrency::<i64, 5>::new(99, 0).to_string(),
-                away_market_quotation_price: QuoteCurrency::<i64, 5>::new(99, 0).to_string()
-            }
-        ))
+        Err(SubmitLimitOrderError::GoodTillCrossingRejectedOrder {
+            limit_price: QuoteCurrency::<i64, 5>::new(99, 0).to_string(),
+            away_market_quotation_price: QuoteCurrency::<i64, 5>::new(99, 0).to_string()
+        })
     );
 }
 

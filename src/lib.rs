@@ -28,7 +28,6 @@ mod utils;
 pub use expect_messages::*;
 pub use load_trades_from_csv::load_trades_from_csv;
 pub use mock_exchange::*;
-pub use types::Result;
 
 /// Exports common types
 pub mod prelude {

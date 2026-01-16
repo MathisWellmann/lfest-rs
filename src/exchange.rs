@@ -24,7 +24,6 @@ use crate::{
         Currency,
         MarketUpdate,
         Mon,
-        OrderError,
         Position,
         QuoteCurrency,
         RePricing,
@@ -35,9 +34,10 @@ use crate::{
     },
     types::{
         Account,
+        AmendLimitOrderError,
         Balances,
         CancelBy,
-        Error,
+        CancelLimitOrderError,
         ExchangeOrderMeta,
         Filled,
         LimitOrder,
@@ -48,9 +48,10 @@ use crate::{
         NewOrder,
         OrderId,
         Pending,
-        Result,
         RiskError,
         Side::*,
+        SubmitLimitOrderError,
+        SubmitMarketOrderError,
         TimestampNs,
         UserOrderId,
     },
@@ -139,7 +140,7 @@ where
     pub fn update_state<U>(
         &mut self,
         market_update: &U,
-    ) -> std::result::Result<&Vec<LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT>>, RiskError>
+    ) -> Result<&Vec<LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT>>, RiskError>
     where
         U: MarketUpdate<I, D, BaseOrQuote>,
     {
@@ -201,7 +202,10 @@ where
     pub fn submit_market_order(
         &mut self,
         order: MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
-    ) -> Result<MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> {
+    ) -> Result<
+        MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>,
+        SubmitMarketOrderError,
+    > {
         self.order_rate_limiter
             .aquire(self.market_state.current_ts_ns())?;
         // Basic checks
@@ -274,7 +278,7 @@ where
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
     ) -> Result<
         LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        // SubmitLimitOrderError,
+        SubmitLimitOrderError,
     > {
         trace!("submit_order: {}", order);
 
@@ -311,15 +315,13 @@ where
         match order.re_pricing() {
             RePricing::GoodTilCrossing => {
                 if marketable {
-                    return Err(Error::OrderError(
-                        OrderError::GoodTillCrossingRejectedOrder {
-                            limit_price: order.limit_price().to_string(),
-                            away_market_quotation_price: match order.side() {
-                                Buy => self.market_state.ask().to_string(),
-                                Sell => self.market_state.bid().to_string(),
-                            },
+                    return Err(SubmitLimitOrderError::GoodTillCrossingRejectedOrder {
+                        limit_price: order.limit_price().to_string(),
+                        away_market_quotation_price: match order.side() {
+                            Buy => self.market_state.ask().to_string(),
+                            Sell => self.market_state.bid().to_string(),
                         },
-                    ));
+                    });
                 }
             }
         }
@@ -339,7 +341,12 @@ where
         &mut self,
         existing_order_id: OrderId,
         mut new_order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
-    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+    ) -> Result<
+        LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        AmendLimitOrderError,
+    > {
+        use AmendLimitOrderError::*;
+
         self.order_rate_limiter
             .aquire(self.market_state.current_ts_ns())?;
         let existing_order = self
@@ -347,13 +354,14 @@ where
             .get_by_id(existing_order_id, new_order.side()) // Its assumed that `new_order` has the same side as existing order.
             .ok_or_else(|| {
                 if existing_order_id < self.next_order_id {
-                    Error::OrderNoLongerActive
+                    OrderNoLongerActive
                 } else {
-                    Error::OrderIdNotFound {
+                    OrderIdNotFound {
                         order_id: existing_order_id,
                     }
                 }
             })?;
+
         // When the order is in partially filled status and the new quantity <= `filled_quantity`, as per `binance` docs.
         //
         // As per cboe: "Changes in OrderQty result in an adjustment of the current order’s OrderQty. The new OrderQty does
@@ -368,13 +376,15 @@ where
         if new_leaves_qty <= BaseOrQuote::zero() {
             self.cancel_limit_order(CancelBy::OrderId(existing_order_id))
                 .expect("Can cancel this order");
-            return Err(Error::AmendQtyAlreadyFilled);
+            return Err(AmendQtyAlreadyFilled);
         }
 
         new_order.set_remaining_quantity(new_leaves_qty);
 
-        self.cancel_limit_order(CancelBy::OrderId(existing_order_id))?;
-        self.submit_limit_order(new_order)
+        self.cancel_limit_order_no_rate_limit(CancelBy::OrderId(existing_order_id))
+            .expect("Can always cancel the order here");
+        let order = self.submit_limit_order(new_order)?;
+        Ok(order)
     }
 
     /// Append a new limit order as active order.
@@ -409,13 +419,28 @@ where
 
     /// Cancel an active limit order.
     /// returns Some order if successful with given order_id
+    #[allow(clippy::complexity, reason = "How is this hard to read?")]
     pub fn cancel_limit_order(
         &mut self,
         cancel_by: CancelBy<UserOrderIdT>,
-    ) -> Result<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+    ) -> Result<
+        LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        CancelLimitOrderError<UserOrderIdT>,
+    > {
         trace!("cancel_order: by {:?}", cancel_by);
         self.order_rate_limiter
             .aquire(self.market_state.current_ts_ns())?;
+        self.cancel_limit_order_no_rate_limit(cancel_by)
+    }
+
+    #[allow(clippy::complexity, reason = "How is this hard to read?")]
+    fn cancel_limit_order_no_rate_limit(
+        &mut self,
+        cancel_by: CancelBy<UserOrderIdT>,
+    ) -> Result<
+        LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        CancelLimitOrderError<UserOrderIdT>,
+    > {
         debug_assert_eq!(
             self.account.balances().order_margin(),
             self.order_margin.order_margin(

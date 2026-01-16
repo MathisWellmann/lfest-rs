@@ -24,7 +24,7 @@ fn submit_market_buy_order_reject() {
     let order = MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap();
     assert_eq!(
         exchange.submit_market_order(order),
-        Err(Error::RiskError(RiskError::NotEnoughAvailableBalance))
+        Err(NotEnoughAvailableBalance.into())
     );
 }
 #[test]

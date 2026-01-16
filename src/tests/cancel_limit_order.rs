@@ -58,8 +58,8 @@ fn cancel_limit_order() {
     let invalid_id: OrderId = 0.into();
     assert_eq!(
         exchange.cancel_limit_order(CancelBy::OrderId(invalid_id)),
-        Err(Error::OrderIdNotFound {
-            order_id: invalid_id
-        })
+        Err(CancelLimitOrderError::OrderIdNotFound(
+            OrderIdNotFound::OrderId(invalid_id)
+        ))
     );
 }
