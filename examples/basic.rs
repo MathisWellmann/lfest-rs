@@ -7,7 +7,7 @@
 )]
 
 use std::{
-    num::NonZeroUsize,
+    num::NonZeroU16,
     time::Instant,
 };
 
@@ -46,7 +46,7 @@ fn main() {
     .expect("is valid");
     let config = Config::new(
         starting_balance,
-        NonZeroUsize::new(200).unwrap(),
+        NonZeroU16::new(200).unwrap(),
         contract_spec,
         OrderRateLimits::default(),
     )

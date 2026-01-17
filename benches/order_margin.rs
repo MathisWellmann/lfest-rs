@@ -8,7 +8,7 @@
 
 use std::{
     hint::black_box,
-    num::NonZeroUsize,
+    num::NonZeroU16,
 };
 
 use const_decimal::Decimal;
@@ -41,7 +41,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     (
-                        OrderMargin::new(NonZeroUsize::new(n).unwrap()),
+                        OrderMargin::new(NonZeroU16::new(n).unwrap()),
                         Account::builder()
                             .balances(Balances::new(QuoteCurrency::new(1_000_000, 0)))
                             .build(),
@@ -63,7 +63,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             }));
             b.iter_with_setup(
                 || {
-                    let mut om = OrderMargin::new(NonZeroUsize::new(n).unwrap());
+                    let mut om = OrderMargin::new(NonZeroU16::new(n).unwrap());
                     let mut account = Account::builder()
                         .balances(Balances::new(QuoteCurrency::new(1_000_000, 0)))
                         .build();
@@ -91,7 +91,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             }));
             b.iter_with_setup(
                 || {
-                    let mut order_margin = OrderMargin::new(NonZeroUsize::new(n).unwrap());
+                    let mut order_margin = OrderMargin::new(NonZeroU16::new(n).unwrap());
                     let mut account = Account::builder()
                         .balances(Balances::new(QuoteCurrency::new(1_000_000, 0)))
                         .build();
@@ -124,7 +124,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             let init_margin_req = Decimal::one();
             b.iter_with_setup(
                 || {
-                    let mut order_margin = OrderMargin::new(NonZeroUsize::new(n).unwrap());
+                    let mut order_margin = OrderMargin::new(NonZeroU16::new(n).unwrap());
                     let mut account = Account::builder()
                         .balances(Balances::new(QuoteCurrency::new(1_000_000, 0)))
                         .build();
@@ -152,7 +152,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             let init_margin_req = Decimal::one();
             b.iter_with_setup(
                 || {
-                    let mut order_margin = OrderMargin::new(NonZeroUsize::new(n).unwrap());
+                    let mut order_margin = OrderMargin::new(NonZeroU16::new(n).unwrap());
                     let mut account = Account::builder()
                         .balances(Balances::new(QuoteCurrency::new(1_000_000, 0)))
                         .build();
@@ -180,7 +180,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             let init_margin_req = Decimal::one();
             b.iter_with_setup(
                 || {
-                    let mut order_margin = OrderMargin::new(NonZeroUsize::new(n).unwrap());
+                    let mut order_margin = OrderMargin::new(NonZeroU16::new(n).unwrap());
                     let mut account = Account::builder()
                         .balances(Balances::new(QuoteCurrency::new(1_000_000, 0)))
                         .build();

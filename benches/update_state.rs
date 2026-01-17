@@ -9,7 +9,7 @@
 
 use std::{
     hint::black_box,
-    num::NonZeroUsize,
+    num::NonZeroU16,
 };
 
 use const_decimal::Decimal;
@@ -70,7 +70,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     .expect("works");
     let config = Config::new(
         starting_balance,
-        NonZeroUsize::new(200).unwrap(),
+        NonZeroU16::new(200).unwrap(),
         contract_spec,
         OrderRateLimits::default(),
     )

@@ -9,8 +9,8 @@
 use std::{
     hint::black_box,
     num::{
+        NonZeroU16,
         NonZeroU32,
-        NonZeroUsize,
     },
 };
 
@@ -52,7 +52,7 @@ fn setup_exchange() -> ThisExchange {
     .expect("works");
     let config = Config::new(
         starting_balance,
-        NonZeroUsize::new(200).unwrap(),
+        NonZeroU16::new(200).unwrap(),
         contract_spec,
         OrderRateLimits::new(NonZeroU32::MAX),
     )

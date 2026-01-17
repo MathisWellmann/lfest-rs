@@ -1,4 +1,4 @@
-use std::num::NonZeroUsize;
+use std::num::NonZeroU16;
 
 use crate::{
     mock_exchange_linear,
@@ -165,7 +165,7 @@ fn submit_market_buy_order_with_short_position() {
     );
     assert_eq!(
         exchange.active_limit_orders(),
-        &ActiveLimitOrders::with_capacity(NonZeroUsize::new(10).unwrap())
+        &ActiveLimitOrders::with_capacity(NonZeroU16::new(10).unwrap())
     );
 
     // Now close the position with a buy order

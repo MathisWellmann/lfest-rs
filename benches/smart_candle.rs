@@ -6,7 +6,7 @@
     reason = "Benchmarks don't use all dev-dependencies"
 )]
 
-use std::num::NonZeroUsize;
+use std::num::NonZeroU16;
 
 use const_decimal::Decimal;
 use criterion::{
@@ -43,7 +43,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     .expect("works");
     let config = Config::new(
         starting_balance,
-        NonZeroUsize::new(200).unwrap(),
+        NonZeroU16::new(200).unwrap(),
         contract_spec,
         OrderRateLimits::default(),
     )

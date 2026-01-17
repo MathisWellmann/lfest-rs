@@ -8,7 +8,7 @@
 
 use std::{
     hint::black_box,
-    num::NonZeroUsize,
+    num::NonZeroU16,
 };
 
 use criterion::{
@@ -43,7 +43,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 order.into_pending(meta)
             }));
             b.iter_with_setup(
-                || ActiveLimitOrders::with_capacity(NonZeroUsize::new(n as usize).unwrap()),
+                || ActiveLimitOrders::with_capacity(NonZeroU16::new(n as u16).unwrap()),
                 |mut ob| {
                     for order in orders.iter() {
                         ob.try_insert(black_box(order.clone())).expect("Can insert");

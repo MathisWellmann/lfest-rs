@@ -1,6 +1,6 @@
 //! Convenience function used in tests.
 
-use std::num::NonZeroUsize;
+use std::num::NonZeroU16;
 
 use const_decimal::Decimal;
 
@@ -43,7 +43,7 @@ pub fn mock_exchange_linear() -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIM
     .expect(EXPECT_CONTRACT_SPEC);
     let config = Config::new(
         QuoteCurrency::new(1000, 0),
-        NonZeroUsize::new(10).expect(EXPECT_NON_ZERO),
+        NonZeroU16::new(10).expect(EXPECT_NON_ZERO),
         contract_spec,
         OrderRateLimits::default(),
     )
@@ -68,7 +68,7 @@ pub fn mock_exchange_linear_with_account_tracker(
     .expect(EXPECT_CONTRACT_SPEC);
     let config = Config::new(
         starting_balance,
-        NonZeroUsize::new(200).expect(EXPECT_NON_ZERO),
+        NonZeroU16::new(200).expect(EXPECT_NON_ZERO),
         contract_spec,
         OrderRateLimits::default(),
     )
@@ -91,7 +91,7 @@ pub fn mock_exchange_inverse(
     .expect(EXPECT_CONTRACT_SPEC);
     let config = Config::new(
         starting_balance,
-        NonZeroUsize::new(200).expect(EXPECT_NON_ZERO),
+        NonZeroU16::new(200).expect(EXPECT_NON_ZERO),
         contract_spec,
         OrderRateLimits::default(),
     )

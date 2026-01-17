@@ -1,4 +1,4 @@
-use std::num::NonZeroUsize;
+use std::num::NonZeroU16;
 
 use getset::{
     CopyGetters,
@@ -38,7 +38,7 @@ where
 
     /// The maximum number of open orders the user can have at any given time.
     #[getset(get_copy = "pub")]
-    max_num_open_orders: NonZeroUsize,
+    max_num_open_orders: NonZeroU16,
 
     /// The contract specification.
     #[getset(get = "pub")]
@@ -68,7 +68,7 @@ where
     /// Either a valid `Config` or an Error
     pub fn new(
         starting_balance: BaseOrQuote,
-        max_num_open_orders: NonZeroUsize,
+        max_num_open_orders: NonZeroU16,
         contract_specification: ContractSpecification<I, D, BaseOrQuote::PairedCurrency>,
         order_rate_limits: OrderRateLimits,
     ) -> Result<Self, ConfigError> {

@@ -51,9 +51,9 @@ pub enum SubmitMarketOrderError {
     ValidateOrderQuantity(#[from] ValidateOrderQuantityError),
 }
 
-/// zero-sized error variant
-#[derive(Error, Debug, Clone, derive_more::Display, Eq, PartialEq)]
-pub struct MaxNumberOfActiveOrders;
+#[derive(Error, Debug, Clone, Eq, PartialEq, derive_more::Display)]
+#[allow(missing_docs, reason = "Self documenting")]
+pub struct MaxNumberOfActiveOrders(pub u16);
 
 #[derive(Debug, Clone, Error, Eq, PartialEq)]
 #[allow(missing_docs, reason = "Self documenting")]
@@ -68,7 +68,7 @@ mod tests {
 
     #[test]
     fn size_of_error() {
-        assert_eq!(size_of::<MaxNumberOfActiveOrders>(), 0);
+        assert_eq!(size_of::<MaxNumberOfActiveOrders>(), 2);
 
         assert_eq!(size_of::<OrderIdNotFound<()>>(), 16);
         assert_eq!(size_of::<OrderIdNotFound<u32>>(), 16);

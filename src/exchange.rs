@@ -116,7 +116,7 @@ where
             next_order_id: OrderId::default(),
             account: Account::builder().balances(balances).build(),
             order_margin: OrderMargin::new(max_active_orders),
-            limit_order_updates: Vec::with_capacity(max_active_orders.get()),
+            limit_order_updates: Vec::with_capacity(max_active_orders.get().into()),
             order_rate_limiter,
         }
     }

@@ -1,4 +1,4 @@
-use std::num::NonZeroUsize;
+use std::num::NonZeroU16;
 
 use crate::{
     mock_exchange_linear,
@@ -101,7 +101,7 @@ fn submit_market_sell_order_with_short_position() {
     );
     assert_eq!(
         exchange.active_limit_orders(),
-        &ActiveLimitOrders::with_capacity(NonZeroUsize::new(10).unwrap())
+        &ActiveLimitOrders::with_capacity(NonZeroU16::new(10).unwrap())
     );
 
     // Sell again
@@ -126,7 +126,7 @@ fn submit_market_sell_order_with_short_position() {
     );
     assert_eq!(
         exchange.active_limit_orders(),
-        &ActiveLimitOrders::with_capacity(NonZeroUsize::new(10).unwrap())
+        &ActiveLimitOrders::with_capacity(NonZeroU16::new(10).unwrap())
     );
 }
 
@@ -205,7 +205,7 @@ fn submit_market_sell_order_turnaround_long() {
     );
     assert_eq!(
         exchange.active_limit_orders(),
-        &ActiveLimitOrders::with_capacity(NonZeroUsize::new(10).unwrap())
+        &ActiveLimitOrders::with_capacity(NonZeroU16::new(10).unwrap())
     );
 
     // Now reverse the position
@@ -232,6 +232,6 @@ fn submit_market_sell_order_turnaround_long() {
     );
     assert_eq!(
         exchange.active_limit_orders(),
-        &ActiveLimitOrders::with_capacity(NonZeroUsize::new(10).unwrap())
+        &ActiveLimitOrders::with_capacity(NonZeroU16::new(10).unwrap())
     );
 }

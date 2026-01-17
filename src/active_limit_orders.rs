@@ -1,4 +1,4 @@
-use std::num::NonZeroUsize;
+use std::num::NonZeroU16;
 
 use getset::Getters;
 use tracing::trace;
@@ -24,7 +24,7 @@ use crate::types::{
 /// - `D`: The constant decimal precision of the currency.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 /// - `UserOrderIdT`: The type of user order id to use. Set to `()` if you don't need one.
-#[derive(Debug, Clone, PartialEq, Eq, Getters)]
+#[derive(Debug, PartialEq, Eq, Getters)]
 pub struct ActiveLimitOrders<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -40,6 +40,25 @@ where
     /// Best ask is the first element.
     #[getset(get = "pub")]
     asks: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
+}
+
+/// A clone impl which retains the capacity as we rely on that assumption downstream.
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Clone
+    for ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    fn clone(&self) -> Self {
+        let mut bids = self.bids.clone();
+        bids.reserve_exact(self.bids.capacity() - self.bids.len());
+        assert_eq!(bids.capacity(), self.bids.capacity());
+        let mut asks = self.asks.clone();
+        asks.reserve_exact(self.asks.capacity() - self.asks.len());
+        assert_eq!(asks.capacity(), self.asks.capacity());
+        Self { bids, asks }
+    }
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> std::fmt::Display
@@ -70,10 +89,11 @@ where
 {
     /// Create a new order book instance with a maximum capacity for bids and asks.
     /// The `max_active_orders` must be non zero as we need at least space for one limit order.
-    pub fn with_capacity(max_active_orders: NonZeroUsize) -> Self {
+    pub fn with_capacity(max_active_orders: NonZeroU16) -> Self {
+        let cap: usize = max_active_orders.get().into();
         Self {
-            bids: Vec::with_capacity(max_active_orders.get()),
-            asks: Vec::with_capacity(max_active_orders.get()),
+            bids: Vec::with_capacity(cap),
+            asks: Vec::with_capacity(cap),
         }
     }
 
@@ -149,7 +169,10 @@ where
         match order.side() {
             Buy => {
                 if self.bids.len() >= self.bids.capacity() {
-                    return Err(MaxNumberOfActiveOrders);
+                    debug_assert!(self.bids.capacity() > 0);
+                    return Err(MaxNumberOfActiveOrders(
+                        self.bids.capacity().try_into().expect("Will not truncate"),
+                    ));
                 }
                 // Find location to insert so that bids remain ordered.
                 let idx = self
@@ -164,7 +187,10 @@ where
             }
             Sell => {
                 if self.asks.len() >= self.asks.capacity() {
-                    return Err(MaxNumberOfActiveOrders);
+                    debug_assert!(self.asks.capacity() > 0);
+                    return Err(MaxNumberOfActiveOrders(
+                        self.bids.capacity().try_into().expect("Will not truncate"),
+                    ));
                 }
                 let idx = self
                     .asks
@@ -276,7 +302,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroUsize;
+    use std::num::NonZeroU16;
 
     use rand::Rng;
 
@@ -297,7 +323,7 @@ mod tests {
     #[tracing_test::traced_test]
     fn active_limit_orders_insert() {
         let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(
-            NonZeroUsize::new(10).unwrap(),
+            NonZeroU16::new(10).unwrap(),
         );
         let order = LimitOrder::new(
             Side::Buy,
@@ -367,7 +393,7 @@ mod tests {
     #[test]
     fn active_limit_orders_display() {
         let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(
-            NonZeroUsize::new(3).unwrap(),
+            NonZeroU16::new(3).unwrap(),
         );
         let order = LimitOrder::new(
             Side::Buy,
