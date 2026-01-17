@@ -103,7 +103,7 @@ where
     /// panics if the order id was not found.
     pub fn fill_order(
         &mut self,
-        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         account: &mut Account<I, D, BaseOrQuote>,
         init_margin_req: Decimal<I, D>,
     ) {
@@ -576,7 +576,7 @@ mod tests {
             LimitOrderFill::FullyFilled { .. } => panic!("Expected `PartiallyFilled`"),
         }
         let remaining_qty = order.remaining_quantity();
-        order_margin.fill_order(order, &mut account, init_margin_req);
+        order_margin.fill_order(&order, &mut account, init_margin_req);
         assert_eq!(order_margin.active_limit_orders.num_active(), 1);
         assert_eq!(remaining_qty, filled_qty);
         let om = QuoteCurrency::convert_from(remaining_qty, limit_price) * init_margin_req;

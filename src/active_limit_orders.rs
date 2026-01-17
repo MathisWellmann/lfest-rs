@@ -211,15 +211,16 @@ where
     #[must_use]
     pub(crate) fn update(
         &mut self,
-        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>> {
+        use Side::*;
         let active_order = match order.side() {
-            Side::Buy => self.bids.iter_mut().find(|o| o.id() == order.id()),
-            Side::Sell => self.asks.iter_mut().find(|o| o.id() == order.id()),
+            Buy => self.bids.iter_mut().find(|o| o.id() == order.id()),
+            Sell => self.asks.iter_mut().find(|o| o.id() == order.id()),
         }
         .expect("Order must have been active before updating it");
         debug_assert_ne!(
-            active_order, &order,
+            active_order, order,
             "An update to an order should not be the same as the existing one"
         );
         assert2::debug_assert!(
@@ -227,10 +228,10 @@ where
             "An update to an existing order must mean the new order has less quantity than the tracked order."
         );
         debug_assert_eq!(order.id(), active_order.id());
-        Self::assert_limit_order_update_reduces_qty(active_order, &order);
+        Self::assert_limit_order_update_reduces_qty(active_order, order);
 
         let old_order = active_order.clone();
-        *active_order = order;
+        *active_order = order.clone();
 
         old_order
     }

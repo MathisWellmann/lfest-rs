@@ -75,11 +75,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 },
                 |(mut order_margin, mut account)| {
                     for order in orders.iter() {
-                        order_margin.fill_order(
-                            black_box(order.clone()),
-                            &mut account,
-                            init_margin_req,
-                        )
+                        order_margin.fill_order(black_box(order), &mut account, init_margin_req)
                     }
                 },
             )

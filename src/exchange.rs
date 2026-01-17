@@ -573,7 +573,7 @@ where
         } else {
             assert2::debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
             self.order_margin
-                .fill_order(order, &mut self.account, init_margin_req)
+                .fill_order(&order, &mut self.account, init_margin_req)
         }
         self.limit_order_updates
             .push_within_capacity(limit_order_update)
