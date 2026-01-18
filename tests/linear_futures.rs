@@ -57,9 +57,14 @@ fn lin_long_market_win_full() {
         &Balances::builder()
             .available(QuoteCurrency::new(500, 0) - fee)
             .position_margin(QuoteCurrency::new(500, 0))
-            .order_margin(QuoteCurrency::zero())
             .total_fees_paid(fee)
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        Zero::zero()
     );
 
     let bid = QuoteCurrency::new(200, 0);
@@ -97,9 +102,14 @@ fn lin_long_market_win_full() {
         &Balances::builder()
             .available(QuoteCurrency::new(14991, 1))
             .position_margin(QuoteCurrency::zero())
-            .order_margin(QuoteCurrency::zero())
             .total_fees_paid(QuoteCurrency::new(9, 1))
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        Zero::zero()
     );
     assert_eq!(
         exchange.account().balances().total_fees_paid(),

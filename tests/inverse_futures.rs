@@ -20,6 +20,7 @@ use num_traits::{
 #[tracing_test::traced_test]
 fn inv_long_market_win_full() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::new(1, 0));
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let _ = exchange
         .update_state(&Bba {
             bid: QuoteCurrency::new(999, 0),
@@ -58,9 +59,12 @@ fn inv_long_market_win_full() {
         &Balances::builder()
             .available(BaseCurrency::new(2, 1) - fee0)
             .position_margin(BaseCurrency::new(8, 1))
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee0)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 
     let bid = QuoteCurrency::new(2000, 0);
@@ -101,9 +105,12 @@ fn inv_long_market_win_full() {
         &Balances::builder()
             .available(BaseCurrency::new(14, 1) - fee0 - fee1)
             .position_margin(BaseCurrency::zero())
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee0 + fee1)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 }
 
@@ -111,6 +118,7 @@ fn inv_long_market_win_full() {
 #[tracing_test::traced_test]
 fn inv_long_market_loss_full() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(999, 0);
     let ask = QuoteCurrency::new(1000, 0);
     let order_updates = exchange
@@ -144,9 +152,12 @@ fn inv_long_market_loss_full() {
         &Balances::builder()
             .available(BaseCurrency::new(2, 1) - fee0)
             .position_margin(BaseCurrency::new(8, 1))
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee0)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 
     let bid = QuoteCurrency::new(800, 0);
@@ -188,9 +199,12 @@ fn inv_long_market_loss_full() {
         &Balances::builder()
             .available(BaseCurrency::new(8, 1) - fee_combined)
             .position_margin(BaseCurrency::zero())
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee_combined)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 }
 
@@ -198,6 +212,7 @@ fn inv_long_market_loss_full() {
 #[tracing_test::traced_test]
 fn inv_short_market_win_full() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let bid = QuoteCurrency::new(1000, 0);
     assert!(
         exchange
@@ -225,9 +240,12 @@ fn inv_short_market_win_full() {
         &Balances::builder()
             .available(BaseCurrency::new(2, 1) - fee0)
             .position_margin(BaseCurrency::new(8, 1))
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee0)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 
     assert!(
@@ -275,9 +293,12 @@ fn inv_short_market_win_full() {
         &Balances::builder()
             .available(BaseCurrency::new(12, 1) - fee0 - fee1)
             .position_margin(BaseCurrency::zero())
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee0 + fee1)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 }
 
@@ -285,6 +306,7 @@ fn inv_short_market_win_full() {
 #[tracing_test::traced_test]
 fn inv_short_market_loss_full() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(
         exchange
             .update_state(&Bba {
@@ -331,9 +353,12 @@ fn inv_short_market_loss_full() {
         &Balances::builder()
             .available(BaseCurrency::new(6, 1) - fee)
             .position_margin(BaseCurrency::new(4, 1))
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 
     let ask = QuoteCurrency::new(2000, 0);
@@ -353,9 +378,12 @@ fn inv_short_market_loss_full() {
         &Balances::builder()
             .available(BaseCurrency::new(79964, 5))
             .position_margin(BaseCurrency::zero())
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee + liq_fee)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 }
 
@@ -363,6 +391,7 @@ fn inv_short_market_loss_full() {
 #[tracing_test::traced_test]
 fn inv_long_market_win_partial() {
     let mut exchange = mock_exchange_inverse(BaseCurrency::one());
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     let order_updates = exchange
         .update_state(&Bba {
             bid: QuoteCurrency::new(999, 0),
@@ -402,9 +431,12 @@ fn inv_long_market_win_partial() {
         &Balances::builder()
             .available(BaseCurrency::new(2, 1) - fee_0)
             .position_margin(BaseCurrency::new(8, 1))
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee_0)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 
     assert!(
@@ -465,9 +497,12 @@ fn inv_long_market_win_partial() {
         &Balances::builder()
             .available(BaseCurrency::new(8, 1) - fee_0 - fee_1)
             .position_margin(BaseCurrency::new(4, 1))
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee_0 + fee_1)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 }
 
@@ -564,9 +599,14 @@ fn inv_long_market_loss_partial() {
         &Balances::builder()
             .available(BaseCurrency::new(5, 1) - fee_0 - fee_1)
             .position_margin(BaseCurrency::new(4, 1))
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee + fee_1)
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        Zero::zero()
     );
 }
 
@@ -611,9 +651,14 @@ fn inv_short_market_win_partial() {
         &Balances::builder()
             .available(BaseCurrency::new(2, 1) - fee_0)
             .position_margin(BaseCurrency::new(8, 1))
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee_0)
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        Zero::zero()
     );
 
     let ask = QuoteCurrency::new(800, 0);
@@ -668,9 +713,14 @@ fn inv_short_market_win_partial() {
         &Balances::builder()
             .available(BaseCurrency::new(7, 1) - fee_0 - fee_1)
             .position_margin(BaseCurrency::new(4, 1))
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee_0 + fee_1)
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        Zero::zero()
     );
 }
 
@@ -717,9 +767,14 @@ fn inv_short_market_loss_partial() {
         &Balances::builder()
             .available(BaseCurrency::new(2, 1) - fee0)
             .position_margin(BaseCurrency::new(8, 1))
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee0)
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        Zero::zero()
     );
 
     let bid = QuoteCurrency::new(1999, 0);
@@ -739,9 +794,14 @@ fn inv_short_market_loss_partial() {
         &Balances::builder()
             .available(BaseCurrency::new(59928, 5))
             .position_margin(BaseCurrency::zero())
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee0 + liq_fee)
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        Zero::zero()
     );
 }
 
@@ -792,9 +852,14 @@ fn inv_test_market_roundtrip() {
         &Balances::builder()
             .available(BaseCurrency::one() - fee0 - fee0)
             .position_margin(BaseCurrency::zero())
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee0 + fee0)
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        Zero::zero()
     );
 }
 
@@ -817,15 +882,20 @@ fn inv_execute_limit() {
     let fee_0 = BaseCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     let o = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.active_limit_orders().num_active(), 1);
+    assert_eq!(exchange.account().active_limit_orders().num_active(), 1);
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
             .available(BaseCurrency::new(5, 1))
             .position_margin(BaseCurrency::zero())
-            .order_margin(BaseCurrency::new(5, 1))
             .total_fees_paid(Zero::zero())
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        BaseCurrency::new(5, 1)
     );
 
     let order_updates = exchange
@@ -850,7 +920,7 @@ fn inv_execute_limit() {
 
     assert_eq!(exchange.market_state().bid(), QuoteCurrency::new(750, 0));
     assert_eq!(exchange.market_state().ask(), QuoteCurrency::new(751, 0));
-    assert_eq!(exchange.active_limit_orders().num_active(), 0);
+    assert_eq!(exchange.account().active_limit_orders().num_active(), 0);
     assert_eq!(
         exchange.account().position().clone(),
         Position::Long(PositionInner::new(qty, limit_price))
@@ -860,16 +930,21 @@ fn inv_execute_limit() {
         &Balances::builder()
             .available(BaseCurrency::new(5, 1) - fee_0)
             .position_margin(BaseCurrency::new(5, 1))
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee_0)
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        Zero::zero()
     );
 
     let limit_price = QuoteCurrency::new(1000, 0);
     let fee_1 = BaseCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     let o = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.active_limit_orders().num_active(), 1);
+    assert_eq!(exchange.account().active_limit_orders().num_active(), 1);
 
     let order_updates = exchange
         .update_state(&Trade {
@@ -891,16 +966,21 @@ fn inv_execute_limit() {
         .unwrap();
     assert!(order_updates.is_empty());
 
-    assert_eq!(exchange.active_limit_orders().num_active(), 0);
+    assert_eq!(exchange.account().active_limit_orders().num_active(), 0);
     assert_eq!(exchange.account().position(), &Position::Neutral);
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
             .available(BaseCurrency::new(105, 2) - fee_0 - fee_1)
             .position_margin(BaseCurrency::zero())
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee_0 + fee_1)
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        Zero::zero()
     );
 
     let qty = QuoteCurrency::new(600, 0);
@@ -908,16 +988,21 @@ fn inv_execute_limit() {
     let fee_2 = BaseCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     let o = LimitOrder::new(Side::Sell, limit_price, qty).unwrap();
     exchange.submit_limit_order(o).unwrap();
-    assert_eq!(exchange.active_limit_orders().num_active(), 1);
+    assert_eq!(exchange.account().active_limit_orders().num_active(), 1);
     assert_eq!(exchange.account().position(), &Position::Neutral);
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
             .available(BaseCurrency::new(55, 2) - fee_0 - fee_1)
             .position_margin(Zero::zero())
-            .order_margin(BaseCurrency::new(5, 1))
             .total_fees_paid(fee_0 + fee_1)
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        BaseCurrency::new(5, 1)
     );
 
     let order_updates = exchange
@@ -948,8 +1033,13 @@ fn inv_execute_limit() {
         &Balances::builder()
             .available(BaseCurrency::new(55, 2) - fee_0 - fee_1 - fee_2)
             .position_margin(BaseCurrency::new(5, 1))
-            .order_margin(BaseCurrency::zero())
             .total_fees_paid(fee_0 + fee_1 + fee_2)
             .build()
+    );
+    assert_eq!(
+        exchange
+            .account()
+            .order_margin(exchange.config().contract_spec().init_margin_req()),
+        Zero::zero()
     );
 }

@@ -47,8 +47,9 @@ where
     UserOrderIdT: UserOrderId + Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use LimitOrderFill::*;
         match self {
-            LimitOrderFill::PartiallyFilled {
+            PartiallyFilled {
                 filled_quantity,
                 fee,
                 order_after_fill,
@@ -56,7 +57,7 @@ where
                 f,
                 "PartiallyFilled( filled_quantity: {filled_quantity}, fee: {fee}, order_after_fill: {order_after_fill})"
             ),
-            LimitOrderFill::FullyFilled {
+            FullyFilled {
                 filled_quantity,
                 fee,
                 order_after_fill,

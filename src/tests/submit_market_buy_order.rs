@@ -63,9 +63,12 @@ fn submit_market_buy_order_no_position() {
         &Balances::builder()
             .available(QuoteCurrency::new(495, 0) - fee)
             .position_margin(QuoteCurrency::new(505, 0))
-            .order_margin(QuoteCurrency::new(0, 0))
             .total_fees_paid(fee)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 }
 
@@ -73,6 +76,7 @@ fn submit_market_buy_order_no_position() {
 #[tracing_test::traced_test]
 fn submit_market_buy_order_with_long_position() {
     let mut exchange = mock_exchange_linear();
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
             .update_state(&Bba {
@@ -94,15 +98,18 @@ fn submit_market_buy_order_with_long_position() {
         exchange.account().position().clone(),
         Position::Long(PositionInner::new(qty, entry_price,))
     );
-    assert!(exchange.active_limit_orders().is_empty());
+    assert!(exchange.account().active_limit_orders().is_empty());
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
             .available(QuoteCurrency::new(500, 0) - fee0)
             .position_margin(QuoteCurrency::new(500, 0))
-            .order_margin(QuoteCurrency::new(0, 0))
             .total_fees_paid(fee0)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 
     // Buy again
@@ -114,9 +121,12 @@ fn submit_market_buy_order_with_long_position() {
         &Balances::builder()
             .available(QuoteCurrency::new(100, 0) - fee0 - fee1)
             .position_margin(QuoteCurrency::new(900, 0))
-            .order_margin(QuoteCurrency::new(0, 0))
             .total_fees_paid(fee0 + fee1)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
     assert_eq!(
         exchange.account().position().clone(),
@@ -125,13 +135,14 @@ fn submit_market_buy_order_with_long_position() {
             QuoteCurrency::new(100, 0),
         ))
     );
-    assert!(exchange.active_limit_orders().is_empty());
+    assert!(exchange.account().active_limit_orders().is_empty());
 }
 
 #[test]
 #[tracing_test::traced_test]
 fn submit_market_buy_order_with_short_position() {
     let mut exchange = mock_exchange_linear();
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
             .update_state(&Bba {
@@ -152,9 +163,12 @@ fn submit_market_buy_order_with_short_position() {
         &Balances::builder()
             .available(QuoteCurrency::new(100, 0) - fee0)
             .position_margin(QuoteCurrency::new(900, 0))
-            .order_margin(QuoteCurrency::new(0, 0))
             .total_fees_paid(fee0)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
     assert_eq!(
         exchange.account().position().clone(),
@@ -164,7 +178,7 @@ fn submit_market_buy_order_with_short_position() {
         ))
     );
     assert_eq!(
-        exchange.active_limit_orders(),
+        exchange.account().active_limit_orders(),
         &ActiveLimitOrders::with_capacity(NonZeroU16::new(10).unwrap())
     );
 
@@ -179,9 +193,12 @@ fn submit_market_buy_order_with_short_position() {
         &Balances::builder()
             .available(QuoteCurrency::new(1000, 0) - fee0 - fee1 - QuoteCurrency::new(9, 0))
             .position_margin(QuoteCurrency::new(0, 0))
-            .order_margin(QuoteCurrency::new(0, 0))
             .total_fees_paid(fee0 + fee1)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 }
 
@@ -189,6 +206,7 @@ fn submit_market_buy_order_with_short_position() {
 #[tracing_test::traced_test]
 fn submit_market_buy_order_turnaround_short() {
     let mut exchange = mock_exchange_linear();
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
             .update_state(&Bba {
@@ -207,7 +225,7 @@ fn submit_market_buy_order_turnaround_short() {
     let entry_price = QuoteCurrency::new(99, 0);
     let notional = QuoteCurrency::convert_from(qty, entry_price);
     let fee_0 = notional * *test_fee_taker().as_ref();
-    assert!(exchange.active_limit_orders().is_empty());
+    assert!(exchange.account().active_limit_orders().is_empty());
     assert_eq!(
         exchange.account().position().clone(),
         Position::Short(PositionInner::new(qty, entry_price))
@@ -217,9 +235,12 @@ fn submit_market_buy_order_turnaround_short() {
         &Balances::builder()
             .available(QuoteCurrency::new(109, 0) - fee_0)
             .position_margin(QuoteCurrency::new(891, 0))
-            .order_margin(Zero::zero())
             .total_fees_paid(fee_0)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 
     // Close the entire position and buy some more
@@ -228,7 +249,7 @@ fn submit_market_buy_order_turnaround_short() {
     exchange.submit_market_order(order).unwrap();
     let entry_price = QuoteCurrency::new(100, 0);
     let fee_1 = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
-    assert!(exchange.active_limit_orders().is_empty());
+    assert!(exchange.account().active_limit_orders().is_empty());
     assert_eq!(
         exchange.account().position().clone(),
         Position::Long(PositionInner::new(BaseCurrency::new(9, 0), entry_price))
@@ -243,8 +264,11 @@ fn submit_market_buy_order_turnaround_short() {
                     - QuoteCurrency::new(9, 0)
             )
             .position_margin(QuoteCurrency::new(900, 0))
-            .order_margin(Zero::zero())
             .total_fees_paid(fee_0 + fee_1)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 }

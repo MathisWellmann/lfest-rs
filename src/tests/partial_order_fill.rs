@@ -30,7 +30,7 @@ fn partial_limit_order_fill(
     );
     let order = LimitOrder::new(side, limit_price, qty).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
-    assert_eq!(exchange.active_limit_orders().num_active(), 1);
+    assert_eq!(exchange.account().active_limit_orders().num_active(), 1);
 
     let exec_orders = exchange
         .update_state(&Trade {

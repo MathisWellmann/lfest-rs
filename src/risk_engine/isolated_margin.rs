@@ -5,17 +5,19 @@ use super::RiskEngine;
 use crate::{
     contract_specification::ContractSpecification,
     market_state::MarketState,
-    order_margin::OrderMargin,
     prelude::{
         Currency,
         Mon,
-        Position,
-        Position::*,
+        Position::{
+            self,
+            *,
+        },
         PositionInner,
         QuoteCurrency,
         RiskError,
     },
     types::{
+        Account,
         Balances,
         LimitOrder,
         MarginCurrency,
@@ -70,18 +72,14 @@ where
 
     fn check_limit_order(
         &self,
-        position: &Position<I, D, BaseOrQuote>,
+        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        available_balance: BaseOrQuote::PairedCurrency,
-        order_margin: &OrderMargin<I, D, BaseOrQuote, UserOrderIdT>,
     ) -> Result<(), NotEnoughAvailableBalance> {
-        let om = order_margin.order_margin(self.contract_spec.init_margin_req(), position);
-        let new_order_margin = order_margin.order_margin_with_order(
-            order,
-            self.contract_spec.init_margin_req(),
-            position,
-        );
+        let om = account.order_margin(self.contract_spec.init_margin_req());
+        let new_order_margin =
+            account.order_margin_with_order(order, self.contract_spec.init_margin_req());
 
+        let available_balance = account.balances().available();
         trace!(
             "order_margin: {om:?}, new_order_margin: {new_order_margin:?}, available_balance: {available_balance:?}"
         );

@@ -8,6 +8,7 @@ use crate::{
 #[tracing_test::traced_test]
 fn submit_limit_sell_order_no_position() {
     let mut exchange = mock_exchange_linear();
+    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(
         exchange
             .update_state(&Bba {
@@ -61,9 +62,12 @@ fn submit_limit_sell_order_no_position() {
         &Balances::builder()
             .available(QuoteCurrency::new(100, 0) - fee0)
             .position_margin(QuoteCurrency::new(900, 0))
-            .order_margin(QuoteCurrency::new(0, 0))
             .total_fees_paid(fee0)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 
     // close the position again
@@ -97,9 +101,12 @@ fn submit_limit_sell_order_no_position() {
         &Balances::builder()
             .available(QuoteCurrency::new(1000, 0) - fee0 - fee1)
             .position_margin(QuoteCurrency::new(0, 0))
-            .order_margin(QuoteCurrency::new(0, 0))
             .total_fees_paid(fee0 + fee1)
             .build()
+    );
+    assert_eq!(
+        exchange.account().order_margin(init_margin_req),
+        Zero::zero()
     );
 }
 

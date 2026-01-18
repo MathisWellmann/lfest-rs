@@ -3,6 +3,7 @@ use std::{
     ops::Neg,
 };
 
+use Position::*;
 use const_decimal::Decimal;
 use num::One;
 use num_traits::Zero;
@@ -53,36 +54,36 @@ where
         assert2::debug_assert!(bid > Zero::zero());
         assert2::debug_assert!(ask > Zero::zero());
         match self {
-            Position::Neutral => BaseOrQuote::PairedCurrency::zero(),
-            Position::Long(inner) => inner.unrealized_pnl(bid),
-            Position::Short(inner) => inner.unrealized_pnl(ask).neg(),
+            Neutral => BaseOrQuote::PairedCurrency::zero(),
+            Long(inner) => inner.unrealized_pnl(bid),
+            Short(inner) => inner.unrealized_pnl(ask).neg(),
         }
     }
 
     /// The quantity of the position, is negative when short.
     pub fn quantity(&self) -> BaseOrQuote {
         match self {
-            Position::Neutral => BaseOrQuote::zero(),
-            Position::Long(inner) => inner.quantity(),
-            Position::Short(inner) => inner.quantity().neg(),
+            Neutral => BaseOrQuote::zero(),
+            Long(inner) => inner.quantity(),
+            Short(inner) => inner.quantity().neg(),
         }
     }
 
     /// The entry price of the position which is the total cost of the position relative to its quantity.
     pub fn entry_price(&self) -> QuoteCurrency<I, D> {
         match self {
-            Position::Neutral => QuoteCurrency::zero(),
-            Position::Long(inner) => inner.entry_price(),
-            Position::Short(inner) => inner.entry_price(),
+            Neutral => QuoteCurrency::zero(),
+            Long(inner) => inner.entry_price(),
+            Short(inner) => inner.entry_price(),
         }
     }
 
     /// The total value of the position which is composed of quantity and avg. entry price.
     pub fn total_cost(&self) -> BaseOrQuote::PairedCurrency {
         match self {
-            Position::Neutral => BaseOrQuote::PairedCurrency::zero(),
-            Position::Long(inner) => inner.notional(),
-            Position::Short(inner) => inner.notional(),
+            Neutral => BaseOrQuote::PairedCurrency::zero(),
+            Long(inner) => inner.notional(),
+            Short(inner) => inner.notional(),
         }
     }
 
@@ -110,6 +111,7 @@ where
             self.total_cost() * init_margin_req
         );
 
+        use Ordering::*;
         let pnl = match self {
             Neutral => {
                 match side {
@@ -124,18 +126,18 @@ where
                     Zero::zero()
                 }
                 Sell => match filled_qty.cmp(&inner.quantity()) {
-                    Ordering::Less => {
+                    Less => {
                         let pnl = inner.decrease_contracts(filled_qty, fill_price, true);
                         balances.apply_pnl(pnl);
                         Zero::zero()
                     }
-                    Ordering::Equal => {
+                    Equal => {
                         let pnl = inner.decrease_contracts(filled_qty, fill_price, true);
 
                         *self = Neutral;
                         pnl
                     }
-                    Ordering::Greater => {
+                    Greater => {
                         let new_short_qty = filled_qty - inner.quantity();
                         let pnl = inner.decrease_contracts(inner.quantity(), fill_price, true);
                         balances.apply_pnl(pnl);
@@ -148,14 +150,14 @@ where
             },
             Short(inner) => match side {
                 Buy => match filled_qty.cmp(&inner.quantity()) {
-                    Ordering::Less => inner.decrease_contracts(filled_qty, fill_price, false),
-                    Ordering::Equal => {
+                    Less => inner.decrease_contracts(filled_qty, fill_price, false),
+                    Equal => {
                         let pnl = inner.decrease_contracts(filled_qty, fill_price, false);
 
                         *self = Neutral;
                         pnl
                     }
-                    Ordering::Greater => {
+                    Greater => {
                         let new_long_qty = filled_qty - inner.quantity();
                         let pnl = inner.decrease_contracts(inner.quantity(), fill_price, false);
                         debug_assert_eq!(inner.quantity(), BaseOrQuote::zero());
@@ -173,12 +175,12 @@ where
         let new_position_margin = self.total_cost() * init_margin_req;
         assert!(new_position_margin >= Zero::zero());
         match new_position_margin.cmp(&balances.position_margin()) {
-            Ordering::Less => {
+            Less => {
                 let delta = balances.position_margin() - new_position_margin;
                 balances.free_position_margin(delta);
             }
-            Ordering::Equal => {}
-            Ordering::Greater => {
+            Equal => {}
+            Greater => {
                 let delta = new_position_margin - balances.position_margin();
                 let success = balances.try_reserve_position_margin(delta);
                 debug_assert!(success, "Can reserve position margin");
@@ -197,11 +199,11 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Position::Neutral => write!(f, "Neutral"),
-            Position::Long(inner) => {
+            Neutral => write!(f, "Neutral"),
+            Long(inner) => {
                 write!(f, "Long {} @ {}", inner.quantity(), inner.entry_price())
             }
-            Position::Short(inner) => {
+            Short(inner) => {
                 write!(f, "Short {} @ {}", inner.quantity(), inner.entry_price())
             }
         }
@@ -219,7 +221,7 @@ mod tests {
 
     #[test]
     fn position_display() {
-        let pos = Position::Short(PositionInner::from_parts(
+        let pos = Short(PositionInner::from_parts(
             BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(317, 3).unwrap()),
             QuoteCurrency::from(Decimal::try_from_scaled(958423665, 5).unwrap()),
         ));
@@ -238,17 +240,16 @@ mod tests {
         let init_margin = notional * init_margin_req;
         assert!(balances.try_reserve_position_margin(init_margin));
 
-        let mut pos = Position::Short(PositionInner::new(qty, entry_price));
+        let mut pos = Short(PositionInner::new(qty, entry_price));
 
         let exit_price = QuoteCurrency::new(30204_27, 2);
         pos.change(qty, exit_price, Side::Buy, &mut balances, init_margin_req);
-        assert_eq!(pos, Position::Neutral);
+        assert_eq!(pos, Neutral);
         assert_eq!(
             balances,
             Balances::builder()
                 .available(QuoteCurrency::new(10_000, 0) - QuoteCurrency::new(6536_55268, 5))
                 .position_margin(Zero::zero())
-                .order_margin(Zero::zero())
                 .total_fees_paid(Zero::zero())
                 .build()
         );
@@ -258,7 +259,7 @@ mod tests {
     #[tracing_test::traced_test]
     #[ignore]
     fn position_change_position_2(leverage: u8) {
-        let mut pos = Position::Long(PositionInner::from_parts(
+        let mut pos = Long(PositionInner::from_parts(
             BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(16800, 5).unwrap()),
             QuoteCurrency::from(Decimal::try_from_scaled(5949354994, 5).unwrap()),
         ));
@@ -290,7 +291,7 @@ mod tests {
             let notional = QuoteCurrency::convert_from(filled_qty, fill_price);
             let margin = notional * init_margin_req;
 
-            let mut position = Position::Neutral;
+            let mut position = Neutral;
             let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
 
             assert!(do_buy == 0 || do_buy == 1);
@@ -307,13 +308,12 @@ mod tests {
                 init_margin_req,
             );
             match side {
-                Side::Buy => assert_eq!(position, Position::Long(PositionInner::new(filled_qty, fill_price))),
-                Side::Sell => assert_eq!(position, Position::Short(PositionInner::new(filled_qty, fill_price))),
+                Side::Buy => assert_eq!(position, Long(PositionInner::new(filled_qty, fill_price))),
+                Side::Sell => assert_eq!(position, Short(PositionInner::new(filled_qty, fill_price))),
             }
             assert_eq!(balances, Balances::builder()
                 .available(QuoteCurrency::new(10_000, 0) - margin)
                 .position_margin(margin)
-                .order_margin(Zero::zero())
                 .total_fees_paid(Zero::zero())
                 .build()
             );
@@ -328,7 +328,7 @@ mod tests {
             let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
             let start_qty = BaseCurrency::new(50, 0);
-            let mut position = Position::Long(PositionInner::new(start_qty, fill_price));
+            let mut position = Long(PositionInner::new(start_qty, fill_price));
             let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
             let margin = QuoteCurrency::convert_from(start_qty, fill_price) * init_margin_req;
             assert!(balances.try_reserve_position_margin(margin));
@@ -342,17 +342,16 @@ mod tests {
             );
             let new_qty = (start_qty - filled_qty).abs();
             if filled_qty > start_qty {
-                assert_eq!(position, Position::Short(PositionInner::new(new_qty, fill_price)));
+                assert_eq!(position, Short(PositionInner::new(new_qty, fill_price)));
             } else if filled_qty < start_qty {
-                assert_eq!(position, Position::Long(PositionInner::new(new_qty, fill_price)));
+                assert_eq!(position, Long(PositionInner::new(new_qty, fill_price)));
             } else {
-                assert_eq!(position, Position::Neutral);
+                assert_eq!(position, Neutral);
             }
             let margin = QuoteCurrency::convert_from(new_qty, fill_price) * init_margin_req;
             assert_eq!(balances, Balances::builder()
                 .available(QuoteCurrency::new(10_000, 0) - margin)
                 .position_margin(margin)
-                .order_margin(Zero::zero())
                 .total_fees_paid(Zero::zero())
                 .build()
             );
@@ -367,7 +366,7 @@ mod tests {
             let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
             let start_qty = BaseCurrency::new(50, 0);
-            let mut position = Position::Long(PositionInner::new(start_qty, fill_price));
+            let mut position = Long(PositionInner::new(start_qty, fill_price));
             let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
             let margin = QuoteCurrency::convert_from(start_qty, fill_price) * init_margin_req;
             assert!(balances.try_reserve_position_margin(margin));
@@ -380,12 +379,11 @@ mod tests {
                 init_margin_req,
             );
             let new_qty = start_qty + filled_qty;
-            assert_eq!(position, Position::Long(PositionInner::new(new_qty, fill_price)));
+            assert_eq!(position, Long(PositionInner::new(new_qty, fill_price)));
             let margin = QuoteCurrency::convert_from(new_qty, fill_price) * init_margin_req;
             assert_eq!(balances, Balances::builder()
                 .available(QuoteCurrency::new(10_000, 0) - margin)
                 .position_margin(margin)
-                .order_margin(Zero::zero())
                 .total_fees_paid(Zero::zero())
                 .build()
             );
@@ -400,7 +398,7 @@ mod tests {
             let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
             let start_qty = BaseCurrency::new(50, 0);
-            let mut position = Position::Short(PositionInner::new(start_qty, fill_price));
+            let mut position = Short(PositionInner::new(start_qty, fill_price));
             let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
             let margin = QuoteCurrency::convert_from(start_qty, fill_price) * init_margin_req;
             assert!(balances.try_reserve_position_margin(margin));
@@ -414,17 +412,16 @@ mod tests {
             );
             let new_qty = (start_qty - filled_qty).abs();
             if filled_qty > start_qty {
-                assert_eq!(position, Position::Long(PositionInner::new(new_qty, fill_price)));
+                assert_eq!(position, Long(PositionInner::new(new_qty, fill_price)));
             } else if filled_qty < start_qty {
-                assert_eq!(position, Position::Short(PositionInner::new(new_qty, fill_price)));
+                assert_eq!(position, Short(PositionInner::new(new_qty, fill_price)));
             } else {
-                assert_eq!(position, Position::Neutral);
+                assert_eq!(position, Neutral);
             }
             let margin = QuoteCurrency::convert_from(new_qty, fill_price) * init_margin_req;
             assert_eq!(balances, Balances::builder()
                 .available(QuoteCurrency::new(10_000, 0) - margin)
                 .position_margin(margin)
-                .order_margin(Zero::zero())
                 .total_fees_paid(Zero::zero())
                 .build()
             );
@@ -439,7 +436,7 @@ mod tests {
             let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
 
             let start_qty = BaseCurrency::new(50, 0);
-            let mut position = Position::Short(PositionInner::new(start_qty, fill_price));
+            let mut position = Short(PositionInner::new(start_qty, fill_price));
             let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
             let margin = QuoteCurrency::convert_from(start_qty, fill_price) * init_margin_req;
             assert!(balances.try_reserve_position_margin(margin));
@@ -452,12 +449,11 @@ mod tests {
                 init_margin_req,
             );
             let new_qty = start_qty + filled_qty;
-            assert_eq!(position, Position::Short(PositionInner::new(new_qty, fill_price)));
+            assert_eq!(position, Short(PositionInner::new(new_qty, fill_price)));
             let margin = QuoteCurrency::convert_from(new_qty, fill_price) * init_margin_req;
             assert_eq!(balances, Balances::builder()
                 .available(QuoteCurrency::new(10_000, 0) - margin)
                 .position_margin(margin)
-                .order_margin(Zero::zero())
                 .total_fees_paid(Zero::zero())
                 .build()
             );

@@ -24,10 +24,6 @@ where
     #[getset(get_copy = "pub")]
     position_margin: BaseOrQuote,
 
-    /// The margin reserved for the open limit orders.
-    #[getset(get_copy = "pub")]
-    order_margin: BaseOrQuote,
-
     // TODO: could be removed here and done differently.
     /// The total amount of fees paid or received.
     #[getset(get_copy = "pub")]
@@ -46,8 +42,8 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "available: {}, position_margin: {}, order_margin: {}",
-            self.available, self.position_margin, self.order_margin
+            "available: {}, position_margin: {}",
+            self.available, self.position_margin,
         )
     }
 }
@@ -62,22 +58,14 @@ where
         Self {
             available: init_balance,
             position_margin: BaseOrQuote::zero(),
-            order_margin: BaseOrQuote::zero(),
             total_fees_paid: BaseOrQuote::zero(),
             _i: PhantomData,
         }
     }
 
-    /// Sum of all balances.
-    #[inline(always)]
-    pub fn sum(&self) -> BaseOrQuote {
-        self.available + self.position_margin + self.order_margin
-    }
-
     pub(crate) fn debug_assert_state(&self) {
         assert2::debug_assert!(self.available >= BaseOrQuote::zero());
         assert2::debug_assert!(self.position_margin >= BaseOrQuote::zero());
-        assert2::debug_assert!(self.order_margin >= BaseOrQuote::zero());
     }
 
     /// If `fee` is negative then we receive balance.
@@ -106,7 +94,6 @@ where
 
         self.available -= margin;
         assert2::debug_assert!(self.available >= BaseOrQuote::zero());
-        self.order_margin += margin;
         true
     }
 
@@ -116,10 +103,6 @@ where
         trace!("free_order_margin: {margin} on self: {self}");
         assert2::debug_assert!(margin > BaseOrQuote::zero());
         self.debug_assert_state();
-        assert2::debug_assert!(self.order_margin >= margin);
-
-        self.order_margin -= margin;
-        assert2::debug_assert!(self.order_margin >= BaseOrQuote::zero());
         self.available += margin;
     }
 
@@ -170,18 +153,6 @@ mod test {
     use super::*;
     use crate::types::QuoteCurrency;
 
-    #[test]
-    fn user_balances() {
-        let balances = Balances {
-            available: QuoteCurrency::<i64, 5>::new(1000, 0),
-            position_margin: QuoteCurrency::new(200, 0),
-            order_margin: QuoteCurrency::new(100, 0),
-            total_fees_paid: QuoteCurrency::zero(),
-            _i: PhantomData,
-        };
-        assert_eq!(balances.sum(), QuoteCurrency::new(1300, 0));
-    }
-
     proptest! {
         #[test]
         fn proptest_balances_account_for_fee(fee in 0..1000_i64) {
@@ -192,7 +163,6 @@ mod test {
             assert_eq!(balances, Balances::builder()
                 .available(QuoteCurrency::new(10_000, 0) - fee)
                 .position_margin(Zero::zero())
-                .order_margin(Zero::zero())
                 .total_fees_paid(fee)
                 .build()
             );
@@ -209,7 +179,6 @@ mod test {
             assert_eq!(balances, Balances::builder()
                 .available(QuoteCurrency::new(1000, 0) - margin)
                 .position_margin(Zero::zero())
-                .order_margin(margin)
                 .total_fees_paid(Zero::zero())
                 .build()
             );
@@ -227,18 +196,10 @@ mod test {
             assert_eq!(balances, Balances::builder()
                 .available(QuoteCurrency::new(1000, 0))
                 .position_margin(Zero::zero())
-                .order_margin(Zero::zero())
                 .total_fees_paid(Zero::zero())
                 .build()
             );
         }
-    }
-
-    #[test]
-    #[should_panic]
-    fn balances_free_order_margin_panic() {
-        let mut balances = Balances::new(QuoteCurrency::<i64, 5>::new(1000, 0));
-        balances.free_order_margin(QuoteCurrency::new(100, 0));
     }
 
     proptest! {
@@ -251,7 +212,6 @@ mod test {
             assert_eq!(balances, Balances::builder()
                 .available(QuoteCurrency::new(1000, 0) - margin)
                 .position_margin(margin)
-                .order_margin(Zero::zero())
                 .total_fees_paid(Zero::zero())
                 .build()
             );
@@ -275,7 +235,6 @@ mod test {
             assert_eq!(balances, Balances::builder()
                 .available(QuoteCurrency::new(1000, 0))
                 .position_margin(Zero::zero())
-                .order_margin(Zero::zero())
                 .total_fees_paid(Zero::zero())
                 .build()
             );
@@ -295,7 +254,6 @@ mod test {
         let balances = Balances::builder()
             .available(QuoteCurrency::<i64, 5>::new(-1, 0))
             .position_margin(Zero::zero())
-            .order_margin(Zero::zero())
             .total_fees_paid(Zero::zero())
             .build();
         balances.debug_assert_state();
@@ -307,19 +265,6 @@ mod test {
         let balances = Balances::builder()
             .available(Zero::zero())
             .position_margin(QuoteCurrency::<i64, 5>::new(-1, 0))
-            .order_margin(Zero::zero())
-            .total_fees_paid(Zero::zero())
-            .build();
-        balances.debug_assert_state();
-    }
-
-    #[test]
-    #[should_panic]
-    fn balances_debug_assert_state_order_margin() {
-        let balances = Balances::builder()
-            .available(Zero::zero())
-            .position_margin(Zero::zero())
-            .order_margin(QuoteCurrency::<i64, 5>::new(-1, 0))
             .total_fees_paid(Zero::zero())
             .build();
         balances.debug_assert_state();
@@ -330,12 +275,11 @@ mod test {
         let balances = Balances::builder()
             .available(QuoteCurrency::<i64, 5>::new(1000, 0))
             .position_margin(QuoteCurrency::new(50, 0))
-            .order_margin(QuoteCurrency::new(100, 0))
             .total_fees_paid(QuoteCurrency::new(5, 0))
             .build();
         assert_eq!(
             balances.to_string(),
-            "available: 1000.00000 Quote, position_margin: 50.00000 Quote, order_margin: 100.00000 Quote"
+            "available: 1000.00000 Quote, position_margin: 50.00000 Quote"
         );
     }
 }

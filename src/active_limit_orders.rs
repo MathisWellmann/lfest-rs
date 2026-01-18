@@ -1,19 +1,40 @@
 use std::num::NonZeroU16;
 
+use const_decimal::Decimal;
 use getset::Getters;
-use tracing::trace;
+use num::{
+    One,
+    Zero,
+};
+use tracing::{
+    debug,
+    trace,
+};
 
-use crate::types::{
-    Currency,
-    LimitOrder,
-    MarginCurrency,
-    MaxNumberOfActiveOrders,
-    Mon,
-    OrderId,
-    Pending,
-    Side,
-    UserOrderId,
-    price_time_priority_ordering,
+use crate::{
+    prelude::Position::{
+        self,
+        *,
+    },
+    types::{
+        Balances,
+        CancelBy,
+        Currency,
+        LimitOrder,
+        MarginCurrency,
+        MaxNumberOfActiveOrders,
+        Mon,
+        OrderId,
+        OrderIdNotFound,
+        Pending,
+        Side::{
+            self,
+            *,
+        },
+        UserOrderId,
+        price_time_priority_ordering,
+    },
+    utils::max,
 };
 
 // TODO: rename to `OrderBook`
@@ -24,7 +45,7 @@ use crate::types::{
 /// - `D`: The constant decimal precision of the currency.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 /// - `UserOrderIdT`: The type of user order id to use. Set to `()` if you don't need one.
-#[derive(Debug, PartialEq, Eq, Getters)]
+#[derive(Debug, Default, PartialEq, Eq, Getters)]
 pub struct ActiveLimitOrders<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -35,11 +56,13 @@ where
     /// Best bid is the last element.
     #[getset(get = "pub")]
     bids: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
+    bids_notional: BaseOrQuote::PairedCurrency,
 
     /// Stores all the active sell orders in ascending price, time priority.
     /// Best ask is the first element.
     #[getset(get = "pub")]
     asks: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
+    asks_notional: BaseOrQuote::PairedCurrency,
 }
 
 /// A clone impl which retains the capacity as we rely on that assumption downstream.
@@ -57,7 +80,12 @@ where
         let mut asks = self.asks.clone();
         asks.reserve_exact(self.asks.capacity() - self.asks.len());
         assert_eq!(asks.capacity(), self.asks.capacity());
-        Self { bids, asks }
+        Self {
+            bids,
+            asks,
+            bids_notional: self.bids_notional,
+            asks_notional: self.asks_notional,
+        }
     }
 }
 
@@ -93,7 +121,9 @@ where
         let cap: usize = max_active_orders.get().into();
         Self {
             bids: Vec::with_capacity(cap),
+            bids_notional: Zero::zero(),
             asks: Vec::with_capacity(cap),
+            asks_notional: Zero::zero(),
         }
     }
 
@@ -162,11 +192,15 @@ where
     pub fn try_insert(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        position: &Position<I, D, BaseOrQuote>,
+        balances: &mut Balances<I, D, BaseOrQuote::PairedCurrency>,
+        init_margin_req: Decimal<I, D>,
     ) -> Result<(), MaxNumberOfActiveOrders> {
         use std::cmp::Ordering::*;
 
-        use Side::*;
-        match order.side() {
+        let side = order.side();
+        let notional = order.notional();
+        match side {
             Buy => {
                 if self.bids.len() >= self.bids.capacity() {
                     debug_assert!(self.bids.capacity() > 0);
@@ -203,7 +237,76 @@ where
                 self.asks.insert(idx, order)
             }
         }
+
+        let current_om = self.order_margin(init_margin_req, position);
+        match side {
+            Buy => self.bids_notional += notional,
+            Sell => self.asks_notional += notional,
+        }
+
+        // Update balances
+        let new_order_margin = self.order_margin(init_margin_req, position);
+        debug!("new_order_margin: {new_order_margin}");
+        if new_order_margin > current_om {
+            let margin = new_order_margin - current_om;
+            assert2::debug_assert!(margin >= BaseOrQuote::PairedCurrency::zero());
+            let success = balances.try_reserve_order_margin(margin);
+            assert!(success, "Can place order");
+        }
         Ok(())
+    }
+
+    /// The margin requirement for all the tracked orders.
+    pub(crate) fn order_margin(
+        &self,
+        init_margin_req: Decimal<I, D>,
+        position: &Position<I, D, BaseOrQuote>,
+    ) -> BaseOrQuote::PairedCurrency {
+        assert2::debug_assert!(init_margin_req > Decimal::zero());
+        assert2::debug_assert!(init_margin_req <= Decimal::one());
+
+        match position {
+            Neutral => max(self.bids_notional, self.asks_notional) * init_margin_req,
+            Long(inner) => {
+                max(self.bids_notional, self.asks_notional - inner.notional()) * init_margin_req
+            }
+            Short(inner) => {
+                max(self.bids_notional - inner.notional(), self.asks_notional) * init_margin_req
+            }
+        }
+    }
+
+    /// Get the order margin if a new order were to be added.
+    pub(crate) fn order_margin_with_order(
+        &self,
+        new_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        init_margin_req: Decimal<I, D>,
+        position: &Position<I, D, BaseOrQuote>,
+    ) -> BaseOrQuote::PairedCurrency {
+        assert2::debug_assert!(init_margin_req > Decimal::zero());
+        assert2::debug_assert!(init_margin_req <= Decimal::one());
+
+        let mut buy_notional = self.bids_notional;
+        let mut sell_notional = self.asks_notional;
+        let new_notional = new_order.notional();
+        match new_order.side() {
+            Buy => buy_notional += new_notional,
+            Sell => sell_notional += new_notional,
+        }
+
+        match position {
+            Neutral => max(buy_notional, sell_notional) * init_margin_req,
+            Long(inner) => {
+                let notional = inner.notional();
+                trace!("notional: {notional}");
+                max(buy_notional, sell_notional - notional) * init_margin_req
+            }
+            Short(inner) => {
+                let notional = inner.notional();
+                trace!("notional: {notional}");
+                max(buy_notional - notional, sell_notional) * init_margin_req
+            }
+        }
     }
 
     /// Update an existing `LimitOrder`.
@@ -213,7 +316,6 @@ where
         &mut self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>> {
-        use Side::*;
         let active_order = match order.side() {
             Buy => self.bids.iter_mut().find(|o| o.id() == order.id()),
             Sell => self.asks.iter_mut().find(|o| o.id() == order.id()),
@@ -256,14 +358,15 @@ where
         side: Side,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         match side {
-            Side::Buy => self.bids.iter().find(|order| order.id() == order_id),
-            Side::Sell => self.asks.iter().find(|order| order.id() == order_id),
+            Buy => self.bids.iter().find(|order| order.id() == order_id),
+            Sell => self.asks.iter().find(|order| order.id() == order_id),
         }
     }
 
+    // TODO: merge with method `remove_by_user_order_id`
     /// Remove an active `LimitOrder` based on its order id.
     #[inline]
-    pub(crate) fn remove(
+    fn remove(
         &mut self,
         id: OrderId,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
@@ -279,7 +382,7 @@ where
 
     /// Remove an active `LimitOrder` based on its order id.
     #[inline]
-    pub(crate) fn remove_by_user_order_id(
+    fn remove_by_user_order_id(
         &mut self,
         user_order_id: UserOrderIdT,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
@@ -299,17 +402,114 @@ where
         trace!("removed {removed}");
         Some(removed)
     }
+
+    /// Remove an order from being tracked for margin purposes.
+    #[allow(clippy::complexity, reason = "How is this hard to read?")]
+    pub(crate) fn remove_limit_order(
+        &mut self,
+        by: CancelBy<UserOrderIdT>,
+        init_margin_req: Decimal<I, D>,
+        position: &Position<I, D, BaseOrQuote>,
+        balances: &mut Balances<I, D, BaseOrQuote::PairedCurrency>,
+    ) -> Result<
+        LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        OrderIdNotFound<UserOrderIdT>,
+    > {
+        let original_om = self.order_margin(init_margin_req, position);
+
+        debug!("remove_limit_order {by:?}");
+        use CancelBy::*;
+        let removed_order = match by {
+            OrderId(order_id) => self
+                .remove(order_id)
+                .ok_or(OrderIdNotFound::OrderId(order_id))?,
+            UserOrderId(user_order_id) => self
+                .remove_by_user_order_id(user_order_id)
+                .ok_or(OrderIdNotFound::UserOrderId(user_order_id))?,
+        };
+
+        match removed_order.side() {
+            Buy => {
+                self.bids_notional -= removed_order.notional();
+                assert2::debug_assert!(self.bids_notional >= Zero::zero());
+            }
+            Sell => {
+                self.asks_notional -= removed_order.notional();
+                assert2::debug_assert!(self.asks_notional >= Zero::zero());
+            }
+        }
+
+        // Update balances
+        let new_order_margin = self.order_margin(init_margin_req, position);
+        assert2::debug_assert!(
+            new_order_margin <= original_om,
+            "When removing a limit order, the new order margin is smaller or equal the old order margin"
+        );
+        if new_order_margin < original_om {
+            let margin = original_om - new_order_margin;
+            assert2::debug_assert!(margin >= Zero::zero());
+            balances.free_order_margin(margin);
+        }
+
+        Ok(removed_order)
+    }
+
+    /// fill an existing limit order, reduces order margin.
+    /// # Panics:
+    /// panics if the order id was not found.
+    pub fn fill_order(
+        &mut self,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        position: &Position<I, D, BaseOrQuote>,
+        balances: &mut Balances<I, D, BaseOrQuote::PairedCurrency>,
+        init_margin_req: Decimal<I, D>,
+    ) {
+        let original_om = self.order_margin(init_margin_req, position);
+
+        trace!("OrderMargin.update {order:?}");
+        let notional = order.notional();
+        assert2::debug_assert!(notional > Zero::zero());
+        let old_order = self.update(order);
+        let notional_delta = notional - old_order.notional();
+
+        match old_order.side() {
+            Buy => {
+                self.bids_notional += notional_delta;
+                assert2::debug_assert!(self.bids_notional >= Zero::zero());
+            }
+            Sell => {
+                self.asks_notional += notional_delta;
+                assert2::debug_assert!(self.asks_notional >= Zero::zero());
+            }
+        }
+
+        // Update balances
+        let new_order_margin = self.order_margin(init_margin_req, position);
+        assert2::debug_assert!(
+            new_order_margin <= original_om,
+            "The order margin does not increase with a filled limit order event."
+        );
+        if new_order_margin < original_om {
+            let margin_delta = original_om - new_order_margin;
+            assert2::debug_assert!(margin_delta > Zero::zero());
+            balances.free_order_margin(margin_delta);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroU16;
 
+    use const_decimal::Decimal;
+    use num::One;
     use rand::Rng;
 
     use super::ActiveLimitOrders;
     use crate::{
+        prelude::Position,
         types::{
+            Balances,
             BaseCurrency,
             ExchangeOrderMeta,
             LimitOrder,
@@ -323,6 +523,10 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn active_limit_orders_insert() {
+        let position = Position::Neutral;
+        let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+        let init_margin_req = Decimal::one();
+
         let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(
             NonZeroU16::new(10).unwrap(),
         );
@@ -334,7 +538,8 @@ mod tests {
         .unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
-        alo.try_insert(order.clone()).unwrap();
+        alo.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+            .unwrap();
 
         assert_eq!(alo.num_active(), 1);
         let removed = alo.remove(0.into()).unwrap();
@@ -349,7 +554,8 @@ mod tests {
         .unwrap();
         let meta = ExchangeOrderMeta::new(1.into(), 1.into());
         let order_1 = order_1.into_pending(meta);
-        alo.try_insert(order_1.clone()).unwrap();
+        alo.try_insert(order_1.clone(), &position, &mut balances, init_margin_req)
+            .unwrap();
         assert_eq!(alo.num_active(), 1);
         let removed = alo.remove(1.into()).unwrap();
         assert_eq!(removed, order_1);
@@ -365,7 +571,8 @@ mod tests {
             .unwrap();
             let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
             let order = order.into_pending(meta);
-            alo.try_insert(order.clone()).unwrap();
+            alo.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+                .unwrap();
             let mut sorted = alo.bids.clone();
             sorted.sort_by(price_time_priority_ordering);
             assert_eq!(sorted, alo.bids);
@@ -381,7 +588,8 @@ mod tests {
             .unwrap();
             let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
             let order = order.into_pending(meta);
-            alo.try_insert(order.clone()).unwrap();
+            alo.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+                .unwrap();
             let mut sorted = alo.asks.clone();
             sorted.sort_by(price_time_priority_ordering);
             assert_eq!(sorted, alo.asks);
@@ -389,10 +597,13 @@ mod tests {
         assert_eq!(alo.num_active(), 10);
     }
 
-    // TODO: another manual test to ensure bids and asks are properly ordered regarding prices and timestamps.
-
     #[test]
+    #[tracing_test::traced_test]
     fn active_limit_orders_display() {
+        let position = Position::Neutral;
+        let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
+        let init_margin_req = Decimal::one();
+
         let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(
             NonZeroU16::new(3).unwrap(),
         );
@@ -404,7 +615,8 @@ mod tests {
         .unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
-        alo.try_insert(order.clone()).unwrap();
+        alo.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+            .unwrap();
 
         assert_eq!(
             &alo.to_string(),

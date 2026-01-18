@@ -1,6 +1,5 @@
 use crate::{
     market_state::MarketState,
-    order_margin::OrderMargin,
     prelude::{
         Currency,
         Mon,
@@ -9,6 +8,7 @@ use crate::{
         RiskError,
     },
     types::{
+        Account,
         Balances,
         LimitOrder,
         MarginCurrency,
@@ -51,10 +51,8 @@ where
     /// Checks if the account it able to satisfy the margin requirements for a new limit order.
     fn check_limit_order(
         &self,
-        position: &Position<I, D, BaseOrQuote>,
+        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        available_wallet_balance: BaseOrQuote::PairedCurrency,
-        order_margin: &OrderMargin<I, D, BaseOrQuote, UserOrderIdT>,
     ) -> Result<(), NotEnoughAvailableBalance>;
 
     /// Ensure the account has enough maintenance margin, to keep the position open.

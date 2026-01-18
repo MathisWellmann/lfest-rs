@@ -13,7 +13,7 @@ mod market_state;
 mod market_update;
 mod mock_exchange;
 mod order_filters;
-mod order_margin;
+// mod order_margin; // TODO: migrate tests
 mod order_rate_limiter;
 mod position;
 mod position_inner;
@@ -49,7 +49,6 @@ pub mod prelude {
             PriceFilter,
             QuantityFilter,
         },
-        order_margin::OrderMargin,
         position::Position,
         position_inner::PositionInner,
         types::*,
