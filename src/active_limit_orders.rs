@@ -358,7 +358,7 @@ where
 
     /// Remove an active `LimitOrder` based on its order id.
     #[inline]
-    fn remove_by_user_order_id(
+    fn remove_by_user_id(
         &mut self,
         uid: UserOrderIdT,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
@@ -400,7 +400,7 @@ where
                 .remove_by_id(order_id)
                 .ok_or(OrderIdNotFound::OrderId(order_id))?,
             UserOrderId(user_order_id) => self
-                .remove_by_user_order_id(user_order_id)
+                .remove_by_user_id(user_order_id)
                 .ok_or(OrderIdNotFound::UserOrderId(user_order_id))?,
         };
 
@@ -554,6 +554,44 @@ mod tests {
         assert_eq!(book.remove_by_id(1.into()), Some(order));
         assert_eq!(book.get_by_id(1.into(), Sell), None);
         assert_eq!(book.remove_by_id(1.into()), None);
+    }
+
+    #[test]
+    fn active_limit_orders_remove_by_user_order_id() {
+        let position = Neutral;
+        let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+        let init_margin_req = Decimal::one();
+        let mut book = ActiveLimitOrders::<i64, 5, BaseCurrency<i64, 5>, i32>::with_capacity(
+            NonZeroU16::new(10).unwrap(),
+        );
+
+        let order = LimitOrder::new_with_user_order_id(
+            Buy,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+            100,
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+            .unwrap();
+        assert_eq!(book.remove_by_user_id(100), Some(order));
+        assert_eq!(book.remove_by_user_id(100), None);
+
+        let order = LimitOrder::new_with_user_order_id(
+            Sell,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+            200,
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(1.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+            .unwrap();
+        assert_eq!(book.remove_by_user_id(200), Some(order));
+        assert_eq!(book.remove_by_user_id(200), None);
     }
 
     #[test]
@@ -737,7 +775,7 @@ mod tests {
         let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
         let init_margin_req = Decimal::one();
 
-        let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(
+        let mut book = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(
             NonZeroU16::new(3).unwrap(),
         );
         let order = LimitOrder::new(
@@ -748,11 +786,11 @@ mod tests {
         .unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
-        alo.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+        book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
             .unwrap();
 
         assert_eq!(
-            &alo.to_string(),
+            &book.to_string(),
             "ActiveLimitOrders:\nuser_id: NoUserOrderId, limit Buy 5.00000 Base @ 100.00000 Quote, state: Pending { meta: ExchangeOrderMeta { id: OrderId(0), ts_exchange_received: TimestampNs(0) }, filled_quantity: Unfilled }\n"
         );
     }
