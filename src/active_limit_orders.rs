@@ -540,13 +540,62 @@ mod tests {
     };
 
     #[test]
+    fn active_limit_orders_clone() {
+        let position = Neutral;
+        let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+        let init_margin_req = Decimal::one();
+
+        let cap = 10;
+        let mut book =
+            ActiveLimitOrders::<i64, 5, BaseCurrency<i64, 5>, NoUserOrderId>::with_capacity(
+                NonZeroU16::new(10).unwrap(),
+            );
+        assert_eq!(book.bids().len(), 0);
+        assert_eq!(book.asks().len(), 0);
+        assert_eq!(book.bids().capacity(), cap);
+        assert_eq!(book.asks().capacity(), cap);
+
+        let order = LimitOrder::new(
+            Buy,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+            .unwrap();
+        book = book.clone();
+        assert_eq!(book.bids().len(), 1);
+        assert_eq!(book.asks().len(), 0);
+        assert_eq!(book.bids().capacity(), cap);
+        assert_eq!(book.asks().capacity(), cap);
+
+        let order = LimitOrder::new(
+            Sell,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+            .unwrap();
+        book = book.clone();
+        assert_eq!(book.bids().len(), 1);
+        assert_eq!(book.asks().len(), 1);
+        assert_eq!(book.bids().capacity(), cap);
+        assert_eq!(book.asks().capacity(), cap);
+    }
+
+    #[test]
     #[tracing_test::traced_test]
     fn active_limit_orders_insert() {
         let position = Neutral;
         let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
         let init_margin_req = Decimal::one();
 
-        let mut alo = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(
+        let mut book = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(
             NonZeroU16::new(10).unwrap(),
         );
         let order = LimitOrder::new(
@@ -557,13 +606,13 @@ mod tests {
         .unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let order = order.into_pending(meta);
-        alo.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+        book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
             .unwrap();
 
-        assert_eq!(alo.num_active(), 1);
-        let removed = alo.remove(0.into()).unwrap();
+        assert_eq!(book.num_active(), 1);
+        let removed = book.remove(0.into()).unwrap();
         assert_eq!(removed, order);
-        assert!(alo.is_empty());
+        assert!(book.is_empty());
 
         let order_1 = LimitOrder::new(
             Buy,
@@ -573,12 +622,12 @@ mod tests {
         .unwrap();
         let meta = ExchangeOrderMeta::new(1.into(), 1.into());
         let order_1 = order_1.into_pending(meta);
-        alo.try_insert(order_1.clone(), &position, &mut balances, init_margin_req)
+        book.try_insert(order_1.clone(), &position, &mut balances, init_margin_req)
             .unwrap();
-        assert_eq!(alo.num_active(), 1);
-        let removed = alo.remove(1.into()).unwrap();
+        assert_eq!(book.num_active(), 1);
+        let removed = book.remove(1.into()).unwrap();
         assert_eq!(removed, order_1);
-        assert!(alo.is_empty());
+        assert!(book.is_empty());
 
         let mut rng = rand::rng();
         for i in 2..7 {
@@ -590,13 +639,13 @@ mod tests {
             .unwrap();
             let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
             let order = order.into_pending(meta);
-            alo.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+            book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
                 .unwrap();
-            let mut sorted = alo.bids.clone();
+            let mut sorted = book.bids.clone();
             sorted.sort_by(price_time_priority_ordering);
-            assert_eq!(sorted, alo.bids);
+            assert_eq!(sorted, book.bids);
         }
-        assert_eq!(alo.num_active(), 5);
+        assert_eq!(book.num_active(), 5);
 
         for i in 0..5 {
             let order = LimitOrder::new(
@@ -607,13 +656,13 @@ mod tests {
             .unwrap();
             let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
             let order = order.into_pending(meta);
-            alo.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+            book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
                 .unwrap();
-            let mut sorted = alo.asks.clone();
+            let mut sorted = book.asks.clone();
             sorted.sort_by(price_time_priority_ordering);
-            assert_eq!(sorted, alo.asks);
+            assert_eq!(sorted, book.asks);
         }
-        assert_eq!(alo.num_active(), 10);
+        assert_eq!(book.num_active(), 10);
     }
 
     #[test]

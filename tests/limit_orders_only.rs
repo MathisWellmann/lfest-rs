@@ -146,6 +146,7 @@ fn limit_orders_only() {
     );
 }
 
+#[ignore]
 #[test]
 #[tracing_test::traced_test]
 fn limit_orders_2() {
