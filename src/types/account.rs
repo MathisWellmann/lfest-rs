@@ -150,9 +150,10 @@ where
         )
     }
 
+    /// Remove a limit order.
     #[allow(clippy::complexity, reason = "How is this hard to read?")]
     #[inline]
-    pub(crate) fn remove_limit_order(
+    pub fn remove_limit_order(
         &mut self,
         by: CancelBy<UserOrderIdT>,
         init_margin_req: Decimal<I, D>,

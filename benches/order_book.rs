@@ -11,6 +11,7 @@ use std::{
     num::NonZeroU16,
 };
 
+use const_decimal::Decimal;
 use criterion::{
     BenchmarkId,
     Criterion,
@@ -28,10 +29,11 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("OrderBook");
 
     let mut rng = rand::rngs::SmallRng::seed_from_u64(0);
+    let init_margin_req = Decimal::one();
 
     for n in 1..100 {
         group.throughput(Throughput::Elements(n));
-        group.bench_with_input(BenchmarkId::new("try_insert", n), &n, |b, _| {
+        group.bench_with_input(BenchmarkId::new("try_insert_order", n), &n, |b, _| {
             let orders = Vec::from_iter((0..n).map(|i| {
                 let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
                 let order = LimitOrder::new(
@@ -43,10 +45,16 @@ fn criterion_benchmark(c: &mut Criterion) {
                 order.into_pending(meta)
             }));
             b.iter_with_setup(
-                || ActiveLimitOrders::with_capacity(NonZeroU16::new(n as u16).unwrap()),
+                || {
+                    Account::new(
+                        Balances::new(QuoteCurrency::new(1000, 0)),
+                        NonZeroU16::new(n as u16).unwrap(),
+                    )
+                },
                 |mut ob| {
                     for order in orders.iter() {
-                        ob.try_insert(black_box(order.clone())).expect("Can insert");
+                        ob.try_insert_order(black_box(order.clone()), init_margin_req)
+                            .expect("Can insert");
                     }
                 },
             )
