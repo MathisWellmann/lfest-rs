@@ -567,6 +567,54 @@ mod tests {
     }
 
     #[test]
+    fn active_limit_orders_get_by_id() {
+        let position = Neutral;
+        let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+        let init_margin_req = Decimal::one();
+
+        let mut book =
+            ActiveLimitOrders::<i64, 5, BaseCurrency<i64, 5>, NoUserOrderId>::with_capacity(
+                NonZeroU16::new(10).unwrap(),
+            );
+        for i in 0..10 {
+            assert_eq!(book.get_by_id(i.into(), Buy), None);
+        }
+        for i in 0..10 {
+            assert_eq!(book.get_by_id(i.into(), Sell), None);
+        }
+
+        let order = LimitOrder::new(
+            Buy,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+            .unwrap();
+        assert_eq!(book.get_by_id(0.into(), Buy).unwrap(), &order);
+        for i in 1..10 {
+            assert_eq!(book.get_by_id(i.into(), Buy), None);
+        }
+
+        let order = LimitOrder::new(
+            Sell,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+            .unwrap();
+        assert_eq!(book.get_by_id(0.into(), Sell).unwrap(), &order);
+        for i in 1..10 {
+            assert!(book.get_by_id(i.into(), Buy).is_none());
+        }
+    }
+
+    #[test]
     #[tracing_test::traced_test]
     fn active_limit_orders_insert() {
         let position = Neutral;

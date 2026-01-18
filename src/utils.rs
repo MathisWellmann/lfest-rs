@@ -14,6 +14,7 @@ impl std::fmt::Display for NoUserOrderId {
 
 /// Return the minimum of two values
 #[inline(always)]
+#[mutants::skip]
 pub(crate) fn min<T>(v0: T, v1: T) -> T
 where
     T: PartialOrd,
@@ -23,6 +24,7 @@ where
 
 /// Return the maximum of two values
 #[inline(always)]
+#[mutants::skip]
 pub(crate) fn max<T>(v0: T, v1: T) -> T
 where
     T: PartialOrd,

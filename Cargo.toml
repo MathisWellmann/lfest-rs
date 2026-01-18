@@ -212,6 +212,7 @@ assert2 = "0.3"
 num = "0.4"
 glidesort = "0.1"
 csv = "1"
+mutants = "0.0.3"
 
 trade_aggregation = { version = "13", optional = true }
 
