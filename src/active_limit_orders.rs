@@ -117,7 +117,7 @@ where
 {
     /// Create a new order book instance with a maximum capacity for bids and asks.
     /// The `max_active_orders` must be non zero as we need at least space for one limit order.
-    pub fn with_capacity(max_active_orders: NonZeroU16) -> Self {
+    pub(crate) fn with_capacity(max_active_orders: NonZeroU16) -> Self {
         let cap: usize = max_active_orders.get().into();
         Self {
             bids: Vec::with_capacity(cap),
@@ -141,7 +141,7 @@ where
 
     /// Peek at the best bid limit order.
     #[inline]
-    pub fn peek_best_bid(
+    pub(crate) fn peek_best_bid(
         &self,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         // The last element in `bids` has the highest price and oldest timestamp.
@@ -165,7 +165,7 @@ where
 
     /// Peek at the best ask limit order.
     #[inline]
-    pub fn peek_best_ask(
+    pub(crate) fn peek_best_ask(
         &self,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         // The first element in `asks` has the lowest price and oldest timestamp.
@@ -189,7 +189,7 @@ where
 
     /// Try to insert a new `LimitOrder` into the order book.
     /// Returns an error if the maximum capacity is reached.
-    pub fn try_insert(
+    pub(crate) fn try_insert(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         position: &Position<I, D, BaseOrQuote>,
@@ -457,7 +457,7 @@ where
     /// fill an existing limit order, reduces order margin.
     /// # Panics:
     /// panics if the order id was not found.
-    pub fn fill_order(
+    pub(crate) fn fill_order(
         &mut self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         position: &Position<I, D, BaseOrQuote>,
@@ -502,19 +502,38 @@ mod tests {
     use std::num::NonZeroU16;
 
     use const_decimal::Decimal;
-    use num::One;
+    use num::{
+        One,
+        Zero,
+    };
     use rand::Rng;
 
     use super::ActiveLimitOrders;
     use crate::{
-        prelude::Position,
+        DECIMALS,
+        prelude::{
+            Position::{
+                self,
+                *,
+            },
+            PositionInner,
+        },
+        test_fee_maker,
         types::{
             Balances,
             BaseCurrency,
+            CancelBy,
+            Currency,
             ExchangeOrderMeta,
+            Leverage,
             LimitOrder,
+            LimitOrderFill,
             QuoteCurrency,
-            Side,
+            Side::{
+                self,
+                *,
+            },
+            TimestampNs,
             price_time_priority_ordering,
         },
         utils::NoUserOrderId,
@@ -523,7 +542,7 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn active_limit_orders_insert() {
-        let position = Position::Neutral;
+        let position = Neutral;
         let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
         let init_margin_req = Decimal::one();
 
@@ -531,7 +550,7 @@ mod tests {
             NonZeroU16::new(10).unwrap(),
         );
         let order = LimitOrder::new(
-            Side::Buy,
+            Buy,
             QuoteCurrency::<i64, 5>::new(100, 0),
             BaseCurrency::new(5, 0),
         )
@@ -547,7 +566,7 @@ mod tests {
         assert!(alo.is_empty());
 
         let order_1 = LimitOrder::new(
-            Side::Buy,
+            Buy,
             QuoteCurrency::<i64, 5>::new(200, 0),
             BaseCurrency::new(1, 0),
         )
@@ -564,7 +583,7 @@ mod tests {
         let mut rng = rand::rng();
         for i in 2..7 {
             let order = LimitOrder::new(
-                Side::Buy,
+                Buy,
                 QuoteCurrency::<i64, 5>::new(rng.random_range(100..500), 0),
                 BaseCurrency::new(1, 0),
             )
@@ -581,7 +600,7 @@ mod tests {
 
         for i in 0..5 {
             let order = LimitOrder::new(
-                Side::Sell,
+                Sell,
                 QuoteCurrency::<i64, 5>::new(rng.random_range(100..500), 0),
                 BaseCurrency::new(1, 0),
             )
@@ -600,7 +619,7 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn active_limit_orders_display() {
-        let position = Position::Neutral;
+        let position = Neutral;
         let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
         let init_margin_req = Decimal::one();
 
@@ -608,7 +627,7 @@ mod tests {
             NonZeroU16::new(3).unwrap(),
         );
         let order = LimitOrder::new(
-            Side::Buy,
+            Buy,
             QuoteCurrency::<i64, 5>::new(100, 0),
             BaseCurrency::new(5, 0),
         )
@@ -622,5 +641,512 @@ mod tests {
             &alo.to_string(),
             "ActiveLimitOrders:\nuser_id: NoUserOrderId, limit Buy 5.00000 Base @ 100.00000 Quote, state: Pending { meta: ExchangeOrderMeta { id: OrderId(0), ts_exchange_received: TimestampNs(0) }, filled_quantity: Unfilled }\n"
         );
+    }
+    #[test]
+    fn order_margin_assert_limit_order_reduces_qty() {
+        let new_active_order = LimitOrder::new(
+            Buy,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 1.into());
+        let active_order = new_active_order.into_pending(meta);
+
+        let mut updated_order = active_order.clone();
+        let fee = QuoteCurrency::new(0, 0);
+        updated_order.fill(BaseCurrency::new(1, 0), fee, 1.into());
+
+        ActiveLimitOrders::assert_limit_order_update_reduces_qty(&active_order, &updated_order);
+    }
+
+    #[test]
+    #[should_panic]
+    fn order_margin_assert_limit_order_reduces_qty_panic() {
+        let new_active_order = LimitOrder::new(
+            Buy,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 1.into());
+        let order_0 = new_active_order.into_pending(meta);
+
+        let mut order_1 = order_0.clone();
+        let fee = QuoteCurrency::new(0, 0);
+        order_1.fill(BaseCurrency::new(1, 0), fee, 1.into());
+
+        ActiveLimitOrders::assert_limit_order_update_reduces_qty(&order_1, &order_0);
+    }
+
+    #[test_case::test_matrix(
+        [1, 2, 5]
+    )]
+    #[tracing_test::traced_test]
+    fn order_margin_neutral_no_orders(leverage: u8) {
+        let order_margin = ActiveLimitOrders::<_, 4, _, NoUserOrderId>::with_capacity(
+            NonZeroU16::new(10).unwrap(),
+        );
+
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+
+        let position = Position::<_, 4, BaseCurrency<i32, 4>>::Neutral;
+        assert_eq!(
+            order_margin.order_margin(init_margin_req, &position),
+            QuoteCurrency::new(0, 0)
+        );
+    }
+
+    #[test_case::test_matrix(
+        [1, 2, 5],
+        [1, 2, 5],
+        [100, 200, 300]
+    )]
+    fn order_margin_long_no_orders(leverage: u8, position_qty: i32, entry_price: i32) {
+        let order_margin = ActiveLimitOrders::<_, 4, _, NoUserOrderId>::with_capacity(
+            NonZeroU16::new(10).unwrap(),
+        );
+
+        let qty = BaseCurrency::new(position_qty, 0);
+        let entry_price = QuoteCurrency::new(entry_price, 0);
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+
+        let mut balances = Balances::new(QuoteCurrency::new(1500, 0));
+        let notional = QuoteCurrency::convert_from(qty, entry_price);
+        let init_margin = notional * init_margin_req;
+        assert!(balances.try_reserve_order_margin(init_margin));
+
+        let position = Long(PositionInner::new(qty, entry_price));
+
+        assert_eq!(
+            order_margin.order_margin(init_margin_req, &position),
+            QuoteCurrency::new(0, 0)
+        );
+    }
+
+    #[test_case::test_matrix(
+        [1, 2, 5],
+        [1, 2, 5],
+        [100, 200, 300]
+    )]
+    fn order_margin_short_no_orders(leverage: u8, position_qty: i32, entry_price: i32) {
+        let order_margin = ActiveLimitOrders::<_, 4, _, NoUserOrderId>::with_capacity(
+            NonZeroU16::new(10).unwrap(),
+        );
+
+        let qty = BaseCurrency::new(position_qty, 0);
+        let entry_price = QuoteCurrency::new(entry_price, 0);
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+
+        let mut balances = Balances::new(QuoteCurrency::new(10000, 0));
+        let notional = QuoteCurrency::convert_from(qty, entry_price);
+        let init_margin = notional * init_margin_req;
+        assert!(balances.try_reserve_order_margin(init_margin));
+
+        let position = Short(PositionInner::new(qty, entry_price));
+
+        assert_eq!(
+            order_margin.order_margin(init_margin_req, &position),
+            QuoteCurrency::new(0, 0)
+        );
+    }
+
+    #[test_case::test_matrix(
+        [1, 2, 5],
+        [Buy, Sell],
+        [100, 150, 200],
+        [1, 2, 3],
+        [1, 2, 3]
+    )]
+    fn order_margin_neutral_orders_of_same_side(
+        leverage: u8,
+        side: Side,
+        limit_price: i32,
+        qty: i32,
+        n: usize,
+    ) {
+        let max_active_orders = NonZeroU16::new(10).unwrap();
+        let mut book =
+            ActiveLimitOrders::<_, 4, _, NoUserOrderId>::with_capacity(max_active_orders);
+
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+
+        let qty = BaseCurrency::new(qty, 0);
+        let limit_price = QuoteCurrency::new(limit_price, 0);
+
+        let orders = Vec::from_iter((0..n).map(|i| {
+            let order = LimitOrder::new(side, limit_price, qty).unwrap();
+            let meta =
+                ExchangeOrderMeta::new((i as u64).into(), Into::<TimestampNs>::into(i as i64));
+            order.into_pending(meta)
+        }));
+        let position = Neutral;
+        let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+        orders.iter().for_each(|order| {
+            book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+                .unwrap()
+        });
+
+        let mult = QuoteCurrency::new(n as i32, 0);
+        let om = mult * QuoteCurrency::convert_from(qty, limit_price) * init_margin_req;
+        assert_eq!(
+            book.order_margin(
+                init_margin_req,
+                &Position::<_, 4, BaseCurrency<i32, 4>>::Neutral
+            ),
+            om
+        );
+        assert_eq!(book.order_margin(init_margin_req, &position), om);
+
+        orders.iter().for_each(|order| {
+            let _ = book.remove_limit_order(
+                CancelBy::OrderId(order.id()),
+                init_margin_req,
+                &position,
+                &mut balances,
+            );
+        });
+        let om = QuoteCurrency::new(0, 0);
+        assert_eq!(
+            book.order_margin(
+                init_margin_req,
+                &Position::<_, 4, BaseCurrency<i32, 4>>::Neutral
+            ),
+            om
+        );
+    }
+
+    #[test_case::test_matrix(
+        [1, 2, 5],
+        [Buy],
+        [100, 150, 200],
+        [1, 2, 3],
+        [1, 2, 3]
+    )]
+    fn order_margin_neutral_orders_of_opposite_side(
+        leverage: u8,
+        side: Side,
+        limit_price: i32,
+        qty: i32,
+        n: usize,
+    ) {
+        let mut book = ActiveLimitOrders::<_, 4, _, NoUserOrderId>::with_capacity(
+            NonZeroU16::new(10).unwrap(),
+        );
+
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+
+        let qty = BaseCurrency::new(qty, 0);
+        let limit_price = QuoteCurrency::new(limit_price, 0);
+
+        let buy_orders = Vec::from_iter((0..n).map(|i| {
+            let order = LimitOrder::new(side, limit_price, qty).unwrap();
+            let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
+            order.into_pending(meta)
+        }));
+        let position = Neutral;
+        let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+        buy_orders.iter().for_each(|order| {
+            book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+                .unwrap();
+        });
+        let notional: QuoteCurrency<i32, 4> = buy_orders.iter().map(|o| o.notional()).sum();
+        assert_eq!(
+            book.order_margin(init_margin_req, &position),
+            notional * init_margin_req
+        );
+
+        let sell_orders = Vec::from_iter((0..n).map(|i| {
+            let order = LimitOrder::new(side.inverted(), limit_price, qty).unwrap();
+            let meta = ExchangeOrderMeta::new(((n + i) as u64).into(), ((n + i) as i64).into());
+            order.into_pending(meta)
+        }));
+        sell_orders.iter().for_each(|order| {
+            book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+                .unwrap();
+        });
+
+        let mult = QuoteCurrency::new(n as i32, 0);
+        let om = mult * QuoteCurrency::convert_from(qty, limit_price) * init_margin_req;
+        assert_eq!(
+            book.order_margin(
+                init_margin_req,
+                &Position::<_, 4, BaseCurrency<i32, 4>>::Neutral,
+            ),
+            om
+        );
+
+        buy_orders.iter().for_each(|order| {
+            let _ = book.remove_limit_order(
+                CancelBy::OrderId(order.id()),
+                init_margin_req,
+                &position,
+                &mut balances,
+            );
+        });
+        sell_orders.iter().for_each(|order| {
+            let _ = book.remove_limit_order(
+                CancelBy::OrderId(order.id()),
+                init_margin_req,
+                &position,
+                &mut balances,
+            );
+        });
+        assert_eq!(
+            book.order_margin(
+                init_margin_req,
+                &Position::<_, 4, BaseCurrency<i32, 4>>::Neutral
+            ),
+            QuoteCurrency::new(0, 0)
+        );
+    }
+
+    #[test_case::test_matrix(
+        [1, 2, 5]
+    )]
+    fn order_margin_long_orders_of_same_qty(leverage: u8) {
+        let mut book = ActiveLimitOrders::<_, 4, _, NoUserOrderId>::with_capacity(
+            NonZeroU16::new(10).unwrap(),
+        );
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+        let qty = BaseCurrency::new(3, 0);
+        let limit_price = QuoteCurrency::new(100, 0);
+        let position = Neutral;
+        let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+
+        let order = LimitOrder::new(Buy, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order, &position, &mut balances, init_margin_req)
+            .unwrap();
+
+        let pos_entry_price = QuoteCurrency::new(90, 0);
+        let position = Short(PositionInner::new(qty, pos_entry_price));
+
+        // The limit orders may require more margin.
+        let om = QuoteCurrency::convert_from(qty, QuoteCurrency::new(10, 0)) * init_margin_req;
+
+        assert_eq!(book.order_margin(init_margin_req, &position), om);
+    }
+
+    #[test_case::test_matrix(
+        [1, 2, 5],
+        [Buy, Sell],
+        [70, 90, 110],
+        [1, 2, 3]
+    )]
+    #[tracing_test::traced_test]
+    fn order_margin_neutral_update_partial_fills(
+        leverage: u8,
+        side: Side,
+        limit_price: i64,
+        qty: i64,
+    ) {
+        let mut book = ActiveLimitOrders::<_, DECIMALS, _, NoUserOrderId>::with_capacity(
+            NonZeroU16::new(10).unwrap(),
+        );
+        let init_margin_req = Leverage::new(leverage).unwrap().init_margin_req();
+        let qty = BaseCurrency::new(qty, 0);
+        let limit_price = QuoteCurrency::new(limit_price, 0);
+
+        let order = LimitOrder::new(side, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let mut order = order.into_pending(meta);
+        let notional = order.notional();
+        let position = Neutral;
+        let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+
+        book.try_insert(order.clone(), &position, &mut balances, init_margin_req)
+            .unwrap();
+        assert_eq!(book.num_active(), 1);
+        assert_eq!(
+            book.order_margin(init_margin_req, &position),
+            notional * init_margin_req
+        );
+
+        // Now partially fill the order
+        let filled_qty = qty / BaseCurrency::new(2, 0);
+        let fee = QuoteCurrency::convert_from(filled_qty, limit_price) * *test_fee_maker().as_ref();
+        match order.fill(filled_qty, fee, 0.into()) {
+            LimitOrderFill::PartiallyFilled {
+                filled_quantity,
+                fee: f,
+                order_after_fill: _,
+            } => {
+                assert_eq!(filled_quantity, filled_qty);
+                assert_eq!(f, fee);
+            }
+            LimitOrderFill::FullyFilled { .. } => panic!("Expected `PartiallyFilled`"),
+        }
+        let remaining_qty = order.remaining_quantity();
+        book.fill_order(&order, &position, &mut balances, init_margin_req);
+        assert_eq!(book.num_active(), 1);
+        assert_eq!(remaining_qty, filled_qty);
+        let om = QuoteCurrency::convert_from(remaining_qty, limit_price) * init_margin_req;
+        assert_eq!(book.order_margin(init_margin_req, &Neutral), om,);
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn order_margin_no_position() {
+        let position = Neutral;
+        let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+        let init_margin_req = Decimal::one();
+        let mut book = ActiveLimitOrders::with_capacity(NonZeroU16::new(10).unwrap());
+
+        assert_eq!(
+            book.order_margin(init_margin_req, &position),
+            QuoteCurrency::new(0, 0)
+        );
+
+        let qty = BaseCurrency::<i32, 4>::new(1, 0);
+        let limit_price = QuoteCurrency::new(90, 0);
+        let order = LimitOrder::new(Buy, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let order = order.into_pending(meta);
+
+        book.try_insert(order, &position, &mut balances, init_margin_req)
+            .unwrap();
+        assert_eq!(book.asks().len(), 0);
+        assert_eq!(
+            book.order_margin(init_margin_req, &position),
+            QuoteCurrency::new(90, 0)
+        );
+
+        let limit_price = QuoteCurrency::new(100, 0);
+        let order = LimitOrder::new(Sell, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(1.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order, &position, &mut balances, init_margin_req)
+            .unwrap();
+        assert_eq!(book.bids().len(), 1);
+        assert_eq!(book.asks().len(), 1);
+        let om = QuoteCurrency::new(100, 0);
+        assert_eq!(book.order_margin(init_margin_req, &position), om);
+
+        let limit_price = QuoteCurrency::new(120, 0);
+        let qty = BaseCurrency::new(1, 0);
+        let order = LimitOrder::new(Sell, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(2.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order, &position, &mut balances, init_margin_req)
+            .unwrap();
+        assert_eq!(book.bids().len(), 1);
+        assert_eq!(book.asks().len(), 2);
+        let om = QuoteCurrency::new(220, 0);
+        assert_eq!(book.order_margin(init_margin_req, &position), om);
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn order_margin_with_long() {
+        let mut book = ActiveLimitOrders::with_capacity(NonZeroU16::new(10).unwrap());
+
+        let qty = BaseCurrency::<i64, 5>::new(1, 0);
+        let entry_price = QuoteCurrency::new(100, 0);
+
+        let position = Long(PositionInner::new(qty, entry_price));
+        let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+        let init_margin_req = Decimal::one();
+
+        assert_eq!(
+            book.order_margin(init_margin_req, &position),
+            QuoteCurrency::new(0, 0)
+        );
+
+        let limit_price = QuoteCurrency::new(90, 0);
+        let order = LimitOrder::new(Buy, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order, &position, &mut balances, init_margin_req)
+            .unwrap();
+        let om = QuoteCurrency::new(90, 0);
+        assert_eq!(book.order_margin(init_margin_req, &position), om);
+
+        let limit_price = QuoteCurrency::new(100, 0);
+        let order = LimitOrder::new(Sell, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(1.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order, &position, &mut balances, init_margin_req)
+            .unwrap();
+        let om = QuoteCurrency::new(90, 0);
+        assert_eq!(book.order_margin(init_margin_req, &position), om,);
+
+        let limit_price = QuoteCurrency::new(120, 0);
+        let order = LimitOrder::new(Sell, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(2.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order, &position, &mut balances, init_margin_req)
+            .unwrap();
+        let om = QuoteCurrency::new(120, 0);
+        assert_eq!(book.order_margin(init_margin_req, &position), om);
+
+        let limit_price = QuoteCurrency::new(95, 0);
+        let order = LimitOrder::new(Buy, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(3.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order, &position, &mut balances, init_margin_req)
+            .unwrap();
+        let om = QuoteCurrency::new(185, 0);
+        assert_eq!(book.order_margin(init_margin_req, &position), om);
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn order_margin_with_short() {
+        let mut book = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(
+            NonZeroU16::new(10).unwrap(),
+        );
+
+        let qty = BaseCurrency::<i64, DECIMALS>::one();
+        let entry_price = QuoteCurrency::new(100, 0);
+
+        let position = Short(PositionInner::new(qty, entry_price));
+        let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
+        let init_margin_req = Decimal::one();
+
+        assert_eq!(
+            book.order_margin(init_margin_req, &position),
+            QuoteCurrency::new(0, 0)
+        );
+
+        let limit_price = QuoteCurrency::new(90, 0);
+        let qty = BaseCurrency::one();
+        let order = LimitOrder::new(Buy, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order, &position, &mut balances, init_margin_req)
+            .unwrap();
+        assert_eq!(
+            book.order_margin(init_margin_req, &position),
+            QuoteCurrency::zero()
+        );
+
+        let limit_price = QuoteCurrency::new(100, 0);
+        let order = LimitOrder::new(Sell, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(1.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order, &position, &mut balances, init_margin_req)
+            .unwrap();
+        let om = QuoteCurrency::new(100, 0);
+        assert_eq!(book.order_margin(init_margin_req, &position), om);
+
+        let limit_price = QuoteCurrency::new(120, 0);
+        let order = LimitOrder::new(Sell, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(2.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order, &position, &mut balances, init_margin_req)
+            .unwrap();
+        let om = QuoteCurrency::new(220, 0);
+        assert_eq!(book.order_margin(init_margin_req, &position), om);
+
+        let limit_price = QuoteCurrency::new(95, 0);
+        let order = LimitOrder::new(Buy, limit_price, qty).unwrap();
+        let meta = ExchangeOrderMeta::new(3.into(), 0.into());
+        let order = order.into_pending(meta);
+        book.try_insert(order, &position, &mut balances, init_margin_req)
+            .unwrap();
+        let om = QuoteCurrency::new(220, 0);
+        assert_eq!(book.order_margin(init_margin_req, &position), om);
     }
 }

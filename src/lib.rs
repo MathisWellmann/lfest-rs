@@ -13,7 +13,6 @@ mod market_state;
 mod market_update;
 mod mock_exchange;
 mod order_filters;
-// mod order_margin; // TODO: migrate tests
 mod order_rate_limiter;
 mod position;
 mod position_inner;
