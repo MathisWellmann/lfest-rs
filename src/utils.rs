@@ -59,6 +59,30 @@ pub fn scale<F: num::Float>(from_min: F, from_max: F, to_min: F, to_max: F, valu
     to_min + ((value - from_min) * (to_max - to_min)) / (from_max - from_min)
 }
 
+/// The margin requirement for all the tracked orders.
+#[inline]
+pub(crate) fn order_margin<I, const D: u8, BaseOrQuote>(
+    bids_notional: BaseOrQuote::PairedCurrency,
+    asks_notional: BaseOrQuote::PairedCurrency,
+    init_margin_req: Decimal<I, D>,
+    position: &Position<I, D, BaseOrQuote>,
+) -> BaseOrQuote::PairedCurrency
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+{
+    assert2::debug_assert!(init_margin_req > Decimal::zero());
+    assert2::debug_assert!(init_margin_req <= Decimal::one());
+
+    use Position::*;
+    match position {
+        Neutral => max(bids_notional, asks_notional) * init_margin_req,
+        Long(inner) => max(bids_notional, asks_notional - inner.notional()) * init_margin_req,
+        Short(inner) => max(bids_notional - inner.notional(), asks_notional) * init_margin_req,
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use const_decimal::Decimal;

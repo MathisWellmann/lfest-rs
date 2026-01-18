@@ -12,10 +12,7 @@ use tracing::{
 };
 
 use crate::{
-    prelude::Position::{
-        self,
-        *,
-    },
+    prelude::Position,
     types::{
         Balances,
         CancelBy,
@@ -34,7 +31,7 @@ use crate::{
         UserOrderId,
         price_time_priority_ordering,
     },
-    utils::max,
+    utils::order_margin,
 };
 
 // TODO: rename to `OrderBook`
@@ -256,24 +253,17 @@ where
         Ok(())
     }
 
-    /// The margin requirement for all the tracked orders.
     pub(crate) fn order_margin(
         &self,
         init_margin_req: Decimal<I, D>,
         position: &Position<I, D, BaseOrQuote>,
     ) -> BaseOrQuote::PairedCurrency {
-        assert2::debug_assert!(init_margin_req > Decimal::zero());
-        assert2::debug_assert!(init_margin_req <= Decimal::one());
-
-        match position {
-            Neutral => max(self.bids_notional, self.asks_notional) * init_margin_req,
-            Long(inner) => {
-                max(self.bids_notional, self.asks_notional - inner.notional()) * init_margin_req
-            }
-            Short(inner) => {
-                max(self.bids_notional - inner.notional(), self.asks_notional) * init_margin_req
-            }
-        }
+        order_margin(
+            self.bids_notional,
+            self.asks_notional,
+            init_margin_req,
+            position,
+        )
     }
 
     /// Get the order margin if a new order were to be added.
@@ -294,19 +284,7 @@ where
             Sell => sell_notional += new_notional,
         }
 
-        match position {
-            Neutral => max(buy_notional, sell_notional) * init_margin_req,
-            Long(inner) => {
-                let notional = inner.notional();
-                trace!("notional: {notional}");
-                max(buy_notional, sell_notional - notional) * init_margin_req
-            }
-            Short(inner) => {
-                let notional = inner.notional();
-                trace!("notional: {notional}");
-                max(buy_notional - notional, sell_notional) * init_margin_req
-            }
-        }
+        order_margin(buy_notional, sell_notional, init_margin_req, position)
     }
 
     /// Update an existing `LimitOrder`.
