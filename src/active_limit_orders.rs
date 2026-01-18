@@ -341,44 +341,42 @@ where
         }
     }
 
-    // TODO: merge with method `remove_by_user_order_id`
     /// Remove an active `LimitOrder` based on its order id.
     #[inline]
-    fn remove(
+    fn remove_by_id(
         &mut self,
         id: OrderId,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        let removed = if let Some(pos) = self.bids.iter_mut().position(|order| order.id() == id) {
-            self.bids.remove(pos)
-        } else {
-            let pos = self.asks.iter_mut().position(|order| order.id() == id)?;
-            self.asks.remove(pos)
+        if let Some(pos) = self.bids.iter_mut().position(|order| order.id() == id) {
+            return Some(self.bids.remove(pos));
+        }
+        if let Some(pos) = self.asks.iter_mut().position(|order| order.id() == id) {
+            return Some(self.asks.remove(pos));
         };
-        trace!("removed {removed}");
-        Some(removed)
+        None
     }
 
     /// Remove an active `LimitOrder` based on its order id.
     #[inline]
     fn remove_by_user_order_id(
         &mut self,
-        user_order_id: UserOrderIdT,
+        uid: UserOrderIdT,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        let removed = if let Some(pos) = self
+        if let Some(pos) = self
             .bids
             .iter_mut()
-            .position(|order| order.user_order_id() == user_order_id)
+            .position(|order| order.user_order_id() == uid)
         {
-            self.bids.remove(pos)
-        } else {
-            let pos = self
-                .asks
-                .iter_mut()
-                .position(|order| order.user_order_id() == user_order_id)?;
-            self.asks.remove(pos)
+            return Some(self.bids.remove(pos));
+        }
+        if let Some(pos) = self
+            .asks
+            .iter_mut()
+            .position(|order| order.user_order_id() == uid)
+        {
+            return Some(self.asks.remove(pos));
         };
-        trace!("removed {removed}");
-        Some(removed)
+        None
     }
 
     /// Remove an order from being tracked for margin purposes.
@@ -399,7 +397,7 @@ where
         use CancelBy::*;
         let removed_order = match by {
             OrderId(order_id) => self
-                .remove(order_id)
+                .remove_by_id(order_id)
                 .ok_or(OrderIdNotFound::OrderId(order_id))?,
             UserOrderId(user_order_id) => self
                 .remove_by_user_order_id(user_order_id)
@@ -636,7 +634,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(book.num_active(), 1);
-        let removed = book.remove(0.into()).unwrap();
+        let removed = book.remove_by_id(0.into()).unwrap();
         assert_eq!(removed, order);
         assert!(book.is_empty());
 
@@ -651,7 +649,7 @@ mod tests {
         book.try_insert(order_1.clone(), &position, &mut balances, init_margin_req)
             .unwrap();
         assert_eq!(book.num_active(), 1);
-        let removed = book.remove(1.into()).unwrap();
+        let removed = book.remove_by_id(1.into()).unwrap();
         assert_eq!(removed, order_1);
         assert!(book.is_empty());
 
