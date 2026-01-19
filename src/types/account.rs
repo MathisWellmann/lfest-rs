@@ -51,6 +51,9 @@ where
     /// The active limit orders of the account.
     #[getset(get = "pub")]
     active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
+
+    /// The initial margin requirement is set based on the selected leverage of the account.
+    init_margin_req: Decimal<I, D>,
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Account<I, D, BaseOrQuote, UserOrderIdT>
@@ -69,15 +72,41 @@ where
             active_limit_orders: ActiveLimitOrders::with_capacity(max_active_orders),
             position: Position::Neutral,
             balances,
+            init_margin_req: Decimal::ONE, // 1x leverage by default.
         }
     }
 
-    /// The sum of all balances including available balance, position and order margin.
+    /// The available balance is the account equity minus position and order margin.
     #[inline]
-    pub fn balances_sum(&self, init_margin_req: Decimal<I, D>) -> BaseOrQuote::PairedCurrency {
-        self.balances.available()
-            + self.balances.position_margin()
-            + self.order_margin(init_margin_req)
+    pub fn available_balance(&self) -> BaseOrQuote::PairedCurrency {
+        let avail = self.balances.equity() - self.position_margin() - self.order_margin();
+        assert!(avail >= Zero::zero());
+        avail
+    }
+
+    /// The current position margin
+    #[inline(always)]
+    pub fn position_margin(&self) -> BaseOrQuote::PairedCurrency {
+        self.position.notional() * self.init_margin_req
+    }
+
+    /// The current order margin.
+    #[inline]
+    pub fn order_margin(&self) -> BaseOrQuote::PairedCurrency {
+        self.active_limit_orders
+            .order_margin(self.init_margin_req, &self.position)
+    }
+
+    #[inline]
+    pub(crate) fn order_margin_with_order(
+        &self,
+        new_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+    ) -> BaseOrQuote::PairedCurrency {
+        self.active_limit_orders.order_margin_with_order(
+            new_order,
+            self.init_margin_req,
+            &self.position,
+        )
     }
 
     /// Change the account position, modifying its balances.
@@ -89,42 +118,13 @@ where
         fill_price: QuoteCurrency<I, D>,
         side: Side,
         fee: BaseOrQuote::PairedCurrency,
-        init_margin_req: Decimal<I, D>,
     ) {
         assert2::debug_assert!(filled_qty > BaseOrQuote::zero());
         assert2::debug_assert!(fill_price > QuoteCurrency::zero());
 
-        self.position.change(
-            filled_qty,
-            fill_price,
-            side,
-            &mut self.balances,
-            init_margin_req,
-        );
+        self.position
+            .change(filled_qty, fill_price, side, &mut self.balances);
         self.balances.account_for_fee(fee);
-    }
-
-    /// Get the current order margin.
-    #[inline]
-    pub fn order_margin(&self, init_margin_req: Decimal<I, D>) -> BaseOrQuote::PairedCurrency {
-        self.active_limit_orders
-            .order_margin(init_margin_req, &self.position)
-    }
-
-    #[deprecated]
-    #[inline]
-    pub(crate) fn free_order_margin(&mut self, margin: BaseOrQuote::PairedCurrency) {
-        self.balances.free_order_margin(margin)
-    }
-
-    #[inline]
-    pub(crate) fn order_margin_with_order(
-        &self,
-        new_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        init_margin_req: Decimal<I, D>,
-    ) -> BaseOrQuote::PairedCurrency {
-        self.active_limit_orders
-            .order_margin_with_order(new_order, init_margin_req, &self.position)
     }
 
     /// Try to insert a new limit order and update the order margin and balances appropriately.
@@ -132,14 +132,8 @@ where
     pub fn try_insert_order(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        init_margin_req: Decimal<I, D>,
     ) -> Result<(), MaxNumberOfActiveOrders> {
-        self.active_limit_orders.try_insert(
-            order,
-            &self.position,
-            &mut self.balances,
-            init_margin_req,
-        )
+        self.active_limit_orders.try_insert(order)
     }
 
     /// fill an existing limit order, reduces order margin.
@@ -149,14 +143,8 @@ where
     pub fn fill_order(
         &mut self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        init_margin_req: Decimal<I, D>,
     ) {
-        self.active_limit_orders.fill_order(
-            order,
-            &self.position,
-            &mut self.balances,
-            init_margin_req,
-        )
+        self.active_limit_orders.fill_order(order)
     }
 
     // TODO: is this a remove due to cancellation, or full fill?
@@ -166,16 +154,10 @@ where
     pub fn remove_limit_order(
         &mut self,
         by: CancelBy<UserOrderIdT>,
-        init_margin_req: Decimal<I, D>,
     ) -> Result<
         LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         OrderIdNotFound<UserOrderIdT>,
     > {
-        self.active_limit_orders.remove_limit_order(
-            by,
-            init_margin_req,
-            &self.position,
-            &mut self.balances,
-        )
+        self.active_limit_orders.remove_limit_order(by)
     }
 }

@@ -18,7 +18,6 @@ use crate::{
     },
     types::{
         Account,
-        Balances,
         LimitOrder,
         MarginCurrency,
         MarketOrder,
@@ -59,14 +58,14 @@ where
     // TODO: just pass in `Account` instead of `Position` and `Balances` separately
     fn check_market_order(
         &self,
-        position: &Position<I, D, BaseOrQuote>,
+        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
         order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
-        balances: &Balances<I, D, BaseOrQuote::PairedCurrency>,
     ) -> Result<(), NotEnoughAvailableBalance> {
+        use Side::*;
         match order.side() {
-            Side::Buy => self.check_market_buy_order(position, order, fill_price, balances),
-            Side::Sell => self.check_market_sell_order(position, order, fill_price, balances),
+            Buy => self.check_market_buy_order(account, order, fill_price),
+            Sell => self.check_market_sell_order(account, order, fill_price),
         }
     }
 
@@ -75,11 +74,10 @@ where
         account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Result<(), NotEnoughAvailableBalance> {
-        let om = account.order_margin(self.contract_spec.init_margin_req());
-        let new_order_margin =
-            account.order_margin_with_order(order, self.contract_spec.init_margin_req());
+        let om = account.order_margin();
+        let new_order_margin = account.order_margin_with_order(order);
 
-        let available_balance = account.balances().available();
+        let available_balance = account.available_balance();
         trace!(
             "order_margin: {om:?}, new_order_margin: {new_order_margin:?}, available_balance: {available_balance:?}"
         );
@@ -127,17 +125,16 @@ where
 {
     fn check_market_buy_order<UserOrderIdT>(
         &self,
-        position: &Position<I, D, BaseOrQuote>,
+        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
         order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
-        balances: &Balances<I, D, BaseOrQuote::PairedCurrency>,
     ) -> Result<(), NotEnoughAvailableBalance>
     where
         UserOrderIdT: UserOrderId,
     {
         debug_assert_eq!(order.side(), Side::Buy);
 
-        match position {
+        match account.position() {
             Neutral | Long(_) => {
                 // A long position increases in size.
                 let notional_value =
@@ -145,7 +142,7 @@ where
                 let init_margin = notional_value * self.contract_spec.init_margin_req();
 
                 let fee = notional_value * *self.contract_spec.fee_taker().as_ref();
-                if init_margin + fee > balances.available() {
+                if init_margin + fee > account.available_balance() {
                     return Err(NotEnoughAvailableBalance);
                 }
             }
@@ -155,7 +152,7 @@ where
                     return Ok(());
                 }
                 // The order reduces the short and puts on a long
-                let released_from_old_pos = balances.position_margin();
+                let released_from_old_pos = account.position_margin();
 
                 let new_long_size = Self::quantity_minus_position(order.quantity(), pos_inner);
                 assert2::debug_assert!(new_long_size > BaseOrQuote::zero());
@@ -170,7 +167,7 @@ where
                 if Self::margin_exceeds_risk(
                     new_init_margin,
                     fee,
-                    balances.available(),
+                    account.available_balance(),
                     released_from_old_pos,
                 ) {
                     return Err(NotEnoughAvailableBalance);
@@ -183,24 +180,23 @@ where
 
     fn check_market_sell_order<UserOrderIdT>(
         &self,
-        position: &Position<I, D, BaseOrQuote>,
+        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
         order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
-        balances: &Balances<I, D, BaseOrQuote::PairedCurrency>,
     ) -> Result<(), NotEnoughAvailableBalance>
     where
         UserOrderIdT: UserOrderId,
     {
         debug_assert_eq!(order.side(), Side::Sell);
 
-        match position {
+        match account.position() {
             Neutral | Short(_) => {
                 let notional_value =
                     BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
                 let init_margin = notional_value * self.contract_spec.init_margin_req();
                 let fee = notional_value * *self.contract_spec.fee_taker().as_ref();
 
-                if init_margin + fee > balances.available() {
+                if init_margin + fee > account.available_balance() {
                     return Err(NotEnoughAvailableBalance);
                 }
             }
@@ -211,7 +207,7 @@ where
                     return Ok(());
                 }
                 // The order reduces the long position and opens a short.
-                let released_from_old_pos = balances.position_margin();
+                let released_from_old_pos = account.position_margin();
 
                 let new_short_size = Self::quantity_minus_position(order.quantity(), pos_inner);
                 assert2::debug_assert!(new_short_size > BaseOrQuote::zero());
@@ -226,7 +222,7 @@ where
                 if Self::margin_exceeds_risk(
                     new_init_margin,
                     fee,
-                    balances.available(),
+                    account.available_balance(),
                     released_from_old_pos,
                 ) {
                     return Err(NotEnoughAvailableBalance);
@@ -323,7 +319,6 @@ mod tests {
             test_fee_taker(),
         )
         .unwrap();
-        let init_margin_req = contract_spec.init_margin_req();
         let re =
             IsolatedMarginRiskEngine::<_, DECIMALS, BaseCurrency<_, DECIMALS>>::new(contract_spec);
         let market_state = MarketState::from_components(
@@ -345,11 +340,6 @@ mod tests {
 
         let qty = BaseCurrency::new(1, 0);
         let entry_price = QuoteCurrency::new(100, 0);
-        let notional = QuoteCurrency::convert_from(qty, entry_price);
-
-        let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
-        let init_margin = notional * init_margin_req;
-        assert!(balances.try_reserve_order_margin(init_margin));
 
         let position = Long(PositionInner::new(qty, entry_price));
         RiskEngine::<_, DECIMALS, _, NoUserOrderId>::check_maintenance_margin(

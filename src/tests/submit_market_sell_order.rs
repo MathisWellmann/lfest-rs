@@ -56,22 +56,24 @@ fn submit_market_sell_order() {
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(500, 0) - fees)
-            .position_margin(QuoteCurrency::new(500, 0))
+            .equity(QuoteCurrency::new(1_000, 0) - fees)
             .total_fees_paid(fees)
             .build()
     );
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
-        exchange.account().order_margin(init_margin_req),
-        Zero::zero()
+        exchange.account().position_margin(),
+        QuoteCurrency::new(500, 0)
+    );
+    assert!(exchange.account().order_margin().is_zero());
+    assert_eq!(
+        exchange.account().available_balance(),
+        QuoteCurrency::new(500, 0) - fees
     );
 }
 
 #[test]
 fn submit_market_sell_order_with_short_position() {
     let mut exchange = mock_exchange_linear();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
             .update_state(&Bba {
@@ -91,14 +93,18 @@ fn submit_market_sell_order_with_short_position() {
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(500, 0) - fee0)
-            .position_margin(QuoteCurrency::new(500, 0))
+            .equity(QuoteCurrency::new(1_000, 0) - fee0)
             .total_fees_paid(fee0)
             .build()
     );
     assert_eq!(
-        exchange.account().order_margin(init_margin_req),
-        Zero::zero()
+        exchange.account().position_margin(),
+        QuoteCurrency::new(500, 0)
+    );
+    assert!(exchange.account().order_margin().is_zero());
+    assert_eq!(
+        exchange.account().available_balance(),
+        QuoteCurrency::new(500, 0) - fee0
     );
     assert_eq!(
         exchange.account().position().clone(),
@@ -119,14 +125,18 @@ fn submit_market_sell_order_with_short_position() {
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(100, 0) - fee0 - fee1)
-            .position_margin(QuoteCurrency::new(900, 0))
+            .equity(QuoteCurrency::new(1_000, 0) - fee0 - fee1)
             .total_fees_paid(fee0 + fee1)
             .build()
     );
     assert_eq!(
-        exchange.account().order_margin(init_margin_req),
-        Zero::zero()
+        exchange.account().position_margin(),
+        QuoteCurrency::new(900, 0)
+    );
+    assert!(exchange.account().order_margin().is_zero());
+    assert_eq!(
+        exchange.account().available_balance(),
+        QuoteCurrency::new(100, 0) - fee0 - fee1
     );
     assert_eq!(
         exchange.account().position().clone(),
@@ -144,7 +154,6 @@ fn submit_market_sell_order_with_short_position() {
 #[test]
 fn submit_market_sell_order_with_long_position() {
     let mut exchange = mock_exchange_linear();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert_eq!(
         exchange
             .update_state(&Bba {
@@ -171,21 +180,17 @@ fn submit_market_sell_order_with_long_position() {
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(1000, 0) - QuoteCurrency::new(9, 0) - fee_0 - fee_1)
-            .position_margin(QuoteCurrency::new(0, 0))
+            .equity(QuoteCurrency::new(1000, 0) - QuoteCurrency::new(9, 0) - fee_0 - fee_1)
             .total_fees_paid(fee_0 + fee_1)
             .build()
     );
-    assert_eq!(
-        exchange.account().order_margin(init_margin_req),
-        Zero::zero()
-    );
+    assert_eq!(exchange.account().position_margin(), Zero::zero());
+    assert_eq!(exchange.account().order_margin(), Zero::zero());
 }
 
 #[test]
 fn submit_market_sell_order_turnaround_long() {
     let mut exchange = mock_exchange_linear();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(
         exchange
             .update_state(&Bba {
@@ -206,14 +211,18 @@ fn submit_market_sell_order_turnaround_long() {
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(100, 0) - fee0)
-            .position_margin(QuoteCurrency::new(900, 0))
+            .equity(QuoteCurrency::new(1_000, 0) - fee0)
             .total_fees_paid(fee0)
             .build()
     );
     assert_eq!(
-        exchange.account().order_margin(init_margin_req),
-        Zero::zero()
+        exchange.account().position_margin(),
+        QuoteCurrency::new(900, 0)
+    );
+    assert!(exchange.account().order_margin().is_zero());
+    assert_eq!(
+        exchange.account().available_balance(),
+        QuoteCurrency::new(100, 0) - fee0
     );
     assert_eq!(
         exchange.account().position(),
@@ -236,14 +245,18 @@ fn submit_market_sell_order_turnaround_long() {
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(100, 0) - fee0 - fee1)
-            .position_margin(QuoteCurrency::new(891, 0))
+            .equity(QuoteCurrency::new(991, 0) - fee0 - fee1)
             .total_fees_paid(fee0 + fee1)
             .build()
     );
     assert_eq!(
-        exchange.account().order_margin(init_margin_req),
-        Zero::zero()
+        exchange.account().position_margin(),
+        QuoteCurrency::new(891, 0)
+    );
+    assert!(exchange.account().order_margin().is_zero());
+    assert_eq!(
+        exchange.account().available_balance(),
+        QuoteCurrency::new(100, 0) - fee0 - fee1
     );
     assert_eq!(
         exchange.account().position().clone(),

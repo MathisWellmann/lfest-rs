@@ -9,7 +9,6 @@ use crate::{
     },
     types::{
         Account,
-        Balances,
         LimitOrder,
         MarginCurrency,
         MarketOrder,
@@ -42,10 +41,9 @@ where
     /// If Err, the account cannot satisfy the margin requirements.
     fn check_market_order(
         &self,
-        position: &Position<I, D, BaseOrQuote>,
+        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
         order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
-        balances: &Balances<I, D, BaseOrQuote::PairedCurrency>,
     ) -> Result<(), NotEnoughAvailableBalance>;
 
     /// Checks if the account it able to satisfy the margin requirements for a new limit order.

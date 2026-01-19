@@ -144,7 +144,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use const_decimal::Decimal;
     use num_traits::One;
 
     use super::*;
@@ -293,12 +292,6 @@ mod tests {
     fn position_inner_entry_price_inverse(qty: i32) {
         let qty = QuoteCurrency::<i32, DECIMALS>::new(qty, 0);
         let entry_price = QuoteCurrency::new(100, 0);
-        let init_margin_req = Decimal::one();
-
-        let mut balances = Balances::new(BaseCurrency::new(10, 0));
-        let notional = BaseCurrency::convert_from(qty, entry_price);
-        let init_margin = notional * init_margin_req;
-        assert!(balances.try_reserve_order_margin(init_margin));
 
         let pos = PositionInner::new(qty, entry_price);
         assert_eq!(pos.entry_price(), QuoteCurrency::new(100, 0));
@@ -308,12 +301,6 @@ mod tests {
     fn position_inner_display() {
         let qty = BaseCurrency::<i64, 1>::new(5, 1);
         let entry_price = QuoteCurrency::new(100, 0);
-        let init_margin_req = Decimal::try_from_scaled(1, 0).unwrap();
-
-        let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
-        let notional = QuoteCurrency::convert_from(qty, entry_price);
-        let init_margin = notional * init_margin_req;
-        assert!(balances.try_reserve_order_margin(init_margin));
 
         let pos = PositionInner::new(qty, entry_price);
         assert_eq!(&pos.to_string(), "PositionInner( 0.5 Base )");

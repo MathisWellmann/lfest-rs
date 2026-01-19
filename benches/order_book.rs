@@ -11,7 +11,6 @@ use std::{
     num::NonZeroU16,
 };
 
-use const_decimal::Decimal;
 use criterion::{
     BenchmarkId,
     Criterion,
@@ -29,7 +28,6 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("OrderBook");
 
     let mut rng = rand::rngs::SmallRng::seed_from_u64(0);
-    let init_margin_req = Decimal::one();
 
     for n in 1..100 {
         group.throughput(Throughput::Elements(n));
@@ -53,7 +51,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 },
                 |mut ob| {
                     for order in orders.iter() {
-                        ob.try_insert_order(black_box(order.clone()), init_margin_req)
+                        ob.try_insert_order(black_box(order.clone()))
                             .expect("Can insert");
                     }
                 },

@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use assert2::assert;
 use getset::{
     Getters,
@@ -211,12 +209,8 @@ where
             Buy => self.market_state.ask(),
             Sell => self.market_state.bid(),
         };
-        self.risk_engine.check_market_order(
-            self.account.position(),
-            &order,
-            fill_price,
-            self.account.balances(),
-        )?;
+        self.risk_engine
+            .check_market_order(&self.account, &order, fill_price)?;
 
         let filled_order = order.into_filled(fill_price, self.market_state.current_timestamp_ns());
         self.settle_filled_market_order(filled_order.clone());
@@ -236,13 +230,8 @@ where
         let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price);
         let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
 
-        self.account.change_position(
-            filled_qty,
-            fill_price,
-            order.side(),
-            fee,
-            self.config.contract_spec().init_margin_req(),
-        );
+        self.account
+            .change_position(filled_qty, fill_price, order.side(), fee);
     }
 
     #[inline]
@@ -385,10 +374,9 @@ where
             self.account.position(),
         );
 
-        let init_margin_req = self.config().contract_spec().init_margin_req();
-        self.account.try_insert_order(order, init_margin_req)?;
+        self.account.try_insert_order(order)?;
         debug_assert!(if self.account.active_limit_orders().is_empty() {
-            self.account.order_margin(init_margin_req).is_zero()
+            self.account.order_margin().is_zero()
         } else {
             true
         });
@@ -421,13 +409,10 @@ where
         LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         CancelLimitOrderError<UserOrderIdT>,
     > {
-        let init_margin_req = self.config().contract_spec().init_margin_req();
-        let removed_order = self
-            .account
-            .remove_limit_order(cancel_by, init_margin_req)?;
+        let removed_order = self.account.remove_limit_order(cancel_by)?;
 
         assert!(if self.account.active_limit_orders().is_empty() {
-            self.account.order_margin(init_margin_req).is_zero()
+            self.account.order_margin().is_zero()
         } else {
             true
         });
@@ -487,9 +472,8 @@ where
             }
         }
 
-        let init_order_margin = self.config.contract_spec().init_margin_req();
         assert2::debug_assert!(if self.account.active_limit_orders().is_empty() {
-            self.account.order_margin(init_order_margin).is_zero()
+            self.account.order_margin().is_zero()
         } else {
             true
         });
@@ -520,38 +504,19 @@ where
         let fee = notional * *self.config.contract_spec().fee_maker().as_ref();
 
         let limit_order_update = order.fill(filled_qty, fee, ts_ns);
-        let init_margin_req = self.config().contract_spec().init_margin_req();
         if let LimitOrderFill::FullyFilled { .. } = limit_order_update {
             self.account
-                .remove_limit_order(CancelBy::OrderId(order.id()), init_margin_req)
+                .remove_limit_order(CancelBy::OrderId(order.id()))
                 .expect("Can remove order as its an internal call");
         } else {
             assert2::debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
-            self.account.fill_order(&order, init_margin_req)
+            self.account.fill_order(&order)
         }
         self.limit_order_updates
             .push_within_capacity(limit_order_update)
             .expect(EXPECT_CAPACITY);
 
         self.account
-            .change_position(filled_qty, limit_price, side, fee, init_margin_req);
-
-        let new_order_margin = self.account.order_margin(init_margin_req);
-        use Ordering::*;
-        match new_order_margin.cmp(&self.account.order_margin(init_margin_req)) {
-            Less => {
-                let margin_delta = self.account.order_margin(init_margin_req) - new_order_margin;
-                assert2::debug_assert!(margin_delta > Zero::zero());
-                self.account.free_order_margin(margin_delta);
-            }
-            Equal => {}
-            Greater => {
-                panic!("Filling a limit order should never increase order margin");
-                // let margin_delta = new_order_margin - self.account.order_margin(init_margin_req);
-                // assert2::debug_assert!(margin_delta > Zero::zero());
-                // let success = self.account.try_reserve_order_margin(margin_delta);
-                // assert!(success, "Can reserve order margin");
-            }
-        }
+            .change_position(filled_qty, limit_price, side, fee);
     }
 }

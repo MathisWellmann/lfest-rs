@@ -8,7 +8,6 @@ use crate::{
 #[tracing_test::traced_test]
 fn submit_limit_sell_order_no_position() {
     let mut exchange = mock_exchange_linear();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     assert!(
         exchange
             .update_state(&Bba {
@@ -60,14 +59,18 @@ fn submit_limit_sell_order_no_position() {
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(100, 0) - fee0)
-            .position_margin(QuoteCurrency::new(900, 0))
+            .equity(QuoteCurrency::new(1_000, 0) - fee0)
             .total_fees_paid(fee0)
             .build()
     );
     assert_eq!(
-        exchange.account().order_margin(init_margin_req),
-        Zero::zero()
+        exchange.account().position_margin(),
+        QuoteCurrency::new(900, 0)
+    );
+    assert!(exchange.account().order_margin().is_zero());
+    assert_eq!(
+        exchange.account().available_balance(),
+        QuoteCurrency::new(100, 0) - fee0
     );
 
     // close the position again
@@ -99,15 +102,12 @@ fn submit_limit_sell_order_no_position() {
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(1000, 0) - fee0 - fee1)
-            .position_margin(QuoteCurrency::new(0, 0))
+            .equity(QuoteCurrency::new(1000, 0) - fee0 - fee1)
             .total_fees_paid(fee0 + fee1)
             .build()
     );
-    assert_eq!(
-        exchange.account().order_margin(init_margin_req),
-        Zero::zero()
-    );
+    assert_eq!(exchange.account().position_margin(), Zero::zero());
+    assert_eq!(exchange.account().order_margin(), Zero::zero());
 }
 
 // Test there is a maximum quantity of buy orders the account can post.
@@ -204,7 +204,7 @@ fn submit_limit_sell_order_below_bid() {
 }
 
 // With a long position open, be able to open a short position of equal size using a limit order
-// TODO: this requires a change in the `IsolatedMarginRiskEngine`
+// TODO: re-activate this test
 #[test]
 #[tracing_test::traced_test]
 fn submit_limit_sell_order_turnaround_long() {

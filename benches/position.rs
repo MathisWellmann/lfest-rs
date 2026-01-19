@@ -8,7 +8,6 @@
 
 use std::hint::black_box;
 
-use const_decimal::Decimal;
 use criterion::{
     Criterion,
     Throughput,
@@ -54,13 +53,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                     || (pos.clone(), Balances::new(QuoteCurrency::new(1000, 0))),
                     |(mut position, mut balances)| {
                         for (filled_qty, fill_price) in random_changes.iter() {
-                            let _: () = position.change(
-                                *filled_qty,
-                                *fill_price,
-                                side,
-                                &mut balances,
-                                Decimal::ONE,
-                            );
+                            let _: () =
+                                position.change(*filled_qty, *fill_price, side, &mut balances);
                             black_box(());
                         }
                     },

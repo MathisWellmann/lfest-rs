@@ -6,7 +6,6 @@ use crate::{
 #[test]
 fn cancel_limit_order() {
     let mut exchange = mock_exchange_linear();
-    let init_margin_req = exchange.config().contract_spec().init_margin_req();
     exchange
         .update_state(&Bba {
             bid: QuoteCurrency::new(100, 0),
@@ -37,14 +36,18 @@ fn cancel_limit_order() {
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(900, 0))
-            .position_margin(QuoteCurrency::zero())
+            .equity(QuoteCurrency::new(1_000, 0))
             .total_fees_paid(QuoteCurrency::zero())
             .build()
     );
+    assert!(exchange.account().position_margin().is_zero());
     assert_eq!(
-        exchange.account().order_margin(init_margin_req),
+        exchange.account().order_margin(),
         QuoteCurrency::new(100, 0)
+    );
+    assert_eq!(
+        exchange.account().available_balance(),
+        QuoteCurrency::new(900, 0)
     );
 
     exchange
@@ -54,15 +57,12 @@ fn cancel_limit_order() {
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
-            .available(QuoteCurrency::new(1000, 0))
-            .position_margin(QuoteCurrency::zero())
+            .equity(QuoteCurrency::new(1000, 0))
             .total_fees_paid(QuoteCurrency::zero())
             .build()
     );
-    assert_eq!(
-        exchange.account().order_margin(init_margin_req),
-        Zero::zero()
-    );
+    assert_eq!(exchange.account().position_margin(), Zero::zero());
+    assert_eq!(exchange.account().order_margin(), Zero::zero());
 
     let invalid_id: OrderId = 0.into();
     assert_eq!(

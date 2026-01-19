@@ -11,7 +11,6 @@ use std::{
     num::NonZeroU16,
 };
 
-use const_decimal::Decimal;
 use criterion::{
     BenchmarkId,
     Criterion,
@@ -30,13 +29,12 @@ fn criterion_benchmark(c: &mut Criterion) {
     )
     .unwrap();
 
-    let init_margin_req = Decimal::ONE;
     let max_active_orders = NonZeroU16::new(100).unwrap();
 
     for n in 1..20 {
         group.bench_with_input(BenchmarkId::new("insert", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
                 order.clone().into_pending(meta)
             }));
             b.iter_with_setup(
@@ -49,7 +47,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 |mut account| {
                     for order in orders.iter() {
                         account
-                            .try_insert_order(black_box(order.clone()), init_margin_req)
+                            .try_insert_order(black_box(order.clone()))
                             .expect("Can insert")
                     }
                 },
@@ -57,7 +55,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         });
         group.bench_with_input(BenchmarkId::new("fill_order", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
                 order.clone().into_pending(meta)
             }));
             b.iter_with_setup(
@@ -67,22 +65,20 @@ fn criterion_benchmark(c: &mut Criterion) {
                         max_active_orders,
                     );
                     for order in orders.iter() {
-                        account
-                            .try_insert_order(order.clone(), init_margin_req)
-                            .expect("Can insert");
+                        account.try_insert_order(order.clone()).expect("Can insert");
                     }
                     account
                 },
                 |mut account| {
                     for order in orders.iter() {
-                        account.fill_order(black_box(order), init_margin_req)
+                        account.fill_order(black_box(order))
                     }
                 },
             )
         });
         group.bench_with_input(BenchmarkId::new("remove", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
                 order.clone().into_pending(meta)
             }));
             b.iter_with_setup(
@@ -92,19 +88,14 @@ fn criterion_benchmark(c: &mut Criterion) {
                         max_active_orders,
                     );
                     for order in orders.iter() {
-                        account
-                            .try_insert_order(black_box(order.clone()), init_margin_req)
-                            .unwrap()
+                        account.try_insert_order(black_box(order.clone())).unwrap()
                     }
                     account
                 },
                 |mut account| {
                     for order in orders.iter() {
                         account
-                            .remove_limit_order(
-                                black_box(CancelBy::OrderId(order.id())),
-                                init_margin_req,
-                            )
+                            .remove_limit_order(black_box(CancelBy::OrderId(order.id())))
                             .expect("Can insert");
                     }
                 },
@@ -112,10 +103,9 @@ fn criterion_benchmark(c: &mut Criterion) {
         });
         group.bench_with_input(BenchmarkId::new("order_margin_neutral", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
                 order.clone().into_pending(meta)
             }));
-            let init_margin_req = Decimal::one();
             b.iter_with_setup(
                 || {
                     let mut account = Account::new(
@@ -123,23 +113,20 @@ fn criterion_benchmark(c: &mut Criterion) {
                         max_active_orders,
                     );
                     for order in orders.iter() {
-                        account
-                            .try_insert_order(black_box(order.clone()), init_margin_req)
-                            .unwrap()
+                        account.try_insert_order(black_box(order.clone())).unwrap()
                     }
                     account
                 },
                 |account| {
-                    let _ = black_box(account.order_margin(init_margin_req));
+                    let _ = black_box(account.order_margin());
                 },
             )
         });
         group.bench_with_input(BenchmarkId::new("order_margin_long", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
                 order.clone().into_pending(meta)
             }));
-            let init_margin_req = Decimal::one();
             b.iter_with_setup(
                 || {
                     let mut account = Account::new(
@@ -147,23 +134,20 @@ fn criterion_benchmark(c: &mut Criterion) {
                         max_active_orders,
                     );
                     for order in orders.iter() {
-                        account
-                            .try_insert_order(black_box(order.clone()), init_margin_req)
-                            .unwrap()
+                        account.try_insert_order(black_box(order.clone())).unwrap()
                     }
                     account
                 },
                 |account| {
-                    let _ = black_box(account.order_margin(init_margin_req));
+                    let _ = black_box(account.order_margin());
                 },
             )
         });
         group.bench_with_input(BenchmarkId::new("order_margin_short", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
                 order.clone().into_pending(meta)
             }));
-            let init_margin_req = Decimal::one();
             b.iter_with_setup(
                 || {
                     let mut account = Account::new(
@@ -171,14 +155,12 @@ fn criterion_benchmark(c: &mut Criterion) {
                         max_active_orders,
                     );
                     for order in orders.iter() {
-                        account
-                            .try_insert_order(black_box(order.clone()), init_margin_req)
-                            .unwrap()
+                        account.try_insert_order(black_box(order.clone())).unwrap()
                     }
                     account
                 },
                 |account| {
-                    let _ = black_box(account.order_margin(init_margin_req));
+                    let _ = black_box(account.order_margin());
                 },
             )
         });

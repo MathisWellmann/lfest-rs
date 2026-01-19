@@ -78,11 +78,12 @@ where
     assert2::debug_assert!(init_margin_req <= Decimal::one());
 
     use Position::*;
-    match position {
-        Neutral => max(bids_notional, asks_notional) * init_margin_req,
-        Long(inner) => max(bids_notional, asks_notional - inner.notional()) * init_margin_req,
-        Short(inner) => max(bids_notional - inner.notional(), asks_notional) * init_margin_req,
-    }
+    let v = match position {
+        Neutral => max(bids_notional, asks_notional),
+        Long(inner) => max(bids_notional, asks_notional - inner.notional()),
+        Short(inner) => max(bids_notional - inner.notional(), asks_notional),
+    };
+    v * init_margin_req
 }
 
 #[cfg(test)]
