@@ -6,6 +6,10 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     hongdown.url = "github:dahlia/hongdown";
+    naersk = {
+      url = "github:nix-community/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = {
@@ -13,6 +17,7 @@
     rust-overlay,
     flake-utils,
     hongdown,
+    naersk,
     ...
   }:
     flake-utils.lib.eachDefaultSystem (
@@ -21,46 +26,31 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
-        rust = pkgs.rust-bin.selectLatestNightlyWith(toolchain: toolchain.default.override{
-          extensions = [
-            "rust-src"
-            "rust-analyzer"
-            "miri"
-          ];
-          targets = ["x86_64-unknown-linux-gnu"];
-        });
-        cargo-upgrades = pkgs.callPackage ./nix/cargo-upgrades.nix {};
-        creusot = pkgs.stdenv.mkDerivation{
-          name = "creusot";
-          src = builtins.fetchGit {
-            url = "https://github.com/creusot-rs/creusot";
-            rev = "879cd335441a1a126380c007d38cb499faa316dc";
+        rust = pkgs.rust-bin.selectLatestNightlyWith (toolchain:
+          toolchain.default.override {
+            extensions = [
+              "rust-src"
+              "rust-analyzer"
+              "miri"
+            ];
+            targets = ["x86_64-unknown-linux-gnu"];
+          });
+        naersk' = let
+          toolchain = pkgs.rust-bin.nightly."2025-11-13".default.override {
+            extensions = [
+              "rust-src"
+              "rustc-dev"
+              "llvm-tools"
+            ];
+            targets = ["x86_64-unknown-linux-gnu"];
           };
-          buildInputs = with pkgs; [
-            rust
-            pkg-config
-            openssl
-            opam
-            gcc
-            autoconf
-            gtk3
-            gtksourceview
-            cairo
-            zeromq
-            rsync
-            git
-          ];
-          buildPhase = ''
-            mkdir -p $out/bin
-            ls -la .
-            # opam init
-            cargo run --bin creusot-install
-          '';
-          # installPhase = ''
-          #   # Make the script executable
-          #   chmod +x $out/hello.py
-          # '';
-        };
+        in
+          pkgs.callPackage naersk {
+            cargo = toolchain;
+            rustc = toolchain;
+          };
+        cargo-upgrades = pkgs.callPackage ./nix/cargo-upgrades.nix {};
+        creusot = import ./nix/creusot.nix {inherit pkgs naersk';};
       in
         with pkgs; {
           devShells.default = mkShell {
@@ -77,7 +67,7 @@
               taplo
               mprocs # Run multiple commands in parallel from `mprocs.yml`, acting essentially as a local CI system.
               hongdown.packages.${system}.hongdown
-              # creusot
+              creusot # Execute with `cargo creusot`
             ];
             RUST_BACKTRACE = "1";
           };
