@@ -48,12 +48,12 @@ where
     #[getset(get = "pub")]
     balances: Balances<I, D, BaseOrQuote::PairedCurrency>,
 
+    /// The initial margin requirement is set based on the selected leverage of the account.
+    init_margin_req: Decimal<I, D>,
+
     /// The active limit orders of the account.
     #[getset(get = "pub")]
     active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
-
-    /// The initial margin requirement is set based on the selected leverage of the account.
-    init_margin_req: Decimal<I, D>,
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Account<I, D, BaseOrQuote, UserOrderIdT>
@@ -159,5 +159,28 @@ where
         OrderIdNotFound<UserOrderIdT>,
     > {
         self.active_limit_orders.remove_limit_order(by)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        types::BaseCurrency,
+        utils::NoUserOrderId,
+    };
+
+    #[test]
+    fn size_of_account() {
+        assert_eq!(
+            size_of::<Account<i32, 5, BaseCurrency<i32, 5>, NoUserOrderId>>(),
+            128
+        );
+        assert_eq!(
+            size_of::<Account<i64, 5, BaseCurrency<i64, 5>, NoUserOrderId>>(),
+            128
+        );
+        assert_eq!(size_of::<Account<i64, 5, BaseCurrency<i64, 5>, i32>>(), 128);
+        assert_eq!(size_of::<Account<i64, 5, BaseCurrency<i64, 5>, i64>>(), 128);
     }
 }

@@ -153,6 +153,12 @@ mod tests {
     };
 
     #[test]
+    fn size_of_position_inner() {
+        assert_eq!(size_of::<PositionInner<i32, 6, BaseCurrency<i32, 6>>>(), 8);
+        assert_eq!(size_of::<PositionInner<i64, 6, BaseCurrency<i64, 6>>>(), 16);
+    }
+
+    #[test]
     fn position_inner_new() {
         let qty = BaseCurrency::<i64, 5>::new(5, 1);
         let entry_price = QuoteCurrency::new(100, 0);

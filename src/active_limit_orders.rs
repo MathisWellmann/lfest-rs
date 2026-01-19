@@ -33,7 +33,6 @@ use crate::{
     utils::order_margin,
 };
 
-// TODO: rename to `OrderBook`
 /// The datatype that holds the active limit orders of a user.
 ///
 /// Generics:
@@ -48,17 +47,18 @@ where
     BaseOrQuote: Currency<I, D>,
     UserOrderIdT: UserOrderId,
 {
+    bids_notional: BaseOrQuote::PairedCurrency,
+    asks_notional: BaseOrQuote::PairedCurrency,
+
     /// Stores all the active buy orders in ascending price, time priority.
     /// Best bid is the last element.
     #[getset(get = "pub")]
     bids: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
-    bids_notional: BaseOrQuote::PairedCurrency,
 
     /// Stores all the active sell orders in ascending price, time priority.
     /// Best ask is the first element.
     #[getset(get = "pub")]
     asks: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
-    asks_notional: BaseOrQuote::PairedCurrency,
 }
 
 /// A clone impl which retains the capacity as we rely on that assumption downstream.
@@ -77,10 +77,10 @@ where
         asks.reserve_exact(self.asks.capacity() - self.asks.len());
         assert_eq!(asks.capacity(), self.asks.capacity());
         Self {
-            bids,
-            asks,
             bids_notional: self.bids_notional,
             asks_notional: self.asks_notional,
+            bids,
+            asks,
         }
     }
 }

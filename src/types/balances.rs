@@ -90,7 +90,16 @@ mod test {
     use proptest::prelude::*;
 
     use super::*;
-    use crate::types::QuoteCurrency;
+    use crate::types::{
+        BaseCurrency,
+        QuoteCurrency,
+    };
+
+    #[test]
+    fn size_of_balances() {
+        assert_eq!(size_of::<Balances<i32, 5, BaseCurrency<i32, 5>>>(), 8);
+        assert_eq!(size_of::<Balances<i64, 5, BaseCurrency<i64, 5>>>(), 16);
+    }
 
     proptest! {
         #[test]
