@@ -124,19 +124,19 @@ where
     }
 
     /// Get the number of active limit orders.
-    #[inline]
+    #[inline(always)]
     pub fn num_active(&self) -> usize {
         self.bids.len() + self.asks.len()
     }
 
     /// `true` is there are no active orders.
-    #[inline]
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.bids.is_empty() && self.asks.is_empty()
     }
 
     /// Peek at the best bid limit order.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn peek_best_bid(
         &self,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
@@ -160,7 +160,7 @@ where
     }
 
     /// Peek at the best ask limit order.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn peek_best_ask(
         &self,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
@@ -239,6 +239,7 @@ where
         Ok(())
     }
 
+    #[inline(always)]
     pub(crate) fn order_margin(
         &self,
         init_margin_req: Decimal<I, D>,
@@ -315,7 +316,7 @@ where
 
     /// Get a `LimitOrder` by the given `OrderId` if any.
     /// Optimized to be fast for small number of active limit orders.
-    #[inline]
+    #[inline(always)]
     pub fn get_by_id(
         &self,
         order_id: OrderId,
@@ -328,7 +329,7 @@ where
     }
 
     /// Remove an active `LimitOrder` based on its order id.
-    #[inline]
+    #[inline(always)]
     fn remove_by_id(
         &mut self,
         id: OrderId,

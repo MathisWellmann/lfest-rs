@@ -77,10 +77,10 @@ where
     }
 
     /// The available balance is the account equity minus position and order margin.
-    #[inline]
+    #[inline(always)]
     pub fn available_balance(&self) -> BaseOrQuote::PairedCurrency {
         let avail = self.balances.equity() - self.position_margin() - self.order_margin();
-        assert!(avail >= Zero::zero());
+        debug_assert!(avail >= Zero::zero());
         avail
     }
 
@@ -91,13 +91,13 @@ where
     }
 
     /// The current order margin.
-    #[inline]
+    #[inline(always)]
     pub fn order_margin(&self) -> BaseOrQuote::PairedCurrency {
         self.active_limit_orders
             .order_margin(self.init_margin_req, &self.position)
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn order_margin_with_order(
         &self,
         new_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
@@ -111,7 +111,7 @@ where
 
     /// Change the account position, modifying its balances.
     /// This method is usually called by `Exchange`, but exposed for advanced use cases.
-    #[inline]
+    #[inline(always)]
     pub fn change_position(
         &mut self,
         filled_qty: BaseOrQuote,
@@ -128,7 +128,7 @@ where
     }
 
     /// Try to insert a new limit order and update the order margin and balances appropriately.
-    #[inline]
+    #[inline(always)]
     pub fn try_insert_order(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
@@ -139,7 +139,7 @@ where
     /// fill an existing limit order, reduces order margin.
     /// # Panics:
     /// panics if the order id was not found.
-    #[inline]
+    #[inline(always)]
     pub fn fill_order(
         &mut self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
@@ -150,7 +150,7 @@ where
     // TODO: is this a remove due to cancellation, or full fill?
     /// Remove a limit order.
     #[allow(clippy::complexity, reason = "How is this hard to read?")]
-    #[inline]
+    #[inline(always)]
     pub fn remove_limit_order(
         &mut self,
         by: CancelBy<UserOrderIdT>,
