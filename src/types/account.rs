@@ -71,6 +71,15 @@ where
             balances,
         }
     }
+
+    /// The sum of all balances including available balance, position and order margin.
+    #[inline]
+    pub fn balances_sum(&self, init_margin_req: Decimal<I, D>) -> BaseOrQuote::PairedCurrency {
+        self.balances.available()
+            + self.balances.position_margin()
+            + self.order_margin(init_margin_req)
+    }
+
     /// Change the account position, modifying its balances.
     /// This method is usually called by `Exchange`, but exposed for advanced use cases.
     #[inline]
@@ -150,6 +159,7 @@ where
         )
     }
 
+    // TODO: is this a remove due to cancellation, or full fill?
     /// Remove a limit order.
     #[allow(clippy::complexity, reason = "How is this hard to read?")]
     #[inline]
