@@ -7,11 +7,12 @@ use serde::{
 
 /// Side of the order
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum Side {
     /// Buy side
-    Buy,
+    Buy = 0,
     /// Sell side
-    Sell,
+    Sell = 1,
 }
 
 impl Side {
@@ -73,5 +74,10 @@ mod tests {
     fn side_display() {
         assert_eq!(&Side::Buy.to_string(), "Buy");
         assert_eq!(&Side::Sell.to_string(), "Sell");
+    }
+
+    #[test]
+    fn size_of_side() {
+        assert_eq!(size_of::<Side>(), 1);
     }
 }

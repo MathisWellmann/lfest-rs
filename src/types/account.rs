@@ -134,7 +134,7 @@ where
         self.balances.account_for_fee(fee);
     }
 
-    /// Try to insert a new limit order and update the order margin and balances appropriately.
+    /// Try to insert a new limit order.
     #[inline(always)]
     pub fn try_insert_order(
         &mut self,
@@ -159,7 +159,6 @@ where
             .fill_order(id, side, filled_quantity, ts_ns)
     }
 
-    // TODO: is this a remove due to cancellation, or full fill?
     /// Remove a limit order.
     #[allow(clippy::complexity, reason = "How is this hard to read?")]
     #[inline(always)]
