@@ -16,6 +16,7 @@ use crate::{
     types::{
         CancelBy,
         Currency,
+        Filled,
         LimitOrder,
         MarginCurrency,
         MaxNumberOfActiveOrders,
@@ -27,6 +28,7 @@ use crate::{
             self,
             *,
         },
+        TimestampNs,
         UserOrderId,
     },
     utils::order_margin,
@@ -359,48 +361,68 @@ where
     }
 
     /// fill an existing limit order, reduces order margin.
-    /// # Panics:
-    /// panics if the order id was not found.
     pub(crate) fn fill_order(
         &mut self,
-        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) {
-        trace!("OrderMargin.update {order:?}");
-        let notional = order.notional();
-        assert2::debug_assert!(notional > Zero::zero());
-
-        // The filled order must hit the one sorted by time and price priority, so no need so iterate the orders.
-        let active_order = match order.side() {
-            Buy => self.bids.last_mut().expect("Has best bid order"),
-            Sell => self.asks.first_mut().expect("Has best ask order"),
-        };
-        debug_assert_eq!(
-            active_order.id(),
-            order.id(),
-            "The filled order must be the one sorted by time and price."
-        );
-        debug_assert_eq!(active_order.limit_price(), order.limit_price());
-        assert2::debug_assert!(
-            order.remaining_quantity() < active_order.remaining_quantity(),
-            "An update to an existing order must mean the new order has less quantity than the tracked order."
-        );
-
-        let notional_delta = notional - active_order.notional();
-        assert2::debug_assert!(
-            notional_delta < Zero::zero(),
-            "Filling an order reduces the remaining notional value"
-        );
-
-        *active_order = order.clone();
-
-        match active_order.side() {
+        id: OrderId,
+        side: Side,
+        filled_quantity: BaseOrQuote,
+        ts_ns: TimestampNs,
+    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> {
+        // TODO: deduplicate code with a macro or with new `SortetOrders` idee
+        match side {
             Buy => {
+                // The filled order must hit the one sorted by time and price priority, so no need so iterate the orders.
+                let active_order = self.bids.last_mut().expect("Has best bid order");
+                debug_assert_eq!(
+                    active_order.id(),
+                    id,
+                    "The filled order must be the one sorted by time and price."
+                );
+                let old_notional = active_order.notional();
+
+                active_order.fill(filled_quantity);
+                let new_notional = active_order.notional();
+
+                let notional_delta = new_notional - old_notional;
+                assert2::debug_assert!(
+                    notional_delta < Zero::zero(),
+                    "Filling an order reduces the remaining notional value"
+                );
                 self.bids_notional += notional_delta;
                 assert2::debug_assert!(self.bids_notional >= Zero::zero());
+
+                if active_order.remaining_quantity().is_zero() {
+                    Some(self.bids.pop().expect("Has best bid").into_filled(ts_ns))
+                } else {
+                    None
+                }
             }
             Sell => {
+                // The filled order must hit the one sorted by time and price priority, so no need so iterate the orders.
+                let active_order = self.asks.first_mut().expect("Has best bid order");
+                debug_assert_eq!(
+                    active_order.id(),
+                    id,
+                    "The filled order must be the one sorted by time and price."
+                );
+                let old_notional = active_order.notional();
+
+                active_order.fill(filled_quantity);
+                let new_notional = active_order.notional();
+
+                let notional_delta = new_notional - old_notional;
+                assert2::debug_assert!(
+                    notional_delta < Zero::zero(),
+                    "Filling an order reduces the remaining notional value"
+                );
                 self.asks_notional += notional_delta;
                 assert2::debug_assert!(self.asks_notional >= Zero::zero());
+
+                if active_order.remaining_quantity().is_zero() {
+                    Some(self.asks.remove(0).into_filled(ts_ns))
+                } else {
+                    None
+                }
             }
         }
     }
@@ -427,7 +449,6 @@ mod tests {
             },
             PositionInner,
         },
-        test_fee_maker,
         types::{
             BaseCurrency,
             CancelBy,
@@ -435,7 +456,6 @@ mod tests {
             ExchangeOrderMeta,
             Leverage,
             LimitOrder,
-            LimitOrderFill,
             QuoteCurrency,
             Side::{
                 self,
@@ -702,8 +722,7 @@ mod tests {
         let active_order = new_active_order.into_pending(meta);
 
         let mut updated_order = active_order.clone();
-        let fee = QuoteCurrency::new(0, 0);
-        updated_order.fill(BaseCurrency::new(1, 0), fee, 1.into());
+        updated_order.fill(BaseCurrency::new(1, 0));
 
         assert!(updated_order.remaining_quantity() < active_order.remaining_quantity());
     }
@@ -960,20 +979,12 @@ mod tests {
 
         // Now partially fill the order
         let filled_qty = qty / BaseCurrency::new(2, 0);
-        let fee = QuoteCurrency::convert_from(filled_qty, limit_price) * *test_fee_maker().as_ref();
-        match order.fill(filled_qty, fee, 0.into()) {
-            LimitOrderFill::PartiallyFilled {
-                filled_quantity,
-                fee: f,
-                order_after_fill: _,
-            } => {
-                assert_eq!(filled_quantity, filled_qty);
-                assert_eq!(f, fee);
-            }
-            LimitOrderFill::FullyFilled { .. } => panic!("Expected `PartiallyFilled`"),
-        }
+        order.fill(filled_qty);
         let remaining_qty = order.remaining_quantity();
-        book.fill_order(&order);
+        assert!(
+            book.fill_order(order.id(), order.side(), order.filled_quantity(), 0.into())
+                .is_none()
+        );
         assert_eq!(book.num_active(), 1);
         assert_eq!(remaining_qty, filled_qty);
         let om = QuoteCurrency::convert_from(remaining_qty, limit_price) * init_margin_req;

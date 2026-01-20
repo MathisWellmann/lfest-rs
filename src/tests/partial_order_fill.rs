@@ -48,10 +48,7 @@ fn partial_limit_order_fill(
     let mut order = order.into_pending(meta);
     let fill_qty = qty / BaseCurrency::new(2, 0);
     let f = QuoteCurrency::convert_from(fill_qty, order.limit_price()) * *test_fee_maker().as_ref();
-    assert!(matches!(
-        order.fill(fill_qty, f, ts.into()),
-        LimitOrderFill::PartiallyFilled { .. }
-    ));
+    order.fill(fill_qty);
     let expected_order_update = LimitOrderFill::PartiallyFilled {
         filled_quantity: qty / BaseCurrency::new(2, 0),
         fee: f,

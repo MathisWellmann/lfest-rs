@@ -409,7 +409,7 @@ where
         LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         CancelLimitOrderError<UserOrderIdT>,
     > {
-        let removed_order = self.account.remove_limit_order(cancel_by)?;
+        let removed_order = self.account.cancel_limit_order(cancel_by)?;
 
         assert!(if self.account.active_limit_orders().is_empty() {
             self.account.order_margin().is_zero()
@@ -438,11 +438,14 @@ where
             while let Some(order) = self.account.active_limit_orders().peek_best_bid() {
                 // TODO: if some quantity was filled, mutate `market_update` to reflect the reduced liquidity so it does not fill more orders than possible.
                 if let Some((filled_qty, exhausted)) = market_update.limit_order_filled(order) {
-                    self.fill_limit_order(
+                    let limit_order_update = self.fill_limit_order(
                         order.clone(),
                         filled_qty,
                         market_update.timestamp_exchange_ns(),
                     );
+                    self.limit_order_updates
+                        .push_within_capacity(limit_order_update)
+                        .expect(EXPECT_CAPACITY);
                     if exhausted {
                         return;
                     }
@@ -457,11 +460,14 @@ where
             while let Some(order) = self.account.active_limit_orders().peek_best_ask() {
                 // TODO: if some quantity was filled, mutate `market_update` to reflect the reduced liquidity so it does not fill more orders than possible.
                 if let Some((filled_qty, exhausted)) = market_update.limit_order_filled(order) {
-                    self.fill_limit_order(
+                    let limit_order_update = self.fill_limit_order(
                         order.clone(),
                         filled_qty,
                         market_update.timestamp_exchange_ns(),
                     );
+                    self.limit_order_updates
+                        .push_within_capacity(limit_order_update)
+                        .expect(EXPECT_CAPACITY);
                     if exhausted {
                         return;
                     }
@@ -482,41 +488,50 @@ where
 
     fn fill_limit_order(
         &mut self,
-        mut order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        filled_qty: BaseOrQuote,
+        // TODO: refactor this as technically ownership does not make sense here as we should reference the `ActiveLimitOrders` one.
+        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        filled_quantity: BaseOrQuote,
         ts_ns: TimestampNs,
-    ) {
+    ) -> LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT> {
         debug!(
-            "filled limit {} order {}: {filled_qty}/{} @ {}",
+            "filled limit {} order {}: {filled_quantity}/{} @ {}",
             order.side(),
             order.id(),
             order.remaining_quantity(),
             order.limit_price()
         );
         assert2::debug_assert!(
-            filled_qty > BaseOrQuote::zero(),
+            filled_quantity > BaseOrQuote::zero(),
             "The filled_qty must be greater than zero"
         );
 
         let side = order.side();
         let limit_price = order.limit_price();
-        let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, limit_price);
-        let fee = notional * *self.config.contract_spec().fee_maker().as_ref();
-
-        let limit_order_update = order.fill(filled_qty, fee, ts_ns);
-        if let LimitOrderFill::FullyFilled { .. } = limit_order_update {
-            self.account
-                .remove_limit_order(CancelBy::OrderId(order.id()))
-                .expect("Can remove order as its an internal call");
-        } else {
-            assert2::debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
-            self.account.fill_order(&order)
-        }
-        self.limit_order_updates
-            .push_within_capacity(limit_order_update)
-            .expect(EXPECT_CAPACITY);
+        let notional = BaseOrQuote::PairedCurrency::convert_from(filled_quantity, limit_price);
+        let fee = notional * *self.config().contract_spec().fee_maker().as_ref();
 
         self.account
-            .change_position(filled_qty, limit_price, side, fee);
+            .change_position(filled_quantity, limit_price, side, fee);
+
+        match self
+            .account
+            .fill_order(order.id(), side, filled_quantity, ts_ns)
+        {
+            Some(order_after_fill) => LimitOrderFill::FullyFilled {
+                filled_quantity,
+                fee,
+                order_after_fill,
+            },
+            None => LimitOrderFill::PartiallyFilled {
+                filled_quantity,
+                fee,
+                order_after_fill: self
+                    .account
+                    .active_limit_orders()
+                    .get_by_id(order.id(), side)
+                    .cloned()
+                    .expect("Has this active order"),
+            },
+        }
     }
 }

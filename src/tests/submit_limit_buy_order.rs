@@ -47,7 +47,7 @@ fn submit_limit_buy_order_no_position() {
     let ts = 0;
     let meta = ExchangeOrderMeta::new(0.into(), ts.into());
     let mut order = order.into_pending(meta);
-    let expected_order_update = order.fill(order.remaining_quantity(), fee, ts.into());
+    order.fill(order.remaining_quantity());
     assert_eq!(
         exchange
             .update_state(&Trade {
@@ -57,7 +57,11 @@ fn submit_limit_buy_order_no_position() {
                 timestamp_exchange_ns: 0.into()
             })
             .unwrap(),
-        &vec![expected_order_update]
+        &vec![LimitOrderFill::FullyFilled {
+            filled_quantity: BaseCurrency::new(5, 0),
+            fee,
+            order_after_fill: order.into_filled(0.into()),
+        }]
     );
     let bid = QuoteCurrency::new(96, 0);
     let ask = QuoteCurrency::new(99, 0);
@@ -137,7 +141,7 @@ fn submit_limit_buy_order_no_position() {
     let meta = ExchangeOrderMeta::new(1.into(), ts);
     let mut order = order.into_pending(meta);
     let fee = QuoteCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
-    let expected_order_update = order.fill(order.remaining_quantity(), fee, 3.into());
+    order.fill(order.remaining_quantity());
     assert_eq!(
         exchange
             .update_state(&Trade {
@@ -147,7 +151,11 @@ fn submit_limit_buy_order_no_position() {
                 timestamp_exchange_ns: 3.into()
             })
             .unwrap(),
-        &vec![expected_order_update]
+        &vec![LimitOrderFill::FullyFilled {
+            filled_quantity: BaseCurrency::new(5, 0),
+            fee,
+            order_after_fill: order.into_filled(3.into())
+        }]
     );
     assert_eq!(exchange.account().position(), &Position::Neutral);
     assert_eq!(
@@ -302,12 +310,12 @@ fn submit_limit_buy_order_with_long() {
     )
     .unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
-    let f = QuoteCurrency::convert_from(order.remaining_quantity(), order.limit_price())
+    let fee = QuoteCurrency::convert_from(order.remaining_quantity(), order.limit_price())
         * *test_fee_maker().as_ref();
 
     let meta = ExchangeOrderMeta::new(2.into(), 1.into());
     let mut order = order.into_pending(meta);
-    let expected_order_update = order.fill(order.remaining_quantity(), f, 2.into());
+    order.fill(order.remaining_quantity());
     assert_eq!(
         exchange
             .update_state(&Trade {
@@ -317,7 +325,11 @@ fn submit_limit_buy_order_with_long() {
                 timestamp_exchange_ns: 2.into()
             })
             .unwrap(),
-        &vec![expected_order_update]
+        &vec![LimitOrderFill::FullyFilled {
+            filled_quantity: BaseCurrency::new(9, 0),
+            fee,
+            order_after_fill: order.into_filled(2.into())
+        }]
     );
 
     assert_eq!(exchange.account().position(), &Position::Neutral);
@@ -388,7 +400,7 @@ fn submit_limit_buy_order_with_short() {
 
     let meta = ExchangeOrderMeta::new(2.into(), 0.into());
     let mut order = order.into_pending(meta);
-    let expected_order_update = order.fill(order.remaining_quantity(), fee, 1.into());
+    order.fill(order.remaining_quantity());
     assert_eq!(
         exchange
             .update_state(&Trade {
@@ -398,7 +410,11 @@ fn submit_limit_buy_order_with_short() {
                 timestamp_exchange_ns: 1.into(),
             })
             .unwrap(),
-        &vec![expected_order_update]
+        &vec![LimitOrderFill::FullyFilled {
+            filled_quantity: BaseCurrency::new(9, 0),
+            fee,
+            order_after_fill: order.into_filled(1.into())
+        }]
     );
 
     assert_eq!(exchange.account().position(), &Position::Neutral);

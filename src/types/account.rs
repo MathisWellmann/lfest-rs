@@ -13,14 +13,17 @@ use crate::{
         Balances,
         CancelBy,
         Currency,
+        Filled,
         LimitOrder,
         MarginCurrency,
         MaxNumberOfActiveOrders,
         Mon,
+        OrderId,
         OrderIdNotFound,
         Pending,
         QuoteCurrency,
         Side,
+        TimestampNs,
         UserOrderId,
     },
 };
@@ -78,6 +81,7 @@ where
 
     /// The available balance is the account equity minus position and order margin.
     #[inline(always)]
+    #[must_use]
     pub fn available_balance(&self) -> BaseOrQuote::PairedCurrency {
         let avail = self.balances.equity() - self.position_margin() - self.order_margin();
         debug_assert!(avail >= Zero::zero());
@@ -86,18 +90,21 @@ where
 
     /// The current position margin
     #[inline(always)]
+    #[must_use]
     pub fn position_margin(&self) -> BaseOrQuote::PairedCurrency {
         self.position.notional() * self.init_margin_req
     }
 
     /// The current order margin.
     #[inline(always)]
+    #[must_use]
     pub fn order_margin(&self) -> BaseOrQuote::PairedCurrency {
         self.active_limit_orders
             .order_margin(self.init_margin_req, &self.position)
     }
 
     #[inline(always)]
+    #[must_use]
     pub(crate) fn order_margin_with_order(
         &self,
         new_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
@@ -140,18 +147,23 @@ where
     /// # Panics:
     /// panics if the order id was not found.
     #[inline(always)]
+    #[must_use]
     pub fn fill_order(
         &mut self,
-        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) {
-        self.active_limit_orders.fill_order(order)
+        id: OrderId,
+        side: Side,
+        filled_quantity: BaseOrQuote,
+        ts_ns: TimestampNs,
+    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> {
+        self.active_limit_orders
+            .fill_order(id, side, filled_quantity, ts_ns)
     }
 
     // TODO: is this a remove due to cancellation, or full fill?
     /// Remove a limit order.
     #[allow(clippy::complexity, reason = "How is this hard to read?")]
     #[inline(always)]
-    pub fn remove_limit_order(
+    pub fn cancel_limit_order(
         &mut self,
         by: CancelBy<UserOrderIdT>,
     ) -> Result<

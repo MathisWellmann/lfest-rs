@@ -71,7 +71,12 @@ fn criterion_benchmark(c: &mut Criterion) {
                 },
                 |mut account| {
                     for order in orders.iter() {
-                        account.fill_order(black_box(order))
+                        let _ = account.fill_order(
+                            black_box(order.id()),
+                            black_box(order.side()),
+                            black_box(order.filled_quantity()),
+                            black_box(0.into()),
+                        );
                     }
                 },
             )
@@ -95,7 +100,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 |mut account| {
                     for order in orders.iter() {
                         account
-                            .remove_limit_order(black_box(CancelBy::OrderId(order.id())))
+                            .cancel_limit_order(black_box(CancelBy::OrderId(order.id())))
                             .expect("Can insert");
                     }
                 },
