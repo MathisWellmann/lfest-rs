@@ -382,11 +382,17 @@ where
         let notional = order.notional();
         assert2::debug_assert!(notional > Zero::zero());
 
+        // The filled order must hit the one sorted by time and price priority, so no need so iterate the orders.
         let active_order = match order.side() {
-            Buy => self.bids.iter_mut().find(|o| o.id() == order.id()),
-            Sell => self.asks.iter_mut().find(|o| o.id() == order.id()),
-        }
-        .expect("Order must have been active before updating it");
+            Buy => self.bids.last_mut().expect("Has best bid order"),
+            Sell => self.asks.first_mut().expect("Has best ask order"),
+        };
+        debug_assert_eq!(
+            active_order.id(),
+            order.id(),
+            "The filled order must be the one sorted by time and price."
+        );
+
         debug_assert_ne!(
             active_order, order,
             "An update to an order should not be the same as the existing one"
