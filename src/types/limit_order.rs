@@ -32,35 +32,6 @@ use crate::{
     utils::NoUserOrderId,
 };
 
-/// Price time priority ordering
-pub fn price_time_priority_ordering<I, const D: u8, BaseOrQuote, UserOrderIdT>(
-    o0: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    o1: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-) -> Ordering
-where
-    I: Mon<D>,
-    BaseOrQuote: Currency<I, D>,
-    UserOrderIdT: UserOrderId,
-{
-    use Ordering::*;
-    match o0.limit_price().cmp(&o1.limit_price()) {
-        Less => Less,
-        Equal => {
-            match o0
-                .state()
-                .meta()
-                .ts_exchange_received()
-                .cmp(&o1.state().meta().ts_exchange_received())
-            {
-                Less => Less,
-                Equal => Equal,
-                Greater => Greater,
-            }
-        }
-        Greater => Greater,
-    }
-}
-
 /// Defines a limit order.
 ///
 /// Generics:
@@ -99,6 +70,54 @@ where
     /// Depending on the status, different information is available.
     #[getset(get = "pub")]
     state: OrderStatus,
+}
+
+/// Price time priority ordering
+/// Lower priced orders will come first,
+/// at the same price, older orders come first.
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> PartialOrd
+    for LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        use Ordering::*;
+        Some(match self.limit_price().cmp(&other.limit_price()) {
+            Less => Less,
+            Equal => {
+                match self
+                    .state()
+                    .meta()
+                    .ts_exchange_received()
+                    .cmp(&other.state().meta().ts_exchange_received())
+                {
+                    Less => Less,
+                    Equal => Equal,
+                    Greater => Greater,
+                }
+            }
+            Greater => Greater,
+        })
+    }
+}
+
+/// Price time priority ordering
+/// Lower priced orders will come first,
+/// at the same price, older orders come first.
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Ord
+    for LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    #[inline(always)]
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).expect("Can always campare")
+    }
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT, OrderStatus> std::fmt::Display
@@ -338,13 +357,13 @@ where
     }
 
     /// Get the order id assigned by the exchange.
-    #[inline]
+    #[inline(always)]
     pub fn id(&self) -> OrderId {
         self.state().meta().id()
     }
 
     /// The notional value is related to the quantity and its limit price.
-    #[inline]
+    #[inline(always)]
     pub fn notional(&self) -> BaseOrQuote::PairedCurrency {
         BaseOrQuote::PairedCurrency::convert_from(self.remaining_quantity, self.limit_price)
     }

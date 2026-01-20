@@ -24,10 +24,7 @@ pub use fee::{
     Taker,
 };
 pub use leverage::Leverage;
-pub use limit_order::{
-    LimitOrder,
-    price_time_priority_ordering,
-};
+pub use limit_order::LimitOrder;
 pub use limits::OrderRateLimits;
 pub use market_order::MarketOrder;
 pub use order_id::OrderId;

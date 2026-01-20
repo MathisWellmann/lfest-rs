@@ -28,7 +28,6 @@ use crate::{
             *,
         },
         UserOrderId,
-        price_time_priority_ordering,
     },
     utils::order_margin,
 };
@@ -205,9 +204,10 @@ where
                 let idx = self
                     .bids
                     .iter()
-                    .position(|bid| {
-                        matches!(price_time_priority_ordering(&order, bid), Less | Equal)
-                    })
+                    // TODO: this sorting means that the `last` value actually has the higher timestamp if multiple bids are on the same price level.
+                    // Ideally we'd want the highest price level and the oldest order at the last vector position.
+                    // Fix this by creating `SortedOrders` with a custom sorting rule and tests.
+                    .position(|bid| matches!(order.cmp(bid), Less | Equal))
                     .unwrap_or(self.bids.len());
                 trace!("insert bid {order} at idx {idx}, bids: {:?}", self.bids);
                 self.bids.insert(idx, order)
@@ -222,9 +222,7 @@ where
                 let idx = self
                     .asks
                     .iter()
-                    .position(|bid| {
-                        matches!(price_time_priority_ordering(&order, bid), Less | Equal)
-                    })
+                    .position(|bid| matches!(order.cmp(bid), Less | Equal))
                     .unwrap_or(self.asks.len());
                 trace!("insert ask {order} at idx {idx}, asks: {:?}", self.asks);
                 self.asks.insert(idx, order)
@@ -444,7 +442,6 @@ mod tests {
                 *,
             },
             TimestampNs,
-            price_time_priority_ordering,
         },
         utils::NoUserOrderId,
     };
@@ -650,7 +647,7 @@ mod tests {
             let order = order.into_pending(meta);
             book.try_insert(order.clone()).unwrap();
             let mut sorted = book.bids.clone();
-            sorted.sort_by(price_time_priority_ordering);
+            sorted.sort();
             assert_eq!(sorted, book.bids);
         }
         assert_eq!(book.num_active(), 5);
@@ -666,7 +663,7 @@ mod tests {
             let order = order.into_pending(meta);
             book.try_insert(order.clone()).unwrap();
             let mut sorted = book.asks.clone();
-            sorted.sort_by(price_time_priority_ordering);
+            sorted.sort();
             assert_eq!(sorted, book.asks);
         }
         assert_eq!(book.num_active(), 10);

@@ -91,9 +91,10 @@ where
     BaseOrQuote: Currency<I, D>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use FilledQuantity::*;
         match self {
-            FilledQuantity::Unfilled => write!(f, "Unfilled"),
-            FilledQuantity::Filled {
+            Unfilled => write!(f, "Unfilled"),
+            Filled {
                 cumulative_qty,
                 avg_price,
             } => write!(
