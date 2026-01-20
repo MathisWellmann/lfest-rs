@@ -274,17 +274,6 @@ where
         order_margin(buy_notional, sell_notional, init_margin_req, position)
     }
 
-    pub(crate) fn assert_limit_order_update_reduces_qty(
-        active_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        updated_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) {
-        // when an existing limit order is updated for margin purposes here, its quantity is always reduced.
-        assert2::debug_assert!(
-            active_order.remaining_quantity() - updated_order.remaining_quantity()
-                > BaseOrQuote::zero()
-        );
-    }
-
     /// Get a `LimitOrder` by the given `OrderId` if any.
     /// Optimized to be fast for small number of active limit orders.
     #[inline(always)]
@@ -392,28 +381,21 @@ where
             order.id(),
             "The filled order must be the one sorted by time and price."
         );
-
-        debug_assert_ne!(
-            active_order, order,
-            "An update to an order should not be the same as the existing one"
-        );
+        debug_assert_eq!(active_order.limit_price(), order.limit_price());
         assert2::debug_assert!(
             order.remaining_quantity() < active_order.remaining_quantity(),
             "An update to an existing order must mean the new order has less quantity than the tracked order."
         );
-        debug_assert_eq!(order.id(), active_order.id());
-        Self::assert_limit_order_update_reduces_qty(active_order, order);
 
-        let old_order = active_order.clone();
-        *active_order = order.clone();
-
-        let notional_delta = notional - old_order.notional();
+        let notional_delta = notional - active_order.notional();
         assert2::debug_assert!(
             notional_delta < Zero::zero(),
             "Filling an order reduces the remaining notional value"
         );
 
-        match old_order.side() {
+        *active_order = order.clone();
+
+        match active_order.side() {
             Buy => {
                 self.bids_notional += notional_delta;
                 assert2::debug_assert!(self.bids_notional >= Zero::zero());
@@ -726,26 +708,7 @@ mod tests {
         let fee = QuoteCurrency::new(0, 0);
         updated_order.fill(BaseCurrency::new(1, 0), fee, 1.into());
 
-        ActiveLimitOrders::assert_limit_order_update_reduces_qty(&active_order, &updated_order);
-    }
-
-    #[test]
-    #[should_panic]
-    fn order_margin_assert_limit_order_reduces_qty_panic() {
-        let new_active_order = LimitOrder::new(
-            Buy,
-            QuoteCurrency::<i64, 5>::new(100, 0),
-            BaseCurrency::new(5, 0),
-        )
-        .unwrap();
-        let meta = ExchangeOrderMeta::new(0.into(), 1.into());
-        let order_0 = new_active_order.into_pending(meta);
-
-        let mut order_1 = order_0.clone();
-        let fee = QuoteCurrency::new(0, 0);
-        order_1.fill(BaseCurrency::new(1, 0), fee, 1.into());
-
-        ActiveLimitOrders::assert_limit_order_update_reduces_qty(&order_1, &order_0);
+        assert!(updated_order.remaining_quantity() < active_order.remaining_quantity());
     }
 
     #[test_case::test_matrix(
