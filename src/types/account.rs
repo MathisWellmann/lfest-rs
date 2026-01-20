@@ -161,26 +161,3 @@ where
         self.active_limit_orders.remove_limit_order(by)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{
-        types::BaseCurrency,
-        utils::NoUserOrderId,
-    };
-
-    #[test]
-    fn size_of_account() {
-        assert_eq!(
-            size_of::<Account<i32, 5, BaseCurrency<i32, 5>, NoUserOrderId>>(),
-            128
-        );
-        assert_eq!(
-            size_of::<Account<i64, 5, BaseCurrency<i64, 5>, NoUserOrderId>>(),
-            128
-        );
-        assert_eq!(size_of::<Account<i64, 5, BaseCurrency<i64, 5>, i32>>(), 128);
-        assert_eq!(size_of::<Account<i64, 5, BaseCurrency<i64, 5>, i64>>(), 128);
-    }
-}

@@ -274,35 +274,6 @@ where
         order_margin(buy_notional, sell_notional, init_margin_req, position)
     }
 
-    /// Update an existing `LimitOrder`.
-    /// Returns the old order
-    #[must_use]
-    pub(crate) fn update(
-        &mut self,
-        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) -> LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>> {
-        let active_order = match order.side() {
-            Buy => self.bids.iter_mut().find(|o| o.id() == order.id()),
-            Sell => self.asks.iter_mut().find(|o| o.id() == order.id()),
-        }
-        .expect("Order must have been active before updating it");
-        debug_assert_ne!(
-            active_order, order,
-            "An update to an order should not be the same as the existing one"
-        );
-        assert2::debug_assert!(
-            order.remaining_quantity() < active_order.remaining_quantity(),
-            "An update to an existing order must mean the new order has less quantity than the tracked order."
-        );
-        debug_assert_eq!(order.id(), active_order.id());
-        Self::assert_limit_order_update_reduces_qty(active_order, order);
-
-        let old_order = active_order.clone();
-        *active_order = order.clone();
-
-        old_order
-    }
-
     pub(crate) fn assert_limit_order_update_reduces_qty(
         active_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         updated_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
@@ -410,8 +381,31 @@ where
         trace!("OrderMargin.update {order:?}");
         let notional = order.notional();
         assert2::debug_assert!(notional > Zero::zero());
-        let old_order = self.update(order);
+
+        let active_order = match order.side() {
+            Buy => self.bids.iter_mut().find(|o| o.id() == order.id()),
+            Sell => self.asks.iter_mut().find(|o| o.id() == order.id()),
+        }
+        .expect("Order must have been active before updating it");
+        debug_assert_ne!(
+            active_order, order,
+            "An update to an order should not be the same as the existing one"
+        );
+        assert2::debug_assert!(
+            order.remaining_quantity() < active_order.remaining_quantity(),
+            "An update to an existing order must mean the new order has less quantity than the tracked order."
+        );
+        debug_assert_eq!(order.id(), active_order.id());
+        Self::assert_limit_order_update_reduces_qty(active_order, order);
+
+        let old_order = active_order.clone();
+        *active_order = order.clone();
+
         let notional_delta = notional - old_order.notional();
+        assert2::debug_assert!(
+            notional_delta < Zero::zero(),
+            "Filling an order reduces the remaining notional value"
+        );
 
         match old_order.side() {
             Buy => {
