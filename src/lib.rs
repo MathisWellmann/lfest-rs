@@ -17,6 +17,7 @@ mod order_rate_limiter;
 mod position;
 mod position_inner;
 mod risk_engine;
+mod sorted_orders;
 #[cfg(test)]
 mod tests;
 #[cfg(feature = "trade_aggregation")]

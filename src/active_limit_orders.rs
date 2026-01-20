@@ -86,6 +86,7 @@ where
     }
 }
 
+// TODO: remove impl
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> std::fmt::Display
     for ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>
 where
