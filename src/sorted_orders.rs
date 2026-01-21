@@ -418,4 +418,42 @@ mod tests {
         assert!(!asks.is_empty());
         assert_eq!(asks.best(), Some(&pending_0));
     }
+
+    #[test]
+    #[should_panic]
+    fn sorted_orders_bids_should_panic() {
+        let mut bids =
+            SortedOrders::<i64, 6, BaseCurrency<_, 6>, NoUserOrderId, Bids>::with_capacity(
+                NonZeroU16::new(3).unwrap(),
+            );
+        let order_0 = LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(100, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let pending_0 = order_0.into_pending(meta);
+        // Should panic irregardless of the result.
+        let _ = bids.try_insert(pending_0.clone());
+    }
+
+    #[test]
+    #[should_panic]
+    fn sorted_orders_asks_should_panic() {
+        let mut bids =
+            SortedOrders::<i64, 6, BaseCurrency<_, 6>, NoUserOrderId, Asks>::with_capacity(
+                NonZeroU16::new(3).unwrap(),
+            );
+        let order_0 = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(100, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let pending_0 = order_0.into_pending(meta);
+        // Should panic irregardless of the result.
+        let _ = bids.try_insert(pending_0.clone());
+    }
 }
