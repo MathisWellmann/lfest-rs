@@ -258,7 +258,7 @@ where
 {
     /// Used when an order gets some `quantity` filled at its limit price.
     #[inline(always)]
-    pub(crate) fn fill(&mut self, filled_quantity: BaseOrQuote) {
+    pub fn fill(&mut self, filled_quantity: BaseOrQuote) {
         assert2::debug_assert!(
             filled_quantity <= self.remaining_quantity,
             "The filled quantity can not be greater than the limit order quantity"
@@ -291,12 +291,15 @@ where
         };
     }
 
+    /// Transition into the `Filled` state.
+    /// # Panics
+    /// When the `remaining_quanity > 0`
     #[inline(always)]
-    pub(crate) fn into_filled(
+    pub fn into_filled(
         self,
         ts_ns: TimestampNs,
     ) -> LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>> {
-        debug_assert!(self.remaining_quantity.is_zero(),);
+        debug_assert!(self.remaining_quantity.is_zero());
         let cumulative_qty = match self.state.filled_quantity() {
             FilledQuantity::Filled {
                 cumulative_qty,

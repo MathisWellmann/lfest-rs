@@ -143,7 +143,9 @@ where
         self.active_limit_orders.try_insert(order)
     }
 
-    /// fill an existing limit order, reduces order margin.
+    // TODO: this API in princible only need to know `id` (and maybe `side`)
+    /// Fill an existing limit order and change the position accordingly; reduces order margin.
+    ///
     /// # Panics:
     /// panics if the order id was not found.
     #[inline(always)]
@@ -153,8 +155,11 @@ where
         id: OrderId,
         side: Side,
         filled_quantity: BaseOrQuote,
+        limit_price: QuoteCurrency<I, D>,
+        fee: BaseOrQuote::PairedCurrency,
         ts_ns: TimestampNs,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> {
+        self.change_position(filled_quantity, limit_price, side, fee);
         self.active_limit_orders
             .fill_order(id, side, filled_quantity, ts_ns)
     }

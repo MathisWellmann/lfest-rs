@@ -75,6 +75,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                             black_box(order.id()),
                             black_box(order.side()),
                             black_box(order.filled_quantity()),
+                            black_box(order.limit_price()),
+                            black_box(QuoteCurrency::new(1, 4)),
                             black_box(0.into()),
                         );
                     }

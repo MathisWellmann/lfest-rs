@@ -3,10 +3,6 @@ use getset::{
     Getters,
 };
 use num_traits::Zero;
-use tracing::{
-    debug,
-    trace,
-};
 
 use crate::{
     prelude::{
@@ -61,8 +57,9 @@ where
     ///
     /// # Panics:
     /// if `quantity` or `entry_price` are invalid.
+    #[inline(always)]
+    #[must_use]
     pub fn new(quantity: BaseOrQuote, entry_price: QuoteCurrency<I, D>) -> Self {
-        trace!("Position::new: {quantity} @ {entry_price}");
         assert2::debug_assert!(quantity > BaseOrQuote::zero());
         assert2::debug_assert!(entry_price > QuoteCurrency::zero());
 
@@ -74,6 +71,7 @@ where
 
     /// The value of the position at its entry price.
     #[inline(always)]
+    #[must_use]
     pub fn notional(&self) -> BaseOrQuote::PairedCurrency {
         assert2::debug_assert!(self.entry_price > Zero::zero());
         assert2::debug_assert!(self.quantity >= Zero::zero());
@@ -84,6 +82,7 @@ where
     /// denoted in QUOTE when using linear futures,
     /// denoted in BASE when using inverse futures
     #[inline(always)]
+    #[must_use]
     pub fn unrealized_pnl(
         &self,
         mark_to_market_price: QuoteCurrency<I, D>,
@@ -99,7 +98,6 @@ where
         qty: BaseOrQuote,
         entry_price: QuoteCurrency<I, D>,
     ) {
-        debug!("increase_contracts: {qty} @ {entry_price}; self: {}", self);
         assert2::debug_assert!(qty > BaseOrQuote::zero());
         assert2::debug_assert!(entry_price > QuoteCurrency::zero());
 
@@ -124,7 +122,6 @@ where
         exit_price: QuoteCurrency<I, D>,
         is_long: bool,
     ) -> BaseOrQuote::PairedCurrency {
-        debug!("decrease_contracts: {qty} @ {exit_price}; self: {}", self);
         assert2::debug_assert!(qty > BaseOrQuote::zero());
         assert2::debug_assert!(qty <= self.quantity);
 

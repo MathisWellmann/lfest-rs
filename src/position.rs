@@ -102,6 +102,7 @@ where
             "The filled_qty must be greater than zero"
         );
 
+        // TODO: Performance can be much better I'm sure.
         use Ordering::*;
         let pnl = match self {
             Neutral => {

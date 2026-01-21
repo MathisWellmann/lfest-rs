@@ -1,7 +1,6 @@
 use std::marker::PhantomData;
 
 use getset::CopyGetters;
-use tracing::trace;
 use typed_builder::TypedBuilder;
 
 use super::{
@@ -58,7 +57,7 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn debug_assert_state(&self) {
         assert2::debug_assert!(self.equity >= BaseOrQuote::zero());
     }
@@ -66,7 +65,6 @@ where
     /// If `fee` is negative then we receive balance.
     #[inline(always)]
     pub fn account_for_fee(&mut self, fee: BaseOrQuote) {
-        trace!("account_for_fee: {fee}");
         self.debug_assert_state();
 
         self.equity -= fee;
@@ -78,7 +76,6 @@ where
     /// Profit and loss are applied to the available balance.
     #[inline(always)]
     pub fn apply_pnl(&mut self, pnl: BaseOrQuote) {
-        trace!("apply_pnl: {pnl}, self: {self}");
         self.equity += pnl;
         assert2::debug_assert!(self.equity >= BaseOrQuote::zero());
     }

@@ -510,12 +510,9 @@ where
         let notional = BaseOrQuote::PairedCurrency::convert_from(filled_quantity, limit_price);
         let fee = notional * *self.config().contract_spec().fee_maker().as_ref();
 
-        self.account
-            .change_position(filled_quantity, limit_price, side, fee);
-
         match self
             .account
-            .fill_order(order.id(), side, filled_quantity, ts_ns)
+            .fill_order(order.id(), side, filled_quantity, limit_price, fee, ts_ns)
         {
             Some(order_after_fill) => LimitOrderFill::FullyFilled {
                 filled_quantity,
