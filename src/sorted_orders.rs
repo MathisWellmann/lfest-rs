@@ -274,13 +274,14 @@ mod tests {
         )
         .unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
-        let pending_0 = order_0.into_pending(meta);
+        let mut pending_0 = order_0.into_pending(meta);
         bids.try_insert(pending_0.clone()).unwrap();
         assert_eq!(bids.notional_sum, QuoteCurrency::new(100, 0));
         assert_eq!(bids.orders.len(), 1);
         assert_eq!(bids.len(), 1);
         assert!(!bids.is_empty());
         assert_eq!(bids.best(), Some(&pending_0));
+        assert_eq!(bids.best_mut(), Some(&mut pending_0));
 
         let order_1 = LimitOrder::new(
             Side::Buy,
@@ -441,7 +442,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn sorted_orders_asks_should_panic() {
-        let mut bids =
+        let mut asks =
             SortedOrders::<i64, 6, BaseCurrency<_, 6>, NoUserOrderId, Asks>::with_capacity(
                 NonZeroU16::new(3).unwrap(),
             );
@@ -454,6 +455,28 @@ mod tests {
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
         let pending_0 = order_0.into_pending(meta);
         // Should panic irregardless of the result.
-        let _ = bids.try_insert(pending_0.clone());
+        let _ = asks.try_insert(pending_0.clone());
+    }
+
+    #[test]
+    fn sorted_orders_clone() {
+        let mut bids =
+            SortedOrders::<i64, 6, BaseCurrency<_, 6>, NoUserOrderId, Bids>::with_capacity(
+                NonZeroU16::new(3).unwrap(),
+            );
+        let order_0 = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(100, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap();
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let pending_0 = order_0.into_pending(meta);
+        bids.try_insert(pending_0.clone()).unwrap();
+
+        let bids_clone = bids.clone();
+        assert_eq!(bids.orders, bids_clone.orders);
+        assert_eq!(bids.notional_sum, bids_clone.notional_sum);
+        assert_eq!(bids.orders.capacity(), bids_clone.orders.capacity());
     }
 }
