@@ -262,3 +262,7 @@ harness = false
 [[bench]]
 name = "position"
 harness = false
+
+[[bench]]
+name = "sorted_orders"
+harness = false

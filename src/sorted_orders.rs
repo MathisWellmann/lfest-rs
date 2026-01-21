@@ -1,3 +1,6 @@
+//! Contains a data structure for maintaining an ordered list of limit orders,
+//! optimized for a small number of active ones.
+
 use std::{
     cmp::Ordering,
     marker::PhantomData,
@@ -21,7 +24,8 @@ use crate::{
     },
 };
 
-pub(crate) struct Bids;
+/// zero-sized marker struct indicating sorting for bids.
+pub struct Bids;
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Cmp<I, D, BaseOrQuote, UserOrderIdT> for Bids
 where
@@ -60,7 +64,8 @@ where
     }
 }
 
-pub(crate) struct Asks;
+/// zero-sized marker struct indicating sorting for asks.
+pub struct Asks;
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Cmp<I, D, BaseOrQuote, UserOrderIdT> for Asks
 where
@@ -102,28 +107,32 @@ where
 
 /// Provides the sorting between two limit orders.
 /// This differs for bids and asks.
-pub(crate) trait Cmp<I, const D: u8, BaseOrQuote, UserOrderIdT>
+pub trait Cmp<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     UserOrderIdT: UserOrderId,
 {
+    /// If `true`, the side is the same as the marker struct implementing this function.
+    /// Used for asserting that only limit orders of the correct side are included.
     fn is_same_side(side: Side) -> bool;
 
+    /// Compare a new order with an existing one for ordering them appropriately.
+    /// This implementation differs for `Bids` and `Asks` as the best price and oldest order is always at the last vector position.
     fn cmp(
         new_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         existing_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Ordering;
 }
 
-// TODO: benchmark this, compare it with `BTreeMap` and const array.
+// TODO: compare it with `BTreeMap` and const array implementations.
 /// Maintains a list of orders, sorted by price and time priority.
 /// Optimized for fast insert and removal operations for a small number of orders like 1, 2 or 3.
 /// The best ask price and oldest timestamp order will be at the last index.
 /// The best bid price and oldest timestamp order will be at the last index.
 /// Bids and asks are stored separately, hence the `SideT` generic.
 #[derive(Debug, PartialEq, Eq, CopyGetters)]
-pub(crate) struct SortedOrders<I, const D: u8, BaseOrQuote, UserOrderIdT, SideT>
+pub struct SortedOrders<I, const D: u8, BaseOrQuote, UserOrderIdT, SideT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
@@ -146,7 +155,7 @@ where
     fn clone(&self) -> Self {
         let mut orders = self.orders.clone();
         orders.reserve_exact(self.orders.capacity() - self.orders.len());
-        assert_eq!(orders.capacity(), self.orders.capacity());
+        debug_assert_eq!(orders.capacity(), self.orders.capacity());
         Self {
             orders,
             notional_sum: self.notional_sum,
@@ -164,7 +173,9 @@ where
     UserOrderIdT: UserOrderId,
     SideT: Cmp<I, D, BaseOrQuote, UserOrderIdT>,
 {
-    pub(crate) fn with_capacity(cap: NonZeroU16) -> Self {
+    /// Create a new instance with a fixed capacity.
+    /// This capacity is retained across `.clone()` calls as well.
+    pub fn with_capacity(cap: NonZeroU16) -> Self {
         Self {
             orders: Vec::with_capacity(cap.get().into()),
             notional_sum: Zero::zero(),
@@ -206,8 +217,10 @@ where
         })
     }
 
+    /// Insert a new limit orders if there is enough capacity,
+    /// otherwise return an error.
     #[inline]
-    pub(crate) fn try_insert(
+    pub fn try_insert(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Result<(), MaxNumberOfActiveOrders> {
