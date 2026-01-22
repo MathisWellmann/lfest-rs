@@ -17,6 +17,7 @@ use crate::{
         PriceFilter,
         QuoteCurrency,
         Side,
+        Side::*,
     },
     types::{
         PriceFilterError,
@@ -58,8 +59,8 @@ where
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> bool {
         match order.side() {
-            Side::Buy => self.price < order.limit_price() && matches!(self.side, Side::Sell),
-            Side::Sell => self.price > order.limit_price() && matches!(self.side, Side::Buy),
+            Buy => self.price < order.limit_price() && matches!(self.side, Sell),
+            Sell => self.price > order.limit_price() && matches!(self.side, Buy),
         }
     }
 }
@@ -133,16 +134,16 @@ where
     #[inline(always)]
     fn can_fill_bids(&self) -> bool {
         match self.side {
-            Side::Buy => false,
-            Side::Sell => true,
+            Buy => false,
+            Sell => true,
         }
     }
 
     #[inline(always)]
     fn can_fill_asks(&self) -> bool {
         match self.side {
-            Side::Buy => true,
-            Side::Sell => false,
+            Buy => true,
+            Sell => false,
         }
     }
 }
@@ -152,7 +153,7 @@ mod tests {
     use super::*;
     use crate::prelude::*;
 
-    #[test_case::test_case(Side::Buy, false, true)]
+    #[test_case::test_case(Buy, false, true)]
     fn trade_update_can_fill_bids_asks(side: Side, can_fill_bid: bool, can_fill_ask: bool) {
         let trade = Trade {
             price: QuoteCurrency::<i64, 1>::new(100, 0),
@@ -167,19 +168,15 @@ mod tests {
     // A buy trade can never fill a buy limit order.
     #[test_case::test_matrix([90, 95, 100, 105, 110])]
     fn trade_update_fills_buy_order_never(price: i64) {
-        let new_order = LimitOrder::new(
-            Side::Buy,
-            QuoteCurrency::new(100, 0),
-            BaseCurrency::new(5, 0),
-        )
-        .unwrap();
+        let new_order =
+            LimitOrder::new(Buy, QuoteCurrency::new(100, 0), BaseCurrency::new(5, 0)).unwrap();
         let meta = ExchangeOrderMeta::default();
         let order = new_order.into_pending(meta);
 
         let trade = Trade {
             price: QuoteCurrency::<i64, 1>::new(price, 0),
             quantity: BaseCurrency::new(5, 0),
-            side: Side::Buy,
+            side: Buy,
             timestamp_exchange_ns: 0.into(),
         };
         assert!(!trade.fills_order(&order));
@@ -188,19 +185,15 @@ mod tests {
     // A sell trade can fill a buy limit order at certain prices.
     #[test_case::test_matrix([90, 95, 99])]
     fn trade_update_fills_buy_order(price: i64) {
-        let new_order = LimitOrder::new(
-            Side::Buy,
-            QuoteCurrency::new(100, 0),
-            BaseCurrency::new(5, 0),
-        )
-        .unwrap();
+        let new_order =
+            LimitOrder::new(Buy, QuoteCurrency::new(100, 0), BaseCurrency::new(5, 0)).unwrap();
         let meta = ExchangeOrderMeta::default();
         let order = new_order.into_pending(meta);
 
         let trade = Trade {
             price: QuoteCurrency::<i64, 1>::new(price, 0),
             quantity: BaseCurrency::new(5, 0),
-            side: Side::Sell,
+            side: Sell,
             timestamp_exchange_ns: 0.into(),
         };
         assert!(trade.fills_order(&order));
@@ -209,19 +202,15 @@ mod tests {
     // A sell trade can fill a buy limit order at certain prices.
     #[test_case::test_matrix([100, 101, 105, 110])]
     fn trade_update_fills_buy_order_not(price: i64) {
-        let new_order = LimitOrder::new(
-            Side::Buy,
-            QuoteCurrency::new(100, 0),
-            BaseCurrency::new(5, 0),
-        )
-        .unwrap();
+        let new_order =
+            LimitOrder::new(Buy, QuoteCurrency::new(100, 0), BaseCurrency::new(5, 0)).unwrap();
         let meta = ExchangeOrderMeta::default();
         let order = new_order.into_pending(meta);
 
         let trade = Trade {
             price: QuoteCurrency::<i64, 1>::new(price, 0),
             quantity: BaseCurrency::new(5, 0),
-            side: Side::Sell,
+            side: Sell,
             timestamp_exchange_ns: 0.into(),
         };
         assert!(!trade.fills_order(&order));
@@ -230,19 +219,15 @@ mod tests {
     // A buy trade can never fill a buy limit order.
     #[test_case::test_matrix([90, 95, 100, 105, 110])]
     fn trade_update_fills_sell_order_never(price: i64) {
-        let new_order = LimitOrder::new(
-            Side::Sell,
-            QuoteCurrency::new(100, 0),
-            BaseCurrency::new(5, 0),
-        )
-        .unwrap();
+        let new_order =
+            LimitOrder::new(Sell, QuoteCurrency::new(100, 0), BaseCurrency::new(5, 0)).unwrap();
         let meta = ExchangeOrderMeta::default();
         let order = new_order.into_pending(meta);
 
         let trade = Trade {
             price: QuoteCurrency::<i64, 1>::new(price, 0),
             quantity: BaseCurrency::new(5, 0),
-            side: Side::Sell,
+            side: Sell,
             timestamp_exchange_ns: 0.into(),
         };
         assert!(!trade.fills_order(&order));
@@ -251,19 +236,15 @@ mod tests {
     // A sell trade can fill a buy limit order at certain prices.
     #[test_case::test_matrix([101, 105, 110])]
     fn trade_update_fills_sell_order(price: i64) {
-        let new_order = LimitOrder::new(
-            Side::Sell,
-            QuoteCurrency::new(100, 0),
-            BaseCurrency::new(5, 0),
-        )
-        .unwrap();
+        let new_order =
+            LimitOrder::new(Sell, QuoteCurrency::new(100, 0), BaseCurrency::new(5, 0)).unwrap();
         let meta = ExchangeOrderMeta::default();
         let order = new_order.into_pending(meta);
 
         let trade = Trade {
             price: QuoteCurrency::<i64, 1>::new(price, 0),
             quantity: BaseCurrency::new(5, 0),
-            side: Side::Buy,
+            side: Buy,
             timestamp_exchange_ns: 0.into(),
         };
         assert!(trade.fills_order(&order));
@@ -272,19 +253,15 @@ mod tests {
     // A sell trade can fill a buy limit order at certain prices.
     #[test_case::test_matrix([90, 95, 99])]
     fn trade_update_fills_sell_order_not(price: i64) {
-        let new_order = LimitOrder::new(
-            Side::Sell,
-            QuoteCurrency::new(100, 0),
-            BaseCurrency::new(5, 0),
-        )
-        .unwrap();
+        let new_order =
+            LimitOrder::new(Sell, QuoteCurrency::new(100, 0), BaseCurrency::new(5, 0)).unwrap();
         let meta = ExchangeOrderMeta::default();
         let order = new_order.into_pending(meta);
 
         let trade = Trade {
             price: QuoteCurrency::<i64, 1>::new(price, 0),
             quantity: BaseCurrency::new(5, 0),
-            side: Side::Buy,
+            side: Buy,
             timestamp_exchange_ns: 0.into(),
         };
         assert!(!trade.fills_order(&order));
@@ -295,7 +272,7 @@ mod tests {
         let trade = Trade {
             price: QuoteCurrency::<i64, 5>::new(100, 0),
             quantity: BaseCurrency::new(5, 0),
-            side: Side::Buy,
+            side: Buy,
             timestamp_exchange_ns: 0.into(),
         };
         let mut state = MarketState::default();
@@ -308,7 +285,7 @@ mod tests {
         let trade = Trade {
             price: QuoteCurrency::<i64, 5>::new(100, 0),
             quantity: BaseCurrency::new(5, 0),
-            side: Side::Buy,
+            side: Buy,
             timestamp_exchange_ns: 0.into(),
         };
         assert_eq!(
@@ -320,7 +297,7 @@ mod tests {
     #[test_case::test_matrix(
         [100, 110, 120],
         [1, 2, 3],
-        [Side::Buy, Side::Sell]
+        [Buy, Sell]
     )]
     fn trade_limit_order_filled_some(price: i32, qty: i32, side: Side) {
         let price = QuoteCurrency::<i32, 2>::new(price, 0);
@@ -333,8 +310,8 @@ mod tests {
         };
 
         let offset = match side {
-            Side::Buy => QuoteCurrency::new(-1, 0),
-            Side::Sell => QuoteCurrency::new(1, 0),
+            Buy => QuoteCurrency::new(-1, 0),
+            Sell => QuoteCurrency::new(1, 0),
         };
         let limit_order = LimitOrder::new(side.inverted(), price + offset, quantity).unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
@@ -353,7 +330,7 @@ mod tests {
     #[test_case::test_matrix(
         [100, 110, 120],
         [1, 2, 3],
-        [Side::Buy, Side::Sell]
+        [Buy, Sell]
     )]
     fn trade_limit_order_filled_none(price: i32, qty: i32, side: Side) {
         let price = QuoteCurrency::<i32, 2>::new(price, 0);
@@ -365,8 +342,8 @@ mod tests {
             timestamp_exchange_ns: 0.into(),
         };
         let offset = match side {
-            Side::Buy => QuoteCurrency::new(-1, 0),
-            Side::Sell => QuoteCurrency::new(1, 0),
+            Buy => QuoteCurrency::new(-1, 0),
+            Sell => QuoteCurrency::new(1, 0),
         };
         let limit_order = LimitOrder::new(
             side.inverted(),
