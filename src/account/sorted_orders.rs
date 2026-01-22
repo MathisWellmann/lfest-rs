@@ -323,6 +323,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use rand::{
+        Rng,
+        rng,
+    };
+
     use super::*;
     use crate::{
         types::{
@@ -601,5 +606,26 @@ mod tests {
             );
         }
         assert!(bids.is_empty());
+    }
+
+    #[test]
+    fn sorted_orders_random() {
+        let cap = 1000;
+        let mut bids =
+            SortedOrders::<i64, 6, BaseCurrency<_, 6>, NoUserOrderId, Bids>::with_capacity(
+                NonZeroU16::new(cap).unwrap(),
+            );
+        let mut rng = rng();
+        for i in 0..cap {
+            let order_0 = LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(rng.random_range(1..100), 0),
+                BaseCurrency::new(rng.random_range(1..100), 2),
+            )
+            .unwrap();
+            let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
+            let pending_0 = order_0.into_pending(meta);
+            bids.try_insert(pending_0.clone()).unwrap();
+        }
     }
 }
