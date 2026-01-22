@@ -18,6 +18,7 @@ use crate::{
         MarginCurrency,
         MaxNumberOfActiveOrders,
         Mon,
+        OrderId,
         Pending,
         Side,
         UserOrderId,
@@ -184,16 +185,19 @@ where
     }
 
     #[inline(always)]
+    #[must_use]
     pub(crate) fn len(&self) -> usize {
         self.orders.len()
     }
 
     #[inline(always)]
+    #[must_use]
     pub(crate) fn is_empty(&self) -> bool {
         self.orders.is_empty()
     }
 
     #[inline(always)]
+    #[must_use]
     pub(crate) fn best(
         &self,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
@@ -201,6 +205,7 @@ where
     }
 
     #[inline(always)]
+    #[must_use]
     pub(crate) fn best_mut(
         &mut self,
     ) -> Option<&mut LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
@@ -208,6 +213,7 @@ where
     }
 
     #[inline(always)]
+    #[must_use]
     pub(crate) fn pop_best(
         &mut self,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
@@ -253,6 +259,26 @@ where
         self.orders.sort_by(|a, b| SideT::cmp(a, b));
 
         Ok(())
+    }
+
+    /// Remove a limit order by its id.
+    /// The ordering is preserved by this operation.
+    /// The `notional_sum` is decremented.
+    #[inline]
+    #[must_use]
+    pub fn remove_order(
+        &mut self,
+        id: OrderId,
+    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+        self.orders
+            .iter()
+            .position(|order| order.id() == id)
+            .and_then(|idx| {
+                let order = self.orders.remove(idx);
+                self.notional_sum -= order.notional();
+                assert2::debug_assert!(self.notional_sum >= Zero::zero());
+                Some(order)
+            })
     }
 }
 
@@ -491,5 +517,41 @@ mod tests {
         assert_eq!(bids.orders, bids_clone.orders);
         assert_eq!(bids.notional_sum, bids_clone.notional_sum);
         assert_eq!(bids.orders.capacity(), bids_clone.orders.capacity());
+    }
+
+    #[test]
+    fn sorted_orders_remove() {
+        let cap = 10;
+        let mut bids =
+            SortedOrders::<i64, 6, BaseCurrency<_, 6>, NoUserOrderId, Bids>::with_capacity(
+                NonZeroU16::new(cap).unwrap(),
+            );
+        for i in 0..cap {
+            let order_0 = LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(100, 0),
+                BaseCurrency::new(1, 0),
+            )
+            .unwrap();
+            let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
+            let pending_0 = order_0.into_pending(meta);
+            bids.try_insert(pending_0.clone()).unwrap();
+            assert_eq!(
+                bids.notional_sum,
+                QuoteCurrency::new(100 * (i as i64 + 1), 0)
+            );
+        }
+        assert_eq!(bids.notional_sum, QuoteCurrency::new(100 * cap as i64, 0));
+
+        for i in 0..cap {
+            let i = i as u64;
+            assert_eq!(bids.remove_order(i.into()).unwrap().id(), i.into());
+            assert!(bids.remove_order(i.into()).is_none());
+            assert_eq!(
+                bids.notional_sum,
+                QuoteCurrency::new((100 * cap as i64) - 100 * (i as i64 + 1), 0)
+            );
+        }
+        assert!(bids.is_empty());
     }
 }
