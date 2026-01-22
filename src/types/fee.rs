@@ -1,6 +1,10 @@
 use const_decimal::Decimal;
 
 use super::Mon;
+use crate::types::{
+    BaseCurrency,
+    QuoteCurrency,
+};
 
 /// Fee as a part per one hundred thousand.
 /// The generic `MarkerTaker` marker indicates to the type system if its a maker or taker fee.
@@ -26,6 +30,30 @@ impl<I, const D: u8, MakerTaker> AsRef<Decimal<I, D>> for Fee<I, D, MakerTaker> 
     #[inline]
     fn as_ref(&self) -> &Decimal<I, D> {
         &self.value
+    }
+}
+
+impl<I, const D: u8, MakerTaker> std::ops::Mul<QuoteCurrency<I, D>> for Fee<I, D, MakerTaker>
+where
+    I: Mon<D>,
+{
+    type Output = QuoteCurrency<I, D>;
+
+    #[inline(always)]
+    fn mul(self, rhs: QuoteCurrency<I, D>) -> Self::Output {
+        rhs * self.value
+    }
+}
+
+impl<I, const D: u8, MakerTaker> std::ops::Mul<BaseCurrency<I, D>> for Fee<I, D, MakerTaker>
+where
+    I: Mon<D>,
+{
+    type Output = BaseCurrency<I, D>;
+
+    #[inline(always)]
+    fn mul(self, rhs: BaseCurrency<I, D>) -> Self::Output {
+        rhs * self.value
     }
 }
 
