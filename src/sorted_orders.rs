@@ -10,21 +10,18 @@ use std::{
 use getset::CopyGetters;
 use num::Zero;
 
-use crate::{
-    EXPECT_CAPACITY,
-    types::{
-        Currency,
-        Filled,
-        LimitOrder,
-        MarginCurrency,
-        MaxNumberOfActiveOrders,
-        Mon,
-        OrderId,
-        Pending,
-        Side,
-        TimestampNs,
-        UserOrderId,
-    },
+use crate::types::{
+    Currency,
+    Filled,
+    LimitOrder,
+    MarginCurrency,
+    MaxNumberOfActiveOrders,
+    Mon,
+    OrderId,
+    Pending,
+    Side,
+    TimestampNs,
+    UserOrderId,
 };
 
 // TODO: move `Bids`,`Asks` and `Cmp` to its own file.
@@ -304,10 +301,21 @@ where
         }
         self.notional_sum += order.notional();
 
-        self.orders
-            .push_within_capacity(order)
-            .expect(EXPECT_CAPACITY);
-        self.orders.sort_by(|a, b| SideT::cmp(a, b));
+        use std::cmp::Ordering::*;
+        let idx = self
+            .orders
+            .iter()
+            .position(|existing| matches!(SideT::cmp(&order, existing), Less | Equal))
+            .unwrap_or(self.orders.len());
+        self.orders.insert(idx, order);
+        debug_assert_eq!(
+            {
+                let mut cloned = self.orders.clone();
+                cloned.sort_by(|a, b| SideT::cmp(a, b));
+                cloned
+            },
+            self.orders
+        );
 
         Ok(())
     }
