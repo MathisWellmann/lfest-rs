@@ -1,5 +1,6 @@
 use std::fmt::Formatter;
 
+use Side::*;
 use serde::{
     Deserialize,
     Serialize,
@@ -17,10 +18,11 @@ pub enum Side {
 
 impl Side {
     /// Returns the inverted side
+    #[inline(always)]
     pub fn inverted(&self) -> Self {
         match self {
-            Side::Buy => Side::Sell,
-            Side::Sell => Side::Buy,
+            Buy => Sell,
+            Sell => Buy,
         }
     }
 
@@ -31,11 +33,7 @@ impl Side {
     {
         assert!(!qty.is_zero(), "A trade quantity cannot be zero");
 
-        if qty.is_negative() {
-            Side::Sell
-        } else {
-            Side::Buy
-        }
+        if qty.is_negative() { Sell } else { Buy }
     }
 }
 
@@ -56,11 +54,11 @@ mod tests {
     fn side_from_taker_quantity() {
         assert_eq!(
             Side::from_taker_quantity(QuoteCurrency::<i32, 4>::new(1, 0)),
-            Side::Buy
+            Buy
         );
         assert_eq!(
             Side::from_taker_quantity(QuoteCurrency::<i32, 4>::new(-1, 0)),
-            Side::Sell
+            Sell
         );
     }
 
@@ -72,8 +70,8 @@ mod tests {
 
     #[test]
     fn side_display() {
-        assert_eq!(&Side::Buy.to_string(), "Buy");
-        assert_eq!(&Side::Sell.to_string(), "Sell");
+        assert_eq!(&Buy.to_string(), "Buy");
+        assert_eq!(&Sell.to_string(), "Sell");
     }
 
     #[test]
