@@ -3,7 +3,7 @@
 
 //! lfest - leveraged futures exchange for simulated trading
 
-mod active_limit_orders;
+mod account;
 mod config;
 mod contract_specification;
 mod exchange;
@@ -14,10 +14,7 @@ mod market_update;
 mod mock_exchange;
 mod order_filters;
 mod order_rate_limiter;
-mod position;
-mod position_inner;
 mod risk_engine;
-pub mod sorted_orders;
 #[cfg(test)]
 mod tests;
 #[cfg(feature = "trade_aggregation")]
@@ -38,7 +35,7 @@ pub mod prelude {
     };
 
     pub use crate::{
-        active_limit_orders::ActiveLimitOrders,
+        account::*,
         config::Config,
         contract_specification::*,
         exchange::Exchange,
@@ -49,8 +46,6 @@ pub mod prelude {
             PriceFilter,
             QuantityFilter,
         },
-        position::Position,
-        position_inner::PositionInner,
         types::*,
         utils::{
             NoUserOrderId,

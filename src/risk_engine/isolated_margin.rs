@@ -3,6 +3,7 @@ use tracing::trace;
 
 use super::RiskEngine;
 use crate::{
+    account::Account,
     contract_specification::ContractSpecification,
     market_state::MarketState,
     prelude::{
@@ -17,7 +18,6 @@ use crate::{
         RiskError,
     },
     types::{
-        Account,
         LimitOrder,
         MarginCurrency,
         MarketOrder,

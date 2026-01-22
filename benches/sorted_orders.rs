@@ -18,10 +18,6 @@ use criterion::{
 use lfest::{
     EXPECT_NON_ZERO,
     prelude::*,
-    sorted_orders::{
-        Bids,
-        SortedOrders,
-    },
 };
 use rand::{
     Rng,

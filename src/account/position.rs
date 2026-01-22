@@ -7,15 +7,17 @@ use Position::*;
 use num_traits::Zero;
 use tracing::debug;
 
+use super::{
+    Balances,
+    PositionInner,
+};
 use crate::{
-    position_inner::PositionInner,
     prelude::{
         Currency,
         Mon,
         QuoteCurrency,
     },
     types::{
-        Balances,
         MarginCurrency,
         Side,
     },

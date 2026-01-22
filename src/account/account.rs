@@ -4,13 +4,13 @@ use const_decimal::Decimal;
 use getset::Getters;
 use num::Zero;
 
+use super::Balances;
 use crate::{
     prelude::{
         ActiveLimitOrders,
         Position,
     },
     types::{
-        Balances,
         CancelBy,
         Currency,
         Filled,

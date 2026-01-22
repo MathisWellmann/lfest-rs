@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use getset::CopyGetters;
 use typed_builder::TypedBuilder;
 
-use super::{
+use crate::types::{
     MarginCurrency,
     Mon,
 };

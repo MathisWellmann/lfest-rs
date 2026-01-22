@@ -13,6 +13,10 @@ use tracing::{
 
 use crate::{
     EXPECT_CAPACITY,
+    account::{
+        Account,
+        Balances,
+    },
     config::Config,
     market_state::MarketState,
     order_rate_limiter::OrderRateLimiter,
@@ -29,9 +33,7 @@ use crate::{
         RiskEngine,
     },
     types::{
-        Account,
         AmendLimitOrderError,
-        Balances,
         CancelBy,
         CancelLimitOrderError,
         ExchangeOrderMeta,

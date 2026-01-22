@@ -1,4 +1,5 @@
 use crate::{
+    account::Account,
     market_state::MarketState,
     prelude::{
         Currency,
@@ -8,7 +9,6 @@ use crate::{
         RiskError,
     },
     types::{
-        Account,
         LimitOrder,
         MarginCurrency,
         MarketOrder,
