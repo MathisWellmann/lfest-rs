@@ -63,6 +63,24 @@ fn criterion_benchmark(c: &mut Criterion) {
                 },
             )
         });
+        group.bench_function(format!("with_capacity_{cap}_remove"), |b| {
+            b.iter_with_setup(
+                || {
+                    let mut bids = SortedOrders::<i64, 6, BaseCurrency<i64, 6>, NoUserOrderId, Bids>::with_capacity(
+                        NonZeroU16::new(cap.try_into().unwrap()).expect(EXPECT_NON_ZERO),
+                    );
+                    for i in 0..cap {
+                        let _ = black_box(bids.try_insert(black_box(test_bids[i].clone())));
+                    }
+                    bids
+                },
+                |mut orders| {
+                    for i in 0..cap {
+                        let _ = black_box(orders.remove_order((i as u64).into()));
+                    }
+                },
+            )
+        });
     }
 }
 criterion_group!(benches, criterion_benchmark);
