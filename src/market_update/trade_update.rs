@@ -54,7 +54,7 @@ where
 {
     /// If `true` then the `Trade` update fills the `order`.
     #[inline(always)]
-    fn fills_order<UserOrderIdT: UserOrderId>(
+    pub fn fills_order<UserOrderIdT: UserOrderId>(
         &self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> bool {
