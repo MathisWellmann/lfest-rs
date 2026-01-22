@@ -6,7 +6,10 @@ use std::{
     num::NonZeroU16,
 };
 
-use getset::CopyGetters;
+use getset::{
+    CopyGetters,
+    Getters,
+};
 use num::Zero;
 
 use crate::{
@@ -31,13 +34,15 @@ use crate::{
 /// The best ask price and oldest timestamp order will be at the last index.
 /// The best bid price and oldest timestamp order will be at the last index.
 /// Bids and asks are stored separately, hence the `SideT` generic.
-#[derive(Debug, PartialEq, Eq, CopyGetters)]
+#[derive(Debug, PartialEq, Eq, CopyGetters, Getters)]
 pub struct SortedOrders<I, const D: u8, BaseOrQuote, UserOrderIdT, SideT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     UserOrderIdT: UserOrderId,
 {
+    /// The sorted limit orders.
+    #[getset(get = "pub")]
     orders: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
     #[getset(get_copy = "pub(crate)")]
     notional_sum: BaseOrQuote::PairedCurrency,
