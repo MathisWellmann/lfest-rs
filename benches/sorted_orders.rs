@@ -63,7 +63,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 },
             )
         });
-        group.bench_function(format!("with_capacity_{cap}_remove"), |b| {
+        group.bench_function(format!("with_capacity_{cap}_remove_by_id"), |b| {
             b.iter_with_setup(
                 || {
                     let mut bids = SortedOrders::<i64, 6, BaseCurrency<i64, 6>, NoUserOrderId, Bids>::with_capacity(
@@ -76,7 +76,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 },
                 |mut orders| {
                     for i in 0..cap {
-                        let _ = black_box(orders.remove_order((i as u64).into()));
+                        let _ = black_box(orders.remove_by_id((i as u64).into()));
                     }
                 },
             )

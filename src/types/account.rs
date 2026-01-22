@@ -18,7 +18,6 @@ use crate::{
         MarginCurrency,
         MaxNumberOfActiveOrders,
         Mon,
-        OrderId,
         OrderIdNotFound,
         Pending,
         QuoteCurrency,
@@ -150,9 +149,8 @@ where
     /// panics if the order id was not found.
     #[inline(always)]
     #[must_use]
-    pub fn fill_order(
+    pub fn fill_best(
         &mut self,
-        id: OrderId,
         side: Side,
         filled_quantity: BaseOrQuote,
         limit_price: QuoteCurrency<I, D>,
@@ -161,7 +159,7 @@ where
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> {
         self.change_position(filled_quantity, limit_price, side, fee);
         self.active_limit_orders
-            .fill_order(id, side, filled_quantity, ts_ns)
+            .fill_best(side, filled_quantity, ts_ns)
     }
 
     /// Remove a limit order.

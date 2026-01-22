@@ -295,7 +295,7 @@ where
             }
         }
 
-        self.append_limit_order(order.clone(), marketable)?;
+        self.append_limit_order(order.clone())?;
 
         Ok(order)
     }
@@ -364,16 +364,7 @@ where
     fn append_limit_order(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        marketable: bool,
     ) -> Result<(), MaxNumberOfActiveOrders> {
-        trace!("append_limit_order: order: {order}, marketable: {marketable}");
-        trace!(
-            "active_limit_orders: {}, market_state: {}, position: {}",
-            self.account.active_limit_orders(),
-            self.market_state,
-            self.account.position(),
-        );
-
         self.account.try_insert_order(order)?;
         debug_assert!(if self.account.active_limit_orders().is_empty() {
             self.account.order_margin().is_zero()
@@ -435,7 +426,7 @@ where
 
         if market_update.can_fill_bids() {
             // peek at the best bid order.
-            while let Some(order) = self.account.active_limit_orders().peek_best_bid() {
+            while let Some(order) = self.account.active_limit_orders().best_bid() {
                 if let Some((filled_qty, exhausted)) = market_update.limit_order_filled(order) {
                     let limit_order_update = self.fill_limit_order(
                         order.clone(),
@@ -456,7 +447,7 @@ where
         }
 
         if market_update.can_fill_asks() {
-            while let Some(order) = self.account.active_limit_orders().peek_best_ask() {
+            while let Some(order) = self.account.active_limit_orders().best_ask() {
                 if let Some((filled_qty, exhausted)) = market_update.limit_order_filled(order) {
                     let limit_order_update = self.fill_limit_order(
                         order.clone(),
@@ -510,7 +501,7 @@ where
 
         match self
             .account
-            .fill_order(order.id(), side, filled_quantity, limit_price, fee, ts_ns)
+            .fill_best(side, filled_quantity, limit_price, fee, ts_ns)
         {
             Some(order_after_fill) => LimitOrderFill::FullyFilled {
                 filled_quantity,

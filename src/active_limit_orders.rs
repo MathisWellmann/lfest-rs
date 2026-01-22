@@ -6,13 +6,15 @@ use num::{
     One,
     Zero,
 };
-use tracing::{
-    debug,
-    trace,
-};
+use tracing::debug;
 
 use crate::{
     prelude::Position,
+    sorted_orders::{
+        Asks,
+        Bids,
+        SortedOrders,
+    },
     types::{
         CancelBy,
         Currency,
@@ -41,69 +43,22 @@ use crate::{
 /// - `D`: The constant decimal precision of the currency.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 /// - `UserOrderIdT`: The type of user order id to use. Set to `()` if you don't need one.
-#[derive(Debug, Default, PartialEq, Eq, Getters)]
+#[derive(Clone, Debug, PartialEq, Eq, Getters)]
 pub struct ActiveLimitOrders<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
     UserOrderIdT: UserOrderId,
 {
-    bids_notional: BaseOrQuote::PairedCurrency,
-    asks_notional: BaseOrQuote::PairedCurrency,
-
-    /// Stores all the active buy orders in ascending price, time priority.
-    /// Best bid is the last element.
+    /// Stores all the active buy orders in ascending price priority.
+    /// Best bid with oldest timestamp is the last element.
     #[getset(get = "pub")]
-    bids: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
+    bids: SortedOrders<I, D, BaseOrQuote, UserOrderIdT, Bids>,
 
-    /// Stores all the active sell orders in ascending price, time priority.
-    /// Best ask is the first element.
+    /// Stores all the active sell orders in descending price priority.
+    /// Best ask with oldest timestamp is the last element.
     #[getset(get = "pub")]
-    asks: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
-}
-
-/// A clone impl which retains the capacity as we rely on that assumption downstream.
-impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Clone
-    for ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>
-where
-    I: Mon<D>,
-    BaseOrQuote: Currency<I, D>,
-    UserOrderIdT: UserOrderId,
-{
-    fn clone(&self) -> Self {
-        let mut bids = self.bids.clone();
-        bids.reserve_exact(self.bids.capacity() - self.bids.len());
-        assert_eq!(bids.capacity(), self.bids.capacity());
-        let mut asks = self.asks.clone();
-        asks.reserve_exact(self.asks.capacity() - self.asks.len());
-        assert_eq!(asks.capacity(), self.asks.capacity());
-        Self {
-            bids_notional: self.bids_notional,
-            asks_notional: self.asks_notional,
-            bids,
-            asks,
-        }
-    }
-}
-
-// TODO: remove impl
-impl<I, const D: u8, BaseOrQuote, UserOrderIdT> std::fmt::Display
-    for ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>
-where
-    I: Mon<D>,
-    BaseOrQuote: Currency<I, D>,
-    UserOrderIdT: UserOrderId,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "ActiveLimitOrders:")?;
-        for order in self.bids.iter() {
-            writeln!(f, "{order}")?;
-        }
-        for order in self.asks.iter() {
-            writeln!(f, "{order}")?;
-        }
-        Ok(())
-    }
+    asks: SortedOrders<I, D, BaseOrQuote, UserOrderIdT, Asks>,
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>
@@ -115,13 +70,10 @@ where
 {
     /// Create a new order book instance with a maximum capacity for bids and asks.
     /// The `max_active_orders` must be non zero as we need at least space for one limit order.
-    pub(crate) fn with_capacity(max_active_orders: NonZeroU16) -> Self {
-        let cap: usize = max_active_orders.get().into();
+    pub(crate) fn with_capacity(max_active_orders_per_side: NonZeroU16) -> Self {
         Self {
-            bids: Vec::with_capacity(cap),
-            bids_notional: Zero::zero(),
-            asks: Vec::with_capacity(cap),
-            asks_notional: Zero::zero(),
+            bids: SortedOrders::with_capacity(max_active_orders_per_side),
+            asks: SortedOrders::with_capacity(max_active_orders_per_side),
         }
     }
 
@@ -137,124 +89,54 @@ where
         self.bids.is_empty() && self.asks.is_empty()
     }
 
-    /// Peek at the best bid limit order.
+    /// The best bid has the highest limit price of all buy orders and the oldest timestamp.
     #[inline(always)]
-    pub(crate) fn peek_best_bid(
+    #[must_use]
+    pub fn best_bid(
         &self,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        // The last element in `bids` has the highest price and oldest timestamp.
-        let opt_out = self.bids().last();
-
-        // Make sure bids are sorted by time and price priority.
-        debug_assert!(
-            if let Some(order) = opt_out {
-                self.bids
-                    .iter()
-                    .all(|bid| order.limit_price() >= bid.limit_price())
-            } else {
-                true
-            },
-            "The order {opt_out:?} must be the best bid in bids {:?}",
-            self.bids
-        );
-
-        opt_out
+        self.bids.best()
     }
 
-    /// Peek at the best ask limit order.
+    /// The best ask has the lowest limit price of all sell orders and the oldest timestamp.
     #[inline(always)]
-    pub(crate) fn peek_best_ask(
+    #[must_use]
+    pub fn best_ask(
         &self,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        // The first element in `asks` has the lowest price and oldest timestamp.
-        let opt_out = self.asks().first();
-
-        // Make sure asks are sorted by time and price priority.
-        debug_assert!(
-            if let Some(order) = opt_out {
-                self.asks
-                    .iter()
-                    .all(|ask| order.limit_price() <= ask.limit_price())
-            } else {
-                true
-            },
-            "The order {opt_out:?} must be the best ask in asks {:?}",
-            self.asks
-        );
-
-        opt_out
+        self.asks.best()
     }
 
     /// Try to insert a new `LimitOrder` into the order book.
     /// Returns an error if the maximum capacity is reached.
+    #[inline(always)]
     pub(crate) fn try_insert(
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Result<(), MaxNumberOfActiveOrders> {
-        use std::cmp::Ordering::*;
-
-        let side = order.side();
-        let notional = order.notional();
-        match side {
-            Buy => {
-                if self.bids.len() >= self.bids.capacity() {
-                    debug_assert!(self.bids.capacity() > 0);
-                    return Err(MaxNumberOfActiveOrders(
-                        self.bids.capacity().try_into().expect("Will not truncate"),
-                    ));
-                }
-                // Find location to insert so that bids remain ordered.
-                let idx = self
-                    .bids
-                    .iter()
-                    // TODO: this sorting means that the `last` value actually has the higher timestamp if multiple bids are on the same price level.
-                    // Ideally we'd want the highest price level and the oldest order at the last vector position.
-                    // Fix this by creating `SortedOrders` with a custom sorting rule and tests.
-                    .position(|bid| matches!(order.cmp(bid), Less | Equal))
-                    .unwrap_or(self.bids.len());
-                trace!("insert bid {order} at idx {idx}, bids: {:?}", self.bids);
-                self.bids.insert(idx, order)
-            }
-            Sell => {
-                if self.asks.len() >= self.asks.capacity() {
-                    debug_assert!(self.asks.capacity() > 0);
-                    return Err(MaxNumberOfActiveOrders(
-                        self.bids.capacity().try_into().expect("Will not truncate"),
-                    ));
-                }
-                let idx = self
-                    .asks
-                    .iter()
-                    .position(|bid| matches!(order.cmp(bid), Less | Equal))
-                    .unwrap_or(self.asks.len());
-                trace!("insert ask {order} at idx {idx}, asks: {:?}", self.asks);
-                self.asks.insert(idx, order)
-            }
+        match order.side() {
+            Buy => self.bids.try_insert(order),
+            Sell => self.asks.try_insert(order),
         }
-
-        match side {
-            Buy => self.bids_notional += notional,
-            Sell => self.asks_notional += notional,
-        }
-
-        Ok(())
     }
 
     #[inline(always)]
+    #[must_use]
     pub(crate) fn order_margin(
         &self,
         init_margin_req: Decimal<I, D>,
         position: &Position<I, D, BaseOrQuote>,
     ) -> BaseOrQuote::PairedCurrency {
         order_margin(
-            self.bids_notional,
-            self.asks_notional,
+            self.bids.notional_sum(),
+            self.asks.notional_sum(),
             init_margin_req,
             position,
         )
     }
 
     /// Get the order margin if a new order were to be added.
+    #[must_use]
     pub(crate) fn order_margin_with_order(
         &self,
         new_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
@@ -264,8 +146,8 @@ where
         assert2::debug_assert!(init_margin_req > Decimal::zero());
         assert2::debug_assert!(init_margin_req <= Decimal::one());
 
-        let mut buy_notional = self.bids_notional;
-        let mut sell_notional = self.asks_notional;
+        let mut buy_notional = self.bids.notional_sum();
+        let mut sell_notional = self.asks.notional_sum();
         let new_notional = new_order.notional();
         match new_order.side() {
             Buy => buy_notional += new_notional,
@@ -278,28 +160,30 @@ where
     /// Get a `LimitOrder` by the given `OrderId` if any.
     /// Optimized to be fast for small number of active limit orders.
     #[inline(always)]
+    #[must_use]
     pub fn get_by_id(
         &self,
         order_id: OrderId,
         side: Side,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         match side {
-            Buy => self.bids.iter().find(|order| order.id() == order_id),
-            Sell => self.asks.iter().find(|order| order.id() == order_id),
+            Buy => self.bids.get_by_id(order_id),
+            Sell => self.asks.get_by_id(order_id),
         }
     }
 
     /// Remove an active `LimitOrder` based on its order id.
     #[inline(always)]
+    #[must_use]
     fn remove_by_id(
         &mut self,
         id: OrderId,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        if let Some(pos) = self.bids.iter_mut().position(|order| order.id() == id) {
-            return Some(self.bids.remove(pos));
+        if let Some(order) = self.bids.remove_by_id(id) {
+            return Some(order);
         }
-        if let Some(pos) = self.asks.iter_mut().position(|order| order.id() == id) {
-            return Some(self.asks.remove(pos));
+        if let Some(order) = self.asks.remove_by_id(id) {
+            return Some(order);
         };
         None
     }
@@ -310,19 +194,11 @@ where
         &mut self,
         uid: UserOrderIdT,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        if let Some(pos) = self
-            .bids
-            .iter_mut()
-            .position(|order| order.user_order_id() == uid)
-        {
-            return Some(self.bids.remove(pos));
+        if let Some(order) = self.bids.remove_by_user_id(uid) {
+            return Some(order);
         }
-        if let Some(pos) = self
-            .asks
-            .iter_mut()
-            .position(|order| order.user_order_id() == uid)
-        {
-            return Some(self.asks.remove(pos));
+        if let Some(order) = self.asks.remove_by_user_id(uid) {
+            return Some(order);
         };
         None
     }
@@ -338,93 +214,28 @@ where
     > {
         debug!("remove_limit_order {by:?}");
         use CancelBy::*;
-        let removed_order = match by {
+        match by {
             OrderId(order_id) => self
                 .remove_by_id(order_id)
-                .ok_or(OrderIdNotFound::OrderId(order_id))?,
+                .ok_or(OrderIdNotFound::OrderId(order_id)),
             UserOrderId(user_order_id) => self
                 .remove_by_user_id(user_order_id)
-                .ok_or(OrderIdNotFound::UserOrderId(user_order_id))?,
-        };
-
-        match removed_order.side() {
-            Buy => {
-                self.bids_notional -= removed_order.notional();
-                assert2::debug_assert!(self.bids_notional >= Zero::zero());
-            }
-            Sell => {
-                self.asks_notional -= removed_order.notional();
-                assert2::debug_assert!(self.asks_notional >= Zero::zero());
-            }
+                .ok_or(OrderIdNotFound::UserOrderId(user_order_id)),
         }
-
-        Ok(removed_order)
     }
 
     /// fill an existing limit order, reduces order margin.
-    pub(crate) fn fill_order(
+    #[inline]
+    pub(crate) fn fill_best(
         &mut self,
-        id: OrderId,
         side: Side,
         filled_quantity: BaseOrQuote,
         ts_ns: TimestampNs,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> {
-        // TODO: deduplicate code with a macro or with new `SortetOrders` idee
+        // TODO: deduplicate code with a macro or with new `SortedOrders` idea
         match side {
-            Buy => {
-                // The filled order must hit the one sorted by time and price priority, so no need so iterate the orders.
-                let active_order = self.bids.last_mut().expect("Has best bid order");
-                debug_assert_eq!(
-                    active_order.id(),
-                    id,
-                    "The filled order must be the one sorted by time and price."
-                );
-                let old_notional = active_order.notional();
-
-                active_order.fill(filled_quantity);
-                let new_notional = active_order.notional();
-
-                let notional_delta = new_notional - old_notional;
-                assert2::debug_assert!(
-                    notional_delta < Zero::zero(),
-                    "Filling an order reduces the remaining notional value"
-                );
-                self.bids_notional += notional_delta;
-                assert2::debug_assert!(self.bids_notional >= Zero::zero());
-
-                if active_order.remaining_quantity().is_zero() {
-                    Some(self.bids.pop().expect("Has best bid").into_filled(ts_ns))
-                } else {
-                    None
-                }
-            }
-            Sell => {
-                // The filled order must hit the one sorted by time and price priority, so no need so iterate the orders.
-                let active_order = self.asks.first_mut().expect("Has best bid order");
-                debug_assert_eq!(
-                    active_order.id(),
-                    id,
-                    "The filled order must be the one sorted by time and price."
-                );
-                let old_notional = active_order.notional();
-
-                active_order.fill(filled_quantity);
-                let new_notional = active_order.notional();
-
-                let notional_delta = new_notional - old_notional;
-                assert2::debug_assert!(
-                    notional_delta < Zero::zero(),
-                    "Filling an order reduces the remaining notional value"
-                );
-                self.asks_notional += notional_delta;
-                assert2::debug_assert!(self.asks_notional >= Zero::zero());
-
-                if active_order.remaining_quantity().is_zero() {
-                    Some(self.asks.remove(0).into_filled(ts_ns))
-                } else {
-                    None
-                }
-            }
+            Buy => self.bids.fill_best(filled_quantity, ts_ns),
+            Sell => self.asks.fill_best(filled_quantity, ts_ns),
         }
     }
 }
@@ -537,49 +348,6 @@ mod tests {
     }
 
     #[test]
-    fn active_limit_orders_clone() {
-        let cap = 10;
-        let mut book =
-            ActiveLimitOrders::<i64, 5, BaseCurrency<i64, 5>, NoUserOrderId>::with_capacity(
-                NonZeroU16::new(10).unwrap(),
-            );
-        assert_eq!(book.bids().len(), 0);
-        assert_eq!(book.asks().len(), 0);
-        assert_eq!(book.bids().capacity(), cap);
-        assert_eq!(book.asks().capacity(), cap);
-
-        let order = LimitOrder::new(
-            Buy,
-            QuoteCurrency::<i64, 5>::new(100, 0),
-            BaseCurrency::new(5, 0),
-        )
-        .unwrap();
-        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
-        let order = order.into_pending(meta);
-        book.try_insert(order.clone()).unwrap();
-        book = book.clone();
-        assert_eq!(book.bids().len(), 1);
-        assert_eq!(book.asks().len(), 0);
-        assert_eq!(book.bids().capacity(), cap);
-        assert_eq!(book.asks().capacity(), cap);
-
-        let order = LimitOrder::new(
-            Sell,
-            QuoteCurrency::<i64, 5>::new(100, 0),
-            BaseCurrency::new(5, 0),
-        )
-        .unwrap();
-        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
-        let order = order.into_pending(meta);
-        book.try_insert(order.clone()).unwrap();
-        book = book.clone();
-        assert_eq!(book.bids().len(), 1);
-        assert_eq!(book.asks().len(), 1);
-        assert_eq!(book.bids().capacity(), cap);
-        assert_eq!(book.asks().capacity(), cap);
-    }
-
-    #[test]
     fn active_limit_orders_get_by_id() {
         let mut book =
             ActiveLimitOrders::<i64, 5, BaseCurrency<i64, 5>, NoUserOrderId>::with_capacity(
@@ -667,9 +435,6 @@ mod tests {
             let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
             let order = order.into_pending(meta);
             book.try_insert(order.clone()).unwrap();
-            let mut sorted = book.bids.clone();
-            sorted.sort();
-            assert_eq!(sorted, book.bids);
         }
         assert_eq!(book.num_active(), 5);
 
@@ -683,34 +448,10 @@ mod tests {
             let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
             let order = order.into_pending(meta);
             book.try_insert(order.clone()).unwrap();
-            let mut sorted = book.asks.clone();
-            sorted.sort();
-            assert_eq!(sorted, book.asks);
         }
         assert_eq!(book.num_active(), 10);
     }
 
-    #[test]
-    #[tracing_test::traced_test]
-    fn active_limit_orders_display() {
-        let mut book = ActiveLimitOrders::<i64, 5, _, NoUserOrderId>::with_capacity(
-            NonZeroU16::new(3).unwrap(),
-        );
-        let order = LimitOrder::new(
-            Buy,
-            QuoteCurrency::<i64, 5>::new(100, 0),
-            BaseCurrency::new(5, 0),
-        )
-        .unwrap();
-        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
-        let order = order.into_pending(meta);
-        book.try_insert(order.clone()).unwrap();
-
-        assert_eq!(
-            &book.to_string(),
-            "ActiveLimitOrders:\nuser_id: NoUserOrderId, limit Buy 5.00000 Base @ 100.00000 Quote, state: Pending { meta: ExchangeOrderMeta { id: OrderId(0), ts_exchange_received: TimestampNs(0) }, filled_quantity: Unfilled }\n"
-        );
-    }
     #[test]
     fn order_margin_assert_limit_order_reduces_qty() {
         let new_active_order = LimitOrder::new(
@@ -983,7 +724,7 @@ mod tests {
         order.fill(filled_qty);
         let remaining_qty = order.remaining_quantity();
         assert!(
-            book.fill_order(order.id(), order.side(), order.filled_quantity(), 0.into())
+            book.fill_best(order.side(), order.filled_quantity(), 0.into())
                 .is_none()
         );
         assert_eq!(book.num_active(), 1);

@@ -71,8 +71,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 },
                 |mut account| {
                     for order in orders.iter() {
-                        let _ = account.fill_order(
-                            black_box(order.id()),
+                        let _ = account.fill_best(
                             black_box(order.side()),
                             black_box(order.filled_quantity()),
                             black_box(order.limit_price()),

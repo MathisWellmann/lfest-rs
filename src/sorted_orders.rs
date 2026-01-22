@@ -14,6 +14,7 @@ use crate::{
     EXPECT_CAPACITY,
     types::{
         Currency,
+        Filled,
         LimitOrder,
         MarginCurrency,
         MaxNumberOfActiveOrders,
@@ -21,11 +22,14 @@ use crate::{
         OrderId,
         Pending,
         Side,
+        TimestampNs,
         UserOrderId,
     },
 };
 
+// TODO: move `Bids`,`Asks` and `Cmp` to its own file.
 /// zero-sized marker struct indicating sorting for bids.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Bids;
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Cmp<I, D, BaseOrQuote, UserOrderIdT> for Bids
@@ -41,6 +45,7 @@ where
 
     /// New orders which have a higher price will come later in the vector.
     /// Older orders at the same price level come later in the vector.
+    #[inline(always)]
     fn cmp(
         new_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         existing_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
@@ -66,6 +71,7 @@ where
 }
 
 /// zero-sized marker struct indicating sorting for asks.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Asks;
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Cmp<I, D, BaseOrQuote, UserOrderIdT> for Asks
@@ -81,7 +87,7 @@ where
 
     /// New orders which have a lower price will come later in the vector.
     /// Older orders at the same price level come later in the vector.
-    #[inline]
+    #[inline(always)]
     fn cmp(
         new_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         existing_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
@@ -140,7 +146,7 @@ where
     UserOrderIdT: UserOrderId,
 {
     orders: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
-    #[getset(get = "pub(crate)")]
+    #[getset(get_copy = "pub(crate)")]
     notional_sum: BaseOrQuote::PairedCurrency,
     _side: PhantomData<SideT>,
 }
@@ -204,23 +210,78 @@ where
         self.orders.last()
     }
 
+    /// Fill the best limit order,
+    /// popping it if fully filled
+    /// and returning it in the `Filled` state.
+    #[inline]
+    #[must_use]
+    pub(crate) fn fill_best(
+        &mut self,
+        filled_quantity: BaseOrQuote,
+        ts_ns: TimestampNs,
+    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> {
+        self.orders
+            .pop_if(|order| {
+                let old_notional = order.notional();
+                order.fill(filled_quantity);
+                let new_notional = order.notional();
+
+                let notional_delta = new_notional - old_notional;
+                assert2::debug_assert!(
+                    notional_delta < Zero::zero(),
+                    "Filling and order reduces the remaining notional value"
+                );
+                self.notional_sum += notional_delta;
+                assert2::debug_assert!(self.notional_sum >= Zero::zero());
+
+                order.remaining_quantity().is_zero()
+            })
+            .and_then(|order| Some(order.into_filled(ts_ns)))
+    }
+
+    /// Get a `LimitOrder` by the given `OrderId` if any.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn best_mut(
+    pub(crate) fn get_by_id(
+        &self,
+        order_id: OrderId,
+    ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+        self.orders.iter().find(|order| order.id() == order_id)
+    }
+
+    /// Remove a limit order based on its `OrderId`
+    #[inline(always)]
+    #[must_use]
+    pub fn remove_by_id(
         &mut self,
-    ) -> Option<&mut LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        self.orders.last_mut()
+        order_id: OrderId,
+    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+        self.orders
+            .iter()
+            .position(|order| order.id() == order_id)
+            .and_then(|idx| {
+                let order = self.orders.remove(idx);
+                self.notional_sum -= order.notional();
+                assert2::debug_assert!(self.notional_sum >= Zero::zero());
+                Some(order)
+            })
     }
 
     #[inline(always)]
     #[must_use]
-    pub(crate) fn pop_best(
+    pub(crate) fn remove_by_user_id(
         &mut self,
+        uid: UserOrderIdT,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        self.orders.pop().and_then(|order| {
-            self.notional_sum -= order.notional();
-            Some(order)
-        })
+        self.orders
+            .iter()
+            .position(|order| order.user_order_id() == uid)
+            .and_then(|idx| {
+                let order = self.orders.remove(idx);
+                self.notional_sum -= order.notional();
+                assert2::debug_assert!(self.notional_sum >= Zero::zero());
+                Some(order)
+            })
     }
 
     /// Insert a new limit orders if there is enough capacity,
@@ -243,42 +304,12 @@ where
         }
         self.notional_sum += order.notional();
 
-        // Find location to insert so that orders remain ordered.
-        /*
-        use std::cmp::Ordering::*;
-        let idx = self
-            .orders
-            .iter()
-            .position(|existing| matches!(SideT::cmp(existing, &order), Less | Equal))
-            .unwrap_or(self.orders.len());
-        self.orders.insert(idx, order);
-        */
         self.orders
             .push_within_capacity(order)
             .expect(EXPECT_CAPACITY);
         self.orders.sort_by(|a, b| SideT::cmp(a, b));
 
         Ok(())
-    }
-
-    /// Remove a limit order by its id.
-    /// The ordering is preserved by this operation.
-    /// The `notional_sum` is decremented.
-    #[inline]
-    #[must_use]
-    pub fn remove_order(
-        &mut self,
-        id: OrderId,
-    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        self.orders
-            .iter()
-            .position(|order| order.id() == id)
-            .and_then(|idx| {
-                let order = self.orders.remove(idx);
-                self.notional_sum -= order.notional();
-                assert2::debug_assert!(self.notional_sum >= Zero::zero());
-                Some(order)
-            })
     }
 }
 
@@ -313,14 +344,13 @@ mod tests {
         )
         .unwrap();
         let meta = ExchangeOrderMeta::new(0.into(), 0.into());
-        let mut pending_0 = order_0.into_pending(meta);
+        let pending_0 = order_0.into_pending(meta);
         bids.try_insert(pending_0.clone()).unwrap();
         assert_eq!(bids.notional_sum, QuoteCurrency::new(100, 0));
         assert_eq!(bids.orders.len(), 1);
         assert_eq!(bids.len(), 1);
         assert!(!bids.is_empty());
         assert_eq!(bids.best(), Some(&pending_0));
-        assert_eq!(bids.best_mut(), Some(&mut pending_0));
 
         let order_1 = LimitOrder::new(
             Side::Buy,
@@ -353,7 +383,12 @@ mod tests {
         assert!(!bids.is_empty());
         assert_eq!(bids.best(), Some(&pending_2));
 
-        assert_eq!(bids.pop_best(), Some(pending_2.clone()));
+        assert_eq!(
+            bids.fill_best(BaseCurrency::new(1, 0), 3.into())
+                .unwrap()
+                .id(),
+            2.into()
+        );
         assert_eq!(bids.notional_sum, QuoteCurrency::new(199, 0));
         assert_eq!(bids.orders.len(), 2);
         assert_eq!(bids.len(), 2);
@@ -438,7 +473,12 @@ mod tests {
         assert!(!asks.is_empty());
         assert_eq!(asks.best(), Some(&pending_2));
 
-        assert_eq!(asks.pop_best(), Some(pending_2));
+        assert_eq!(
+            asks.fill_best(BaseCurrency::new(1, 0), 3.into())
+                .unwrap()
+                .id(),
+            2.into()
+        );
         assert_eq!(asks.notional_sum, QuoteCurrency::new(201, 0));
         assert_eq!(asks.orders.len(), 2);
         assert_eq!(asks.len(), 2);
@@ -545,8 +585,8 @@ mod tests {
 
         for i in 0..cap {
             let i = i as u64;
-            assert_eq!(bids.remove_order(i.into()).unwrap().id(), i.into());
-            assert!(bids.remove_order(i.into()).is_none());
+            assert_eq!(bids.remove_by_id(i.into()).unwrap().id(), i.into());
+            assert!(bids.remove_by_id(i.into()).is_none());
             assert_eq!(
                 bids.notional_sum,
                 QuoteCurrency::new((100 * cap as i64) - 100 * (i as i64 + 1), 0)
