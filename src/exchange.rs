@@ -436,7 +436,6 @@ where
         if market_update.can_fill_bids() {
             // peek at the best bid order.
             while let Some(order) = self.account.active_limit_orders().peek_best_bid() {
-                // TODO: if some quantity was filled, mutate `market_update` to reflect the reduced liquidity so it does not fill more orders than possible.
                 if let Some((filled_qty, exhausted)) = market_update.limit_order_filled(order) {
                     let limit_order_update = self.fill_limit_order(
                         order.clone(),
@@ -458,7 +457,6 @@ where
 
         if market_update.can_fill_asks() {
             while let Some(order) = self.account.active_limit_orders().peek_best_ask() {
-                // TODO: if some quantity was filled, mutate `market_update` to reflect the reduced liquidity so it does not fill more orders than possible.
                 if let Some((filled_qty, exhausted)) = market_update.limit_order_filled(order) {
                     let limit_order_update = self.fill_limit_order(
                         order.clone(),
