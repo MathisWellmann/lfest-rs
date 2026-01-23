@@ -125,8 +125,9 @@ where
 {
     type PairedCurrency = BaseCurrency<I, D>;
 
+    #[inline]
     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self {
-        assert2::debug_assert!(price_per_unit > Zero::zero());
+        assert2::debug_assert!(price_per_unit >= Zero::zero());
         QuoteCurrency(*units.as_ref() * *price_per_unit.as_ref())
     }
 }

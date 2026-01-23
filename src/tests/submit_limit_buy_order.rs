@@ -24,7 +24,7 @@ fn submit_limit_buy_order_no_position() {
     let qty = BaseCurrency::new(5, 0);
     let order = LimitOrder::new(Side::Buy, limit_price, qty).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
-    assert_eq!(exchange.account().position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::default());
     let fee = QuoteCurrency::convert_from(qty, limit_price) * *test_fee_maker().as_ref();
     assert_eq!(
         exchange.account().balances(),
@@ -77,7 +77,7 @@ fn submit_limit_buy_order_no_position() {
     );
     assert_eq!(
         exchange.account().position(),
-        &Position::Long(PositionInner::new(qty, limit_price))
+        &Position::new(qty, limit_price).unwrap()
     );
     assert_eq!(
         exchange.account().balances(),
@@ -107,7 +107,7 @@ fn submit_limit_buy_order_no_position() {
     exchange.submit_limit_order(order.clone()).unwrap();
     assert_eq!(
         exchange.account().position(),
-        &Position::Long(PositionInner::new(qty, limit_price))
+        &Position::new(qty, limit_price).unwrap()
     );
     assert_eq!(
         exchange.account().balances(),
@@ -157,7 +157,7 @@ fn submit_limit_buy_order_no_position() {
             order_after_fill: order.into_filled(3.into())
         }]
     );
-    assert_eq!(exchange.account().position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::default());
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
@@ -257,10 +257,7 @@ fn submit_limit_buy_order_with_long() {
     let fee = QuoteCurrency::convert_from(qty, ask) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Long(PositionInner::new(
-            BaseCurrency::new(9, 0),
-            QuoteCurrency::new(100, 0),
-        )),
+        Position::new(BaseCurrency::new(9, 0), QuoteCurrency::new(100, 0),).unwrap(),
     );
     assert_eq!(
         exchange.account().balances(),
@@ -332,7 +329,7 @@ fn submit_limit_buy_order_with_long() {
         }]
     );
 
-    assert_eq!(exchange.account().position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::default());
 }
 
 #[test]
@@ -356,7 +353,7 @@ fn submit_limit_buy_order_with_short() {
     let fee = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Short(PositionInner::new(qty, entry_price,))
+        Position::new(-qty, entry_price).unwrap()
     );
     assert_eq!(
         exchange.account().balances(),
@@ -417,7 +414,7 @@ fn submit_limit_buy_order_with_short() {
         }]
     );
 
-    assert_eq!(exchange.account().position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::default());
 }
 
 // test rejection if the limit price >= ask

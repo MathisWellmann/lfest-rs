@@ -52,7 +52,7 @@ fn submit_market_buy_order_no_position() {
     let fee = notional * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Long(PositionInner::new(qty, entry_price))
+        Position::new(qty, entry_price).unwrap()
     );
     assert_eq!(
         exchange.account().balances(),
@@ -95,7 +95,7 @@ fn submit_market_buy_order_with_long_position() {
     let fee0 = QuoteCurrency::new(3, 1);
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Long(PositionInner::new(qty, entry_price,))
+        Position::new(qty, entry_price).unwrap()
     );
     assert!(exchange.account().active_limit_orders().is_empty());
     assert_eq!(
@@ -133,10 +133,7 @@ fn submit_market_buy_order_with_long_position() {
     assert!(exchange.account().order_margin().is_zero());
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Long(PositionInner::new(
-            BaseCurrency::new(9, 0),
-            QuoteCurrency::new(100, 0),
-        ))
+        Position::new(BaseCurrency::new(9, 0), QuoteCurrency::new(100, 0)).unwrap()
     );
     assert_eq!(
         exchange.account().available_balance(),
@@ -182,10 +179,7 @@ fn submit_market_buy_order_with_short_position() {
     );
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Short(PositionInner::new(
-            BaseCurrency::new(9, 0),
-            QuoteCurrency::new(100, 0),
-        ))
+        Position::new(BaseCurrency::new(-9, 0), QuoteCurrency::new(100, 0)).unwrap()
     );
     assert_eq!(
         exchange.account().active_limit_orders(),
@@ -197,7 +191,7 @@ fn submit_market_buy_order_with_short_position() {
     let fee1 = QuoteCurrency::convert_from(order.quantity(), exchange.market_state().ask())
         * *test_fee_taker().as_ref();
     exchange.submit_market_order(order).unwrap();
-    assert_eq!(exchange.account().position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::default());
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
@@ -234,7 +228,7 @@ fn submit_market_buy_order_turnaround_short() {
     assert!(exchange.account().active_limit_orders().is_empty());
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Short(PositionInner::new(qty, entry_price))
+        Position::new(-qty, entry_price).unwrap()
     );
     assert_eq!(
         exchange.account().balances(),
@@ -262,7 +256,7 @@ fn submit_market_buy_order_turnaround_short() {
     assert!(exchange.account().active_limit_orders().is_empty());
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Long(PositionInner::new(BaseCurrency::new(9, 0), entry_price))
+        Position::new(BaseCurrency::new(9, 0), entry_price).unwrap()
     );
     assert_eq!(
         exchange.account().balances(),

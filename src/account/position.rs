@@ -1,16 +1,10 @@
-use std::{
-    cmp::Ordering,
-    ops::Neg,
+use getset::{
+    CopyGetters,
+    Getters,
 };
-
-use Position::*;
 use num_traits::Zero;
-use tracing::debug;
 
-use super::{
-    Balances,
-    PositionInner,
-};
+use super::Balances;
 use crate::{
     prelude::{
         Currency,
@@ -24,19 +18,19 @@ use crate::{
 };
 
 /// A futures position can be one of three variants.
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub enum Position<I, const D: u8, BaseOrQuote>
+#[derive(Debug, Clone, Default, Eq, PartialEq, Getters, CopyGetters)]
+pub struct Position<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
 {
-    /// No position present.
-    #[default]
-    Neutral,
-    /// A position in the long direction.
-    Long(PositionInner<I, D, BaseOrQuote>),
-    /// A position in the short direction.
-    Short(PositionInner<I, D, BaseOrQuote>),
+    /// The number of futures contracts making up the position.
+    #[getset(get_copy = "pub")]
+    quantity: BaseOrQuote,
+
+    /// The average price at which this position was entered at.
+    #[getset(get_copy = "pub")]
+    entry_price: QuoteCurrency<I, D>,
 }
 
 impl<I, const D: u8, BaseOrQuote> Position<I, D, BaseOrQuote>
@@ -45,6 +39,20 @@ where
     BaseOrQuote: Currency<I, D>,
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
+    /// Create a new Position instance.
+    /// The `entry_price` must be positive.
+    #[inline]
+    #[must_use]
+    pub fn new(quantity: BaseOrQuote, entry_price: QuoteCurrency<I, D>) -> Option<Self> {
+        if entry_price <= Zero::zero() {
+            return None;
+        }
+        Some(Self {
+            quantity,
+            entry_price,
+        })
+    }
+
     /// Return the positions unrealized profit and loss.
     #[must_use]
     #[inline(always)]
@@ -55,47 +63,28 @@ where
     ) -> BaseOrQuote::PairedCurrency {
         assert2::debug_assert!(bid > Zero::zero());
         assert2::debug_assert!(ask > Zero::zero());
-        match self {
-            Neutral => BaseOrQuote::PairedCurrency::zero(),
-            Long(inner) => inner.unrealized_pnl(bid),
-            Short(inner) => inner.unrealized_pnl(ask).neg(),
-        }
-    }
 
-    /// The quantity of the position, is negative when short.
-    #[must_use]
-    #[inline(always)]
-    pub fn quantity(&self) -> BaseOrQuote {
-        match self {
-            Neutral => BaseOrQuote::zero(),
-            Long(inner) => inner.quantity(),
-            Short(inner) => inner.quantity().neg(),
-        }
-    }
-
-    /// The entry price of the position which is the total cost of the position relative to its quantity.
-    #[must_use]
-    #[inline(always)]
-    pub fn entry_price(&self) -> QuoteCurrency<I, D> {
-        match self {
-            Neutral => QuoteCurrency::zero(),
-            Long(inner) => inner.entry_price(),
-            Short(inner) => inner.entry_price(),
+        use std::cmp::Ordering::*;
+        match self.quantity.cmp(&Zero::zero()) {
+            Less => BaseOrQuote::PairedCurrency::pnl(self.entry_price(), ask, self.quantity),
+            Equal => Zero::zero(),
+            Greater => BaseOrQuote::PairedCurrency::pnl(self.entry_price(), bid, self.quantity),
         }
     }
 
     /// The total value of the position which is composed of quantity and avg. entry price.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn notional(&self) -> BaseOrQuote::PairedCurrency {
-        match self {
-            Neutral => BaseOrQuote::PairedCurrency::zero(),
-            Long(inner) => inner.notional(),
-            Short(inner) => inner.notional(),
+        if self.entry_price.is_zero() {
+            Zero::zero()
+        } else {
+            BaseOrQuote::PairedCurrency::convert_from(self.quantity.abs(), self.entry_price)
         }
     }
 
     /// Change a position while doing proper accounting and balance transfers.
+    #[inline]
     pub fn change(
         &mut self,
         filled_qty: BaseOrQuote,
@@ -103,78 +92,123 @@ where
         side: Side,
         balances: &mut Balances<I, D, BaseOrQuote::PairedCurrency>,
     ) {
-        use Position::*;
         use Side::*;
 
-        debug!("Position.change {self}, {side} {filled_qty} @ {fill_price}, balances: {balances}");
+        tracing::trace!(
+            "Position.change {self}, {side} {filled_qty} @ {fill_price}, balances: {balances}"
+        );
         assert2::debug_assert!(
             filled_qty > BaseOrQuote::zero(),
             "The filled_qty must be greater than zero"
         );
 
-        // TODO: Performance can be much better I'm sure.
-        use Ordering::*;
-        let pnl = match self {
-            Neutral => {
-                match side {
-                    Buy => *self = Long(PositionInner::new(filled_qty, fill_price)),
-                    Sell => *self = Short(PositionInner::new(filled_qty, fill_price)),
-                }
-                Zero::zero()
-            }
-            Long(inner) => match side {
+        // TODO: simplify.
+        use std::cmp::Ordering::*;
+        match self.quantity.cmp(&Zero::zero()) {
+            Equal => match side {
                 Buy => {
-                    inner.increase_contracts(filled_qty, fill_price);
-                    Zero::zero()
+                    self.entry_price = fill_price;
+                    self.quantity = filled_qty;
                 }
-                Sell => match filled_qty.cmp(&inner.quantity()) {
+                Sell => {
+                    self.entry_price = fill_price;
+                    self.quantity = -filled_qty;
+                }
+            },
+            // Long
+            Greater => match side {
+                Buy => {
+                    self.entry_price = QuoteCurrency::new_weighted_price(
+                        self.entry_price,
+                        *self.quantity.as_ref(),
+                        fill_price,
+                        *filled_qty.as_ref(),
+                    );
+                    self.quantity += filled_qty;
+                }
+                Sell => match filled_qty.cmp(&self.quantity().abs()) {
                     Less => {
-                        let pnl = inner.decrease_contracts(filled_qty, fill_price, true);
-                        balances.apply_pnl(pnl);
-                        Zero::zero()
+                        self.quantity -= filled_qty;
+                        assert2::debug_assert!(self.quantity > Zero::zero());
+                        balances.apply_pnl(BaseOrQuote::PairedCurrency::pnl(
+                            self.entry_price,
+                            fill_price,
+                            filled_qty,
+                        ));
                     }
                     Equal => {
-                        let pnl = inner.decrease_contracts(filled_qty, fill_price, true);
-
-                        *self = Neutral;
-                        pnl
+                        balances.apply_pnl(BaseOrQuote::PairedCurrency::pnl(
+                            self.entry_price,
+                            fill_price,
+                            filled_qty,
+                        ));
+                        self.quantity -= filled_qty;
+                        debug_assert_eq!(self.quantity, Zero::zero());
+                        self.entry_price = Zero::zero();
                     }
                     Greater => {
-                        let new_short_qty = filled_qty - inner.quantity();
-                        let pnl = inner.decrease_contracts(inner.quantity(), fill_price, true);
-                        balances.apply_pnl(pnl);
-                        debug_assert_eq!(inner.quantity(), BaseOrQuote::zero());
-
-                        *self = Short(PositionInner::new(new_short_qty, fill_price));
-                        Zero::zero()
+                        balances.apply_pnl(BaseOrQuote::PairedCurrency::pnl(
+                            self.entry_price,
+                            fill_price,
+                            self.quantity,
+                        ));
+                        self.quantity -= filled_qty;
+                        assert2::debug_assert!(self.quantity < Zero::zero());
+                        self.entry_price = fill_price;
                     }
                 },
             },
-            Short(inner) => match side {
-                Buy => match filled_qty.cmp(&inner.quantity()) {
-                    Less => inner.decrease_contracts(filled_qty, fill_price, false),
+            // Short
+            Less => match side {
+                Buy => match filled_qty.cmp(&self.quantity().abs()) {
+                    Less => {
+                        balances.apply_pnl(-BaseOrQuote::PairedCurrency::pnl(
+                            self.entry_price,
+                            fill_price,
+                            filled_qty,
+                        ));
+                        self.quantity += filled_qty;
+                        assert2::debug_assert!(self.quantity < Zero::zero());
+                    }
                     Equal => {
-                        let pnl = inner.decrease_contracts(filled_qty, fill_price, false);
-
-                        *self = Neutral;
-                        pnl
+                        balances.apply_pnl(-BaseOrQuote::PairedCurrency::pnl(
+                            self.entry_price,
+                            fill_price,
+                            filled_qty,
+                        ));
+                        self.quantity += filled_qty;
+                        debug_assert_eq!(self.quantity, Zero::zero());
+                        self.entry_price = Zero::zero();
                     }
                     Greater => {
-                        let new_long_qty = filled_qty - inner.quantity();
-                        let pnl = inner.decrease_contracts(inner.quantity(), fill_price, false);
-                        debug_assert_eq!(inner.quantity(), BaseOrQuote::zero());
-
-                        *self = Long(PositionInner::new(new_long_qty, fill_price));
-                        pnl
+                        balances.apply_pnl(-BaseOrQuote::PairedCurrency::pnl(
+                            self.entry_price,
+                            fill_price,
+                            self.quantity.abs(),
+                        ));
+                        self.quantity += filled_qty;
+                        assert2::debug_assert!(self.quantity > Zero::zero());
+                        self.entry_price = fill_price;
                     }
                 },
                 Sell => {
-                    inner.increase_contracts(filled_qty, fill_price);
-                    Zero::zero()
+                    self.entry_price = QuoteCurrency::new_weighted_price(
+                        self.entry_price,
+                        *self.quantity.abs().as_ref(),
+                        fill_price,
+                        *filled_qty.as_ref(),
+                    );
+                    self.quantity -= filled_qty;
                 }
             },
-        };
-        balances.apply_pnl(pnl);
+        }
+        debug_assert!({
+            if self.quantity.is_zero() {
+                self.entry_price.is_zero()
+            } else {
+                true
+            }
+        });
     }
 }
 
@@ -185,14 +219,17 @@ where
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Neutral => write!(f, "Neutral"),
-            Long(inner) => {
-                write!(f, "Long {} @ {}", inner.quantity(), inner.entry_price())
-            }
-            Short(inner) => {
-                write!(f, "Short {} @ {}", inner.quantity(), inner.entry_price())
-            }
+        if self.quantity.is_zero() {
+            write!(f, "Neutral")
+        } else if self.quantity.is_negative() {
+            write!(
+                f,
+                "Short {} @ {}",
+                self.quantity().abs(),
+                self.entry_price()
+            )
+        } else {
+            write!(f, "Long {} @ {}", self.quantity(), self.entry_price())
         }
     }
 }
@@ -208,10 +245,11 @@ mod tests {
 
     #[test]
     fn position_display() {
-        let pos = Short(PositionInner::from_parts(
-            BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(317, 3).unwrap()),
+        let pos = Position::new(
+            BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(-317, 3).unwrap()),
             QuoteCurrency::from(Decimal::try_from_scaled(958423665, 5).unwrap()),
-        ));
+        )
+        .unwrap();
         assert_eq!(&pos.to_string(), "Short 0.31700 Base @ 9584.23665 Quote");
     }
 
@@ -223,11 +261,11 @@ mod tests {
 
         let mut balances = Balances::new(QuoteCurrency::new(10000, 0));
 
-        let mut pos = Short(PositionInner::new(qty, entry_price));
+        let mut pos = Position::new(-qty, entry_price).unwrap();
 
         let exit_price = QuoteCurrency::new(30204_27, 2);
         pos.change(qty, exit_price, Side::Buy, &mut balances);
-        assert_eq!(pos, Neutral);
+        assert_eq!(pos, Position::default());
         assert_eq!(
             balances,
             Balances::builder()
@@ -240,10 +278,11 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn position_change_position_2() {
-        let mut pos = Long(PositionInner::from_parts(
+        let mut pos = Position::new(
             BaseCurrency::<i64, 5>::from(Decimal::try_from_scaled(16800, 5).unwrap()),
             QuoteCurrency::from(Decimal::try_from_scaled(5949354994, 5).unwrap()),
-        ));
+        )
+        .unwrap();
         let filled_qty = BaseCurrency::new(16800, 5);
         let fill_price = QuoteCurrency::new(6001260000, 5);
         let mut balances = Balances::new(QuoteCurrency::new(1000, 0));
@@ -252,8 +291,8 @@ mod tests {
 
     #[test]
     fn size_of_position() {
-        assert_eq!(size_of::<Position<i32, 4, BaseCurrency<_, 4>>>(), 12);
-        assert_eq!(size_of::<Position<i64, 5, BaseCurrency<_, 5>>>(), 24);
+        assert_eq!(size_of::<Position<i32, 4, BaseCurrency<_, 4>>>(), 8);
+        assert_eq!(size_of::<Position<i64, 5, BaseCurrency<_, 5>>>(), 16);
     }
 
     proptest! {
@@ -262,7 +301,7 @@ mod tests {
             let filled_qty = BaseCurrency::<i64, 5>::new(qty, 0);
             let fill_price = QuoteCurrency::new(fill_price, 0);
 
-            let mut position = Neutral;
+            let mut position = Position::default();
             let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
 
             assert!(do_buy == 0 || do_buy == 1);
@@ -278,8 +317,8 @@ mod tests {
                 &mut balances,
             );
             match side {
-                Side::Buy => assert_eq!(position, Long(PositionInner::new(filled_qty, fill_price))),
-                Side::Sell => assert_eq!(position, Short(PositionInner::new(filled_qty, fill_price))),
+                Side::Buy => assert_eq!(position, Position::new(filled_qty, fill_price).unwrap()),
+                Side::Sell => assert_eq!(position, Position::new(-filled_qty, fill_price).unwrap()),
             }
             assert_eq!(balances, Balances::builder()
                 .equity(QuoteCurrency::new(10_000, 0))
@@ -296,7 +335,7 @@ mod tests {
             let fill_price = QuoteCurrency::new(fill_price, 0);
 
             let start_qty = BaseCurrency::new(50, 0);
-            let mut position = Long(PositionInner::new(start_qty, fill_price));
+            let mut position = Position::new(start_qty, fill_price).unwrap();
             let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
 
             position.change(
@@ -307,11 +346,11 @@ mod tests {
             );
             let new_qty = (start_qty - filled_qty).abs();
             if filled_qty > start_qty {
-                assert_eq!(position, Short(PositionInner::new(new_qty, fill_price)));
+                assert_eq!(position, Position::new(-new_qty, fill_price).unwrap());
             } else if filled_qty < start_qty {
-                assert_eq!(position, Long(PositionInner::new(new_qty, fill_price)));
+                assert_eq!(position, Position::new(new_qty, fill_price).unwrap());
             } else {
-                assert_eq!(position, Neutral);
+                assert_eq!(position, Position::default());
             }
             assert_eq!(balances, Balances::builder()
                 .equity(QuoteCurrency::new(10_000, 0))
@@ -328,7 +367,7 @@ mod tests {
             let fill_price = QuoteCurrency::new(fill_price, 0);
 
             let start_qty = BaseCurrency::new(50, 0);
-            let mut position = Long(PositionInner::new(start_qty, fill_price));
+            let mut position = Position::new(start_qty, fill_price).unwrap();
             let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
 
             position.change(
@@ -338,7 +377,7 @@ mod tests {
                 &mut balances,
             );
             let new_qty = start_qty + filled_qty;
-            assert_eq!(position, Long(PositionInner::new(new_qty, fill_price)));
+            assert_eq!(position, Position::new(new_qty, fill_price).unwrap());
             assert_eq!(balances, Balances::builder()
                 .equity(QuoteCurrency::new(10_000, 0))
                 .total_fees_paid(Zero::zero())
@@ -354,7 +393,7 @@ mod tests {
             let fill_price = QuoteCurrency::new(fill_price, 0);
 
             let start_qty = BaseCurrency::new(50, 0);
-            let mut position = Short(PositionInner::new(start_qty, fill_price));
+            let mut position = Position::new(-start_qty, fill_price).unwrap();
             let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
 
             position.change(
@@ -365,11 +404,11 @@ mod tests {
             );
             let new_qty = (start_qty - filled_qty).abs();
             if filled_qty > start_qty {
-                assert_eq!(position, Long(PositionInner::new(new_qty, fill_price)));
+                assert_eq!(position, Position::new(new_qty, fill_price).unwrap());
             } else if filled_qty < start_qty {
-                assert_eq!(position, Short(PositionInner::new(new_qty, fill_price)));
+                assert_eq!(position, Position::new(-new_qty, fill_price).unwrap());
             } else {
-                assert_eq!(position, Neutral);
+                assert_eq!(position, Position::default());
             }
             assert_eq!(balances, Balances::builder()
                 .equity(QuoteCurrency::new(10_000, 0))
@@ -386,7 +425,7 @@ mod tests {
             let fill_price = QuoteCurrency::new(100, 0);
 
             let start_qty = BaseCurrency::new(50, 0);
-            let mut position = Short(PositionInner::new(start_qty, fill_price));
+            let mut position = Position::new(-start_qty, fill_price).unwrap();
             let mut balances = Balances::new(QuoteCurrency::new(10_000, 0));
 
             position.change(
@@ -396,7 +435,7 @@ mod tests {
                 &mut balances,
             );
             let new_qty = start_qty + filled_qty;
-            assert_eq!(position, Short(PositionInner::new(new_qty, fill_price)));
+            assert_eq!(position, Position::new(-new_qty, fill_price).unwrap());
             assert_eq!(balances, Balances::builder()
                 .equity(QuoteCurrency::new(10_000, 0))
                 .total_fees_paid(Zero::zero())

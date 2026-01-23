@@ -23,7 +23,7 @@ fn submit_limit_sell_order_no_position() {
     let order = LimitOrder::new(Side::Sell, limit_price, BaseCurrency::new(9, 0)).unwrap();
     exchange.submit_limit_order(order.clone()).unwrap();
 
-    assert_eq!(exchange.account().position(), &Position::Neutral,);
+    assert_eq!(exchange.account().position(), &Position::default());
 
     // Now fill the order
     let meta = ExchangeOrderMeta::new(0.into(), 0.into());
@@ -58,7 +58,7 @@ fn submit_limit_sell_order_no_position() {
     let fee0 = QuoteCurrency::convert_from(qty, entry_price) * *test_fee_maker().as_ref();
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Short(PositionInner::new(qty, entry_price))
+        Position::new(-qty, entry_price).unwrap()
     );
     assert_eq!(
         exchange.account().balances(),
@@ -106,7 +106,7 @@ fn submit_limit_sell_order_no_position() {
             order_after_fill: order.into_filled(3.into()),
         }]
     );
-    assert_eq!(exchange.account().position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::default());
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()

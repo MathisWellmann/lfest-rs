@@ -3,17 +3,15 @@ use tracing::trace;
 
 use super::RiskEngine;
 use crate::{
-    account::Account,
+    account::{
+        Account,
+        Position,
+    },
     contract_specification::ContractSpecification,
     market_state::MarketState,
     prelude::{
         Currency,
         Mon,
-        Position::{
-            self,
-            *,
-        },
-        PositionInner,
         QuoteCurrency,
         RiskError,
     },
@@ -93,21 +91,22 @@ where
         market_state: &MarketState<I, D>,
         position: &Position<I, D, BaseOrQuote>,
     ) -> Result<(), RiskError> {
-        match position {
-            Neutral => {}
-            Long(inner) => {
-                let liquidation_price = inner
-                    .entry_price()
-                    .liquidation_price_long(self.contract_spec.maintenance_margin());
-                if market_state.bid() < liquidation_price {
-                    return Err(RiskError::Liquidate);
-                }
-            }
-            Short(inner) => {
-                let liquidation_price = inner
+        use std::cmp::Ordering::*;
+        match position.quantity().cmp(&Zero::zero()) {
+            Less => {
+                let liquidation_price = position
                     .entry_price()
                     .liquidation_price_short(self.contract_spec.maintenance_margin());
                 if market_state.ask() > liquidation_price {
+                    return Err(RiskError::Liquidate);
+                }
+            }
+            Equal => return Ok(()),
+            Greater => {
+                let liquidation_price = position
+                    .entry_price()
+                    .liquidation_price_long(self.contract_spec.maintenance_margin());
+                if market_state.bid() < liquidation_price {
                     return Err(RiskError::Liquidate);
                 }
             }
@@ -134,8 +133,9 @@ where
     {
         debug_assert_eq!(order.side(), Side::Buy);
 
-        match account.position() {
-            Neutral | Long(_) => {
+        use std::cmp::Ordering::*;
+        match account.position().quantity().cmp(&Zero::zero()) {
+            Equal | Greater => {
                 // A long position increases in size.
                 let notional_value =
                     BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
@@ -146,15 +146,16 @@ where
                     return Err(NotEnoughAvailableBalance);
                 }
             }
-            Short(pos_inner) => {
-                if order.quantity() <= pos_inner.quantity() {
+            Less => {
+                let abs_qty = account.position().quantity().abs();
+                if order.quantity() <= abs_qty {
                     // The order strictly reduces the position, so no additional margin is required.
                     return Ok(());
                 }
                 // The order reduces the short and puts on a long
                 let released_from_old_pos = account.position_margin();
 
-                let new_long_size = Self::quantity_minus_position(order.quantity(), pos_inner);
+                let new_long_size = order.quantity() - abs_qty;
                 assert2::debug_assert!(new_long_size > BaseOrQuote::zero());
                 let new_notional_value =
                     BaseOrQuote::PairedCurrency::convert_from(new_long_size, fill_price);
@@ -189,8 +190,9 @@ where
     {
         debug_assert_eq!(order.side(), Side::Sell);
 
-        match account.position() {
-            Neutral | Short(_) => {
+        use std::cmp::Ordering::*;
+        match account.position().quantity().cmp(&Zero::zero()) {
+            Equal | Less => {
                 let notional_value =
                     BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
                 let init_margin = notional_value * self.contract_spec.init_margin_req();
@@ -200,16 +202,17 @@ where
                     return Err(NotEnoughAvailableBalance);
                 }
             }
-            Long(pos_inner) => {
+            Greater => {
+                let abs_qty = account.position().quantity().abs();
                 // Else its a long position which needs to be reduced
-                if order.quantity() <= pos_inner.quantity() {
+                if order.quantity() <= abs_qty {
                     // The order strictly reduces the position, so no additional margin is required.
                     return Ok(());
                 }
                 // The order reduces the long position and opens a short.
                 let released_from_old_pos = account.position_margin();
 
-                let new_short_size = Self::quantity_minus_position(order.quantity(), pos_inner);
+                let new_short_size = order.quantity() - abs_qty;
                 assert2::debug_assert!(new_short_size > BaseOrQuote::zero());
                 let new_notional_value =
                     BaseOrQuote::PairedCurrency::convert_from(new_short_size, fill_price);
@@ -240,14 +243,6 @@ where
         released_margin_from_old_pos: BaseOrQuote::PairedCurrency,
     ) -> bool {
         new_margin_req + tx_fee > available_wallet_balance + released_margin_from_old_pos
-    }
-
-    #[inline(always)]
-    fn quantity_minus_position(
-        quantity: BaseOrQuote,
-        position_inner: &PositionInner<I, D, BaseOrQuote>,
-    ) -> BaseOrQuote {
-        quantity - position_inner.quantity()
     }
 }
 
@@ -292,20 +287,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn isolated_margin_quantity_minus_position() {
-        assert_eq!(
-            IsolatedMarginRiskEngine::quantity_minus_position(
-                BaseCurrency::new(10, 0),
-                &PositionInner::from_parts(
-                    BaseCurrency::<i64, 5>::new(5, 0),
-                    QuoteCurrency::new(100, 0),
-                )
-            ),
-            BaseCurrency::new(5, 0)
-        );
-    }
-
     #[test_case::test_case(2, 75)]
     #[test_case::test_case(3, 84)]
     #[test_case::test_case(5, 90)]
@@ -329,7 +310,7 @@ mod tests {
             0,
         );
 
-        let position = Neutral;
+        let position = Position::default();
 
         RiskEngine::<_, DECIMALS, _, NoUserOrderId>::check_maintenance_margin(
             &re,
@@ -341,7 +322,7 @@ mod tests {
         let qty = BaseCurrency::new(1, 0);
         let entry_price = QuoteCurrency::new(100, 0);
 
-        let position = Long(PositionInner::new(qty, entry_price));
+        let position = Position::new(qty, entry_price).unwrap();
         RiskEngine::<_, DECIMALS, _, NoUserOrderId>::check_maintenance_margin(
             &re,
             &market_state,
@@ -349,7 +330,7 @@ mod tests {
         )
         .unwrap();
 
-        let position = Long(PositionInner::new(qty, entry_price));
+        let position = Position::new(qty, entry_price).unwrap();
         let market_state = MarketState::from_components(
             QuoteCurrency::new(200, 0),
             QuoteCurrency::new(201, 0),
@@ -409,10 +390,7 @@ mod tests {
             0,
         );
 
-        let position = Short(PositionInner::new(
-            BaseCurrency::one(),
-            QuoteCurrency::new(100, 0),
-        ));
+        let position = Position::new(-BaseCurrency::one(), QuoteCurrency::new(100, 0)).unwrap();
         RiskEngine::<i64, DECIMALS, _, NoUserOrderId>::check_maintenance_margin(
             &re,
             &market_state,

@@ -72,7 +72,7 @@ where
     ) -> Self {
         Self {
             active_limit_orders: ActiveLimitOrders::with_capacity(max_active_orders),
-            position: Position::Neutral,
+            position: Position::default(),
             balances,
             init_margin_req: Decimal::ONE, // 1x leverage by default.
         }

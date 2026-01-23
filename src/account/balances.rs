@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
 use getset::CopyGetters;
+use tracing::trace;
 use typed_builder::TypedBuilder;
 
 use crate::types::{
@@ -37,7 +38,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "available: {}, total_fees_paid: {}",
+            "equity: {}, total_fees_paid: {}",
             self.equity, self.total_fees_paid,
         )
     }
@@ -76,6 +77,7 @@ where
     /// Profit and loss are applied to the available balance.
     #[inline(always)]
     pub fn apply_pnl(&mut self, pnl: BaseOrQuote) {
+        trace!("apply_pnl: {pnl}");
         self.equity += pnl;
         assert2::debug_assert!(self.equity >= BaseOrQuote::zero());
     }
@@ -131,7 +133,7 @@ mod test {
             .build();
         assert_eq!(
             balances.to_string(),
-            "available: 1000.00000 Quote, total_fees_paid: 5.00000 Quote"
+            "equity: 1000.00000 Quote, total_fees_paid: 5.00000 Quote"
         );
     }
 }

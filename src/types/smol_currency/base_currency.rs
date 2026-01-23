@@ -99,6 +99,7 @@ where
     // Generic over the decimal points in paired currency.
     type PairedCurrency = QuoteCurrency<I, D>;
 
+    #[inline]
     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self {
         assert2::debug_assert!(price_per_unit > Zero::zero());
         BaseCurrency(*units.as_ref() / *price_per_unit.as_ref())

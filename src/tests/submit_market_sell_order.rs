@@ -51,7 +51,7 @@ fn submit_market_sell_order() {
     let fees = notional * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Short(PositionInner::new(qty, entry_price,))
+        Position::new(-qty, entry_price).unwrap(),
     );
     assert_eq!(
         exchange.account().balances(),
@@ -108,10 +108,7 @@ fn submit_market_sell_order_with_short_position() {
     );
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Short(PositionInner::new(
-            BaseCurrency::new(5, 0),
-            QuoteCurrency::new(100, 0),
-        ))
+        Position::new(BaseCurrency::new(-5, 0), QuoteCurrency::new(100, 0),).unwrap()
     );
     assert_eq!(
         exchange.account().active_limit_orders(),
@@ -140,10 +137,7 @@ fn submit_market_sell_order_with_short_position() {
     );
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Short(PositionInner::new(
-            BaseCurrency::new(9, 0),
-            QuoteCurrency::new(100, 0),
-        ))
+        Position::new(BaseCurrency::new(-9, 0), QuoteCurrency::new(100, 0),).unwrap()
     );
     assert_eq!(
         exchange.account().active_limit_orders(),
@@ -176,7 +170,7 @@ fn submit_market_sell_order_with_long_position() {
     let fee_1 = QuoteCurrency::convert_from(order.quantity(), QuoteCurrency::new(99, 0))
         * *test_fee_taker().as_ref();
     exchange.submit_market_order(order).unwrap();
-    assert_eq!(exchange.account().position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::default());
     assert_eq!(
         exchange.account().balances(),
         &Balances::builder()
@@ -189,6 +183,7 @@ fn submit_market_sell_order_with_long_position() {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn submit_market_sell_order_turnaround_long() {
     let mut exchange = mock_exchange_linear();
     assert!(
@@ -226,10 +221,7 @@ fn submit_market_sell_order_turnaround_long() {
     );
     assert_eq!(
         exchange.account().position(),
-        &Position::Long(PositionInner::new(
-            BaseCurrency::new(9, 0),
-            QuoteCurrency::new(100, 0),
-        ))
+        &Position::new(BaseCurrency::new(9, 0), QuoteCurrency::new(100, 0)).unwrap()
     );
     assert_eq!(
         exchange.account().active_limit_orders(),
@@ -260,10 +252,7 @@ fn submit_market_sell_order_turnaround_long() {
     );
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Short(PositionInner::new(
-            BaseCurrency::new(9, 0),
-            QuoteCurrency::new(99, 0),
-        ))
+        Position::new(BaseCurrency::new(-9, 0), QuoteCurrency::new(99, 0),).unwrap()
     );
     assert_eq!(
         exchange.account().active_limit_orders(),

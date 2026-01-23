@@ -29,15 +29,13 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let mut rng = SmallRng::seed_from_u64(0);
     let starting_positions = [
-        Position::Neutral,
-        Position::Long(PositionInner::new(
+        Position::default(),
+        Position::new(
             BaseCurrency::<i64, 5>::new(1, 0),
             QuoteCurrency::new(100, 0),
-        )),
-        Position::Short(PositionInner::new(
-            BaseCurrency::new(1, 0),
-            QuoteCurrency::new(100, 0),
-        )),
+        )
+        .unwrap(),
+        Position::new(BaseCurrency::new(-1, 0), QuoteCurrency::new(100, 0)).unwrap(),
     ];
     let random_changes = Vec::from_iter((0..N).map(|_| {
         (

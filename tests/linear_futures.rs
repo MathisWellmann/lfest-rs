@@ -46,7 +46,7 @@ fn lin_long_market_win_full() {
     let fee = QuoteCurrency::convert_from(qty, bid) * *test_fee_taker().as_ref();
     assert_eq!(
         exchange.account().position().clone(),
-        Position::Long(PositionInner::new(qty, bid))
+        Position::new(qty, bid).unwrap()
     );
     assert_eq!(
         exchange.account().position().unrealized_pnl(bid, ask),
@@ -91,7 +91,7 @@ fn lin_long_market_win_full() {
         .submit_market_order(MarketOrder::new(Side::Sell, BaseCurrency::new(5, 0)).unwrap())
         .unwrap();
 
-    assert_eq!(exchange.account().position(), &Position::Neutral);
+    assert_eq!(exchange.account().position(), &Position::default());
     assert_eq!(
         exchange
             .account()

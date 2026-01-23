@@ -77,11 +77,11 @@ where
     assert2::debug_assert!(init_margin_req > Decimal::zero());
     assert2::debug_assert!(init_margin_req <= Decimal::one());
 
-    use Position::*;
-    match position {
-        Neutral => max(bids_notional, asks_notional) * init_margin_req,
-        Long(inner) => max(bids_notional, asks_notional - inner.notional()) * init_margin_req,
-        Short(inner) => max(bids_notional - inner.notional(), asks_notional) * init_margin_req,
+    use std::cmp::Ordering::*;
+    match position.quantity().cmp(&Zero::zero()) {
+        Equal => max(bids_notional, asks_notional) * init_margin_req,
+        Greater => max(bids_notional, asks_notional - position.notional()) * init_margin_req,
+        Less => max(bids_notional - position.notional(), asks_notional) * init_margin_req,
     }
 }
 

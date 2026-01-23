@@ -24,7 +24,6 @@ use crate::{
         Currency,
         MarketUpdate,
         Mon,
-        Position,
         QuoteCurrency,
         RePricing,
     },
@@ -164,12 +163,20 @@ where
         warn!("liquidating position {}", self.account.position());
         assert2::debug_assert!(self.market_state.ask() > QuoteCurrency::zero());
         assert2::debug_assert!(self.market_state.bid() > QuoteCurrency::zero());
-        use Position::*;
-        let order = match self.account.position() {
-            Long(pos) => MarketOrder::new(Sell, pos.quantity()).expect("Can create market order."),
-            Short(pos) => MarketOrder::new(Buy, pos.quantity()).expect("Can create market order."),
-            Neutral => panic!("A neutral position can not be liquidated"),
+        if self.account.position().quantity().is_zero() {
+            core::hint::cold_path();
+            panic!("A neutral position can not be liquidated")
+        }
+        let order = {
+            let side = if self.account().position().quantity().is_negative() {
+                Buy
+            } else {
+                Sell
+            };
+            MarketOrder::new(side, self.account.position().quantity().abs())
+                .expect("Can create market order.")
         };
+
         self.submit_market_order(order)
             .expect("Must be able to submit liquidation order");
         info!("balances after liquidation: {}", self.account.balances());
