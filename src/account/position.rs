@@ -46,6 +46,8 @@ where
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     /// Return the positions unrealized profit and loss.
+    #[must_use]
+    #[inline(always)]
     pub fn unrealized_pnl(
         &self,
         bid: QuoteCurrency<I, D>,
@@ -61,6 +63,8 @@ where
     }
 
     /// The quantity of the position, is negative when short.
+    #[must_use]
+    #[inline(always)]
     pub fn quantity(&self) -> BaseOrQuote {
         match self {
             Neutral => BaseOrQuote::zero(),
@@ -70,6 +74,8 @@ where
     }
 
     /// The entry price of the position which is the total cost of the position relative to its quantity.
+    #[must_use]
+    #[inline(always)]
     pub fn entry_price(&self) -> QuoteCurrency<I, D> {
         match self {
             Neutral => QuoteCurrency::zero(),
@@ -79,6 +85,8 @@ where
     }
 
     /// The total value of the position which is composed of quantity and avg. entry price.
+    #[must_use]
+    #[inline(always)]
     pub fn notional(&self) -> BaseOrQuote::PairedCurrency {
         match self {
             Neutral => BaseOrQuote::PairedCurrency::zero(),
