@@ -1,14 +1,18 @@
+//! Provdes rate limiting for order submission.
+
 use std::num::NonZeroU32;
 
 use crate::types::TimestampNs;
 
+/// The rate limit was reached.
 #[derive(Debug, Clone, thiserror::Error, derive_more::Display, Eq, PartialEq)]
 pub struct RateLimitReached;
 
+// TODO: write a benchmark for it.
 /// Limits the rate at which limit orders can be submitted.
 /// Operates on buckets measured in seconds.
 #[derive(Clone, Debug)]
-pub(crate) struct OrderRateLimiter {
+pub struct OrderRateLimiter {
     /// The start of the rate limiting bucket in seconds.
     bucket_start_ns: TimestampNs,
     /// The maximum number of order actions per second.
@@ -18,7 +22,8 @@ pub(crate) struct OrderRateLimiter {
 }
 
 impl OrderRateLimiter {
-    pub(crate) fn new(orders_per_second: NonZeroU32) -> Self {
+    /// Create a new instance of the rate limiter with a maximum number of orders per second.
+    pub fn new(orders_per_second: NonZeroU32) -> Self {
         let orders_per_second = orders_per_second.get();
         Self {
             bucket_start_ns: 0.into(),
@@ -30,7 +35,7 @@ impl OrderRateLimiter {
     /// If `true`, the `current_ts_ns` falls within the current bucket.
     #[inline(always)]
     fn is_in_bucket(&self, current_ts_ns: TimestampNs) -> bool {
-        debug_assert!(
+        assert2::debug_assert!(
             current_ts_ns >= self.bucket_start_ns,
             "Timestamps are assumed to always increment. Here we don't additionally check for the lower bound of the bucket."
         );
@@ -46,9 +51,9 @@ impl OrderRateLimiter {
     }
 
     /// Acquire a single permit for a new order related action.
-    /// returns `true` if the rate limit has been reached.
+    /// returns `Err(RateLimitReached)` if the rate limit has been reached.
     #[inline]
-    pub(crate) fn aquire(&mut self, current_ts_ns: TimestampNs) -> Result<(), RateLimitReached> {
+    pub fn aquire(&mut self, current_ts_ns: TimestampNs) -> Result<(), RateLimitReached> {
         if !self.is_in_bucket(current_ts_ns) {
             self.new_bucket(current_ts_ns);
             self.remaining -= 1;

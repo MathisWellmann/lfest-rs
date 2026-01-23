@@ -13,7 +13,7 @@ mod market_state;
 mod market_update;
 mod mock_exchange;
 mod order_filters;
-mod order_rate_limiter;
+pub mod order_rate_limiter;
 mod risk_engine;
 #[cfg(test)]
 mod tests;
