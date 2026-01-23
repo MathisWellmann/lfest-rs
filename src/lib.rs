@@ -1,5 +1,5 @@
 #![doc = include_str!("../README.md")]
-#![feature(vec_push_within_capacity)]
+#![feature(vec_push_within_capacity, cold_path)]
 
 //! lfest - leveraged futures exchange for simulated trading
 

@@ -66,6 +66,7 @@ where
     /// `market_update`: Newest market information
     /// `price_filter`: The pricing rules.
     ///
+    #[inline]
     pub(crate) fn update_state<U, BaseOrQuote>(
         &mut self,
         market_update: &U,
@@ -74,10 +75,7 @@ where
         U: MarketUpdate<I, D, BaseOrQuote>,
         BaseOrQuote: Currency<I, D>,
     {
-        if let Err(e) = market_update.validate_market_update(price_filter) {
-            // Only in debug mode do we care to validate the market update, because usually the update comes from an exchange source.
-            debug_assert!(false, "market update {market_update} not valid due to {e}");
-        }
+        assert2::debug_assert!(market_update.validate_market_update(price_filter).is_ok());
         market_update.update_market_state(self);
 
         self.current_ts_ns = market_update.timestamp_exchange_ns();

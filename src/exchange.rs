@@ -129,8 +129,6 @@ where
     where
         U: MarketUpdate<I, D, BaseOrQuote>,
     {
-        trace!("update_state: market_update: {market_update}");
-
         self.market_state
             .update_state(market_update, self.config.contract_spec().price_filter());
 
@@ -144,6 +142,7 @@ where
             &self.market_state,
             self.account.position(),
         ) {
+            core::hint::cold_path();
             self.liquidate();
             return Err(e);
         };
