@@ -1,0 +1,25 @@
+name: "Rust checks"
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  check:
+    # Target self-hosted runner by label
+    runs-on: [ nixos ]
+
+    # SECURITY: Require manual approval for external PRs
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+
+    steps:
+      - name: checkout-code
+        uses: actions/checkout@v4
+
+      - name: cargo-check
+        run: nix develop --command cargo check
+
