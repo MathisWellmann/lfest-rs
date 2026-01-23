@@ -235,7 +235,7 @@ where
             .change_position(filled_qty, fill_price, order.side(), fee);
     }
 
-    #[inline]
+    #[inline(always)]
     fn next_order_id(&mut self) -> OrderId {
         let oid = self.next_order_id;
         self.next_order_id.incr();

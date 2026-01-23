@@ -3,7 +3,7 @@ Leveraged Futures Exchange for Simulated Trading (LFEST)
 
 `lfest-rs` is a simulated perpetual futures exchange capable of leveraged
 positions. Its optimizes correctness, performance and simplicity in that order.
-It can simulate more than 350M trade and 1250M BBa updates per second along
+It can simulate more than 380M trade and 1578M BBa updates per second along
 with 25M limit order submissions per second (Run `cargo bench` to see it for
 your system). You feed in external market data using `Bba`, `Trade`, `Candle`
 or `SmartCandle` to update the `MarketState`, which triggers limit order

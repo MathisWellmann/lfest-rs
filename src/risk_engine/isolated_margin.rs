@@ -93,12 +93,12 @@ where
         market_state: &MarketState<I, D>,
         position: &Position<I, D, BaseOrQuote>,
     ) -> Result<(), RiskError> {
-        let maint_margin_req = self.contract_spec.maintenance_margin();
         match position {
-            Neutral => return Ok(()),
+            Neutral => {}
             Long(inner) => {
-                let liquidation_price =
-                    inner.entry_price().liquidation_price_long(maint_margin_req);
+                let liquidation_price = inner
+                    .entry_price()
+                    .liquidation_price_long(self.contract_spec.maintenance_margin());
                 if market_state.bid() < liquidation_price {
                     return Err(RiskError::Liquidate);
                 }
@@ -106,7 +106,7 @@ where
             Short(inner) => {
                 let liquidation_price = inner
                     .entry_price()
-                    .liquidation_price_short(maint_margin_req);
+                    .liquidation_price_short(self.contract_spec.maintenance_margin());
                 if market_state.ask() > liquidation_price {
                     return Err(RiskError::Liquidate);
                 }

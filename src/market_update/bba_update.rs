@@ -69,11 +69,11 @@ where
 {
     const CAN_FILL_LIMIT_ORDERS: bool = false;
 
-    #[inline(always)]
     fn limit_order_filled<UserOrderIdT: UserOrderId>(
         &mut self,
         _limit_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Option<(BaseOrQuote, Exhausted)> {
+        std::hint::cold_path();
         unreachable!(
             "This should never be called, because a best bid and ask update can never fill a limit order."
         );
@@ -93,7 +93,7 @@ where
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     fn update_market_state(&self, market_state: &mut MarketState<I, D>) {
         market_state.set_bid(self.bid);
         market_state.set_ask(self.ask);
