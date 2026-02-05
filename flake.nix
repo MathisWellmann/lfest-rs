@@ -55,7 +55,6 @@
         with pkgs; {
           devShells.default = mkShell {
             buildInputs = [
-              (lib.hiPrio rust-bin.nightly."2025-02-01".rustfmt)
               rust
               cargo-nextest
               cargo-semver-checks
@@ -64,7 +63,10 @@
               cargo-tarpaulin # Code coverage
               cargo-audit
               cargo-machete
-              taplo
+              taplo # Format `.toml` files.
+              deadnix # Nix dead code checker
+              alejandra # Nix code formatter.
+              statix # Nix static code checker.
               mprocs # Run multiple commands in parallel from `mprocs.yml`, acting essentially as a local CI system.
               hongdown.packages.${system}.hongdown
               creusot # Execute with `cargo creusot`
