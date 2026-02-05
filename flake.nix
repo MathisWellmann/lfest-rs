@@ -6,6 +6,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     hongdown.url = "github:dahlia/hongdown";
+    bencher.url = "github:MathisWellmann/bencher";
     naersk = {
       url = "github:nix-community/naersk";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -18,6 +19,7 @@
     flake-utils,
     hongdown,
     naersk,
+    bencher,
     ...
   }:
     flake-utils.lib.eachDefaultSystem (
@@ -51,26 +53,34 @@
           };
         cargo-upgrades = pkgs.callPackage ./nix/cargo-upgrades.nix {};
         creusot = import ./nix/creusot.nix {inherit pkgs naersk';};
+        buildInputs = [
+          rust
+        ];
+        rust_tools = with pkgs; [
+          cargo-nextest
+          cargo-semver-checks
+          cargo-mutants
+          cargo-upgrades
+          cargo-tarpaulin # Code coverage
+          cargo-audit
+          cargo-machete
+          creusot # Execute with `cargo creusot`
+          taplo # Format `.toml` files.
+        ];
+        nix_tools = with pkgs; [
+          alejandra # Nix code formatter.
+          deadnix # Nix dead code checker
+          statix # Nix static code checker.
+        ];
+        tools = with pkgs; [
+          mprocs # Run multiple commands in parallel from `mprocs.yml`, acting essentially as a local CI system.
+          hongdown.packages.${system}.hongdown
+          bencher.packages.${system}.bencher
+        ];
       in
         with pkgs; {
           devShells.default = mkShell {
-            buildInputs = [
-              rust
-              cargo-nextest
-              cargo-semver-checks
-              cargo-mutants
-              cargo-upgrades
-              cargo-tarpaulin # Code coverage
-              cargo-audit
-              cargo-machete
-              taplo # Format `.toml` files.
-              deadnix # Nix dead code checker
-              alejandra # Nix code formatter.
-              statix # Nix static code checker.
-              mprocs # Run multiple commands in parallel from `mprocs.yml`, acting essentially as a local CI system.
-              hongdown.packages.${system}.hongdown
-              creusot # Execute with `cargo creusot`
-            ];
+            buildInputs = buildInputs ++ rust_tools ++ nix_tools ++ tools;
             RUST_BACKTRACE = "1";
           };
         }
