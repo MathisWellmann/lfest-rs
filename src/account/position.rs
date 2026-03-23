@@ -20,8 +20,11 @@ use crate::{
 /// The side of the position depends on its quantity.
 #[derive(Debug, Clone, Copy)]
 pub enum PositionSide {
+    /// A negative position quantity.
     Short,
+    /// No position quantity.
     Neutral,
+    /// A positive positive position quantity.
     Long,
 }
 

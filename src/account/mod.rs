@@ -9,5 +9,8 @@ pub use account::Account;
 pub use active_limit_orders::ActiveLimitOrders;
 pub use balances::Balances;
 pub use bids_asks::*;
-pub use position::Position;
+pub use position::{
+    Position,
+    PositionSide,
+};
 pub use sorted_orders::*;
