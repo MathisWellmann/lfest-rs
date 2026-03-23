@@ -10,7 +10,7 @@ or `SmartCandle` to update the `MarketState`, which triggers limit order
 executions when appropriate. The exchange can be configured using `Config` and
 `ContractSpecification`.
 
-:radioactive: This is a personal project, use a your own risk. :bangbang:
+This is a personal project, use a your own risk.
 
 ### Features:
 
@@ -59,7 +59,7 @@ The supported order types are:
 
 To use this crate in your project, add the following to your Cargo.toml:
 
-~~~~ ignore
+~~~~ toml
 [dependencies]
 lfest = { git = https://github.com/MathisWellmann/lfest-rs } # Probably pin the version because main is changing quickly
 ~~~~

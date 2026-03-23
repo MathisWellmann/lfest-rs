@@ -150,7 +150,7 @@ where
     /// - `quantity`: A positive nonzero quantity of the amount of contracts this order is for.
     ///
     /// # Returns:
-    /// Either a successfully created order or an [`OrderError`]
+    /// Either a successfully created order or a well scoped [`NewLimitOrderError`].
     pub fn new(
         side: Side,
         limit_price: QuoteCurrency<I, D>,
@@ -190,7 +190,7 @@ where
     /// - `user_order_id`: The user provided id. This value is ignored by the exchange.
     ///
     /// # Returns:
-    /// Either a successfully created order or an [`OrderError`]
+    /// Either a successfully created order or a well scoped [`NewLimitOrderError`]
     pub fn new_with_user_order_id(
         side: Side,
         limit_price: QuoteCurrency<I, D>,
