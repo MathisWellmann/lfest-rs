@@ -17,6 +17,14 @@ use crate::{
     },
 };
 
+/// The side of the position depends on its quantity.
+#[derive(Debug, Clone, Copy)]
+pub enum PositionSide {
+    Short,
+    Neutral,
+    Long,
+}
+
 /// A futures position can be one of three variants.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Getters, CopyGetters)]
 pub struct Position<I, const D: u8, BaseOrQuote>
@@ -25,6 +33,7 @@ where
     BaseOrQuote: Currency<I, D>,
 {
     /// The number of futures contracts making up the position.
+    /// Can be negative if short.
     #[getset(get_copy = "pub")]
     quantity: BaseOrQuote,
 
@@ -51,6 +60,19 @@ where
             quantity,
             entry_price,
         })
+    }
+
+    /// Get which side the position has, either Long, Short or Neutral.
+    #[inline]
+    pub fn side(&self) -> PositionSide {
+        use std::cmp::Ordering::*;
+
+        use PositionSide::*;
+        match self.quantity.cmp(&Zero::zero()) {
+            Less => Short,
+            Equal => Neutral,
+            Greater => Long,
+        }
     }
 
     /// Return the positions unrealized profit and loss.
