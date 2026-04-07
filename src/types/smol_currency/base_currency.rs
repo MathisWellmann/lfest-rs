@@ -255,6 +255,16 @@ where
     }
 }
 
+impl<I, const D: u8> From<BaseCurrency<I, D>> for f32
+where
+    I: Mon<D>,
+{
+    #[inline]
+    fn from(val: BaseCurrency<I, D>) -> Self {
+        val.0.to_f32()
+    }
+}
+
 impl<I, const D: u8> Sum for BaseCurrency<I, D>
 where
     I: Mon<D>,

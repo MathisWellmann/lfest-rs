@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.137.1"
+version = "0.137.2"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2024"
 license-file = "LICENSE"
@@ -270,4 +270,3 @@ harness = false
 [[bench]]
 name = "trade_update"
 harness = false
-
