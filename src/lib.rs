@@ -8,6 +8,7 @@ mod config;
 mod contract_specification;
 mod exchange;
 mod expect_messages;
+pub mod fxmacrodata;
 mod load_trades_from_csv;
 mod market_state;
 mod market_update;
