@@ -26,17 +26,17 @@ where
     }
 }
 
-impl<I, const D: u8, BaseOrQuote> Into<trade_aggregation::Trade> for Trade<I, D, BaseOrQuote>
+impl<I, const D: u8, BaseOrQuote> From<Trade<I, D, BaseOrQuote>> for trade_aggregation::Trade
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
 {
     #[inline]
-    fn into(self) -> trade_aggregation::Trade {
-        trade_aggregation::Trade {
-            timestamp: self.timestamp_exchange_ns.get(),
-            price: self.price.into(),
-            size: <Trade<I, D, BaseOrQuote> as TakerTrade>::size(&self),
+    fn from(trade: Trade<I, D, BaseOrQuote>) -> Self {
+        Self {
+            timestamp: trade.timestamp_exchange_ns.get(),
+            price: trade.price.into(),
+            size: <Trade<I, D, BaseOrQuote> as TakerTrade>::size(&trade),
         }
     }
 }

@@ -1,11 +1,11 @@
-mod account;
+mod account_impl;
 mod active_limit_orders;
 mod balances;
 mod bids_asks;
 mod position;
 mod sorted_orders;
 
-pub use account::Account;
+pub use account_impl::Account;
 pub use active_limit_orders::ActiveLimitOrders;
 pub use balances::Balances;
 pub use bids_asks::*;

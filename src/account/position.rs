@@ -110,6 +110,10 @@ where
 
     /// Change a position while doing proper accounting and balance transfers.
     #[inline]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "keeping all position transitions together makes the accounting easier to verify"
+    )]
     pub fn change(
         &mut self,
         filled_qty: BaseOrQuote,
@@ -227,13 +231,8 @@ where
                 }
             },
         }
-        debug_assert!({
-            if self.quantity.is_zero() {
-                self.entry_price.is_zero()
-            } else {
-                true
-            }
-        });
+        let position_is_valid = !self.quantity.is_zero() || self.entry_price.is_zero();
+        debug_assert!(position_is_valid);
     }
 }
 

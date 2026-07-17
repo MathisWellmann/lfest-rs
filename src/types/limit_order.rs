@@ -83,23 +83,7 @@ where
 {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        use Ordering::*;
-        Some(match self.limit_price().cmp(&other.limit_price()) {
-            Less => Less,
-            Equal => {
-                match self
-                    .state()
-                    .meta()
-                    .ts_exchange_received()
-                    .cmp(&other.state().meta().ts_exchange_received())
-                {
-                    Less => Less,
-                    Equal => Equal,
-                    Greater => Greater,
-                }
-            }
-            Greater => Greater,
-        })
+        Some(self.cmp(other))
     }
 }
 
@@ -115,7 +99,12 @@ where
 {
     #[inline(always)]
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).expect("Can always campare")
+        self.limit_price().cmp(&other.limit_price()).then_with(|| {
+            self.state()
+                .meta()
+                .ts_exchange_received()
+                .cmp(&other.state().meta().ts_exchange_received())
+        })
     }
 }
 
