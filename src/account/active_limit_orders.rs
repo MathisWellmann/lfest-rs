@@ -107,6 +107,20 @@ where
         self.asks.best()
     }
 
+    /// Iterate over all active limit orders; bids in ascending price priority first,
+    /// then asks in descending price priority.
+    pub fn iter(
+        &self,
+    ) -> impl Iterator<Item = &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>
+    {
+        self.bids.orders().iter().chain(self.asks.orders().iter())
+    }
+
+    /// Iterate over the user order ids of all active limit orders; bids first, then asks.
+    pub fn user_order_ids(&self) -> impl Iterator<Item = UserOrderIdT> + '_ {
+        self.iter().map(|order| order.user_order_id())
+    }
+
     /// Try to insert a new `LimitOrder` into the order book.
     /// Returns an error if the maximum capacity is reached.
     #[inline(always)]
@@ -339,6 +353,38 @@ mod tests {
         book.try_insert(order.clone()).unwrap();
         assert_eq!(book.remove_by_user_id(200), Some(order));
         assert_eq!(book.remove_by_user_id(200), None);
+    }
+
+    #[test]
+    fn active_limit_orders_iter_and_user_order_ids() {
+        let mut book = ActiveLimitOrders::<i64, 5, BaseCurrency<i64, 5>, i32>::with_capacity(
+            NonZeroU16::new(10).unwrap(),
+        );
+        assert_eq!(book.iter().count(), 0);
+        assert_eq!(book.user_order_ids().count(), 0);
+
+        let bid = LimitOrder::new_with_user_order_id(
+            Buy,
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            BaseCurrency::new(5, 0),
+            100,
+        )
+        .unwrap()
+        .into_pending(ExchangeOrderMeta::new(0.into(), 0.into()));
+        book.try_insert(bid.clone()).unwrap();
+
+        let ask = LimitOrder::new_with_user_order_id(
+            Sell,
+            QuoteCurrency::<i64, 5>::new(110, 0),
+            BaseCurrency::new(5, 0),
+            200,
+        )
+        .unwrap()
+        .into_pending(ExchangeOrderMeta::new(1.into(), 0.into()));
+        book.try_insert(ask.clone()).unwrap();
+
+        assert_eq!(Vec::from_iter(book.iter()), vec![&bid, &ask]);
+        assert_eq!(Vec::from_iter(book.user_order_ids()), vec![100, 200]);
     }
 
     #[test]
