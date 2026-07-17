@@ -134,7 +134,7 @@ where
 
                 order.remaining_quantity().is_zero()
             })
-            .and_then(|order| Some(order.into_filled(ts_ns)))
+            .map(|order| order.into_filled(ts_ns))
     }
 
     /// Get a `LimitOrder` by the given `OrderId` if any.
@@ -157,11 +157,11 @@ where
         self.orders
             .iter()
             .position(|order| order.id() == order_id)
-            .and_then(|idx| {
+            .map(|idx| {
                 let order = self.orders.remove(idx);
                 self.notional_sum -= order.notional();
                 assert2::debug_assert!(self.notional_sum >= Zero::zero());
-                Some(order)
+                order
             })
     }
 
@@ -174,11 +174,11 @@ where
         self.orders
             .iter()
             .position(|order| order.user_order_id() == uid)
-            .and_then(|idx| {
+            .map(|idx| {
                 let order = self.orders.remove(idx);
                 self.notional_sum -= order.notional();
                 assert2::debug_assert!(self.notional_sum >= Zero::zero());
-                Some(order)
+                order
             })
     }
 
@@ -209,14 +209,12 @@ where
             .position(|existing| matches!(SideT::cmp(&order, existing), Less | Equal))
             .unwrap_or(self.orders.len());
         self.orders.insert(idx, order);
-        debug_assert_eq!(
-            {
-                let mut cloned = self.orders.clone();
-                cloned.sort_by(|a, b| SideT::cmp(a, b));
-                cloned
-            },
-            self.orders
-        );
+        #[cfg(debug_assertions)]
+        {
+            let mut sorted_orders = self.orders.clone();
+            sorted_orders.sort_by(SideT::cmp);
+            debug_assert_eq!(sorted_orders, self.orders);
+        }
 
         Ok(())
     }
