@@ -6,7 +6,6 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     hongdown.url = "github:dahlia/hongdown";
-    bencher.url = "github:MathisWellmann/bencher";
     naersk = {
       url = "github:nix-community/naersk";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -19,7 +18,6 @@
     flake-utils,
     hongdown,
     naersk,
-    bencher,
     ...
   }:
     flake-utils.lib.eachDefaultSystem (
@@ -75,7 +73,6 @@
         tools = with pkgs; [
           mprocs # Run multiple commands in parallel from `mprocs.yml`, acting essentially as a local CI system.
           hongdown.packages.${system}.hongdown
-          bencher.packages.${system}.bencher
         ];
       in
         with pkgs; {
