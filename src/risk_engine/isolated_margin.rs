@@ -74,12 +74,20 @@ where
     ) -> Result<(), NotEnoughAvailableBalance> {
         let om = account.order_margin();
         let new_order_margin = account.order_margin_with_order(order);
+        let maker_fee = (*self.contract_spec.fee_maker().as_ref()).max(Zero::zero());
+        let pending_fees = account
+            .active_limit_orders()
+            .iter()
+            .fold(BaseOrQuote::PairedCurrency::zero(), |fees, order| {
+                fees + order.notional() * maker_fee
+            })
+            + order.notional() * maker_fee;
 
         let available_balance = account.available_balance();
         trace!(
-            "order_margin: {om:?}, new_order_margin: {new_order_margin:?}, available_balance: {available_balance:?}"
+            "order_margin: {om:?}, new_order_margin: {new_order_margin:?}, pending_fees: {pending_fees:?}, available_balance: {available_balance:?}"
         );
-        if new_order_margin > available_balance + om {
+        if new_order_margin + pending_fees > available_balance + om {
             return Err(NotEnoughAvailableBalance);
         }
 
