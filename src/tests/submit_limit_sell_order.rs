@@ -154,7 +154,10 @@ fn submit_limit_sell_order_no_position_max() {
         BaseCurrency::new(1, 0),
     )
     .unwrap();
-    exchange.submit_limit_order(order.clone()).unwrap();
+    assert_eq!(
+        exchange.submit_limit_order(order),
+        Err(NotEnoughAvailableBalance.into())
+    );
 
     let order = LimitOrder::new(
         Side::Buy,

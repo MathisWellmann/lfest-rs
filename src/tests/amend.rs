@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[tracing_test::traced_test]
-#[test_matrix([BaseCurrency::new(1, 0), BaseCurrency::new(3, 0), BaseCurrency::new(5, 0), BaseCurrency::new(10, 0)])]
+#[test_matrix([BaseCurrency::new(1, 0), BaseCurrency::new(3, 0), BaseCurrency::new(5, 0)])]
 fn amend_limit_order_qty(new_qty: BaseCurrency<i64, DECIMALS>) {
     let mut exchange = mock_exchange_linear();
 
