@@ -18,6 +18,7 @@ use crate::{
         MarginCurrency,
         MaxNumberOfActiveOrders,
         Mon,
+        OrderId,
         OrderIdNotFound,
         Pending,
         QuoteCurrency,
@@ -53,6 +54,9 @@ where
     /// The initial margin requirement is set based on the selected leverage of the account.
     init_margin_req: Decimal<I, D>,
 
+    /// The maker fee rate of the venue, used to reserve fees for resting limit orders.
+    maker_fee: Decimal<I, D>,
+
     /// The active limit orders of the account.
     #[getset(get = "pub")]
     active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
@@ -66,25 +70,93 @@ where
     UserOrderIdT: UserOrderId,
 {
     /// Create a new instance with a maximum capacity of `max_active_orders`.
+    ///
+    /// `init_margin_req` is the initial margin requirement derived from the configured
+    /// leverage and `maker_fee` is the venue's maker fee rate, both of which enter the
+    /// canonical collateral requirement of the account.
     pub fn new(
         balances: Balances<I, D, BaseOrQuote::PairedCurrency>,
         max_active_orders: NonZeroU16,
+        init_margin_req: Decimal<I, D>,
+        maker_fee: Decimal<I, D>,
     ) -> Self {
+        assert2::assert!(init_margin_req > Decimal::zero());
+        assert2::assert!(init_margin_req <= Decimal::ONE);
         Self {
             active_limit_orders: ActiveLimitOrders::with_capacity(max_active_orders),
             position: Position::default(),
             balances,
-            init_margin_req: Decimal::ONE, // 1x leverage by default.
+            init_margin_req,
+            maker_fee,
         }
     }
 
-    /// The available balance is the account equity minus position and order margin.
+    /// The maker fees reserved for the resting limit orders, so that any of their fills
+    /// can always be paid for. A negative (rebate) maker fee reserves nothing.
+    #[inline(always)]
+    #[must_use]
+    pub fn reserved_maker_fees(&self) -> BaseOrQuote::PairedCurrency {
+        (self.active_limit_orders.bids().notional_sum()
+            + self.active_limit_orders.asks().notional_sum())
+            * self.maker_fee.max(Decimal::zero())
+    }
+
+    /// The canonical collateral requirement of the account:
+    /// the position margin, the order margin and the reserved maker fees.
+    ///
+    /// Both order admission in the risk engine and the exchange's post-fill margin
+    /// reconciliation are based on this single requirement.
+    #[inline(always)]
+    #[must_use]
+    pub fn required_collateral(&self) -> BaseOrQuote::PairedCurrency {
+        self.position_margin() + self.order_margin() + self.reserved_maker_fees()
+    }
+
+    /// The signed difference between the account equity and its required collateral.
+    ///
+    /// A negative value is a collateral deficit: it can arise from settling a
+    /// position-reducing fill (which is never rejected) and is resolved by the
+    /// exchange's margin call, which force-cancels resting limit orders.
+    #[inline(always)]
+    #[must_use]
+    pub fn margin_excess(&self) -> BaseOrQuote::PairedCurrency {
+        self.balances.equity() - self.required_collateral()
+    }
+
+    /// The balance available for new orders and positions:
+    /// the account equity exceeding the required collateral, floored at zero.
     #[inline(always)]
     #[must_use]
     pub fn available_balance(&self) -> BaseOrQuote::PairedCurrency {
-        let avail = self.balances.equity() - self.position_margin() - self.order_margin();
-        debug_assert!(avail >= Zero::zero());
-        avail
+        self.margin_excess().max(Zero::zero())
+    }
+
+    /// The id of the resting order whose cancellation frees the most collateral;
+    /// see `ActiveLimitOrders::largest_collateral_contributor`.
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn largest_collateral_contributor(&self) -> Option<OrderId> {
+        self.active_limit_orders.largest_collateral_contributor(
+            self.init_margin_req,
+            &self.position,
+            self.maker_fee,
+        )
+    }
+
+    /// The margin excess if `new_order` were also resting,
+    /// including its order margin and maker fee reserve.
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn margin_excess_with_order(
+        &self,
+        new_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+    ) -> BaseOrQuote::PairedCurrency {
+        let new_fee_reserve = new_order.notional() * self.maker_fee.max(Decimal::zero());
+        self.balances.equity()
+            - self.position_margin()
+            - self.order_margin_with_order(new_order)
+            - self.reserved_maker_fees()
+            - new_fee_reserve
     }
 
     /// The current position margin

@@ -9,6 +9,21 @@ use super::{
     UserOrderId,
 };
 
+/// An event concerning a resting limit order, emitted by `Exchange::update_state`.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum LimitOrderEvent<I, const D: u8, BaseOrQuote, UserOrderIdT>
+where
+    I: Mon<D> + Display,
+    BaseOrQuote: Currency<I, D> + Display,
+    UserOrderIdT: UserOrderId + Display,
+{
+    /// The resting order was partially or fully filled.
+    Fill(LimitOrderFill<I, D, BaseOrQuote, UserOrderIdT>),
+    /// The venue force-cancelled the resting order to keep the account's required
+    /// collateral covered by its equity after a fill or liquidation (margin call).
+    ForcedCancel(LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>),
+}
+
 /// Contains the possible updates to limit orders.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum LimitOrderFill<I, const D: u8, BaseOrQuote, UserOrderIdT>

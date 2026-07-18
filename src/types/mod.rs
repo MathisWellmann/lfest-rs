@@ -11,6 +11,7 @@ mod order_update;
 mod re_pricing;
 mod side;
 mod smol_currency;
+mod solvency;
 mod timestamp_ns;
 
 pub use errors::*;
@@ -31,7 +32,10 @@ pub use order_status::{
     NewOrder,
     Pending,
 };
-pub use order_update::LimitOrderFill;
+pub use order_update::{
+    LimitOrderEvent,
+    LimitOrderFill,
+};
 pub use re_pricing::RePricing;
 pub use side::Side;
 pub use smol_currency::{
@@ -41,6 +45,7 @@ pub use smol_currency::{
     Mon,
     QuoteCurrency,
 };
+pub use solvency::Solvency;
 pub(crate) use timestamp_ns::NANOS_PER_SECOND;
 pub use timestamp_ns::TimestampNs;
 

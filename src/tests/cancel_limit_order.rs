@@ -45,9 +45,10 @@ fn cancel_limit_order() {
         exchange.account().order_margin(),
         QuoteCurrency::new(100, 0)
     );
+    // 1000 equity - 100 order margin - 0.02 reserved maker fee.
     assert_eq!(
         exchange.account().available_balance(),
-        QuoteCurrency::new(900, 0)
+        QuoteCurrency::new(89_998_000, 5)
     );
 
     exchange

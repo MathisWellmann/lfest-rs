@@ -17,7 +17,10 @@ use criterion::{
     criterion_group,
     criterion_main,
 };
-use lfest::prelude::*;
+use lfest::{
+    prelude::*,
+    test_fee_maker,
+};
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("OrderMargin");
@@ -42,6 +45,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                     Account::new(
                         Balances::new(QuoteCurrency::new(1_000_000, 0)),
                         max_active_orders,
+                        const_decimal::Decimal::ONE,
+                        *test_fee_maker().as_ref(),
                     )
                 },
                 |mut account| {
@@ -64,6 +69,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                     let mut account = Account::new(
                         Balances::new(QuoteCurrency::new(1_000_000, 0)),
                         max_active_orders,
+                        const_decimal::Decimal::ONE,
+                        *test_fee_maker().as_ref(),
                     );
                     for order in orders.iter() {
                         account.try_insert_order(order.clone()).expect("Can insert");
@@ -94,6 +101,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                     let mut account = Account::new(
                         Balances::new(QuoteCurrency::new(1_000_000, 0)),
                         max_active_orders,
+                        const_decimal::Decimal::ONE,
+                        *test_fee_maker().as_ref(),
                     );
                     for order in orders.iter() {
                         account.try_insert_order(black_box(order.clone())).unwrap()
@@ -119,6 +128,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                     let mut account = Account::new(
                         Balances::new(QuoteCurrency::new(1_000_000, 0)),
                         max_active_orders,
+                        const_decimal::Decimal::ONE,
+                        *test_fee_maker().as_ref(),
                     );
                     for order in orders.iter() {
                         account.try_insert_order(black_box(order.clone())).unwrap()
@@ -140,6 +151,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                     let mut account = Account::new(
                         Balances::new(QuoteCurrency::new(1_000_000, 0)),
                         max_active_orders,
+                        const_decimal::Decimal::ONE,
+                        *test_fee_maker().as_ref(),
                     );
                     for order in orders.iter() {
                         account.try_insert_order(black_box(order.clone())).unwrap()
@@ -161,6 +174,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                     let mut account = Account::new(
                         Balances::new(QuoteCurrency::new(1_000_000, 0)),
                         max_active_orders,
+                        const_decimal::Decimal::ONE,
+                        *test_fee_maker().as_ref(),
                     );
                     for order in orders.iter() {
                         account.try_insert_order(black_box(order.clone())).unwrap()

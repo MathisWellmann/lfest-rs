@@ -46,7 +46,11 @@ pub mod prelude {
         account::*,
         config::Config,
         contract_specification::*,
-        exchange::Exchange,
+        exchange::{
+            Exchange,
+            ForcedCancels,
+            MarketOrderSettlement,
+        },
         leverage,
         market_state::MarketState,
         market_update::*,

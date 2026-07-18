@@ -149,6 +149,39 @@ where
         )
     }
 
+    /// The id of the resting order whose cancellation frees the most collateral:
+    /// the largest marginal contributor of order margin plus reserved maker fee.
+    ///
+    /// The marginal contribution is computed with the same canonical
+    /// [`order_margin`] function which admission is based on, so the margin call
+    /// of the exchange and the risk engine can never disagree.
+    #[must_use]
+    pub(crate) fn largest_collateral_contributor(
+        &self,
+        init_margin_req: Decimal<I, D>,
+        position: &Position<I, D, BaseOrQuote>,
+        maker_fee: Decimal<I, D>,
+    ) -> Option<OrderId> {
+        let bids_notional = self.bids.notional_sum();
+        let asks_notional = self.asks.notional_sum();
+        let current_margin = order_margin(bids_notional, asks_notional, init_margin_req, position);
+        let fee = maker_fee.max(Decimal::zero());
+
+        let marginal_collateral =
+            |order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>| {
+                let (bids, asks) = match order.side() {
+                    Buy => (bids_notional - order.notional(), asks_notional),
+                    Sell => (bids_notional, asks_notional - order.notional()),
+                };
+                let margin_without = order_margin(bids, asks, init_margin_req, position);
+                current_margin - margin_without + order.notional() * fee
+            };
+
+        self.iter()
+            .max_by_key(|order| marginal_collateral(order))
+            .map(|order| order.id())
+    }
+
     /// Get the order margin if a new order were to be added.
     #[must_use]
     pub(crate) fn order_margin_with_order(

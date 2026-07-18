@@ -38,9 +38,10 @@ fn submit_limit_buy_order_no_position() {
         exchange.account().order_margin(),
         QuoteCurrency::new(490, 0)
     );
+    // 1000 equity - 490 order margin - 0.098 reserved maker fee.
     assert_eq!(
         exchange.account().available_balance(),
-        QuoteCurrency::new(510, 0)
+        QuoteCurrency::new(50_990_200, 5)
     );
 
     // Now fill the order
@@ -57,11 +58,11 @@ fn submit_limit_buy_order_no_position() {
                 timestamp_exchange_ns: 0.into()
             })
             .unwrap(),
-        &vec![LimitOrderFill::FullyFilled {
+        &vec![LimitOrderEvent::Fill(LimitOrderFill::FullyFilled {
             filled_quantity: BaseCurrency::new(5, 0),
             fee,
             order_after_fill: order.into_filled(0.into()),
-        }]
+        })]
     );
     let bid = QuoteCurrency::new(96, 0);
     let ask = QuoteCurrency::new(99, 0);
@@ -120,9 +121,11 @@ fn submit_limit_buy_order_no_position() {
         exchange.account().position_margin(),
         QuoteCurrency::new(490, 0)
     );
+    // The resting sell order is fully offset by the long position (zero order margin)
+    // but still reserves its own maker fee, which happens to equal `fee`.
     assert_eq!(
         exchange.account().available_balance(),
-        QuoteCurrency::new(510, 0) - fee
+        QuoteCurrency::new(510, 0) - fee - fee
     );
     assert!(exchange.account().order_margin().is_zero());
 
@@ -151,11 +154,11 @@ fn submit_limit_buy_order_no_position() {
                 timestamp_exchange_ns: 3.into()
             })
             .unwrap(),
-        &vec![LimitOrderFill::FullyFilled {
+        &vec![LimitOrderEvent::Fill(LimitOrderFill::FullyFilled {
             filled_quantity: BaseCurrency::new(5, 0),
             fee,
             order_after_fill: order.into_filled(3.into())
-        }]
+        })]
     );
     assert_eq!(exchange.account().position(), &Position::default());
     assert_eq!(
@@ -325,11 +328,11 @@ fn submit_limit_buy_order_with_long() {
                 timestamp_exchange_ns: 2.into()
             })
             .unwrap(),
-        &vec![LimitOrderFill::FullyFilled {
+        &vec![LimitOrderEvent::Fill(LimitOrderFill::FullyFilled {
             filled_quantity: BaseCurrency::new(9, 0),
             fee,
             order_after_fill: order.into_filled(2.into())
-        }]
+        })]
     );
 
     assert_eq!(exchange.account().position(), &Position::default());
@@ -410,11 +413,11 @@ fn submit_limit_buy_order_with_short() {
                 timestamp_exchange_ns: 1.into(),
             })
             .unwrap(),
-        &vec![LimitOrderFill::FullyFilled {
+        &vec![LimitOrderEvent::Fill(LimitOrderFill::FullyFilled {
             filled_quantity: BaseCurrency::new(9, 0),
             fee,
             order_after_fill: order.into_filled(1.into())
-        }]
+        })]
     );
 
     assert_eq!(exchange.account().position(), &Position::default());

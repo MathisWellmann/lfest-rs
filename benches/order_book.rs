@@ -18,7 +18,10 @@ use criterion::{
     criterion_group,
     criterion_main,
 };
-use lfest::prelude::*;
+use lfest::{
+    prelude::*,
+    test_fee_maker,
+};
 use rand::{
     Rng,
     SeedableRng,
@@ -47,6 +50,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                     Account::new(
                         Balances::new(QuoteCurrency::new(1000, 0)),
                         NonZeroU16::new(n as u16).unwrap(),
+                        const_decimal::Decimal::ONE,
+                        *test_fee_maker().as_ref(),
                     )
                 },
                 |mut ob| {

@@ -46,9 +46,10 @@ fn limit_orders_only() {
         exchange.account().order_margin(),
         QuoteCurrency::new(950, 0)
     );
+    // 1000 equity - 950 order margin - 0.19 reserved maker fee.
     assert_eq!(
         exchange.account().available_balance(),
-        QuoteCurrency::new(50, 0)
+        QuoteCurrency::new(4_981_000, 5)
     );
 
     let order_updates = exchange
