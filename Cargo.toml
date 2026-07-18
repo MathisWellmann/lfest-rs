@@ -217,7 +217,7 @@ mutants = "0.0.4"
 trade_aggregation = { version = "13", optional = true }
 
 [dev-dependencies]
-rand = "0.9"
+rand = "0.10"
 test-case = "3"
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
 criterion = { version = "0.8", features = ["html_reports"] }

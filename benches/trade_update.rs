@@ -9,7 +9,7 @@ use std::hint::black_box;
 use criterion::*;
 use lfest::prelude::*;
 use rand::{
-    Rng,
+    RngExt,
     SeedableRng,
     rngs::SmallRng,
 };

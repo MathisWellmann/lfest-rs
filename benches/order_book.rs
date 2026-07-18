@@ -23,7 +23,7 @@ use lfest::{
     test_fee_maker,
 };
 use rand::{
-    Rng,
+    RngExt,
     SeedableRng,
 };
 

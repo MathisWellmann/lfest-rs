@@ -296,7 +296,7 @@ mod tests {
         One,
         Zero,
     };
-    use rand::Rng;
+    use rand::RngExt;
 
     use super::ActiveLimitOrders;
     use crate::{
