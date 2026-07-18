@@ -20,7 +20,7 @@ use lfest::{
     prelude::*,
 };
 use rand::{
-    Rng,
+    RngExt,
     SeedableRng,
     rngs::SmallRng,
 };

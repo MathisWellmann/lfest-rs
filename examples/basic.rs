@@ -17,7 +17,7 @@ use lfest::{
     prelude::*,
 };
 use rand::{
-    Rng,
+    RngExt,
     rng,
 };
 use tracing::error;

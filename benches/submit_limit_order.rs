@@ -23,7 +23,7 @@ use criterion::{
 };
 use lfest::prelude::*;
 use rand::{
-    Rng,
+    RngExt,
     SeedableRng,
     rngs::SmallRng,
 };
@@ -91,7 +91,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 .unwrap()
             }
         }));
-        group.throughput(criterion::Throughput::Elements(n as u64));
+        group.throughput(criterion::Throughput::Elements(n));
         group.bench_with_input(BenchmarkId::new("submit_limit_order", n), &n, |b, _n| {
             b.iter_with_setup(setup_exchange, |mut exchange| {
                 for order in orders.iter() {
