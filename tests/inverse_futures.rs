@@ -913,9 +913,10 @@ fn inv_execute_limit() {
     );
     assert!(exchange.account().position_margin().is_zero());
     assert_eq!(exchange.account().order_margin(), BaseCurrency::new(5, 1));
+    // 1 equity - 0.5 order margin - 0.0001 reserved maker fee.
     assert_eq!(
         exchange.account().available_balance(),
-        BaseCurrency::new(5, 1)
+        BaseCurrency::new(49_990, 5)
     );
 
     let order_updates = exchange
@@ -1020,9 +1021,10 @@ fn inv_execute_limit() {
     );
     assert!(exchange.account().position_margin().is_zero());
     assert_eq!(exchange.account().order_margin(), BaseCurrency::new(5, 1));
+    // The resting sell order additionally reserves its own maker fee `fee_2`.
     assert_eq!(
         exchange.account().available_balance(),
-        BaseCurrency::new(55, 2) - fee_0 - fee_1
+        BaseCurrency::new(55, 2) - fee_0 - fee_1 - fee_2
     );
 
     let order_updates = exchange

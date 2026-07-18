@@ -40,11 +40,11 @@ fn submit_limit_sell_order_no_position() {
                 timestamp_exchange_ns: 1.into()
             })
             .unwrap(),
-        &vec![LimitOrderFill::FullyFilled {
+        &vec![LimitOrderEvent::Fill(LimitOrderFill::FullyFilled {
             filled_quantity: BaseCurrency::new(9, 0),
             fee,
             order_after_fill: order.into_filled(1.into())
-        }]
+        })]
     );
     exchange
         .update_state(&Bba {
@@ -100,11 +100,11 @@ fn submit_limit_sell_order_no_position() {
                 timestamp_exchange_ns: 3.into(),
             })
             .unwrap(),
-        &vec![LimitOrderFill::FullyFilled {
+        &vec![LimitOrderEvent::Fill(LimitOrderFill::FullyFilled {
             filled_quantity: BaseCurrency::new(9, 0),
             fee: fee1,
             order_after_fill: order.into_filled(3.into()),
-        }]
+        })]
     );
     assert_eq!(exchange.account().position(), &Position::default());
     assert_eq!(

@@ -72,22 +72,12 @@ where
         account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> Result<(), NotEnoughAvailableBalance> {
-        let om = account.order_margin();
-        let new_order_margin = account.order_margin_with_order(order);
-        let maker_fee = (*self.contract_spec.fee_maker().as_ref()).max(Zero::zero());
-        let pending_fees = account
-            .active_limit_orders()
-            .iter()
-            .fold(BaseOrQuote::PairedCurrency::zero(), |fees, order| {
-                fees + order.notional() * maker_fee
-            })
-            + order.notional() * maker_fee;
-
-        let available_balance = account.available_balance();
-        trace!(
-            "order_margin: {om:?}, new_order_margin: {new_order_margin:?}, pending_fees: {pending_fees:?}, available_balance: {available_balance:?}"
-        );
-        if new_order_margin + pending_fees > available_balance + om {
+        // Admission is decided by the canonical collateral requirement of the account:
+        // with the new order resting, the position margin, the order margin and the
+        // reserved maker fees must still be covered by the account equity.
+        let excess = account.margin_excess_with_order(order);
+        trace!("check_limit_order: margin_excess_with_order: {excess:?}");
+        if excess < Zero::zero() {
             return Err(NotEnoughAvailableBalance);
         }
 
@@ -157,7 +147,11 @@ where
             Less => {
                 let abs_qty = account.position().quantity().abs();
                 if order.quantity() <= abs_qty {
-                    // The order strictly reduces the position, so no additional margin is required.
+                    // The order strictly reduces the position, so no additional margin is required
+                    // and a risk-reducing order is never rejected. Any collateral shortfall its
+                    // settlement causes (fees, realized losses, resting orders losing their
+                    // position offset) is resolved by `Exchange::reconcile_margin`, which
+                    // force-cancels resting limit orders like a real venue's margin call.
                     return Ok(());
                 }
                 // The order reduces the short and puts on a long
@@ -214,7 +208,11 @@ where
                 let abs_qty = account.position().quantity().abs();
                 // Else its a long position which needs to be reduced
                 if order.quantity() <= abs_qty {
-                    // The order strictly reduces the position, so no additional margin is required.
+                    // The order strictly reduces the position, so no additional margin is required
+                    // and a risk-reducing order is never rejected. Any collateral shortfall its
+                    // settlement causes (fees, realized losses, resting orders losing their
+                    // position offset) is resolved by `Exchange::reconcile_margin`, which
+                    // force-cancels resting limit orders like a real venue's margin call.
                     return Ok(());
                 }
                 // The order reduces the long position and opens a short.

@@ -54,5 +54,5 @@ fn partial_limit_order_fill(
         fee: f,
         order_after_fill: order,
     };
-    assert_eq!(exec_orders[0], expected_order_update);
+    assert_eq!(exec_orders[0], LimitOrderEvent::Fill(expected_order_update));
 }
