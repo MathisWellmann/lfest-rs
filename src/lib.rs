@@ -29,8 +29,16 @@ pub use mock_exchange::*;
 /// Exports common types
 pub mod prelude {
     pub use const_decimal;
+    // Re-export every `num_traits` trait that appears in a public supertrait
+    // bound (`Mon`, `Currency`) or is implemented on a public currency type.
+    // Trait methods are only callable when the trait is in scope, so omitting
+    // one (e.g. `Signed` for `abs()`, `is_positive()`, `signum()`) causes
+    // "method not found" (E0599) for downstream users despite the impl
+    // existing.
     pub use num_traits::{
+        Num,
         One,
+        Signed,
         Zero,
     };
 
