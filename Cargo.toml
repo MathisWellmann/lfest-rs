@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.138.0"
+version = "0.138.1"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2024"
 license-file = "LICENSE"
@@ -208,7 +208,7 @@ const-decimal = { git = "https://github.com/OliverNChalk/const-decimal", feature
 num-traits = "0.2"
 typed-builder = "0.23"
 getset = "0.1.2"
-assert2 = "0.3"
+assert2 = "0.4"
 num = "0.4"
 glidesort = "0.1"
 csv = "1"
