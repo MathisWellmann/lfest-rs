@@ -533,8 +533,9 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "const-decimal"
-version = "0.3.0"
-source = "git+https://github.com/OliverNChalk/const-decimal#f3172d550d4f97ede714188646242e3d6f8e62b8"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf9ad09b823e19e65d8cb57d12cb241d322b2fcbfa466ba037e1a07509d73389"
 dependencies = [
  "num-traits",
  "paste",
@@ -1135,7 +1136,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lfest"
-version = "0.138.0"
+version = "0.138.1"
 dependencies = [
  "assert2",
  "const-decimal",
