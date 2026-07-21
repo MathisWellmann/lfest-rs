@@ -1,3 +1,4 @@
+use getset::CopyGetters;
 use num::Zero;
 
 use super::MarketUpdate;
@@ -27,23 +28,26 @@ use crate::{
     utils::min,
 };
 
-// TODO: use `Getters`
 /// A taker trade that consumes liquidity in the book.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, CopyGetters)]
 pub struct Trade<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
 {
     /// The nanosecond timestamp at which this trade occurred at the exchange.
+    #[getset(get_copy = "pub")]
     pub timestamp_exchange_ns: TimestampNs,
     /// The price at which the trade executed at.
+    #[getset(get_copy = "pub")]
     pub price: QuoteCurrency<I, D>,
     /// The executed quantity.
     /// Generic denotation, e.g either Quote or Base currency denoted.
+    #[getset(get_copy = "pub")]
     pub quantity: BaseOrQuote,
     /// Either a buy or sell order.
     // TODO: remove field and derive from sign of `quantity` to save size of struct.
+    #[getset(get_copy = "pub")]
     pub side: Side,
 }
 
@@ -161,6 +165,9 @@ mod tests {
             side,
             timestamp_exchange_ns: 0.into(),
         };
+        assert_eq!(trade.side(), side);
+        assert_eq!(trade.price(), trade.price);
+        assert_eq!(trade.quantity(), trade.quantity);
         assert_eq!(trade.can_fill_bids(), can_fill_bid);
         assert_eq!(trade.can_fill_asks(), can_fill_ask);
     }

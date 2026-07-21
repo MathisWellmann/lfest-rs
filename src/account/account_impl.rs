@@ -1,7 +1,10 @@
 use std::num::NonZeroU16;
 
 use const_decimal::Decimal;
-use getset::Getters;
+use getset::{
+    CopyGetters,
+    Getters,
+};
 use num::Zero;
 
 use super::Balances;
@@ -35,7 +38,7 @@ use crate::{
 /// - `D`: The constant decimal precision of the currencies.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 /// - `UserOrderIdT`: The type of user order id to use. Set to `()` if you don't need one.
-#[derive(Debug, Clone, Getters)]
+#[derive(Debug, Clone, CopyGetters, Getters)]
 pub struct Account<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -52,6 +55,7 @@ where
     balances: Balances<I, D, BaseOrQuote::PairedCurrency>,
 
     /// The initial margin requirement is set based on the selected leverage of the account.
+    #[getset(get_copy = "pub")]
     init_margin_req: Decimal<I, D>,
 
     /// The maker fee rate of the venue, used to reserve fees for resting limit orders.
