@@ -79,11 +79,17 @@ where
 
     /// Get the number of active limit orders.
     #[inline(always)]
-    pub fn num_active(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.bids.len() + self.asks.len()
     }
 
-    /// `true` is there are no active orders.
+    /// Get the number of active limit orders.
+    #[inline(always)]
+    pub fn num_active(&self) -> usize {
+        self.len()
+    }
+
+    /// `true` if there are no active orders.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.bids.is_empty() && self.asks.is_empty()
@@ -114,6 +120,14 @@ where
     ) -> impl Iterator<Item = &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>
     {
         self.bids.orders().iter().chain(self.asks.orders().iter())
+    }
+
+    /// Alias for [`Self::iter`] for callers treating active orders as values.
+    pub fn values(
+        &self,
+    ) -> impl Iterator<Item = &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>
+    {
+        self.iter()
     }
 
     /// Iterate over the user order ids of all active limit orders; bids first, then asks.
@@ -287,6 +301,31 @@ where
     }
 }
 
+impl<'a, I, const D: u8, BaseOrQuote, UserOrderIdT> IntoIterator
+    for &'a ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    type Item = &'a LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>;
+    type IntoIter = std::iter::Chain<
+        std::slice::Iter<
+            'a,
+            LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        >,
+        std::slice::Iter<
+            'a,
+            LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        >,
+    >;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.bids.orders().iter().chain(self.asks.orders().iter())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroU16;
@@ -393,7 +432,9 @@ mod tests {
         let mut book = ActiveLimitOrders::<i64, 5, BaseCurrency<i64, 5>, i32>::with_capacity(
             NonZeroU16::new(10).unwrap(),
         );
-        assert_eq!(book.iter().count(), 0);
+        assert_eq!(book.len(), 0);
+        assert_eq!(book.values().count(), 0);
+        assert_eq!((&book).into_iter().count(), 0);
         assert_eq!(book.user_order_ids().count(), 0);
 
         let bid = LimitOrder::new_with_user_order_id(
@@ -416,7 +457,10 @@ mod tests {
         .into_pending(ExchangeOrderMeta::new(1.into(), 0.into()));
         book.try_insert(ask.clone()).unwrap();
 
+        assert_eq!(book.len(), 2);
         assert_eq!(Vec::from_iter(book.iter()), vec![&bid, &ask]);
+        assert_eq!(Vec::from_iter(book.values()), vec![&bid, &ask]);
+        assert_eq!(Vec::from_iter(&book), vec![&bid, &ask]);
         assert_eq!(Vec::from_iter(book.user_order_ids()), vec![100, 200]);
     }
 
