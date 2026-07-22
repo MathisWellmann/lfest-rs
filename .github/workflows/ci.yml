@@ -41,6 +41,8 @@ jobs:
         run: nix develop --command statix check
       - name: nix-alejandra
         run: nix develop --command alejandra --check .
+      - name: yamlfmt
+        run: nix develop --command yamlfmt -lint .
 
 # TODO: enable hongdown
 # - name: markdown-formatting
