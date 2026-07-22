@@ -73,6 +73,7 @@
         tools = with pkgs; [
           mprocs # Run multiple commands in parallel from `mprocs.yml`, acting essentially as a local CI system.
           hongdown.packages.${system}.hongdown
+          yamlfmt
         ];
       in
         with pkgs; {

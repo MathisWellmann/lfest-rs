@@ -3,20 +3,17 @@ procs:
     shell: "cargo check"
   cargo-check-trade_aggregation:
     shell: "cargo check --features trade_aggregation"
-
   # Testing
   cargo-test:
     shell: "cargo test"
   cargo-test-trade_aggregation:
     shell: "cargo test --features trade_aggregation"
-
   cargo-clippy:
     shell: "cargo clippy"
   cargo-doc:
     shell: "cargo doc"
   cargo-machete:
     shell: "cargo machete"
-
   # Benchmarking
   cargo-bench_Position:
     shell: "cargo bench Position"
@@ -60,7 +57,6 @@ procs:
   cargo-bench_OrderBook/try_insert:
     shell: "cargo bench OrderBook/try_insert"
     autostart: false
-
   # Formatting
   taplo:
     shell: "taplo fmt"
@@ -68,7 +64,6 @@ procs:
     shell: "cargo fmt"
   hongdown:
     shell: "hongdown -w ."
-
   # Code Coverage
   cargo-tarpaulin:
     shell: "cargo tarpaulin --target-dir target/tarpaulin"
@@ -76,7 +71,6 @@ procs:
   cargo-mutants:
     shell: "cargo mutants"
     autostart: false
-
   # Security
   cargo-audit:
     shell: "cargo audit"
@@ -84,10 +78,8 @@ procs:
   cargo-miri:
     shell: "MIRIFLAGS=-Zmiri-disable-isolation cargo miri nextest run -j 4"
     autostart: false
-
   # Semantic version check
   semver-checks:
     shell: "cargo semver-checks"
-
   basic-example:
     shell: "cargo run --example basic"
