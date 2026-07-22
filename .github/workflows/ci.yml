@@ -5,6 +5,8 @@ on:
 permissions:
   contents: read
   actions: read
+env:
+  RUSTFLAGS: "-D warnings" # Make all warnings deny.
 jobs:
   check:
     # Target self-hosted runner by label
@@ -15,18 +17,13 @@ jobs:
       - name: checkout-code
         uses: actions/checkout@v4
       - name: cargo-check
-        env:
-          RUSTFLAGS: "-D warnings" # Make all warnings deny.
         run: nix develop --command cargo check
       - name: cargo-test
-        env:
-          RUSTFLAGS: "-D warnings" # Make all warnings deny.
         run: nix develop --command cargo test
-      # TODO: make clippy work
-      # - name: cargo-clippy
-      #   env:
-      #     RUSTFLAGS: "-D warnings" # Make all warnings deny.
-      #   run: nix develop --command cargo clippy
+      # - name: cargo-test
+      #   run: nix develop --command cargo test --release
+      - name: cargo-clippy
+        run: nix develop --command cargo clippy
       - name: cargo-bench
         run: nix develop --command cargo bench --no-run # Just to make sure it compiles
       - name: cargo-fmt
