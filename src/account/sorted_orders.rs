@@ -88,21 +88,24 @@ where
         }
     }
 
+    /// The number of limit orders.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.orders.len()
     }
 
+    /// If `true`, there are no limit orders.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.orders.is_empty()
     }
 
+    /// The limit order closest to the mid price.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn best(
+    pub fn best(
         &self,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
         self.orders.last()
@@ -140,7 +143,7 @@ where
     /// Get a `LimitOrder` by the given `OrderId` if any.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn get_by_id(
+    pub fn get_by_id(
         &self,
         order_id: OrderId,
     ) -> Option<&LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
@@ -165,9 +168,10 @@ where
             })
     }
 
+    /// Remove a limit order based on its user order id.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn remove_by_user_id(
+    pub fn remove_by_user_id(
         &mut self,
         uid: UserOrderIdT,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
