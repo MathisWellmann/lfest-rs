@@ -119,7 +119,7 @@ where
         &self,
     ) -> impl Iterator<Item = &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>
     {
-        self.bids.orders().iter().chain(self.asks.orders().iter())
+        self.bids.iter().chain(self.asks.iter())
     }
 
     /// Alias for [`Self::iter`] for callers treating active orders as values.
@@ -322,7 +322,7 @@ where
     >;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.bids.orders().iter().chain(self.asks.orders().iter())
+        self.bids.iter().chain(self.asks.iter())
     }
 }
 

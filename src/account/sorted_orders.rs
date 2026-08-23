@@ -224,6 +224,44 @@ where
     }
 }
 
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT, SideT>
+    SortedOrders<I, D, BaseOrQuote, UserOrderIdT, SideT>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    /// A non-consuming iterator over the orders, from worst to best price.
+    #[inline(always)]
+    pub fn iter(
+        &self,
+    ) -> std::slice::Iter<'_, LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>
+    {
+        self.orders.iter()
+    }
+}
+
+impl<'a, I, const D: u8, BaseOrQuote, UserOrderIdT, SideT> IntoIterator
+    for &'a SortedOrders<I, D, BaseOrQuote, UserOrderIdT, SideT>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    type Item = &'a LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>;
+    type IntoIter = std::slice::Iter<
+        'a,
+        LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+    >;
+
+    #[inline(always)]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use rand::{
@@ -514,6 +552,33 @@ mod tests {
             );
         }
         assert!(bids.is_empty());
+    }
+
+    #[test]
+    fn sorted_orders_iter() {
+        let mut bids =
+            SortedOrders::<i64, 6, BaseCurrency<_, 6>, NoUserOrderId, Bids>::with_capacity(
+                NonZeroU16::new(3).unwrap(),
+            );
+        for (i, price) in [100, 99, 101].into_iter().enumerate() {
+            let order = LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(price, 0),
+                BaseCurrency::new(1, 0),
+            )
+            .unwrap();
+            let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
+            bids.try_insert(order.into_pending(meta)).unwrap();
+        }
+        assert_eq!(bids.notional_sum, QuoteCurrency::new(300, 0));
+
+        // The non-consuming iterator goes worst to best and leaves everything in place.
+        assert_eq!(
+            bids.iter().map(|order| order.id()).collect::<Vec<_>>(),
+            vec![1.into(), 0.into(), 2.into()]
+        );
+        assert_eq!((&bids).into_iter().count(), 3);
+        assert_eq!(bids.notional_sum, QuoteCurrency::new(300, 0));
     }
 
     #[test]
