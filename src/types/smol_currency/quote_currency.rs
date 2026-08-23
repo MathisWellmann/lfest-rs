@@ -58,11 +58,18 @@ impl<I, const D: u8> QuoteCurrency<I, D>
 where
     I: Mon<D>,
 {
-    // TODO: return `Result`
     /// Create a new instance from an `integer` and a `scale`.
+    ///
+    /// # Panics:
+    /// If the arguments don't fit into the range and can't construct the internal `Decimal` type
+    /// For a panic free version, use `QuoteCurrency::try_from_scaled`
     pub fn new(integer: I, scale: u8) -> Self {
-        assert2::debug_assert!(scale <= D);
-        Self(Decimal::try_from_scaled(integer, scale).expect("Make sure the inputs are correct."))
+        Self::try_from_scaled(integer, scale).expect("Can construct from arguments")
+    }
+
+    /// Create a new instance from an `integer` and a `scale`.
+    pub fn try_from_scaled(integer: I, scale: u8) -> Option<Self> {
+        Decimal::try_from_scaled(integer, scale).map(Self)
     }
 
     #[inline]
