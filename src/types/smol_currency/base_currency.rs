@@ -59,11 +59,18 @@ where
     I: Mon<D>,
 {
     /// Create a new instance from an `integer` and a `scale`.
+    ///
+    /// # Panics:
+    /// If the arguments don't fit into the range and can't construct the internal `Decimal` type
+    /// For a panic free version, use `BaseCurrency::try_from_scaled`
     pub fn new(integer: I, scale: u8) -> Self {
-        Self(
-            Decimal::try_from_scaled(integer, scale)
-                .expect("Can construct `Decimal` from `integer` and `scale`"),
-        )
+        Self::try_from_scaled(integer, scale)
+            .expect("Can construct `Decimal` from `integer` and `scale`")
+    }
+
+    /// Create a new instance from an `integer` and a `scale`.
+    pub fn try_from_scaled(integer: I, scale: u8) -> Option<Self> {
+        Decimal::try_from_scaled(integer, scale).map(Self)
     }
 
     /// Round a number to a multiple of a given `quantum` toward zero.

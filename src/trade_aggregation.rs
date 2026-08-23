@@ -58,7 +58,7 @@ mod test {
             <Trade<i64, 5, BaseCurrency<i64, 5>> as TakerTrade>::size(&trade),
             5.0
         );
-        assert_eq!(trade.price(), 100.0);
+        assert_eq!(<Trade as TakerTrade>::price(trade), 100.0);
         assert_eq!(
             <Trade<i64, 5, BaseCurrency<i64, 5>> as TakerTrade>::price(&trade),
             100.0
