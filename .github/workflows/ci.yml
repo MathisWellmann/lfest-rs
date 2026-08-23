@@ -20,8 +20,6 @@ jobs:
         run: nix develop --command cargo check
       - name: cargo-test
         run: nix develop --command cargo test
-      # - name: cargo-test
-      #   run: nix develop --command cargo test --release
       - name: cargo-clippy
         run: nix develop --command cargo clippy
       - name: cargo-bench
@@ -40,7 +38,3 @@ jobs:
         run: nix develop --command alejandra --check .
       - name: yamlfmt
         run: nix develop --command yamlfmt -lint .
-
-# TODO: enable hongdown
-# - name: markdown-formatting
-#   run: nix develop --command hongdown --check .
