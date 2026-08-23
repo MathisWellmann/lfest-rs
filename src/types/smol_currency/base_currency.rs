@@ -337,4 +337,14 @@ mod test {
         result.set_one();
         assert_eq!(result, BaseCurrency::one());
     }
+
+    #[test]
+    fn base_currency_to_f64_to_f32() {
+        let v = BaseCurrency::<i64, 5>::new(12345, 3);
+        assert_eq!(v.to_f64(), 12.345_f64);
+        assert_eq!(v.to_f32(), 12.345_f32);
+        let v = BaseCurrency::<i64, 5>::new(-12345, 3);
+        assert_eq!(v.to_f64(), -12.345_f64);
+        assert_eq!(v.to_f32(), -12.345_f32);
+    }
 }
