@@ -28,6 +28,19 @@ pub enum PositionSide {
     Long,
 }
 
+impl PositionSide {
+    /// Invert the side of the position. Long becomes short and vice-versa
+    #[inline]
+    pub fn invert(self) -> Self {
+        use PositionSide::*;
+        match self {
+            Short => Long,
+            Neutral => Neutral,
+            Long => Short,
+        }
+    }
+}
+
 /// A futures position can be one of three variants.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Getters, CopyGetters)]
 pub struct Position<I, const D: u8, BaseOrQuote>
@@ -317,6 +330,14 @@ mod tests {
     fn size_of_position() {
         assert_eq!(size_of::<Position<i32, 4, BaseCurrency<_, 4>>>(), 8);
         assert_eq!(size_of::<Position<i64, 5, BaseCurrency<_, 5>>>(), 16);
+    }
+
+    #[test]
+    fn position_side_invert() {
+        use PositionSide::*;
+        assert_eq!(Short.invert(), Long);
+        assert_eq!(Long.invert(), Short);
+        assert_eq!(Neutral.invert(), Neutral);
     }
 
     proptest! {
