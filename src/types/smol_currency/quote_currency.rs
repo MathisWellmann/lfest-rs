@@ -63,13 +63,27 @@ where
     /// # Panics:
     /// If the arguments don't fit into the range and can't construct the internal `Decimal` type
     /// For a panic free version, use `QuoteCurrency::try_from_scaled`
+    #[inline(always)]
     pub fn new(integer: I, scale: u8) -> Self {
         Self::try_from_scaled(integer, scale).expect("Can construct from arguments")
     }
 
     /// Create a new instance from an `integer` and a `scale`.
+    #[inline(always)]
     pub fn try_from_scaled(integer: I, scale: u8) -> Option<Self> {
         Decimal::try_from_scaled(integer, scale).map(Self)
+    }
+
+    /// Convert to `f64`
+    #[inline(always)]
+    pub fn to_f64(&self) -> f64 {
+        self.0.to_f64()
+    }
+
+    /// Convert to `f32`
+    #[inline(always)]
+    pub fn to_f32(&self) -> f32 {
+        self.0.to_f32()
     }
 
     #[inline]
@@ -84,7 +98,8 @@ where
         Self(self.0 * (Decimal::one() + maint_margin_req))
     }
 
-    pub(crate) fn new_weighted_price(
+    /// Create a weighted average price from two prices and their associated weights.
+    pub fn new_weighted_price(
         price_0: Self,
         weight_0: Decimal<I, D>,
         price_1: Self,
