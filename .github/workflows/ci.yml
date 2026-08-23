@@ -19,7 +19,7 @@ jobs:
       - name: cargo-check
         run: nix develop --command cargo check
       - name: cargo-test
-        run: nix develop --command cargo test
+        run: nix develop --command cargo test --all-features
       - name: cargo-clippy
         run: nix develop --command cargo clippy
       - name: cargo-bench
