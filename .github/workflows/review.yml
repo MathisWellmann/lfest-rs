@@ -1,0 +1,155 @@
+name: "review"
+# AI PR review: runs pi with read-only tools against the self-hosted vLLM
+# endpoint (desg0) and posts the result as a PR comment.
+# Separate workflow so a dead inference node shows up as a failed "review"
+# check instead of failing "ci".
+on:
+  pull_request:
+    branches: [main, dev]
+    types: [opened, synchronize, reopened]
+concurrency:
+  group: review-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  pull-requests: write
+  # The comment is created through the issues API (see post-review), so a
+  # scoped automatic token needs issue write access too.
+  issues: write
+jobs:
+  review:
+    runs-on: [native]
+    # Must stay above the inner `timeout 900` around pi.
+    timeout-minutes: 25
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      LLM_BASE_URL: "http://desg0:8000/v1"
+      LLM_MODEL: "RadixArk/Qwen3.8-27B-NVFP4"
+    steps:
+      - name: checkout-code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Fail fast (instead of burning the timeout) if the inference node is
+      # not reachable from the runner.
+      - name: check-inference-endpoint
+        run: nix develop .#review --accept-flake-config --command curl -fsS --max-time 10 "$LLM_BASE_URL/models" > /dev/null && echo "inference endpoint reachable"
+      - name: run-pi-review
+        # Isolated config dir: the native runner user's own ~/.pi/agent
+        # (settings, extensions, other providers) must not leak into this job.
+        # The provider block mirrors the nix-managed pi wrapper's models.json
+        # (http://desg0:8000/v1, sglang, RadixArk/Qwen3.8-27B-NVFP4), so CI
+        # uses the exact same model config as local dev -- including deriving
+        # the token limits from the endpoint, see below.
+        env:
+          # Via env, not inline interpolation: a ${{ }} expansion inside a run
+          # block is textual substitution into shell source, i.e. the shape of
+          # an injection even when the context itself is trusted.
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          export PI_CODING_AGENT_DIR="${RUNNER_TEMP:-/tmp}/pi-review"
+          mkdir -p "$PI_CODING_AGENT_DIR"
+          ctx=$(nix develop .#review --accept-flake-config --command curl -fsS --max-time 10 "$LLM_BASE_URL/models" \
+            | nix develop .#review --command jq -r '.data[0].max_model_len // 65536')
+          case "$ctx" in
+            '' | *[!0-9]*)
+              echo "could not derive the model window from the endpoint, got: $ctx" >&2
+              exit 1
+              ;;
+          esac
+          max_tokens=$((ctx / 4))
+          echo "model window: $ctx tokens, output budget: $max_tokens tokens"
+          echo '{"providers":{"vllm":{"baseUrl":"'"$LLM_BASE_URL"'","api":"openai-completions","apiKey":"vllm","compat":{"supportsDeveloperRole":false,"supportsReasoningEffort":false,"thinkingFormat":"qwen-chat-template"},"models":[{"id":"'"$LLM_MODEL"'","reasoning":true,"contextWindow":'"$ctx"',"maxTokens":'"$max_tokens"'}]}}}' > "$PI_CODING_AGENT_DIR/models.json"
+          if ! git rev-parse --verify --quiet "origin/$BASE_REF" > /dev/null; then
+            echo "base branch origin/$BASE_REF is gone, cannot diff" >&2
+            exit 1
+          fi
+          # flake.lock and archify output are excluded on purpose: lock rev
+          # churn and rendered diagram artifacts (architecture.html is ~650KB
+          # of generated markup) are unreviewable noise that the model happily
+          # spends its word budget describing.
+          git diff "origin/$BASE_REF...HEAD" -- . ':(exclude)flake.lock' ':(exclude)agent-symbiont/architecture*' > pr.diff
+          echo "diff size: $(wc -c < pr.diff) bytes"
+          if [ ! -s pr.diff ]; then
+            echo "no reviewable changes"
+            exit 0
+          fi
+          # 150KB of this repo's diffs is ~70K tokens (measured 2.2
+          # bytes/token): fits ctx - max_tokens with room for pi's system
+          # prompt. Denser content (tables, hashes) raises the token count,
+          # so the cap stays conservative.
+          # ponytail: byte cap, no tokenizer; chunked multi-pass review if
+          # big PRs routinely get clipped.
+          TRUNC_NOTE=""
+          if [ "$(wc -c < pr.diff)" -gt 150000 ]; then
+            head -c 150000 pr.diff > pr.trunc && mv pr.trunc pr.diff
+            echo "diff truncated to 150000 bytes (context window limit)"
+            TRUNC_NOTE="NOTE: the diff was truncated at 150000 bytes; review only what is present and mention the truncation in the summary."
+          fi
+          timeout 900 nix develop .#review --accept-flake-config \
+            --command pi -p \
+            --provider vllm \
+            --model "$LLM_MODEL" \
+            --tools read,grep,find,ls \
+            --no-session \
+            --no-extensions \
+            --no-approve \
+            "You are an expert Rust code reviewer reviewing a pull request.
+          The diff against the base branch is on stdin. You may use the read, grep, find and ls tools to check the surrounding code, at most 5 calls, then write the review.
+          $TRUNC_NOTE
+
+          Report only defects present in this diff: correctness bugs, broken error handling, security issues, inconsistencies with existing APIs and patterns, Rust performance traps, and missing tests for new behavior.
+
+          Hard rules:
+          - Report the single most important issue, plus at most 2 others. Blockers and majors only. No nitpicks, no style or formatting remarks.
+          - Only claim what you verified in the diff or with a tool call. No speculation about future changes, no hypothetical misconfigurations, no advice you cannot tie to a specific line.
+          - flake.lock is excluded from the diff, so draw no conclusions about lock file contents or about whether flake inputs are pinned.
+          - One issue per bullet, at most 2 sentences: path and line, severity, what breaks, then the fix.
+          - Write the review once. Do not revise, re-rank or repeat the list, do not append a final or corrected list, do not comment on these rules.
+          - No preamble, no closing remarks, no thinking out loud.
+          - 200 words maximum for the whole review.
+
+          Output exactly this markdown:
+          ## Summary
+          One or two sentences: what the PR changes and the verdict.
+          ## Issues
+          The bullets, or the single word None if there is no blocker or major issue." < pr.diff > review.md
+          if [ ! -s review.md ]; then
+            echo "pi produced an empty review (output budget exhausted or request rejected)" >&2
+            exit 1
+          fi
+          # Safety net: the model does not reliably honor the word budget, and a
+          # runaway review is worse than a clipped one.
+          if [ "$(wc -c < review.md)" -gt 4000 ]; then
+            { head -c 4000 review.md; printf '\n\n_(review truncated at 4000 bytes)_\n'; } > review.clipped
+            mv review.clipped review.md
+            echo "review truncated to 4000 bytes"
+          fi
+          echo "review written: $(wc -c < review.md) bytes"
+      - name: post-review
+        # Pull requests are issues in the GitHub API too, so POST
+        # /issues/{index}/comments is a valid PR comment route (the native
+        # one is /pulls/{index}/comments).
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Not `github.pr.number`: that context field does not exist and
+          # expands to the empty string, which silently mangles the URL.
+          if [ -z "${PR_NUMBER:-}" ]; then
+            echo "no PR number in the event payload" >&2
+            exit 1
+          fi
+          nix develop .#review --accept-flake-config --command jq -n --rawfile body review.md '{body: $body}' > review.json
+          # No `-f`: it discards the response body, which is where the API
+          # puts the actual reason a post was rejected.
+          code=$(nix develop .#review --accept-flake-config --command curl -sSL -o resp.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data @review.json \
+            "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments")
+          if [ "$code" != "201" ]; then
+            echo "posting the review failed with HTTP $code:" >&2
+            cat resp.json >&2
+            exit 1
+          fi
+          echo "review posted to PR #$PR_NUMBER"

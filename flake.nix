@@ -10,6 +10,8 @@
       url = "github:nix-community/naersk";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Provides the `pi` coding agent package (same input as nixos-config).
+    llm-agents.url = "github:numtide/llm-agents.nix";
   };
 
   outputs = {
@@ -18,6 +20,7 @@
     flake-utils,
     hongdown,
     naersk,
+    llm-agents,
     ...
   }:
     flake-utils.lib.eachDefaultSystem (
@@ -80,6 +83,16 @@
           devShells.default = mkShell {
             buildInputs = buildInputs ++ rust_tools ++ nix_tools ++ tools;
             RUST_BACKTRACE = "1";
+          };
+          # Minimal shell for the AI PR review workflow
+          # (.github/workflows/review.yml). Kept tiny on purpose: `nix develop`
+          # builds this closure on the runner, so no rust/pythonEnv here.
+          devShells.review = mkShell {
+            buildInputs = with pkgs; [
+              llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.pi
+              jq
+              curl
+            ];
           };
         }
     );
