@@ -378,4 +378,31 @@ mod test {
         assert_eq!(result, QuoteCurrency::one());
         assert_eq!(QuoteCurrency::zero(), QuoteCurrency::<i64, 5>::new(0, 0));
     }
+
+    #[test]
+    fn quote_currency_to_f64_to_f32() {
+        let v = QuoteCurrency::<i64, 5>::new(12345, 3);
+        assert_eq!(v.to_f64(), 12.345_f64);
+        assert_eq!(v.to_f32(), 12.345_f32);
+        let v = QuoteCurrency::<i64, 5>::new(-12345, 3);
+        assert_eq!(v.to_f64(), -12.345_f64);
+        assert_eq!(v.to_f32(), -12.345_f32);
+    }
+
+    #[test]
+    fn new_weighted_price() {
+        let p0 = QuoteCurrency::<i64, 5>::new(10, 0);
+        let p1 = QuoteCurrency::<i64, 5>::new(20, 0);
+        let w1 = Decimal::try_from_scaled(1, 0).unwrap();
+        assert_eq!(
+            QuoteCurrency::new_weighted_price(p0, w1, p1, w1),
+            QuoteCurrency::new(15, 0)
+        );
+        // (10 * 1 + 20 * 3) / (1 + 3) = 17.5
+        let w3 = Decimal::try_from_scaled(3, 0).unwrap();
+        assert_eq!(
+            QuoteCurrency::new_weighted_price(p0, w1, p1, w3),
+            QuoteCurrency::new(175, 1)
+        );
+    }
 }
