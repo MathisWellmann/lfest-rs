@@ -285,6 +285,15 @@ where
     }
 }
 
+impl<const D: u8> std::ops::Div<i64> for QuoteCurrency<i64, D> {
+    type Output = Self;
+
+    #[inline]
+    fn div(self, rhs: i64) -> Self::Output {
+        self / Decimal::try_from_scaled(rhs, 0).expect("i64 divisor exceeds decimal precision")
+    }
+}
+
 impl<I, const D: u8> std::ops::Rem for QuoteCurrency<I, D>
 where
     I: Mon<D>,
@@ -371,6 +380,7 @@ mod test {
         assert_eq!(v % QuoteCurrency::new(5, 0), QuoteCurrency::new(3, 0));
         assert_eq!(v.div(QuoteCurrency::new(2, 0)), QuoteCurrency::new(4, 0));
         assert_eq!(v / QuoteCurrency::new(2, 0), QuoteCurrency::new(4, 0));
+        assert_eq!(v / 2, QuoteCurrency::new(4, 0));
 
         let mut result = QuoteCurrency::from_str_radix("27", 10).unwrap();
         assert_eq!(result, QuoteCurrency::<i64, 5>::new(27, 0));
