@@ -91,6 +91,27 @@ where
         }
     }
 
+    /// The signed position quantity as an `f64` (negative for a short position).
+    #[must_use]
+    #[inline(always)]
+    pub fn to_f64(&self) -> f64 {
+        self.quantity.into()
+    }
+
+    /// Whether the position is long (positive quantity).
+    #[must_use]
+    #[inline(always)]
+    pub fn is_long(&self) -> bool {
+        self.quantity.is_positive()
+    }
+
+    /// Whether the position is short (negative quantity).
+    #[must_use]
+    #[inline(always)]
+    pub fn is_short(&self) -> bool {
+        self.quantity.is_negative()
+    }
+
     /// Return the positions unrealized profit and loss.
     #[must_use]
     #[inline(always)]
@@ -330,6 +351,31 @@ mod tests {
     fn size_of_position() {
         assert_eq!(size_of::<Position<i32, 4, BaseCurrency<_, 4>>>(), 8);
         assert_eq!(size_of::<Position<i64, 5, BaseCurrency<_, 5>>>(), 16);
+    }
+
+    #[test]
+    fn position_to_f64_and_side_predicates() {
+        let long = Position::new(
+            BaseCurrency::<i64, 5>::new(17, 2),
+            QuoteCurrency::new(100, 0),
+        )
+        .unwrap();
+        assert!(long.is_long());
+        assert!(!long.is_short());
+        assert_eq!(long.to_f64(), 0.17);
+
+        let short = Position::new(
+            -BaseCurrency::<i64, 5>::new(17, 2),
+            QuoteCurrency::new(100, 0),
+        )
+        .unwrap();
+        assert!(short.is_short());
+        assert!(!short.is_long());
+        assert_eq!(short.to_f64(), -0.17);
+
+        let neutral: Position<i64, 5, BaseCurrency<i64, 5>> = Position::default();
+        assert!(!neutral.is_long());
+        assert!(!neutral.is_short());
     }
 
     #[test]

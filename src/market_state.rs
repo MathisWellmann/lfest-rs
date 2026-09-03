@@ -82,6 +82,18 @@ where
         self.step += 1;
     }
 
+    /// The best (highest) bid price.
+    #[inline(always)]
+    pub fn best_bid(&self) -> QuoteCurrency<I, D> {
+        self.bid
+    }
+
+    /// The best (lowest) ask price.
+    #[inline(always)]
+    pub fn best_ask(&self) -> QuoteCurrency<I, D> {
+        self.ask
+    }
+
     /// Get the mid price
     #[inline(always)]
     pub fn mid_price(&self) -> QuoteCurrency<I, D> {
@@ -128,6 +140,22 @@ mod test {
             &state.to_string(),
             "MarketState( bid: 0.0 Quote, ask: 0.0 Quote, ts_ns: 0, step: 0 )"
         );
+    }
+
+    #[test]
+    fn market_state_best_bid_and_ask() {
+        let mut state = MarketState::<i64, 1>::default();
+        let pf = PriceFilter::default();
+        state.update_state::<_, BaseCurrency<_, 1>>(
+            &Bba {
+                bid: QuoteCurrency::<i64, 1>::new(100, 0),
+                ask: QuoteCurrency::new(101, 0),
+                timestamp_exchange_ns: 1.into(),
+            },
+            &pf,
+        );
+        assert_eq!(state.best_bid(), QuoteCurrency::new(100, 0));
+        assert_eq!(state.best_ask(), QuoteCurrency::new(101, 0));
     }
 
     #[test]
