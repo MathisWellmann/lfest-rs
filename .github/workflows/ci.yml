@@ -17,24 +17,24 @@ jobs:
       - name: checkout-code
         uses: actions/checkout@v4
       - name: cargo-check
-        run: nix develop --command cargo check
+        run: nix develop .#ci --command cargo check
       - name: cargo-test
-        run: nix develop --command cargo test --all-features
+        run: nix develop .#ci --command cargo test --all-features
       - name: cargo-clippy
-        run: nix develop --command cargo clippy
+        run: nix develop .#ci --command cargo clippy
       - name: cargo-bench
-        run: nix develop --command cargo bench --no-run # Just to make sure it compiles
+        run: nix develop .#ci --command cargo bench --no-run # Just to make sure it compiles
       - name: cargo-fmt
-        run: nix develop --command cargo fmt --check
+        run: nix develop .#ci --command cargo fmt --check
       - name: cargo-doc
-        run: nix develop --command cargo doc
+        run: nix develop .#ci --command cargo doc
       - name: nix-flake-check
         run: nix flake check
       - name: nix-deadnix
-        run: nix develop --command deadnix
+        run: nix develop .#ci --command deadnix
       - name: nix-statix
-        run: nix develop --command statix check
+        run: nix develop .#ci --command statix check
       - name: nix-alejandra
-        run: nix develop --command alejandra --check .
+        run: nix develop .#ci --command alejandra --check .
       - name: yamlfmt
-        run: nix develop --command yamlfmt -lint .
+        run: nix develop .#ci --command yamlfmt -lint --gitignore_excludes .
