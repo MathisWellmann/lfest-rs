@@ -80,19 +80,29 @@
         ];
       in
         with pkgs; {
-          devShells.default = mkShell {
-            buildInputs = buildInputs ++ rust_tools ++ nix_tools ++ tools;
-            RUST_BACKTRACE = "1";
-          };
-          # Minimal shell for the AI PR review workflow
-          # (.github/workflows/review.yml). Kept tiny on purpose: `nix develop`
-          # builds this closure on the runner, so no rust/pythonEnv here.
-          devShells.review = mkShell {
-            buildInputs = with pkgs; [
-              llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.pi
-              jq
-              curl
-            ];
+          devShells = {
+            # Minimal shell for .github/workflows/ci.yml: only the tools CI runs.
+            # The default shell also builds creusot, hongdown and the cargo-*
+            # tools, for which nix fetches crate tarballs from crates.io at
+            # build time; CI never uses them.
+            ci = mkShell {
+              buildInputs = [rust] ++ [deadnix statix alejandra yamlfmt];
+              RUST_BACKTRACE = "1";
+            };
+            default = mkShell {
+              buildInputs = buildInputs ++ rust_tools ++ nix_tools ++ tools;
+              RUST_BACKTRACE = "1";
+            };
+            # Minimal shell for the AI PR review workflow
+            # (.github/workflows/review.yml). Kept tiny on purpose: `nix develop`
+            # builds this closure on the runner, so no rust/pythonEnv here.
+            review = mkShell {
+              buildInputs = [
+                llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.pi
+                jq
+                curl
+              ];
+            };
           };
         }
     );
