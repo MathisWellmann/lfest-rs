@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.138.4"
+version = "0.139.0"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2024"
 license-file = "LICENSE"
@@ -209,7 +209,7 @@ glidesort = "0.1"
 csv = "1"
 mutants = "0.0.4"
 
-trade_aggregation = { version = "13", optional = true }
+trade_aggregation = { version = "14", optional = true }
 
 [dev-dependencies]
 rand = "0.10"

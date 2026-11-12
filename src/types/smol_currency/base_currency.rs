@@ -16,6 +16,7 @@ use num_traits::{
 
 use super::{
     Currency,
+    CurrencyKind,
     MarginCurrency,
     Mon,
     QuoteCurrency,
@@ -119,6 +120,8 @@ where
 {
     // Generic over the decimal points in paired currency.
     type PairedCurrency = QuoteCurrency<I, D>;
+
+    const KIND: CurrencyKind = CurrencyKind::Base;
 
     #[inline]
     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self {

@@ -28,6 +28,16 @@ impl<const D: u8> Mon<D> for i32 {}
 impl<const D: u8> Mon<D> for i64 {}
 impl<const D: u8> Mon<D> for i128 {}
 
+/// Whether a [`Currency`] is the base or the quote currency of a symbol,
+/// e.g. BTC or USD of BTCUSD.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CurrencyKind {
+    /// The base currency, e.g. BTC of BTCUSD: [`BaseCurrency`].
+    Base,
+    /// The quote currency, e.g. USD of BTCUSD: [`QuoteCurrency`].
+    Quote,
+}
+
 /// A currency must be marked as it can be either a `Base` or `Quote` currency.
 ///
 /// # Generics:
@@ -58,6 +68,10 @@ where
     /// The paired currency in the `Symbol` with generic decimal precision `DP`.
     type PairedCurrency: Currency<I, D, PairedCurrency = Self>;
 
+    /// Whether this is the base or the quote currency,
+    /// so that generic code can tell the unit of a quantity at compile time.
+    const KIND: CurrencyKind;
+
     /// Convert from one currency to another at a given price per unit.
     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self;
 }
@@ -65,6 +79,16 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn currencies_know_their_kind() {
+        assert_eq!(BaseCurrency::<i64, 5>::KIND, CurrencyKind::Base);
+        assert_eq!(QuoteCurrency::<i64, 5>::KIND, CurrencyKind::Quote);
+        assert_eq!(
+            <BaseCurrency<i64, 5> as Currency<i64, 5>>::PairedCurrency::KIND,
+            CurrencyKind::Quote
+        );
+    }
 
     #[test]
     fn convert_base_to_quote() {

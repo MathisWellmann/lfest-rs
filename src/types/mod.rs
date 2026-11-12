@@ -41,6 +41,7 @@ pub use side::Side;
 pub use smol_currency::{
     BaseCurrency,
     Currency,
+    CurrencyKind,
     MarginCurrency,
     Mon,
     QuoteCurrency,

@@ -17,6 +17,7 @@ use num_traits::{
 use super::{
     BaseCurrency,
     Currency,
+    CurrencyKind,
     MarginCurrency,
     Mon,
 };
@@ -146,6 +147,8 @@ where
     I: Mon<D>,
 {
     type PairedCurrency = BaseCurrency<I, D>;
+
+    const KIND: CurrencyKind = CurrencyKind::Quote;
 
     #[inline]
     fn convert_from(units: Self::PairedCurrency, price_per_unit: QuoteCurrency<I, D>) -> Self {
