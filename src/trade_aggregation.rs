@@ -1,16 +1,40 @@
-use trade_aggregation::TakerTrade;
+//! Aggregate lfest trades into candles with the `trade_aggregation` crate.
+//!
+//! A [`Trade`] is a [`TakerTrade`] with a nanosecond timestamp, and the unit of its size
+//! follows the currency of its quantity, so `By::Base` and `By::Quote` sum base volumes
+//! and notionals for linear and inverse contracts alike.
+
+use trade_aggregation::{
+    SizeUnit,
+    TakerTrade,
+    TimestampResolution,
+    Timestamped,
+};
 
 use crate::prelude::*;
+
+impl<I, const D: u8, BaseOrQuote> Timestamped for Trade<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+{
+    const TIMESTAMP_RESOLUTION: TimestampResolution = TimestampResolution::Nanosecond;
+
+    #[inline(always)]
+    fn timestamp(&self) -> i64 {
+        self.timestamp_exchange_ns.get()
+    }
+}
 
 impl<I, const D: u8, BaseOrQuote> TakerTrade for Trade<I, D, BaseOrQuote>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
 {
-    #[inline(always)]
-    fn timestamp(&self) -> i64 {
-        self.timestamp_exchange_ns.get()
-    }
+    const SIZE_UNIT: SizeUnit = match BaseOrQuote::KIND {
+        CurrencyKind::Base => SizeUnit::Base,
+        CurrencyKind::Quote => SizeUnit::Quote,
+    };
 
     #[inline(always)]
     fn price(&self) -> f64 {
@@ -26,60 +50,40 @@ where
     }
 }
 
-impl<I, const D: u8, BaseOrQuote> From<Trade<I, D, BaseOrQuote>> for trade_aggregation::Trade
-where
-    I: Mon<D>,
-    BaseOrQuote: Currency<I, D>,
-{
-    #[inline]
-    fn from(trade: Trade<I, D, BaseOrQuote>) -> Self {
-        Self {
-            timestamp: trade.timestamp_exchange_ns.get(),
-            price: trade.price.into(),
-            size: <Trade<I, D, BaseOrQuote> as TakerTrade>::size(&trade),
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
-    fn taker_trade() {
+    fn a_linear_trade_has_base_sizes_and_nanosecond_timestamps() {
         let trade = Trade {
             price: QuoteCurrency::<i64, 5>::new(100, 0),
             quantity: BaseCurrency::new(5, 0),
-            side: Side::Buy,
+            side: Side::Sell,
             timestamp_exchange_ns: 1.into(),
         };
-        assert_eq!(trade.size(), 5.0);
-        assert_eq!(
-            <Trade<i64, 5, BaseCurrency<i64, 5>> as TakerTrade>::size(&trade),
-            5.0
-        );
-        assert_eq!(
-            <Trade<i64, 5, BaseCurrency<i64, 5>> as TakerTrade>::price(&trade),
-            100.0
-        );
-        assert_eq!(
-            <Trade<i64, 5, BaseCurrency<i64, 5>> as TakerTrade>::price(&trade),
-            100.0
-        );
-        assert_eq!(trade.timestamp(), 1_i64);
-        assert_eq!(
-            <Trade<i64, 5, BaseCurrency<i64, 5>> as TakerTrade>::timestamp(&trade),
-            1_i64
-        );
+        type T = Trade<i64, 5, BaseCurrency<i64, 5>>;
+        assert_eq!(T::TIMESTAMP_RESOLUTION, TimestampResolution::Nanosecond);
+        assert_eq!(T::SIZE_UNIT, SizeUnit::Base);
+        assert_eq!(Timestamped::timestamp(&trade), 1);
+        assert_eq!(TakerTrade::price(&trade), 100.0);
+        assert_eq!(TakerTrade::size(&trade), -5.0);
+        assert_eq!(trade.base_size(), -5.0);
+        assert_eq!(trade.quote_size(), -500.0);
+    }
 
-        let t: trade_aggregation::Trade = trade.into();
-        assert_eq!(
-            t,
-            trade_aggregation::Trade {
-                price: 100.0,
-                size: 5.0,
-                timestamp: 1,
-            }
-        );
+    #[test]
+    fn an_inverse_trade_has_quote_sizes() {
+        let trade = Trade {
+            price: QuoteCurrency::<i64, 5>::new(100, 0),
+            quantity: QuoteCurrency::new(500, 0),
+            side: Side::Buy,
+            timestamp_exchange_ns: 2.into(),
+        };
+        type T = Trade<i64, 5, QuoteCurrency<i64, 5>>;
+        assert_eq!(T::SIZE_UNIT, SizeUnit::Quote);
+        assert_eq!(TakerTrade::size(&trade), 500.0);
+        assert_eq!(trade.base_size(), 5.0);
+        assert_eq!(trade.quote_size(), 500.0);
     }
 }

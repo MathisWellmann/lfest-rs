@@ -1136,7 +1136,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lfest"
-version = "0.138.4"
+version = "0.139.0"
 dependencies = [
  "assert2",
  "const-decimal",
@@ -2203,9 +2203,9 @@ dependencies = [
 
 [[package]]
 name = "trade_aggregation"
-version = "13.0.1"
+version = "14.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ba52d7dbeef22576e443d0df8f010e11764a49714769e26257ac3f40265e62f"
+checksum = "b253fcd43f38707eb1dfd969795d890799a7306abb60057e4884d6856ebca1e4"
 dependencies = [
  "csv",
  "thiserror 1.0.69",
@@ -2214,12 +2214,13 @@ dependencies = [
 
 [[package]]
 name = "trade_aggregation_derive"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3baef2cac2126ddb2105aed8533e8dedfcedb86a013924e4e3a2401878bad6f"
+checksum = "8dce12c089f7e9e49b34f1e6728219be9300ad6512f3823736df8bba316d37c5"
 dependencies = [
+ "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.119",
 ]
 
 [[package]]
