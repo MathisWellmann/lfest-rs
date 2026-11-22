@@ -25,8 +25,12 @@ where
     #[getset(get_copy = "pub")]
     total_fees_paid: BaseOrQuote,
 
-    /// The cumulative signed funding cashflow applied to the account
+    /// The cumulative signed nominal funding cashflow applied to the account
     /// (positive: net funding received, negative: net funding paid).
+    ///
+    /// Records the full nominal cashflow even when a payment bankrupts the account,
+    /// matching [`Balances::total_fees_paid`]; the excess absorbed by the venue is
+    /// tracked separately in [`Balances::bad_debt`].
     #[getset(get_copy = "pub")]
     #[builder(default)]
     cumulative_funding: BaseOrQuote,
@@ -107,6 +111,7 @@ where
         trace!("apply_funding: {cashflow}");
         self.apply_to_equity(cashflow);
         self.cumulative_funding += cashflow;
+        self.debug_assert_state();
     }
 
     /// Apply a signed equity change from a realized pnl, fee, or funding payment.
