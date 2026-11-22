@@ -49,6 +49,7 @@ pub mod prelude {
         exchange::{
             Exchange,
             ForcedCancels,
+            FundingSettlement,
             MarketOrderSettlement,
         },
         leverage,

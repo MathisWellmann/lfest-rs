@@ -1,5 +1,6 @@
 mod errors;
 mod fee;
+mod funding;
 mod leverage;
 mod limit_order;
 mod limits;
@@ -20,6 +21,7 @@ pub use fee::{
     Maker,
     Taker,
 };
+pub use funding::FundingRate;
 pub use leverage::Leverage;
 pub use limit_order::LimitOrder;
 pub use limits::OrderRateLimits;
