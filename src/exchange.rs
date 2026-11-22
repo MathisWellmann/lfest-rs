@@ -93,9 +93,13 @@ where
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderIdT: UserOrderId,
 {
-    /// The signed cashflow applied to the account equity in margin currency:
+    /// The signed nominal cashflow applied to the account equity in margin currency:
     /// negative when the trader paid funding, positive when the trader received
     /// funding, zero when the position was neutral or the rate was zero.
+    ///
+    /// When a funding payment bankrupts the account, this still reports the full
+    /// nominal cashflow while the venue-absorbed shortfall is recorded in
+    /// [`Balances::bad_debt`].
     pub cashflow: BaseOrQuote::PairedCurrency,
     /// The resting limit orders the venue force-cancelled to keep the account's
     /// required collateral covered after paying funding (margin call or liquidation).
@@ -158,6 +162,11 @@ where
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderIdT: UserOrderId,
 {
+    #[cfg(test)]
+    pub(crate) fn account_mut(&mut self) -> &mut Account<I, D, BaseOrQuote, UserOrderIdT> {
+        &mut self.account
+    }
+
     /// Create a new Exchange with the desired config and whether to use candles
     /// as information source
     pub fn new(config: Config<I, D, BaseOrQuote::PairedCurrency>) -> Self {
@@ -404,8 +413,19 @@ where
     /// force-liquidation if equity drops below maintenance margin, or bankruptcy if equity is
     /// exhausted (with the deficit absorbed into `Balances::bad_debt`).
     ///
+    /// # Market-state and margin-model notes
+    /// - Keep `market_state` up to date before calling `apply_funding`: if funding triggers
+    ///   a force-liquidation, the position is closed against the current `market_state`
+    ///   best bid/ask rather than `mark_price` (and `bid`/`ask` must be strictly positive).
+    /// - Maintenance-margin reconciliation compares wallet equity against entry-price
+    ///   position notional (`Position::notional() * maintenance_margin`), without
+    ///   unrealized PnL at `mark_price`. Likewise, [`Exchange::update_state`] checks
+    ///   price-based liquidation from a static entry-price threshold independent of
+    ///   cumulative funding erosion.
+    ///
     /// # Panics
-    /// Panics if `mark_price <= 0`.
+    /// Panics if `mark_price <= 0`, or (in debug builds) if funding triggers liquidation
+    /// while `market_state` bid/ask have not been initialized to positive prices.
     #[must_use]
     pub fn apply_funding(
         &mut self,
