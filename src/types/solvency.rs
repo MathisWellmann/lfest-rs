@@ -1,8 +1,10 @@
-/// The solvency of the account after a fill was settled and the collateral reconciled.
+/// The solvency of the account after a fill or funding payment was settled and the
+/// collateral reconciled.
 ///
-/// A position-reducing fill is never rejected by the venue, so settling it can leave the
-/// account with less equity than its required collateral. The exchange then reconciles
-/// the account like a real venue would and reports the outcome through this type.
+/// Position-reducing fills and periodic funding payments are never rejected by the venue,
+/// so settling one can leave the account with less equity than its required collateral.
+/// The exchange then reconciles the account like a real venue would and reports the
+/// outcome through this type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Solvency {
     /// The account equity covers the required collateral.

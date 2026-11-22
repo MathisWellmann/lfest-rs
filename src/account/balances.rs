@@ -25,6 +25,12 @@ where
     #[getset(get_copy = "pub")]
     total_fees_paid: BaseOrQuote,
 
+    /// The cumulative signed funding cashflow applied to the account
+    /// (positive: net funding received, negative: net funding paid).
+    #[getset(get_copy = "pub")]
+    #[builder(default)]
+    cumulative_funding: BaseOrQuote,
+
     /// The cumulative losses which exceeded the account equity and were absorbed by the
     /// venue (insurance fund / auto-deleveraging on a real exchange).
     /// Non-zero bad debt means the account went bankrupt; its equity is floored at zero.
@@ -45,8 +51,8 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "equity: {}, total_fees_paid: {}, bad_debt: {}",
-            self.equity, self.total_fees_paid, self.bad_debt,
+            "equity: {}, total_fees_paid: {}, cumulative_funding: {}, bad_debt: {}",
+            self.equity, self.total_fees_paid, self.cumulative_funding, self.bad_debt,
         )
     }
 }
@@ -61,6 +67,7 @@ where
         Self {
             equity: init_balance,
             total_fees_paid: BaseOrQuote::zero(),
+            cumulative_funding: BaseOrQuote::zero(),
             bad_debt: BaseOrQuote::zero(),
             _i: PhantomData,
         }
@@ -89,7 +96,20 @@ where
         self.apply_to_equity(pnl);
     }
 
-    /// Apply a signed equity change from a realized pnl or fee.
+    /// Apply a signed perpetual funding cashflow to the account equity
+    /// (positive: funding received, negative: funding paid).
+    ///
+    /// A funding payment exceeding the equity bankrupts the account; see
+    /// `Balances::apply_to_equity`.
+    #[inline(always)]
+    pub fn apply_funding(&mut self, cashflow: BaseOrQuote) {
+        self.debug_assert_state();
+        trace!("apply_funding: {cashflow}");
+        self.apply_to_equity(cashflow);
+        self.cumulative_funding += cashflow;
+    }
+
+    /// Apply a signed equity change from a realized pnl, fee, or funding payment.
     ///
     /// A change which would push the equity below zero bankrupts the account:
     /// a real venue absorbs the excess loss (insurance fund / auto-deleveraging)
@@ -125,8 +145,9 @@ mod test {
 
     #[test]
     fn size_of_balances() {
-        assert_eq!(size_of::<Balances<i32, 5, BaseCurrency<i32, 5>>>(), 12);
-        assert_eq!(size_of::<Balances<i64, 5, BaseCurrency<i64, 5>>>(), 24);
+        // Four currency fields: equity, total_fees_paid, cumulative_funding, bad_debt.
+        assert_eq!(size_of::<Balances<i32, 5, BaseCurrency<i32, 5>>>(), 16);
+        assert_eq!(size_of::<Balances<i64, 5, BaseCurrency<i64, 5>>>(), 32);
     }
 
     proptest! {
@@ -178,7 +199,28 @@ mod test {
             .build();
         assert_eq!(
             balances.to_string(),
-            "equity: 1000.00000 Quote, total_fees_paid: 5.00000 Quote, bad_debt: 0.00000 Quote"
+            "equity: 1000.00000 Quote, total_fees_paid: 5.00000 Quote, cumulative_funding: 0.00000 Quote, bad_debt: 0.00000 Quote"
         );
+    }
+
+    #[test]
+    fn apply_funding_updates_equity_cumulative_funding_and_bad_debt() {
+        let mut balances = Balances::new(QuoteCurrency::<i64, 5>::new(100, 0));
+        balances.apply_funding(QuoteCurrency::new(15, 0));
+        assert_eq!(balances.equity(), QuoteCurrency::new(115, 0));
+        assert_eq!(balances.cumulative_funding(), QuoteCurrency::new(15, 0));
+        assert!(balances.bad_debt().is_zero());
+
+        balances.apply_funding(QuoteCurrency::new(-25, 0));
+        assert_eq!(balances.equity(), QuoteCurrency::new(90, 0));
+        assert_eq!(balances.cumulative_funding(), QuoteCurrency::new(-10, 0));
+        assert!(balances.bad_debt().is_zero());
+
+        // Paying more than remaining equity bankrupts the account and records bad debt.
+        balances.apply_funding(QuoteCurrency::new(-120, 0));
+        assert!(balances.equity().is_zero());
+        assert_eq!(balances.cumulative_funding(), QuoteCurrency::new(-130, 0));
+        assert_eq!(balances.bad_debt(), QuoteCurrency::new(30, 0));
+        balances.debug_assert_state();
     }
 }

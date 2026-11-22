@@ -17,6 +17,7 @@ use crate::{
         CancelBy,
         Currency,
         Filled,
+        FundingRate,
         LimitOrder,
         MarginCurrency,
         MaxNumberOfActiveOrders,
@@ -189,6 +190,46 @@ where
             self.init_margin_req,
             &self.position,
         )
+    }
+
+    /// Compute the signed perpetual funding cashflow in margin currency for the current
+    /// position at `mark_price` and `rate`.
+    ///
+    /// Positive `rate` means longs pay shorts (`cashflow < 0` for longs, `cashflow > 0`
+    /// for shorts); negative `rate` reverses the direction. Returns zero when the position
+    /// is neutral or the rate is zero.
+    ///
+    /// Works for both linear futures (`QuoteCurrency` margin, `qty * mark_price * -rate`)
+    /// and inverse futures (`BaseCurrency` margin, `qty / mark_price * -rate`).
+    ///
+    /// # Panics
+    /// Panics if `mark_price <= 0`.
+    #[inline]
+    #[must_use]
+    pub fn funding_cashflow(
+        &self,
+        rate: FundingRate<I, D>,
+        mark_price: QuoteCurrency<I, D>,
+    ) -> BaseOrQuote::PairedCurrency {
+        assert!(
+            mark_price > QuoteCurrency::zero(),
+            "funding mark price must be strictly positive, got {mark_price}"
+        );
+        let qty = self.position.quantity();
+        if qty.is_zero() || rate.as_ref().is_zero() {
+            return Zero::zero();
+        }
+        let signed_position_value = BaseOrQuote::PairedCurrency::convert_from(qty, mark_price);
+        -(signed_position_value * *rate.as_ref())
+    }
+
+    /// Apply a signed funding cashflow directly to the account balances.
+    ///
+    /// This method is usually called by [`crate::prelude::Exchange::apply_funding`], which
+    /// also reconciles margin after settling funding, but is exposed for advanced use cases.
+    #[inline(always)]
+    pub fn apply_funding(&mut self, cashflow: BaseOrQuote::PairedCurrency) {
+        self.balances.apply_funding(cashflow);
     }
 
     /// Change the account position, modifying its balances.

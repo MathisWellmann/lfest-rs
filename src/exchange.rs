@@ -37,6 +37,7 @@ use crate::{
         CancelLimitOrderError,
         ExchangeOrderMeta,
         Filled,
+        FundingRate,
         LimitOrder,
         LimitOrderEvent,
         LimitOrderFill,
@@ -81,6 +82,28 @@ where
     pub solvency: Solvency,
 }
 
+/// The result of settling a perpetual funding payment, emitted atomically
+/// together with any margin-call side effects so the caller cannot miss
+/// account-changing events.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct FundingSettlement<I, const D: u8, BaseOrQuote, UserOrderIdT>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    /// The signed cashflow applied to the account equity in margin currency:
+    /// negative when the trader paid funding, positive when the trader received
+    /// funding, zero when the position was neutral or the rate was zero.
+    pub cashflow: BaseOrQuote::PairedCurrency,
+    /// The resting limit orders the venue force-cancelled to keep the account's
+    /// required collateral covered after paying funding (margin call or liquidation).
+    pub forced_cancels: ForcedCancels<I, D, BaseOrQuote, UserOrderIdT>,
+    /// The solvency of the account after settling funding and reconciling collateral.
+    pub solvency: Solvency,
+}
+
 /// The main leveraged futures exchange for simulated trading
 #[derive(Debug, Clone, Getters, MutGetters)]
 pub struct Exchange<I, const D: u8, BaseOrQuote, UserOrderIdT>
@@ -117,7 +140,8 @@ where
     limit_order_events: Vec<LimitOrderEvent<I, D, BaseOrQuote, UserOrderIdT>>,
 
     /// Scratch buffer collecting force-cancelled orders during a collateral
-    /// reconciliation, routed into `limit_order_events` or a `MarketOrderSettlement`.
+    /// reconciliation, routed into `limit_order_events`, a `MarketOrderSettlement`,
+    /// or a `FundingSettlement`.
     forced_cancel_scratch: ForcedCancels<I, D, BaseOrQuote, UserOrderIdT>,
 
     /// Whether a fill-triggered reconciliation liquidated or bankrupted the account
@@ -271,12 +295,13 @@ where
         info!("balances after liquidation: {}", self.account.balances());
     }
 
-    /// Reconcile the account collateral after a fill was settled.
+    /// Reconcile the account collateral after a fill or funding settlement.
     ///
-    /// Position-reducing fills are never rejected by the venue, so settling one can leave
-    /// the account equity below the canonical requirement (`Account::required_collateral`):
-    /// the fill pays fees, may realize a loss and shrinks the position notional which
-    /// offset resting reduce-side limit orders. Mirroring a real venue, the exchange then:
+    /// Position-reducing fills and periodic funding payments are never rejected by the venue,
+    /// so settling one can leave the account equity below the canonical requirement
+    /// (`Account::required_collateral`): a fill pays fees, may realize a loss and shrinks the
+    /// position notional which offset resting reduce-side limit orders; paying funding directly
+    /// debits equity. Mirroring a real venue, the exchange then:
     ///
     /// 1. force-closes the position if its maintenance margin is no longer covered by the
     ///    equity (complementing the price-based liquidation check in `update_state`);
@@ -286,7 +311,8 @@ where
     ///    point deciding whether this settlement bankrupted the account.
     ///
     /// The cancelled orders are buffered in the forced-cancel scratch, which the caller
-    /// routes into its atomic result (a [`MarketOrderSettlement`] or the event stream).
+    /// routes into its atomic result (a [`MarketOrderSettlement`], a [`FundingSettlement`],
+    /// or the event stream).
     #[must_use]
     fn reconcile_margin(&mut self, bad_debt_before: BaseOrQuote::PairedCurrency) -> Solvency {
         let maintenance_margin_req = self.config.contract_spec().maintenance_margin();
@@ -348,6 +374,57 @@ where
                 .expect(EXPECT_CAPACITY);
         }
         self.forced_cancel_scratch.clear();
+    }
+
+    /// Move the force-cancelled orders out of the scratch buffer while retaining its
+    /// capacity, which `push_within_capacity` relies on. Allocation-free when empty.
+    fn take_forced_cancels(&mut self) -> ForcedCancels<I, D, BaseOrQuote, UserOrderIdT> {
+        let mut forced_cancels = ForcedCancels::with_capacity(self.forced_cancel_scratch.len());
+        for order in self.forced_cancel_scratch.drain(..) {
+            forced_cancels
+                .push_within_capacity(order)
+                .expect(EXPECT_CAPACITY);
+        }
+        forced_cancels
+    }
+
+    /// Settle a periodic perpetual futures funding payment on the current open position
+    /// and reconcile the account collateral.
+    ///
+    /// Callers pass the venue's funding mark price when available, or
+    /// `self.market_state().mid_price()` when historical mark prices are unavailable.
+    ///
+    /// Sign convention:
+    /// - Positive `rate`: longs pay shorts (`cashflow < 0` for longs, `cashflow > 0` for shorts).
+    /// - Negative `rate`: shorts pay longs (`cashflow > 0` for longs, `cashflow < 0` for shorts).
+    /// - Neutral position or zero `rate`: zero cashflow; collateral is still reconciled so the
+    ///   returned [`Solvency`] reflects the account's current state.
+    ///
+    /// Paying funding can trigger margin-call forced cancellations of resting limit orders,
+    /// force-liquidation if equity drops below maintenance margin, or bankruptcy if equity is
+    /// exhausted (with the deficit absorbed into `Balances::bad_debt`).
+    ///
+    /// # Panics
+    /// Panics if `mark_price <= 0`.
+    #[must_use]
+    pub fn apply_funding(
+        &mut self,
+        rate: FundingRate<I, D>,
+        mark_price: QuoteCurrency<I, D>,
+    ) -> FundingSettlement<I, D, BaseOrQuote, UserOrderIdT> {
+        let cashflow = self.account.funding_cashflow(rate, mark_price);
+        let bad_debt_before = self.account.balances().bad_debt();
+        if !cashflow.is_zero() {
+            self.account.apply_funding(cashflow);
+        }
+        let solvency = self.reconcile_margin(bad_debt_before);
+        let forced_cancels = self.take_forced_cancels();
+
+        FundingSettlement {
+            cashflow,
+            forced_cancels,
+            solvency,
+        }
     }
 
     /// Submit a new `MarketOrder` to the exchange.
@@ -423,14 +500,7 @@ where
         // A position-reducing fill settles without a prior risk check; the venue
         // reconciles any collateral shortfall instead of rejecting the reduction.
         let solvency = self.reconcile_margin(bad_debt_before);
-        // Move the cancelled orders out while retaining the scratch buffer's capacity,
-        // which `push_within_capacity` relies on. Allocation-free when empty.
-        let mut forced_cancels = ForcedCancels::with_capacity(self.forced_cancel_scratch.len());
-        for order in self.forced_cancel_scratch.drain(..) {
-            forced_cancels
-                .push_within_capacity(order)
-                .expect(EXPECT_CAPACITY);
-        }
+        let forced_cancels = self.take_forced_cancels();
         (forced_cancels, solvency)
     }
 
