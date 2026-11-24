@@ -14,6 +14,7 @@ mod market_update;
 mod mock_exchange;
 mod order_filters;
 pub mod order_rate_limiter;
+mod portfolio;
 mod risk_engine;
 #[cfg(test)]
 mod tests;
@@ -60,6 +61,7 @@ pub mod prelude {
             PriceFilter,
             QuantityFilter,
         },
+        portfolio::*,
         risk_engine::{
             CrossMarginRiskEngine,
             MaintenanceMarginSchedule,

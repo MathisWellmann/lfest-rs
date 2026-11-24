@@ -4,7 +4,9 @@ mod funding;
 mod leverage;
 mod limit_order;
 mod limits;
+mod market_id;
 mod market_order;
+mod mass_cancel;
 mod order_id;
 mod order_meta;
 mod order_status;
@@ -25,7 +27,12 @@ pub use funding::FundingRate;
 pub use leverage::Leverage;
 pub use limit_order::LimitOrder;
 pub use limits::OrderRateLimits;
+pub use market_id::{
+    MarketId,
+    MarketStatus,
+};
 pub use market_order::MarketOrder;
+pub use mass_cancel::MassCancelResult;
 pub use order_id::OrderId;
 pub use order_meta::ExchangeOrderMeta;
 pub use order_status::{
