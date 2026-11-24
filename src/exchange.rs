@@ -1586,26 +1586,12 @@ where
         price_type: TriggerPriceType,
         side: crate::types::Side,
     ) -> Option<QuoteCurrency<I, D>> {
-        let price = match price_type {
-            TriggerPriceType::Mark => self.mark_price(),
-            TriggerPriceType::Last => {
-                let last = self.market_state.last_trade_price();
-                if last > QuoteCurrency::zero() {
-                    last
-                } else {
-                    self.market_state.mid_price()
-                }
-            }
-            TriggerPriceType::BestBidAsk => match side {
-                Buy => self.market_state.ask(),
-                Sell => self.market_state.bid(),
-            },
-        };
-        if price > QuoteCurrency::zero() {
-            Some(price)
-        } else {
-            None
-        }
+        execution_rules::stop_reference_price(
+            &self.market_state,
+            self.config.contract_spec().mark_method(),
+            price_type,
+            side,
+        )
     }
 
     fn evaluate_pending_stops(
@@ -1618,29 +1604,13 @@ where
 
         self.pending_stops.evaluate_and_drain(
             |stop| {
-                if let Some((low, high)) = candle_range {
-                    return Some((low, high));
-                }
-                let p = match stop.trigger_price_type() {
-                    TriggerPriceType::Mark => ms.mark_price(mark_method),
-                    TriggerPriceType::Last => {
-                        let last = ms.last_trade_price();
-                        if last > QuoteCurrency::zero() {
-                            last
-                        } else {
-                            ms.mid_price()
-                        }
-                    }
-                    TriggerPriceType::BestBidAsk => match stop.side() {
-                        Buy => ms.ask(),
-                        Sell => ms.bid(),
-                    },
-                };
-                if p > QuoteCurrency::zero() {
-                    Some((p, p))
-                } else {
-                    None
-                }
+                execution_rules::stop_trigger_band(
+                    ms,
+                    mark_method,
+                    stop.trigger_price_type(),
+                    stop.side(),
+                    candle_range,
+                )
             },
             &mut self.elected_stops_scratch,
         );
@@ -1648,7 +1618,9 @@ where
         let n_elected = self.elected_stops_scratch.len();
         for i in 0..n_elected {
             let (stop, trigger_price) = self.elected_stops_scratch[i];
-            self.execute_elected_stop(stop, trigger_price, candle_range.is_some());
+            let intrabar =
+                execution_rules::elected_intrabar(stop.trigger_price_type(), candle_range);
+            self.execute_elected_stop(stop, trigger_price, intrabar);
             if self.liquidated_during_fills {
                 core::hint::cold_path();
                 // The remaining elected stops were already removed from `pending_stops`,

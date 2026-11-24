@@ -129,10 +129,13 @@ where
     /// Ordering semantics (adapted from `OrderBook-rs` `stop_orders.rs` + conservative bar model):
     /// 1. For point observations (`low == high == p`), trail watermarks at `p` first, then
     ///    elect any stop crossed by `p`.
-    /// 2. For candle intervals (`low < high`), conservatively test stop-loss / trailing stops
-    ///    against the adverse extreme *before* trailing them to the favorable extreme, so a
-    ///    bar that hits both extremes does not optimistically trail a stop out of harm's way.
-    ///    Take-profits are tested against the favorable extreme.
+    /// 2. For candle intervals (`low < high`) the intrabar order of the extremes is unknown,
+    ///    so assume the one worse for the trader: trailing stops first trail to the favorable
+    ///    extreme (which can only tighten them) and are then tested against the adverse
+    ///    extreme. Testing before trailing would assume the adverse extreme printed first and
+    ///    let a bar which ratchets the stop up and then falls through it slip by untriggered.
+    ///    Stop-losses are tested against the adverse extreme, take-profits against the
+    ///    favorable one.
     /// 3. Elected stops are sorted deterministically: stop-losses before take-profits,
     ///    highest stop price first for `AtOrBelow`, lowest first for `AtOrAbove`, ties broken
     ///    by admission `OrderId`.
@@ -194,8 +197,9 @@ where
     /// elects it.
     ///
     /// For single-point prints, trail before testing (matching `OrderBook-rs`).
-    /// For multi-price candle ranges, test the adverse extreme first conservatively and
-    /// only trail to the favorable extreme if the stop survived the adverse one.
+    /// For multi-price candle ranges, trail to the favorable extreme first and then test
+    /// the extreme in the trigger direction, i.e. assume the favorable extreme printed
+    /// first, which elects a trailing stop whenever any intrabar path could have.
     #[inline]
     fn trail_and_test(
         stop: &mut StopOrder<I, D, BaseOrQuote, UserOrderIdT>,
@@ -207,19 +211,22 @@ where
             stop.trail_to(low);
             return stop.is_triggered_by(low).then_some(low);
         }
-        let test_price = match stop.trigger_direction() {
-            TriggerDirection::AtOrBelow => low,
-            TriggerDirection::AtOrAbove => high,
-        };
-        if stop.is_triggered_by(test_price) {
-            return Some(test_price);
-        }
         let favorable = match stop.side() {
             Side::Sell => high,
             Side::Buy => low,
         };
+        let stop_before = stop.stop_price();
         stop.trail_to(favorable);
-        None
+        // Trailing only ever tightens the stop towards the market.
+        match stop.side() {
+            Side::Sell => assert!(stop.stop_price() >= stop_before),
+            Side::Buy => assert!(stop.stop_price() <= stop_before),
+        }
+        let test_price = match stop.trigger_direction() {
+            TriggerDirection::AtOrBelow => low,
+            TriggerDirection::AtOrAbove => high,
+        };
+        stop.is_triggered_by(test_price).then_some(test_price)
     }
 
     #[inline]
@@ -249,6 +256,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use const_decimal::Decimal;
+
     use super::*;
     use crate::{
         DECIMALS,
@@ -256,6 +265,7 @@ mod tests {
             BaseCurrency,
             TimeInForce,
         },
+        stop_orders::TrailDistance,
         utils::NoUserOrderId,
     };
 
@@ -351,6 +361,108 @@ mod tests {
             &mut again,
         );
         assert_eq!(elected, again);
+    }
+
+    fn single_trailing_stop(
+        side: Side,
+        trail: TrailDistance<i64, DECIMALS>,
+    ) -> PendingStops<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+        let mut store = PendingStops::with_capacity(NonZeroU16::new(4).unwrap());
+        let mut stop = Stop::trailing_stop(
+            side,
+            QuoteCurrency::new(100, 0),
+            trail,
+            BaseCurrency::new(1, 0),
+            NoUserOrderId,
+        )
+        .unwrap();
+        stop.stamp_admitted(OrderId::from(1), 0.into());
+        store.try_insert(stop).unwrap();
+        store
+    }
+
+    /// Feed one candle `(low, high)` and return the elected trigger price, if any.
+    fn candle(
+        store: &mut PendingStops<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>,
+        low: i64,
+        high: i64,
+    ) -> Option<QuoteCurrency<i64, DECIMALS>> {
+        let mut elected = Vec::with_capacity(4);
+        store.evaluate_and_drain(
+            |_| Some((QuoteCurrency::new(low, 0), QuoteCurrency::new(high, 0))),
+            &mut elected,
+        );
+        assert!(elected.len() <= 1);
+        elected.first().map(|(_, trig)| *trig)
+    }
+
+    fn stop_price_of(
+        store: &PendingStops<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>,
+    ) -> QuoteCurrency<i64, DECIMALS> {
+        store.get_by_id(OrderId::from(1)).unwrap().stop_price()
+    }
+
+    #[test]
+    fn sell_trailing_stop_candle_trails_then_tests_the_low() {
+        let abs5 = TrailDistance::Absolute(QuoteCurrency::new(5, 0));
+        // Rally to 110 ratchets the stop to 105, then the low of 101 falls through it.
+        let mut store = single_trailing_stop(Side::Sell, abs5);
+        assert_eq!(
+            candle(&mut store, 101, 110),
+            Some(QuoteCurrency::new(101, 0))
+        );
+        assert!(store.is_empty());
+
+        // A low just above the trailed stop survives, and the stop stays trailed.
+        let mut store = single_trailing_stop(Side::Sell, abs5);
+        assert_eq!(candle(&mut store, 106, 110), None);
+        assert_eq!(stop_price_of(&store), QuoteCurrency::new(105, 0));
+        // Low exactly at the trailed stop elects it.
+        assert_eq!(
+            candle(&mut store, 105, 108),
+            Some(QuoteCurrency::new(105, 0))
+        );
+    }
+
+    #[test]
+    fn buy_trailing_stop_candle_trails_then_tests_the_high() {
+        let abs5 = TrailDistance::Absolute(QuoteCurrency::new(5, 0));
+        // Buy trail 5 from 100 starts at 105. A drop to 90 ratchets it to 95, and the
+        // high of 99 rises through it.
+        let mut store = single_trailing_stop(Side::Buy, abs5);
+        assert_eq!(stop_price_of(&store), QuoteCurrency::new(105, 0));
+        assert_eq!(candle(&mut store, 90, 99), Some(QuoteCurrency::new(99, 0)));
+        assert!(store.is_empty());
+
+        let mut store = single_trailing_stop(Side::Buy, abs5);
+        assert_eq!(candle(&mut store, 90, 94), None);
+        assert_eq!(stop_price_of(&store), QuoteCurrency::new(95, 0));
+        // A favorable bar never loosens the stop.
+        assert_eq!(candle(&mut store, 91, 94), None);
+        assert_eq!(stop_price_of(&store), QuoteCurrency::new(95, 0));
+    }
+
+    #[test]
+    fn callback_rate_trailing_stop_candle_trails_then_tests() {
+        let five_pct = TrailDistance::CallbackRate(Decimal::try_from_scaled(5, 2).unwrap());
+        // Sell 5% from 100 starts at 95; a high of 120 trails it to 114.
+        let mut store = single_trailing_stop(Side::Sell, five_pct);
+        assert_eq!(stop_price_of(&store), QuoteCurrency::new(95, 0));
+        assert_eq!(
+            candle(&mut store, 113, 120),
+            Some(QuoteCurrency::new(113, 0))
+        );
+
+        let mut store = single_trailing_stop(Side::Sell, five_pct);
+        assert_eq!(candle(&mut store, 115, 120), None);
+        assert_eq!(stop_price_of(&store), QuoteCurrency::new(114, 0));
+
+        // Buy 5% from 100 starts at 105; a low of 80 trails it to 84.
+        let mut store = single_trailing_stop(Side::Buy, five_pct);
+        assert_eq!(candle(&mut store, 80, 84), Some(QuoteCurrency::new(84, 0)));
+        let mut store = single_trailing_stop(Side::Buy, five_pct);
+        assert_eq!(candle(&mut store, 80, 83), None);
+        assert_eq!(stop_price_of(&store), QuoteCurrency::new(84, 0));
     }
 
     #[test]
