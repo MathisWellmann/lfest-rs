@@ -10,6 +10,7 @@ use crate::{
     prelude::{
         ConfigError,
         MarginCurrency,
+        MarginMode,
         Mon,
     },
     types::OrderRateLimits,
@@ -47,6 +48,10 @@ where
     /// The submission rate limits for orders.
     #[getset(get = "pub")]
     order_rate_limits: OrderRateLimits,
+
+    /// Selects isolated vs cross-margin valuation and liquidation checks.
+    #[getset(get_copy = "pub")]
+    margin_mode: MarginMode,
 }
 
 impl<I, const D: u8, BaseOrQuote> Config<I, D, BaseOrQuote>
@@ -81,6 +86,14 @@ where
             max_num_open_orders,
             contract_spec: contract_specification,
             order_rate_limits,
+            margin_mode: MarginMode::default(),
         })
+    }
+
+    /// Select the [`MarginMode`] (default [`MarginMode::Isolated`]).
+    #[must_use]
+    pub fn with_margin_mode(mut self, margin_mode: MarginMode) -> Self {
+        self.margin_mode = margin_mode;
+        self
     }
 }

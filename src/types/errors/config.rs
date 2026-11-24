@@ -39,4 +39,7 @@ pub enum ConfigError {
 
     #[error("The taker fee rate must be non-negative")]
     InvalidTakerFee,
+
+    #[error("The maintenance margin tier configuration is invalid")]
+    InvalidMaintenanceMarginTier,
 }

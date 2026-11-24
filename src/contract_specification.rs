@@ -16,6 +16,7 @@ use crate::{
     prelude::{
         ConfigError,
         Currency,
+        MaintenanceMarginSchedule,
         Maker,
         MarginCurrency,
         Mon,
@@ -56,6 +57,10 @@ where
     /// Expressed as basis points.
     #[getset(get_copy = "pub")]
     maintenance_margin: Decimal<I, D>,
+
+    /// Tiered maintenance margin schedule (defaults to a single flat tier at `maintenance_margin`).
+    #[getset(get = "pub")]
+    maintenance_margin_schedule: MaintenanceMarginSchedule<I, D, BaseOrQuote::PairedCurrency>,
 
     /// The method for computing `mark-to-market`.
     #[getset(get_copy = "pub", set = "pub")]
@@ -120,11 +125,14 @@ where
         }
 
         let init_margin_req = leverage.init_margin_req();
+        let maint_margin_rate = init_margin_req * maintenance_margin;
+        let maintenance_margin_schedule = MaintenanceMarginSchedule::flat(maint_margin_rate)?;
 
         Ok(Self {
             ticker: String::new(),
             init_margin_req,
-            maintenance_margin: init_margin_req * maintenance_margin,
+            maintenance_margin: maint_margin_rate,
+            maintenance_margin_schedule,
             mark_method: MarkMethod::default(),
             price_filter,
             quantity_filter,
@@ -133,6 +141,17 @@ where
             fee_taker,
             liquidation_fee: Decimal::zero(),
         })
+    }
+
+    /// Replace the flat maintenance margin schedule with a tiered bracket schedule.
+    #[must_use]
+    pub fn with_maintenance_margin_schedule(
+        mut self,
+        schedule: MaintenanceMarginSchedule<I, D, BaseOrQuote::PairedCurrency>,
+    ) -> Self {
+        self.maintenance_margin = schedule.tiers()[0].maintenance_margin_rate();
+        self.maintenance_margin_schedule = schedule;
+        self
     }
 
     /// Configure an optional extra liquidation clearance fee rate (in `[0, 1)`),

@@ -1,0 +1,367 @@
+//! Cross-margin risk engine using live mark-to-market equity and tiered maintenance margin.
+
+use const_decimal::Decimal;
+use num_traits::{
+    One,
+    Zero,
+};
+use tracing::trace;
+
+use super::RiskEngine;
+use crate::{
+    account::{
+        Account,
+        Position,
+        PositionSide,
+    },
+    contract_specification::ContractSpecification,
+    market_state::MarketState,
+    prelude::{
+        Currency,
+        Mon,
+        QuoteCurrency,
+        RiskError,
+    },
+    types::{
+        LimitOrder,
+        MarginCurrency,
+        MarketOrder,
+        NotEnoughAvailableBalance,
+        Pending,
+        Side,
+        UserOrderId,
+    },
+};
+
+/// Selects how an exchange computes account equity and liquidation thresholds.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum MarginMode {
+    /// Legacy isolated-margin mode: static entry-price liquidation threshold and
+    /// wallet-only available balance (default for backwards compatibility).
+    #[default]
+    Isolated,
+    /// Cross-margin mode: live mark-to-market equity (`wallet_balance + unrealized_pnl`),
+    /// mark-notional tiered maintenance margin, and dynamic liquidation pricing.
+    Cross,
+}
+
+/// Risk engine implementing cross-margin admission and mark-to-market maintenance
+/// margin checks.
+///
+/// Unlike the isolated margin risk engine, this engine:
+/// - Evaluates account equity as `wallet_balance + unrealized_pnl(mark_price)`.
+/// - Evaluates maintenance margin against live mark notional through the contract's
+///   [`crate::risk_engine::MaintenanceMarginSchedule`].
+/// - Computes dynamic liquidation prices reflecting actual wallet balance, funding
+///   erosion, realized fees, and bracket maintenance offsets.
+#[derive(Debug, Clone)]
+pub struct CrossMarginRiskEngine<I, const D: u8, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+{
+    contract_spec: ContractSpecification<I, D, BaseOrQuote>,
+}
+
+impl<I, const D: u8, BaseOrQuote> CrossMarginRiskEngine<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+{
+    /// Create a new cross-margin risk engine for `contract_spec`.
+    #[must_use]
+    pub fn new(contract_spec: ContractSpecification<I, D, BaseOrQuote>) -> Self {
+        Self { contract_spec }
+    }
+
+    /// Compute mark-to-market equity (`wallet_equity + unrealized_pnl`) at `market_state`.
+    #[inline]
+    #[must_use]
+    pub fn mark_to_market_equity<UserOrderIdT: UserOrderId>(
+        &self,
+        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
+        market_state: &MarketState<I, D>,
+    ) -> BaseOrQuote::PairedCurrency {
+        let upnl = account
+            .position()
+            .unrealized_pnl_marked(market_state, self.contract_spec.mark_method());
+        account.balances().equity() + upnl
+    }
+
+    /// Compute required maintenance margin for `position` evaluated at its live mark price.
+    #[inline]
+    #[must_use]
+    pub fn maintenance_margin_requirement(
+        &self,
+        market_state: &MarketState<I, D>,
+        position: &Position<I, D, BaseOrQuote>,
+    ) -> BaseOrQuote::PairedCurrency {
+        if position.quantity().is_zero() {
+            return Zero::zero();
+        }
+        let mark_price =
+            market_state.mark_price_for_position(self.contract_spec.mark_method(), position.side());
+        let mark_notional = position.notional_at_price(mark_price);
+        self.contract_spec
+            .maintenance_margin_schedule()
+            .maintenance_margin(mark_notional)
+    }
+
+    /// Check whether mark-to-market equity covers the tiered maintenance margin requirement.
+    ///
+    /// # Errors
+    /// Returns [`RiskError::Liquidate`] when the position is non-zero and
+    /// `wallet_equity + unrealized_pnl < maintenance_margin(mark_notional)`.
+    #[inline]
+    pub fn check_mark_to_market_maintenance_margin<UserOrderIdT: UserOrderId>(
+        &self,
+        market_state: &MarketState<I, D>,
+        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
+    ) -> Result<(), RiskError> {
+        if account.position().quantity().is_zero() {
+            return Ok(());
+        }
+        let mtm_equity = self.mark_to_market_equity(account, market_state);
+        let mm_req = self.maintenance_margin_requirement(market_state, account.position());
+        if mtm_equity < mm_req {
+            return Err(RiskError::Liquidate);
+        }
+        Ok(())
+    }
+
+    /// Check whether a new limit order fits within live mark-to-market equity.
+    ///
+    /// # Errors
+    /// Returns [`NotEnoughAvailableBalance`] when `mtm_equity < required_collateral_with_order`.
+    #[inline]
+    pub fn check_limit_order_with_market<UserOrderIdT: UserOrderId>(
+        &self,
+        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
+        market_state: &MarketState<I, D>,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+    ) -> Result<(), NotEnoughAvailableBalance> {
+        let upnl = account
+            .position()
+            .unrealized_pnl_marked(market_state, self.contract_spec.mark_method());
+        let excess = account.margin_excess_with_order(order) + upnl;
+        trace!("CrossMarginRiskEngine::check_limit_order_with_market: excess={excess:?}");
+        if excess < Zero::zero() {
+            return Err(NotEnoughAvailableBalance);
+        }
+        Ok(())
+    }
+
+    /// Check whether a new market order fits within live mark-to-market equity.
+    ///
+    /// Strictly position-reducing market orders are never rejected.
+    ///
+    /// # Errors
+    /// Returns [`NotEnoughAvailableBalance`] if increasing or flipping the position
+    /// would exceed live mark-to-market available margin.
+    pub fn check_market_order_with_market<UserOrderIdT: UserOrderId>(
+        &self,
+        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
+        market_state: &MarketState<I, D>,
+        order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        fill_price: QuoteCurrency<I, D>,
+    ) -> Result<(), NotEnoughAvailableBalance> {
+        let pos_qty = account.position().quantity();
+        let upnl = account
+            .position()
+            .unrealized_pnl_marked(market_state, self.contract_spec.mark_method());
+        let avail = (account.margin_excess() + upnl).max(Zero::zero());
+
+        let same_direction = match order.side() {
+            Side::Buy => pos_qty >= Zero::zero(),
+            Side::Sell => pos_qty <= Zero::zero(),
+        };
+        if same_direction {
+            let notional = BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
+            let init_margin = notional * self.contract_spec.init_margin_req();
+            let fee = notional * *self.contract_spec.fee_taker().as_ref();
+            if init_margin + fee > avail {
+                return Err(NotEnoughAvailableBalance);
+            }
+            return Ok(());
+        }
+
+        let abs_qty = pos_qty.abs();
+        if order.quantity() <= abs_qty {
+            // Strictly reducing orders are always permitted.
+            return Ok(());
+        }
+
+        // Flipping position: close old leg (realizing PnL at fill_price) and open remainder.
+        let flip_qty = order.quantity() - abs_qty;
+        let close_notional = BaseOrQuote::PairedCurrency::convert_from(abs_qty, fill_price);
+        let flip_notional = BaseOrQuote::PairedCurrency::convert_from(flip_qty, fill_price);
+        let total_fee = (close_notional + flip_notional) * *self.contract_spec.fee_taker().as_ref();
+        let realized_pnl =
+            BaseOrQuote::PairedCurrency::pnl(account.position().entry_price(), fill_price, pos_qty);
+        let post_equity = account.balances().equity() + realized_pnl - total_fee;
+        let post_pos_margin = flip_notional * self.contract_spec.init_margin_req();
+        if post_equity < post_pos_margin {
+            return Err(NotEnoughAvailableBalance);
+        }
+        Ok(())
+    }
+
+    /// Estimate the dynamic liquidation price of a linear or inverse single-position
+    /// cross-margin account given `wallet_equity` and `position`.
+    ///
+    /// Returns `None` if `position` is neutral, or if the liquidation price is non-positive
+    /// (for example a long position backed by >= 100% equity with zero leverage).
+    ///
+    /// For linear contracts (`QuoteCurrency` margin):
+    /// - Long (`q > 0`): `E + q * (P - P_e) = q * P * mm - A  =>  P = (q * P_e - E - A) / (q * (1 - mm))`
+    /// - Short (`q < 0`, `|q| = Q`): `E + Q * (P_e - P) = Q * P * mm - A  =>  P = (Q * P_e + E + A) / (Q * (1 + mm))`
+    ///
+    /// For inverse contracts (`BaseCurrency` margin, `notional = Q / P`):
+    /// - Long (`q > 0`): `E + q * (1/P_e - 1/P) = (q/P) * mm - A  =>  P = q * (1 + mm) / (E + A + q / P_e)`
+    /// - Short (`q < 0`, `Q = |q|`): `E + Q * (1/P - 1/P_e) = (Q/P) * mm - A  =>  P = Q * (1 - mm) / (Q / P_e - E - A)`
+    #[must_use]
+    pub fn estimated_liquidation_price(
+        &self,
+        wallet_equity: BaseOrQuote::PairedCurrency,
+        position: &Position<I, D, BaseOrQuote>,
+        reference_price: QuoteCurrency<I, D>,
+    ) -> Option<QuoteCurrency<I, D>> {
+        if position.quantity().is_zero() || reference_price <= Zero::zero() {
+            return None;
+        }
+        let ref_notional = position.notional_at_price(reference_price);
+        let tier = self
+            .contract_spec
+            .maintenance_margin_schedule()
+            .tier_for_notional(ref_notional);
+        let mm = tier.maintenance_margin_rate();
+        let maint_amount = tier.maintenance_amount();
+        let qty_abs = *position.quantity().abs().as_ref();
+        let entry = *position.entry_price().as_ref();
+        let equity = *wallet_equity.as_ref();
+        let cum = *maint_amount.as_ref();
+
+        let liq_dec: Decimal<I, D> = match BaseOrQuote::PairedCurrency::KIND {
+            crate::types::CurrencyKind::Quote => {
+                // Linear: qty in Base, margin/equity in Quote
+                match position.side() {
+                    PositionSide::Long => {
+                        let denom = qty_abs * (Decimal::one() - mm);
+                        if denom <= Decimal::zero() {
+                            return None;
+                        }
+                        let numer = qty_abs * entry - equity - cum;
+                        numer / denom
+                    }
+                    PositionSide::Short => {
+                        let denom = qty_abs * (Decimal::one() + mm);
+                        if denom <= Decimal::zero() {
+                            return None;
+                        }
+                        let numer = qty_abs * entry + equity + cum;
+                        numer / denom
+                    }
+                    PositionSide::Neutral => return None,
+                }
+            }
+            crate::types::CurrencyKind::Base => {
+                // Inverse: qty in Quote, margin/equity in Base
+                let entry_base = qty_abs / entry;
+                match position.side() {
+                    PositionSide::Long => {
+                        let denom = equity + cum + entry_base;
+                        if denom <= Decimal::zero() {
+                            return None;
+                        }
+                        (qty_abs * (Decimal::one() + mm)) / denom
+                    }
+                    PositionSide::Short => {
+                        let denom = entry_base - equity - cum;
+                        if denom <= Decimal::zero() {
+                            return None;
+                        }
+                        (qty_abs * (Decimal::one() - mm)) / denom
+                    }
+                    PositionSide::Neutral => return None,
+                }
+            }
+        };
+
+        if liq_dec <= Decimal::zero() {
+            None
+        } else {
+            Some(QuoteCurrency::from(liq_dec))
+        }
+    }
+}
+
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> RiskEngine<I, D, BaseOrQuote, UserOrderIdT>
+    for CrossMarginRiskEngine<I, D, BaseOrQuote>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    fn check_market_order(
+        &self,
+        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
+        order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        fill_price: QuoteCurrency<I, D>,
+    ) -> Result<(), NotEnoughAvailableBalance> {
+        let mut ms = MarketState::default();
+        ms.set_bid(fill_price);
+        ms.set_ask(fill_price);
+        self.check_market_order_with_market(account, &ms, order, fill_price)
+    }
+
+    fn check_limit_order(
+        &self,
+        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
+        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+    ) -> Result<(), NotEnoughAvailableBalance> {
+        let excess = account.margin_excess_with_order(order);
+        if excess < Zero::zero() {
+            return Err(NotEnoughAvailableBalance);
+        }
+        Ok(())
+    }
+
+    fn check_maintenance_margin(
+        &self,
+        market_state: &MarketState<I, D>,
+        position: &Position<I, D, BaseOrQuote>,
+    ) -> Result<(), RiskError> {
+        // Fallback for the trait method without `Account`: delegates to static
+        // entry-price threshold. `Exchange` in Cross mode calls
+        // `check_mark_to_market_maintenance_margin` with the full `Account`.
+        use std::cmp::Ordering::*;
+        let mark_method = self.contract_spec.mark_method();
+        match position.quantity().cmp(&Zero::zero()) {
+            Less => {
+                let liquidation_price = position
+                    .entry_price()
+                    .liquidation_price_short(self.contract_spec.maintenance_margin());
+                let reference_price =
+                    market_state.mark_price_for_position(mark_method, PositionSide::Short);
+                if reference_price > liquidation_price {
+                    return Err(RiskError::Liquidate);
+                }
+            }
+            Equal => return Ok(()),
+            Greater => {
+                let liquidation_price = position
+                    .entry_price()
+                    .liquidation_price_long(self.contract_spec.maintenance_margin());
+                let reference_price =
+                    market_state.mark_price_for_position(mark_method, PositionSide::Long);
+                if reference_price < liquidation_price {
+                    return Err(RiskError::Liquidate);
+                }
+            }
+        }
+        Ok(())
+    }
+}

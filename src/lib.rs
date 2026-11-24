@@ -60,6 +60,12 @@ pub mod prelude {
             PriceFilter,
             QuantityFilter,
         },
+        risk_engine::{
+            CrossMarginRiskEngine,
+            MaintenanceMarginSchedule,
+            MaintenanceMarginTier,
+            MarginMode,
+        },
         types::*,
         utils::{
             NoUserOrderId,
