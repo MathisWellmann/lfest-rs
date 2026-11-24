@@ -51,6 +51,7 @@ pub mod prelude {
             Exchange,
             ForcedCancels,
             FundingSettlement,
+            LimitOrderSubmission,
             MarketOrderSettlement,
         },
         leverage,

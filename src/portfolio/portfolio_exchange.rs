@@ -63,6 +63,7 @@ use crate::{
         Solvency,
         SubmitLimitOrderError,
         SubmitMarketOrderError,
+        TimeInForce,
         TimestampNs,
         UserOrderId,
     },
@@ -172,6 +173,17 @@ where
             Buy => pos_qty.is_negative() && quantity <= pos_qty.abs(),
             Sell => pos_qty.is_positive() && quantity <= pos_qty,
         }
+    }
+
+    #[inline]
+    fn clamp_reduce_only_quantity(&self, side: Side, quantity: BaseOrQuote) -> Option<BaseOrQuote> {
+        let pos_qty = self.position.quantity();
+        let opposite_size = match side {
+            Buy if pos_qty.is_negative() => pos_qty.abs(),
+            Sell if pos_qty.is_positive() => pos_qty,
+            _ => return None,
+        };
+        Some(crate::utils::min(quantity, opposite_size))
     }
 
     #[inline]
@@ -571,7 +583,7 @@ where
     pub fn submit_market_order(
         &mut self,
         market_id: MarketId,
-        order: MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+        mut order: MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
     ) -> Result<
         PortfolioMarketOrderSettlement<I, D, BaseOrQuote, UserOrderIdT>,
         PortfolioError<UserOrderIdT>,
@@ -580,11 +592,6 @@ where
         let status = self.markets[idx].status;
         if status == MarketStatus::Delisted {
             return Err(PortfolioError::MarketDelisted(market_id));
-        }
-        let strictly_reducing =
-            self.markets[idx].is_strictly_reducing(order.side(), order.quantity());
-        if status == MarketStatus::ReduceOnly && !strictly_reducing {
-            return Err(PortfolioError::MarketReduceOnly(market_id));
         }
 
         let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
@@ -597,6 +604,23 @@ where
             .quantity_filter()
             .validate_order_quantity(order.quantity())
             .map_err(SubmitMarketOrderError::from)?;
+
+        if order.reduce_only() {
+            let Some(clamped) =
+                self.markets[idx].clamp_reduce_only_quantity(order.side(), order.quantity())
+            else {
+                return Err(SubmitMarketOrderError::ReduceOnlyRejected.into());
+            };
+            if clamped < order.quantity() {
+                order.set_quantity(clamped);
+            }
+        }
+
+        let strictly_reducing =
+            self.markets[idx].is_strictly_reducing(order.side(), order.quantity());
+        if status == MarketStatus::ReduceOnly && !strictly_reducing {
+            return Err(PortfolioError::MarketReduceOnly(market_id));
+        }
 
         assert2::debug_assert!(self.markets[idx].market_state.ask() > QuoteCurrency::zero());
         assert2::debug_assert!(self.markets[idx].market_state.bid() > QuoteCurrency::zero());
@@ -643,26 +667,28 @@ where
         })
     }
 
-    /// Submit a passive limit order on `market_id`.
+    /// Submit a passive or marketable limit order on `market_id`, supporting
+    /// `TimeInForce` (`GTX`, `GTC`, `IOC`, `FOK`), `RePricing::Marketable`, and `reduce_only`.
     ///
     /// # Errors
     /// Returns [`PortfolioError`] on unknown/delisted/reduce-only market, rate limit,
     /// filter violation, crossing GTX order, capacity limit, or insufficient cross-margin.
-    pub fn submit_limit_order(
+    #[allow(
+        clippy::too_many_lines,
+        reason = "keeping all TIF and reduce-only admission branches in one place preserves clarity"
+    )]
+    pub fn submit_limit_order_with_execution(
         &mut self,
         market_id: MarketId,
-        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
-    ) -> Result<PendingLimitOrder<I, D, BaseOrQuote, UserOrderIdT>, PortfolioError<UserOrderIdT>>
-    {
+        mut order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Result<
+        crate::exchange::LimitOrderSubmission<I, D, BaseOrQuote, UserOrderIdT>,
+        PortfolioError<UserOrderIdT>,
+    > {
         let idx = self.validate_market_index(market_id)?;
         let status = self.markets[idx].status;
         if status == MarketStatus::Delisted {
             return Err(PortfolioError::MarketDelisted(market_id));
-        }
-        let strictly_reducing =
-            self.markets[idx].is_strictly_reducing(order.side(), order.remaining_quantity());
-        if status == MarketStatus::ReduceOnly && !strictly_reducing {
-            return Err(PortfolioError::MarketReduceOnly(market_id));
         }
 
         let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
@@ -685,6 +711,22 @@ where
             .validate_limit_price(order.limit_price(), mark_price)
             .map_err(SubmitLimitOrderError::from)?;
 
+        if order.reduce_only() {
+            let Some(clamped) = self.markets[idx]
+                .clamp_reduce_only_quantity(order.side(), order.remaining_quantity())
+            else {
+                return Err(SubmitLimitOrderError::ReduceOnlyRejected.into());
+            };
+            if clamped < order.remaining_quantity() {
+                order.set_remaining_quantity(clamped);
+            }
+        }
+
+        let strictly_reducing =
+            self.markets[idx].is_strictly_reducing(order.side(), order.remaining_quantity());
+        if status == MarketStatus::ReduceOnly && !strictly_reducing {
+            return Err(PortfolioError::MarketReduceOnly(market_id));
+        }
         if !strictly_reducing {
             let notional = BaseOrQuote::PairedCurrency::convert_from(
                 order.remaining_quantity(),
@@ -697,36 +739,120 @@ where
                 .map_err(SubmitLimitOrderError::from)?;
         }
 
-        let meta = ExchangeOrderMeta::new(self.next_order_id(), ts_ns);
-        let pending = order.into_pending(meta);
+        let marketable = match order.side() {
+            Buy => order.limit_price() >= self.markets[idx].market_state.ask(),
+            Sell => order.limit_price() <= self.markets[idx].market_state.bid(),
+        };
+        let is_post_only = order.re_pricing() == RePricing::GoodTilCrossing
+            && order.time_in_force() == TimeInForce::GoodTilCrossing;
 
-        self.check_portfolio_limit_order(idx, &pending)
+        if marketable && is_post_only {
+            let meta = ExchangeOrderMeta::new(self.next_order_id(), ts_ns);
+            let pending = order.into_pending(meta);
+            self.check_portfolio_limit_order(idx, &pending)
+                .map_err(SubmitLimitOrderError::from)?;
+            return Err(SubmitLimitOrderError::GoodTillCrossingRejectedOrder {
+                limit_price: pending.limit_price().to_string(),
+                away_market_quotation_price: match pending.side() {
+                    Buy => self.markets[idx].market_state.ask().to_string(),
+                    Sell => self.markets[idx].market_state.bid().to_string(),
+                },
+            }
+            .into());
+        }
+
+        if marketable {
+            let fill_price = match order.side() {
+                Buy => self.markets[idx].market_state.ask(),
+                Sell => self.markets[idx].market_state.bid(),
+            };
+            self.check_portfolio_market_order(
+                idx,
+                order.side(),
+                order.remaining_quantity(),
+                fill_price,
+            )
             .map_err(SubmitLimitOrderError::from)?;
 
-        let marketable = match pending.side() {
-            Buy => pending.limit_price() >= self.markets[idx].market_state.ask(),
-            Sell => pending.limit_price() <= self.markets[idx].market_state.bid(),
-        };
-        match pending.re_pricing() {
-            RePricing::GoodTilCrossing => {
-                if marketable {
-                    return Err(SubmitLimitOrderError::GoodTillCrossingRejectedOrder {
-                        limit_price: pending.limit_price().to_string(),
-                        away_market_quotation_price: match pending.side() {
-                            Buy => self.markets[idx].market_state.ask().to_string(),
-                            Sell => self.markets[idx].market_state.bid().to_string(),
-                        },
-                    }
-                    .into());
-                }
+            let meta = ExchangeOrderMeta::new(self.next_order_id(), ts_ns);
+            let pending = order.into_pending(meta);
+            let filled_qty = pending.remaining_quantity();
+            let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price);
+            let fee = notional * *self.markets[idx].contract_spec.fee_taker().as_ref();
+            let bad_debt_before = self.balances.bad_debt();
+            self.markets[idx].position.change(
+                filled_qty,
+                fill_price,
+                pending.side(),
+                &mut self.balances,
+            );
+            self.balances.account_for_fee(fee);
+            let solvency = self.reconcile_portfolio_margin(bad_debt_before);
+            let tagged_cancels = self.take_forced_cancels();
+            let mut forced_cancels = Vec::with_capacity(tagged_cancels.len());
+            for (_, o) in tagged_cancels {
+                forced_cancels
+                    .push_within_capacity(o)
+                    .expect(EXPECT_CAPACITY);
             }
+            let filled_order = pending.into_filled_at_price(fill_price, ts_ns);
+            return Ok(crate::exchange::LimitOrderSubmission::ImmediatelyFilled {
+                filled_order,
+                fee,
+                forced_cancels,
+                solvency,
+            });
         }
+
+        if matches!(
+            order.time_in_force(),
+            TimeInForce::ImmediateOrCancel | TimeInForce::FillOrKill
+        ) {
+            return Err(SubmitLimitOrderError::ImmediateExecutionNotMarketable.into());
+        }
+
+        let meta = ExchangeOrderMeta::new(self.next_order_id(), ts_ns);
+        let pending = order.into_pending(meta);
+        self.check_portfolio_limit_order(idx, &pending)
+            .map_err(SubmitLimitOrderError::from)?;
 
         self.markets[idx]
             .active_limit_orders
             .try_insert(pending.clone())
             .map_err(SubmitLimitOrderError::from)?;
-        Ok(pending)
+        Ok(crate::exchange::LimitOrderSubmission::Resting(pending))
+    }
+
+    /// Submit a passive limit order on `market_id`.
+    ///
+    /// # Errors
+    /// Returns [`PortfolioError`] on unknown/delisted/reduce-only market, rate limit,
+    /// filter violation, crossing GTX order, capacity limit, or insufficient cross-margin.
+    pub fn submit_limit_order(
+        &mut self,
+        market_id: MarketId,
+        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Result<PendingLimitOrder<I, D, BaseOrQuote, UserOrderIdT>, PortfolioError<UserOrderIdT>>
+    {
+        match self.submit_limit_order_with_execution(market_id, order)? {
+            crate::exchange::LimitOrderSubmission::Resting(pending) => Ok(pending),
+            crate::exchange::LimitOrderSubmission::ImmediatelyFilled { filled_order, .. } => {
+                let meta = filled_order.state().meta().clone();
+                let mut pending = LimitOrder::new_with_user_order_id(
+                    filled_order.side(),
+                    filled_order.limit_price(),
+                    filled_order.total_quantity(),
+                    filled_order.user_order_id(),
+                )
+                .expect("filled order had positive price and quantity")
+                .with_re_pricing(filled_order.re_pricing())
+                .with_time_in_force(filled_order.time_in_force())
+                .with_reduce_only(filled_order.reduce_only())
+                .into_pending(meta);
+                pending.fill(filled_order.total_quantity());
+                Ok(pending)
+            }
+        }
     }
 
     /// Cancel an active limit order on `market_id`.

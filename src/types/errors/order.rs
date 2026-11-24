@@ -62,6 +62,9 @@ pub enum SubmitMarketOrderError {
 
     #[error(transparent)]
     ValidateOrderNotional(#[from] ValidateOrderNotionalError),
+
+    #[error("Reduce-only order rejected: no opposite open position to reduce")]
+    ReduceOnlyRejected,
 }
 
 #[derive(Error, Debug, Clone, Eq, PartialEq, derive_more::Display)]

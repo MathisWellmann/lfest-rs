@@ -17,6 +17,7 @@ use super::{
     Pending,
     QuoteCurrency,
     RePricing,
+    TimeInForce,
     UserOrderId,
     order_meta::ExchangeOrderMeta,
     order_status::NewOrder,
@@ -65,6 +66,14 @@ where
     /// Determines the behavior for when the limit price locks or crosses an away market quotation.
     #[getset(get_copy = "pub", set = "pub")]
     re_pricing: RePricing,
+
+    /// Time-in-force policy governing immediate execution vs resting behavior.
+    #[getset(get_copy = "pub", set = "pub")]
+    time_in_force: TimeInForce,
+
+    /// When `true`, the order may only reduce an existing opposite-side position.
+    #[getset(get_copy = "pub", set = "pub")]
+    reduce_only: bool,
 
     /// Depending on the status, different information is available.
     #[getset(get = "pub")]
@@ -158,6 +167,8 @@ where
             remaining_quantity: quantity,
             side,
             re_pricing: RePricing::default(),
+            time_in_force: TimeInForce::default(),
+            reduce_only: false,
         })
     }
 }
@@ -199,7 +210,46 @@ where
             remaining_quantity: quantity,
             side,
             re_pricing: RePricing::default(),
+            time_in_force: TimeInForce::default(),
+            reduce_only: false,
         })
+    }
+
+    /// Set the [`TimeInForce`] (builder-style). Automatically switches `re_pricing`
+    /// to [`RePricing::Marketable`] for `GoodTilCancelled`, `ImmediateOrCancel`, and
+    /// `FillOrKill`, and to [`RePricing::GoodTilCrossing`] for `GoodTilCrossing`.
+    #[inline]
+    #[must_use]
+    pub fn with_time_in_force(mut self, tif: TimeInForce) -> Self {
+        self.time_in_force = tif;
+        self.re_pricing = match tif {
+            TimeInForce::GoodTilCrossing => RePricing::GoodTilCrossing,
+            TimeInForce::GoodTilCancelled
+            | TimeInForce::ImmediateOrCancel
+            | TimeInForce::FillOrKill => RePricing::Marketable,
+        };
+        self
+    }
+
+    /// Set [`RePricing`] (builder-style), syncing `time_in_force` when switching to
+    /// [`RePricing::Marketable`] from the default `GoodTilCrossing`.
+    #[inline]
+    #[must_use]
+    pub fn with_re_pricing(mut self, re_pricing: RePricing) -> Self {
+        self.re_pricing = re_pricing;
+        if re_pricing == RePricing::Marketable && self.time_in_force == TimeInForce::GoodTilCrossing
+        {
+            self.time_in_force = TimeInForce::GoodTilCancelled;
+        }
+        self
+    }
+
+    /// Mark this limit order as reduce-only (builder-style).
+    #[inline]
+    #[must_use]
+    pub fn with_reduce_only(mut self, reduce_only: bool) -> Self {
+        self.reduce_only = reduce_only;
+        self
     }
 
     /// Set the `UserOrderId`.
@@ -225,7 +275,9 @@ where
             limit_price: self.limit_price,
             remaining_quantity: self.remaining_quantity,
             state: Pending::new(meta),
-            re_pricing: RePricing::default(),
+            re_pricing: self.re_pricing,
+            time_in_force: self.time_in_force,
+            reduce_only: self.reduce_only,
         }
     }
 
@@ -310,6 +362,33 @@ where
             remaining_quantity: BaseOrQuote::zero(),
             side: self.side,
             re_pricing: self.re_pricing,
+            time_in_force: self.time_in_force,
+            reduce_only: self.reduce_only,
+        }
+    }
+
+    /// Transition an immediately filled marketable limit order into the `Filled` state
+    /// at an explicit execution price `fill_price` (e.g. best bid/ask <= limit price).
+    #[inline]
+    pub(crate) fn into_filled_at_price(
+        self,
+        fill_price: QuoteCurrency<I, D>,
+        ts_ns: TimestampNs,
+    ) -> LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>> {
+        LimitOrder {
+            user_order_id: self.user_order_id,
+            state: Filled::new(
+                self.state.meta().clone(),
+                ts_ns,
+                fill_price,
+                self.remaining_quantity,
+            ),
+            limit_price: self.limit_price,
+            remaining_quantity: BaseOrQuote::zero(),
+            side: self.side,
+            re_pricing: self.re_pricing,
+            time_in_force: self.time_in_force,
+            reduce_only: self.reduce_only,
         }
     }
 

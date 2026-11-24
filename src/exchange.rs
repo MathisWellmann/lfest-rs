@@ -54,10 +54,36 @@ use crate::{
         Solvency,
         SubmitLimitOrderError,
         SubmitMarketOrderError,
+        TimeInForce,
         TimestampNs,
         UserOrderId,
     },
 };
+
+/// Result of submitting a limit order via [`Exchange::submit_limit_order_with_execution`],
+/// distinguishing between a resting passive order and an immediately filled marketable order.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum LimitOrderSubmission<I, const D: u8, BaseOrQuote, UserOrderIdT>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    /// The limit order did not cross the spread and now rests on the book.
+    Resting(LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>),
+    /// The limit order crossed the spread and executed immediately as a taker.
+    ImmediatelyFilled {
+        /// The filled limit order (with average execution price = best opposite quote).
+        filled_order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>,
+        /// Taker fee charged on the immediate execution.
+        fee: BaseOrQuote::PairedCurrency,
+        /// Resting orders force-cancelled if settling the fill caused a margin call.
+        forced_cancels: ForcedCancels<I, D, BaseOrQuote, UserOrderIdT>,
+        /// Account solvency after settlement and reconciliation.
+        solvency: Solvency,
+    },
+}
 
 /// The resting limit orders which the venue force-cancelled to keep the account's
 /// required collateral covered by its equity (margin call).
@@ -374,6 +400,7 @@ where
             self.force_liquidate();
             true
         } else {
+            self.prune_stale_reduce_only_orders();
             false
         };
 
@@ -526,7 +553,7 @@ where
     /// Else its an error.
     pub fn submit_market_order(
         &mut self,
-        order: MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+        mut order: MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
     ) -> Result<MarketOrderSettlement<I, D, BaseOrQuote, UserOrderIdT>, SubmitMarketOrderError>
     {
         self.order_rate_limiter
@@ -536,6 +563,16 @@ where
             .contract_spec()
             .quantity_filter()
             .validate_order_quantity(order.quantity())?;
+
+        if order.reduce_only() {
+            let Some(clamped) = self.clamp_reduce_only_quantity(order.side(), order.quantity())
+            else {
+                return Err(SubmitMarketOrderError::ReduceOnlyRejected);
+            };
+            if clamped < order.quantity() {
+                order.set_quantity(clamped);
+            }
+        }
 
         let meta = ExchangeOrderMeta::new(
             self.next_order_id(),
@@ -677,6 +714,51 @@ where
         }
     }
 
+    /// Compute the clamped executable quantity for a `reduce_only` order, or `None`
+    /// if the account has no opposite-side position to reduce.
+    #[inline]
+    fn clamp_reduce_only_quantity(
+        &self,
+        side: crate::types::Side,
+        quantity: BaseOrQuote,
+    ) -> Option<BaseOrQuote> {
+        let pos_qty = self.account.position().quantity();
+        let opposite_size = match side {
+            Buy if pos_qty.is_negative() => pos_qty.abs(),
+            Sell if pos_qty.is_positive() => pos_qty,
+            _ => return None,
+        };
+        Some(crate::utils::min(quantity, opposite_size))
+    }
+
+    /// Force-cancel any resting `reduce_only` limit orders that can no longer reduce
+    /// the current position (e.g. after the position closed or flipped direction).
+    fn prune_stale_reduce_only_orders(&mut self) {
+        let pos_qty = self.account.position().quantity();
+        loop {
+            let stale_id = self.account.active_limit_orders().iter().find_map(|o| {
+                if !o.reduce_only() {
+                    return None;
+                }
+                let still_reduces = match o.side() {
+                    Buy => pos_qty.is_negative(),
+                    Sell => pos_qty.is_positive(),
+                };
+                if still_reduces { None } else { Some(o.id()) }
+            });
+            let Some(oid) = stale_id else {
+                break;
+            };
+            let cancelled = self
+                .account
+                .cancel_limit_order(CancelBy::OrderId(oid))
+                .expect("stale reduce-only order id is active");
+            self.forced_cancel_scratch
+                .push_within_capacity(cancelled)
+                .expect(EXPECT_CAPACITY);
+        }
+    }
+
     #[inline(always)]
     fn next_order_id(&mut self) -> OrderId {
         let oid = self.next_order_id;
@@ -684,6 +766,178 @@ where
         oid
     }
 
+    /// Submit a limit order with full support for [`TimeInForce`] (`GTX`, `GTC`, `IOC`, `FOK`),
+    /// [`RePricing::Marketable`], and `reduce_only`.
+    ///
+    /// - If the order crosses the spread and uses `GoodTilCancelled`, `ImmediateOrCancel`,
+    ///   `FillOrKill`, or [`RePricing::Marketable`], it executes immediately at the best
+    ///   opposite quote paying the taker fee and returns
+    ///   [`LimitOrderSubmission::ImmediatelyFilled`].
+    /// - If the order does not cross the spread:
+    ///   - `ImmediateOrCancel` / `FillOrKill` return
+    ///     [`SubmitLimitOrderError::ImmediateExecutionNotMarketable`] without resting.
+    ///   - `GoodTilCrossing` / `GoodTilCancelled` rest on the book and return
+    ///     [`LimitOrderSubmission::Resting`].
+    ///
+    /// # Errors
+    /// Returns [`SubmitLimitOrderError`] if rate-limited, filter validation fails,
+    /// `reduce_only` has no opposite position, margin is insufficient, or TIF rejects.
+    pub fn submit_limit_order_with_execution(
+        &mut self,
+        mut order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Result<LimitOrderSubmission<I, D, BaseOrQuote, UserOrderIdT>, SubmitLimitOrderError> {
+        trace!("submit_limit_order_with_execution: {}", order);
+
+        self.order_rate_limiter
+            .aquire(self.market_state.current_ts_ns())?;
+        self.config
+            .contract_spec()
+            .quantity_filter()
+            .validate_order_quantity(order.remaining_quantity())?;
+        let mark_price = self
+            .market_state
+            .mark_price(self.config.contract_spec().mark_method());
+        self.config
+            .contract_spec()
+            .price_filter()
+            .validate_limit_price(order.limit_price(), mark_price)?;
+
+        if order.reduce_only() {
+            let Some(clamped) =
+                self.clamp_reduce_only_quantity(order.side(), order.remaining_quantity())
+            else {
+                return Err(SubmitLimitOrderError::ReduceOnlyRejected);
+            };
+            if clamped < order.remaining_quantity() {
+                order.set_remaining_quantity(clamped);
+            }
+        }
+
+        let strictly_reducing = self.is_strictly_reducing(order.side(), order.remaining_quantity());
+        if !strictly_reducing {
+            let notional = BaseOrQuote::PairedCurrency::convert_from(
+                order.remaining_quantity(),
+                order.limit_price(),
+            );
+            self.config
+                .contract_spec()
+                .notional_filter()
+                .validate_order_notional(notional)?;
+        }
+
+        let marketable = match order.side() {
+            Buy => order.limit_price() >= self.market_state.ask(),
+            Sell => order.limit_price() <= self.market_state.bid(),
+        };
+        let is_post_only = order.re_pricing() == RePricing::GoodTilCrossing
+            && order.time_in_force() == TimeInForce::GoodTilCrossing;
+
+        if marketable && is_post_only {
+            let meta = ExchangeOrderMeta::new(
+                self.next_order_id(),
+                self.market_state.current_timestamp_ns(),
+            );
+            let pending = order.into_pending(meta);
+            match self.config.margin_mode() {
+                MarginMode::Isolated => self
+                    .risk_engine
+                    .check_limit_order(&self.account, &pending)?,
+                MarginMode::Cross => self.cross_risk_engine.check_limit_order_with_market(
+                    &self.account,
+                    &self.market_state,
+                    &pending,
+                )?,
+            }
+            return Err(SubmitLimitOrderError::GoodTillCrossingRejectedOrder {
+                limit_price: pending.limit_price().to_string(),
+                away_market_quotation_price: match pending.side() {
+                    Buy => self.market_state.ask().to_string(),
+                    Sell => self.market_state.bid().to_string(),
+                },
+            });
+        }
+
+        if marketable {
+            return self.execute_marketable_limit_order(order);
+        }
+
+        if matches!(
+            order.time_in_force(),
+            TimeInForce::ImmediateOrCancel | TimeInForce::FillOrKill
+        ) {
+            return Err(SubmitLimitOrderError::ImmediateExecutionNotMarketable);
+        }
+
+        let meta = ExchangeOrderMeta::new(
+            self.next_order_id(),
+            self.market_state.current_timestamp_ns(),
+        );
+        let order = order.into_pending(meta);
+        match self.config.margin_mode() {
+            MarginMode::Isolated => self.risk_engine.check_limit_order(&self.account, &order)?,
+            MarginMode::Cross => self.cross_risk_engine.check_limit_order_with_market(
+                &self.account,
+                &self.market_state,
+                &order,
+            )?,
+        }
+        self.append_limit_order(order.clone())?;
+        Ok(LimitOrderSubmission::Resting(order))
+    }
+
+    fn execute_marketable_limit_order(
+        &mut self,
+        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Result<LimitOrderSubmission<I, D, BaseOrQuote, UserOrderIdT>, SubmitLimitOrderError> {
+        let fill_price = match order.side() {
+            Buy => self.market_state.ask(),
+            Sell => self.market_state.bid(),
+        };
+        let ts_ns = self.market_state.current_timestamp_ns();
+        let meta = ExchangeOrderMeta::new(self.next_order_id(), ts_ns);
+        let mkt_probe = MarketOrder::new_with_user_order_id(
+            order.side(),
+            order.remaining_quantity(),
+            order.user_order_id(),
+        )
+        .expect("limit order remaining quantity is strictly positive")
+        .into_pending(meta.clone());
+        match self.config.margin_mode() {
+            MarginMode::Isolated => {
+                self.risk_engine
+                    .check_market_order(&self.account, &mkt_probe, fill_price)?
+            }
+            MarginMode::Cross => self.cross_risk_engine.check_market_order_with_market(
+                &self.account,
+                &self.market_state,
+                &mkt_probe,
+                fill_price,
+            )?,
+        }
+        let pending = order.into_pending(meta);
+        let filled_qty = pending.remaining_quantity();
+        let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price);
+        let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
+        let bad_debt_before = self.account.balances().bad_debt();
+        self.account
+            .change_position(filled_qty, fill_price, pending.side(), fee);
+        let solvency = self.reconcile_margin(bad_debt_before);
+        let forced_cancels = self.take_forced_cancels();
+        let filled_order = pending.into_filled_at_price(fill_price, ts_ns);
+        Ok(LimitOrderSubmission::ImmediatelyFilled {
+            filled_order,
+            fee,
+            forced_cancels,
+            solvency,
+        })
+    }
+
+    /// Submit a resting passive limit order.
+    ///
+    /// For orders that may cross the spread and execute immediately (`RePricing::Marketable`,
+    /// `TimeInForce::GoodTilCancelled`, `ImmediateOrCancel`, `FillOrKill`), prefer
+    /// [`Self::submit_limit_order_with_execution`].
+    ///
     /// # Arguments:
     /// `order`: The order that is being submitted.
     ///
@@ -697,70 +951,27 @@ where
         LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         SubmitLimitOrderError,
     > {
-        trace!("submit_order: {}", order);
-
-        self.order_rate_limiter
-            .aquire(self.market_state.current_ts_ns())?;
-        // Basic checks
-        self.config
-            .contract_spec()
-            .quantity_filter()
-            .validate_order_quantity(order.remaining_quantity())?;
-        let mark_price = self
-            .market_state
-            .mark_price(self.config.contract_spec().mark_method());
-        self.config
-            .contract_spec()
-            .price_filter()
-            .validate_limit_price(order.limit_price(), mark_price)?;
-        if !self.is_strictly_reducing(order.side(), order.remaining_quantity()) {
-            let notional = BaseOrQuote::PairedCurrency::convert_from(
-                order.remaining_quantity(),
-                order.limit_price(),
-            );
-            self.config
-                .contract_spec()
-                .notional_filter()
-                .validate_order_notional(notional)?;
-        }
-
-        let meta = ExchangeOrderMeta::new(
-            self.next_order_id(),
-            self.market_state.current_timestamp_ns(),
-        );
-        let order = order.into_pending(meta);
-
-        match self.config.margin_mode() {
-            MarginMode::Isolated => self.risk_engine.check_limit_order(&self.account, &order)?,
-            MarginMode::Cross => self.cross_risk_engine.check_limit_order_with_market(
-                &self.account,
-                &self.market_state,
-                &order,
-            )?,
-        }
-
-        // If a limit order is marketable, it will take liquidity from the book at the `limit_price` price level and pay the taker fee,
-        let marketable = match order.side() {
-            Buy => order.limit_price() >= self.market_state.ask(),
-            Sell => order.limit_price() <= self.market_state.bid(),
-        };
-        match order.re_pricing() {
-            RePricing::GoodTilCrossing => {
-                if marketable {
-                    return Err(SubmitLimitOrderError::GoodTillCrossingRejectedOrder {
-                        limit_price: order.limit_price().to_string(),
-                        away_market_quotation_price: match order.side() {
-                            Buy => self.market_state.ask().to_string(),
-                            Sell => self.market_state.bid().to_string(),
-                        },
-                    });
-                }
+        match self.submit_limit_order_with_execution(order)? {
+            LimitOrderSubmission::Resting(pending) => Ok(pending),
+            LimitOrderSubmission::ImmediatelyFilled { filled_order, .. } => {
+                // Convert immediately-filled order into a zero-remaining Pending wrapper
+                // only if a caller invoked the legacy resting-only API with a Marketable order.
+                let meta = filled_order.state().meta().clone();
+                let mut pending = LimitOrder::new_with_user_order_id(
+                    filled_order.side(),
+                    filled_order.limit_price(),
+                    filled_order.total_quantity(),
+                    filled_order.user_order_id(),
+                )
+                .expect("filled order had positive price and quantity")
+                .with_re_pricing(filled_order.re_pricing())
+                .with_time_in_force(filled_order.time_in_force())
+                .with_reduce_only(filled_order.reduce_only())
+                .into_pending(meta);
+                pending.fill(filled_order.total_quantity());
+                Ok(pending)
             }
         }
-
-        self.append_limit_order(order.clone())?;
-
-        Ok(order)
     }
 
     /// Amend an existing limit order.

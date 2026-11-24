@@ -40,6 +40,11 @@ where
     #[getset(get_copy = "pub")]
     side: Side,
 
+    /// When `true`, the order may only reduce an existing opposite-side position
+    /// and will never open or flip a position.
+    #[getset(get_copy = "pub")]
+    reduce_only: bool,
+
     /// The amount of currency `S` the order is for and fill information.
     #[getset(get_copy = "pub")]
     quantity: BaseOrQuote,
@@ -91,6 +96,7 @@ where
             user_order_id: UserOrderIdT::default(),
             state: NewOrder,
             side,
+            reduce_only: false,
             quantity,
             _quote: std::marker::PhantomData,
         })
@@ -118,8 +124,24 @@ where
             state: NewOrder,
             quantity,
             side,
+            reduce_only: false,
             _quote: std::marker::PhantomData,
         })
+    }
+
+    /// Mark this market order as reduce-only (builder-style).
+    #[inline]
+    #[must_use]
+    pub fn with_reduce_only(mut self, reduce_only: bool) -> Self {
+        self.reduce_only = reduce_only;
+        self
+    }
+
+    /// Shrink the market order quantity (used when clamping a reduce-only order to open size).
+    #[inline]
+    pub(crate) fn set_quantity(&mut self, quantity: BaseOrQuote) {
+        assert2::debug_assert!(quantity > BaseOrQuote::zero());
+        self.quantity = quantity;
     }
 
     /// Take in the order metadata provided by the exchange and coverts the order to the `Pending` state.
@@ -130,6 +152,7 @@ where
         MarketOrder {
             user_order_id: self.user_order_id,
             side: self.side,
+            reduce_only: self.reduce_only,
             quantity: self.quantity,
             state: Pending::new(meta),
             _quote: std::marker::PhantomData,
@@ -161,6 +184,7 @@ where
             ),
             quantity: self.quantity,
             side: self.side,
+            reduce_only: self.reduce_only,
             _quote: std::marker::PhantomData,
         }
     }
