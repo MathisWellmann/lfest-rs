@@ -643,3 +643,238 @@ fn portfolio_forced_cancel_from_immediately_filled_stop_limit_child_is_reported(
         other => panic!("expected forced cancel, got {other:?}"),
     }
 }
+
+/// Linear exchange with the mock contract, `max_orders` open orders (and pending stops)
+/// and `orders_per_second` user order actions.
+fn small_exchange(
+    max_orders: u16,
+    orders_per_second: u32,
+) -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+    let config = Config::new(
+        QuoteCurrency::new(1000, 0),
+        NonZeroU16::new(max_orders).expect(EXPECT_NON_ZERO),
+        mock_exchange_linear().config().contract_spec().clone(),
+        OrderRateLimits::new(std::num::NonZeroU32::new(orders_per_second).expect(EXPECT_NON_ZERO)),
+    )
+    .unwrap();
+    let mut ex = Exchange::new(config);
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(100, 0),
+        ask: QuoteCurrency::new(101, 0),
+        timestamp_exchange_ns: 1.into(),
+    })
+    .unwrap();
+    ex
+}
+
+fn reduce_only_sell_stop(
+    stop_price: i64,
+) -> StopOrder<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+    StopOrder::stop_market(
+        Side::Sell,
+        QuoteCurrency::new(stop_price, 0),
+        BaseCurrency::new(5, 0),
+        NoUserOrderId,
+    )
+    .unwrap()
+    .with_reduce_only(true)
+}
+
+fn sell_stop_limit_95_90() -> StopOrder<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+    StopOrder::stop_limit(
+        Side::Sell,
+        QuoteCurrency::new(95, 0),
+        QuoteCurrency::new(90, 0),
+        BaseCurrency::new(2, 0),
+        TimeInForce::GoodTilCancelled,
+        NoUserOrderId,
+    )
+    .unwrap()
+    .with_reduce_only(true)
+}
+
+fn bba_94_95() -> Bba<i64, DECIMALS> {
+    Bba {
+        bid: QuoteCurrency::new(94, 0),
+        ask: QuoteCurrency::new(95, 0),
+        timestamp_exchange_ns: 2.into(),
+    }
+}
+
+#[test]
+fn elected_stop_limit_child_ignores_the_user_rate_limit() {
+    // Two user actions per second: the market order and the stop use them up.
+    let mut ex = small_exchange(10, 2);
+    ex.submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap())
+        .unwrap();
+    ex.submit_stop_order(sell_stop_limit_95_90()).unwrap();
+    assert_eq!(
+        ex.submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap())
+            .unwrap_err(),
+        SubmitMarketOrderError::RateLimitReached(crate::order_rate_limiter::RateLimitReached)
+    );
+
+    // Same rate-limit bucket: the venue-placed child must still execute.
+    ex.update_state(&bba_94_95()).unwrap();
+    assert!(
+        matches!(
+            ex.stop_order_events().as_slice(),
+            [StopOrderEvent::Filled { .. }]
+        ),
+        "{:?}",
+        ex.stop_order_events()
+    );
+    assert!(ex.account().position().quantity().is_zero());
+}
+
+#[test]
+fn portfolio_elected_stop_limit_child_ignores_the_user_rate_limit() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![MarketConfig::new(
+            NonZeroU16::new(10).expect(EXPECT_NON_ZERO),
+            mock_exchange_linear().config().contract_spec().clone(),
+            OrderRateLimits::new(std::num::NonZeroU32::new(2).expect(EXPECT_NON_ZERO)),
+        )],
+    )
+    .unwrap();
+    let mut pf =
+        PortfolioExchange::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>::new(cfg);
+    let m = MarketId::new(0);
+    pf.update_market(
+        m,
+        &Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 1.into(),
+        },
+    )
+    .unwrap();
+    pf.submit_market_order(
+        m,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap(),
+    )
+    .unwrap();
+    pf.submit_stop_order(m, sell_stop_limit_95_90()).unwrap();
+
+    pf.update_market(m, &bba_94_95()).unwrap();
+    assert_eq!(pf.stop_events().len(), 1, "{:?}", pf.stop_events());
+    assert!(matches!(
+        pf.stop_events()[0].event,
+        StopOrderEvent::Filled { .. }
+    ));
+    assert!(pf.market(m).unwrap().position.quantity().is_zero());
+}
+
+#[test]
+fn liquidation_from_apply_funding_reports_every_stop_cancellation() {
+    // Two pending stops at most, so two events fill the stop event buffer.
+    let mut ex = small_exchange(2, 100);
+    // Without a position both reduce-only stops are cancelled on election.
+    ex.submit_stop_order(reduce_only_sell_stop(95)).unwrap();
+    ex.submit_stop_order(reduce_only_sell_stop(95)).unwrap();
+    ex.update_state(&bba_94_95()).unwrap();
+    assert_eq!(ex.stop_order_events().len(), 2);
+
+    ex.submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(5, 0)).unwrap())
+        .unwrap();
+    let s0 = ex.submit_stop_order(reduce_only_sell_stop(50)).unwrap();
+    let s1 = ex.submit_stop_order(reduce_only_sell_stop(50)).unwrap();
+    // Paying 800 of funding leaves the equity below the maintenance margin.
+    let settlement = ex.apply_funding(
+        FundingRate::from(Decimal::try_from_scaled(16, 1).expect(EXPECT_DECIMAL)),
+        QuoteCurrency::new(100, 0),
+    );
+    assert_eq!(settlement.solvency, Solvency::Liquidated);
+    assert!(ex.pending_stops().is_empty());
+    let cancelled: Vec<OrderId> = ex
+        .stop_order_events()
+        .iter()
+        .map(|event| match event {
+            StopOrderEvent::Cancelled {
+                stop_order_id,
+                reason: StopCancelReason::ForcedCancel,
+                ..
+            } => *stop_order_id,
+            other => panic!("expected a forced stop cancel, got {other:?}"),
+        })
+        .collect();
+    assert_eq!(cancelled, vec![s0.id(), s1.id()]);
+}
+
+#[test]
+fn portfolio_liquidation_from_apply_funding_reports_only_its_own_stop_events() {
+    let mut pf = levered_portfolio(QuoteCurrency::new(200, 0));
+    let m = MarketId::new(0);
+    pf.submit_stop_order(m, reduce_only_sell_stop(95)).unwrap();
+    pf.submit_stop_order(m, reduce_only_sell_stop(95)).unwrap();
+    pf.update_market(m, &bba_94_95()).unwrap();
+    assert_eq!(pf.stop_events().len(), 2);
+
+    pf.submit_market_order(
+        m,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap(),
+    )
+    .unwrap();
+    let stop = pf.submit_stop_order(m, reduce_only_sell_stop(50)).unwrap();
+    // Paying 190 of funding leaves the equity below the maintenance margin.
+    let settlement = pf
+        .apply_funding(
+            m,
+            FundingRate::from(Decimal::try_from_scaled(2, 1).expect(EXPECT_DECIMAL)),
+            QuoteCurrency::new(95, 0),
+        )
+        .unwrap();
+    assert_eq!(settlement.solvency, Solvency::Liquidated);
+    assert_eq!(pf.stop_events().len(), 1, "{:?}", pf.stop_events());
+    assert_eq!(
+        pf.stop_events()[0].event,
+        StopOrderEvent::Cancelled {
+            stop_order_id: stop.id(),
+            user_order_id: NoUserOrderId,
+            reason: StopCancelReason::ForcedCancel,
+        }
+    );
+}
+
+#[test]
+fn cloned_exchange_reports_every_stop_cancelled_by_a_liquidation() {
+    let mut ex = small_exchange(2, 100);
+    ex.submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(5, 0)).unwrap())
+        .unwrap();
+    for _ in 0..2 {
+        ex.submit_stop_order(reduce_only_sell_stop(50)).unwrap();
+    }
+    // `Vec::clone` drops spare capacity, so the clone starts with an empty event buffer.
+    let mut cloned = ex.clone();
+    let settlement = cloned.apply_funding(
+        FundingRate::from(Decimal::try_from_scaled(16, 1).expect(EXPECT_DECIMAL)),
+        QuoteCurrency::new(100, 0),
+    );
+    assert_eq!(settlement.solvency, Solvency::Liquidated);
+    assert_eq!(cloned.stop_order_events().len(), 2);
+}
+
+#[test]
+fn cloned_portfolio_reports_every_stop_cancelled_by_a_liquidation() {
+    let mut pf = levered_portfolio(QuoteCurrency::new(200, 0));
+    let m = MarketId::new(0);
+    pf.submit_market_order(
+        m,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap(),
+    )
+    .unwrap();
+    for _ in 0..2 {
+        pf.submit_stop_order(m, reduce_only_sell_stop(50)).unwrap();
+    }
+    let mut cloned = pf.clone();
+    let settlement = cloned
+        .apply_funding(
+            m,
+            FundingRate::from(Decimal::try_from_scaled(2, 1).expect(EXPECT_DECIMAL)),
+            QuoteCurrency::new(95, 0),
+        )
+        .unwrap();
+    assert_eq!(settlement.solvency, Solvency::Liquidated);
+    assert_eq!(cloned.stop_events().len(), 2);
+}

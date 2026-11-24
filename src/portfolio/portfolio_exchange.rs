@@ -258,9 +258,18 @@ where
     #[getset(get = "pub")]
     order_events: Vec<PortfolioOrderEvent<I, D, BaseOrQuote, UserOrderIdT>>,
 
-    /// Conditional / stop order events emitted during the most recent [`Self::update_market`].
+    /// Conditional / stop order events emitted during the most recent call which can elect
+    /// or force-cancel stops: [`Self::update_market`], [`Self::delist_market`], or a
+    /// liquidation triggered by [`Self::submit_market_order`],
+    /// [`Self::submit_limit_order_with_execution`] or [`Self::apply_funding`]. Each of these
+    /// calls clears the buffer first, and its capacity covers every pending stop of every
+    /// market (each yields at most one event per call), so it never drops an event.
     #[getset(get = "pub")]
     stop_events: Vec<PortfolioStopEvent<I, D, BaseOrQuote, UserOrderIdT>>,
+
+    /// Sum of the configured pending-stop capacities of all markets, which bounds the
+    /// number of stop events one call can emit.
+    max_pending_stops: usize,
 
     /// Scratch buffer for elected stops during `update_market`.
     elected_stops_scratch: Vec<(
@@ -320,13 +329,16 @@ where
         }
 
         let scratch_cap = (total_order_cap * 2).max(16);
+        // `PendingStops` holds up to `max_num_open_orders` stops per market.
+        let max_pending_stops = total_order_cap;
         Self {
             balances,
             markets,
             ticker_index,
             next_order_id: OrderId::default(),
             order_events: Vec::with_capacity(scratch_cap * 2),
-            stop_events: Vec::with_capacity(scratch_cap),
+            stop_events: Vec::with_capacity(max_pending_stops),
+            max_pending_stops,
             elected_stops_scratch: Vec::with_capacity(scratch_cap),
             forced_cancel_scratch: Vec::with_capacity(scratch_cap),
             liquidated_during_fills: false,
@@ -393,7 +405,13 @@ where
         let add_cap = usize::from(market_cfg.max_num_open_orders().get()) * 2;
         self.forced_cancel_scratch.reserve(add_cap);
         self.order_events.reserve(add_cap * 2);
-        self.stop_events.reserve(add_cap);
+        self.max_pending_stops += usize::from(market_cfg.max_num_open_orders().get());
+        // `reserve` is relative to `len`, so size against the total stop capacity instead.
+        self.stop_events.reserve(
+            self.max_pending_stops
+                .saturating_sub(self.stop_events.len()),
+        );
+        assert!(self.stop_events.capacity() >= self.max_pending_stops);
         self.elected_stops_scratch.reserve(add_cap);
         #[allow(
             clippy::disallowed_methods,
@@ -546,6 +564,7 @@ where
         if self.markets[idx].status == MarketStatus::Delisted {
             return Err(PortfolioError::MarketDelisted(market_id));
         }
+        self.reset_stop_events();
 
         let cancelled_orders = self.markets[idx].active_limit_orders.cancel_all(None);
         if !self.markets[idx].pending_stops.is_empty() {
@@ -630,7 +649,7 @@ where
     {
         let idx = self.validate_market_index(market_id)?;
         self.order_events.clear();
-        self.stop_events.clear();
+        self.reset_stop_events();
         self.liquidated_during_fills = false;
 
         {
@@ -689,6 +708,8 @@ where
             "funding mark price must be strictly positive, got {mark_price}"
         );
         let idx = self.validate_market_index(market_id)?;
+        // A liquidation reports its stop cancellations in `stop_events`.
+        self.reset_stop_events();
         let qty = self.markets[idx].position.quantity();
         let cashflow = if qty.is_zero() || rate.as_ref().is_zero() {
             Zero::zero()
@@ -739,6 +760,8 @@ where
         if status == MarketStatus::Delisted {
             return Err(PortfolioError::MarketDelisted(market_id));
         }
+        // A liquidation reports its stop cancellations in `stop_events`.
+        self.reset_stop_events();
 
         let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
         self.markets[idx]
@@ -779,14 +802,13 @@ where
                 order.quantity(),
             )
             .execution_price();
-        if !strictly_reducing {
-            let notional = BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
-            self.markets[idx]
-                .contract_spec
-                .notional_filter()
-                .validate_order_notional(notional)
-                .map_err(SubmitMarketOrderError::from)?;
-        }
+        crate::execution_rules::validate_order_notional(
+            self.markets[idx].contract_spec.notional_filter(),
+            order.quantity(),
+            fill_price,
+            order.reduce_only(),
+        )
+        .map_err(SubmitMarketOrderError::from)?;
 
         self.check_portfolio_market_order(idx, order.side(), order.quantity(), fill_price)
             .map_err(SubmitMarketOrderError::from)?;
@@ -829,10 +851,49 @@ where
     /// Submit a passive or marketable limit order on `market_id`, supporting
     /// `TimeInForce` (`GTX`, `GTC`, `IOC`, `FOK`), `RePricing::Marketable`, and `reduce_only`.
     ///
+    /// A liquidation caused by an immediate fill reports the cancelled stop orders in
+    /// [`Self::stop_events`], which this call clears first.
+    ///
     /// # Errors
     /// Returns [`PortfolioError`] on unknown/delisted/reduce-only market, rate limit,
     /// filter violation, crossing GTX order, capacity limit, or insufficient cross-margin.
     pub fn submit_limit_order_with_execution(
+        &mut self,
+        market_id: MarketId,
+        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Result<
+        crate::exchange::LimitOrderSubmission<I, D, BaseOrQuote, UserOrderIdT>,
+        PortfolioError<UserOrderIdT>,
+    > {
+        self.acquire_submit_rate_limit(market_id)?;
+        self.reset_stop_events();
+        self.submit_limit_order_no_rate_limit(market_id, order)
+    }
+
+    /// Acquire a user rate-limit slot on `market_id` for a limit order submission.
+    ///
+    /// # Errors
+    /// [`PortfolioError::UnknownMarket`], [`PortfolioError::MarketDelisted`] or the rate
+    /// limit error, checked in this order so they match the order of the admission checks.
+    fn acquire_submit_rate_limit(
+        &mut self,
+        market_id: MarketId,
+    ) -> Result<(), PortfolioError<UserOrderIdT>> {
+        let idx = self.validate_market_index(market_id)?;
+        if self.markets[idx].status == MarketStatus::Delisted {
+            return Err(PortfolioError::MarketDelisted(market_id));
+        }
+        let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
+        self.markets[idx]
+            .order_rate_limiter
+            .aquire(ts_ns)
+            .map_err(SubmitLimitOrderError::from)?;
+        Ok(())
+    }
+
+    /// [`Self::submit_limit_order_with_execution`] without the user's rate limiter and
+    /// without clearing `stop_events`.
+    fn submit_limit_order_no_rate_limit(
         &mut self,
         market_id: MarketId,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
@@ -863,6 +924,10 @@ where
     /// forced cancellations in `forced_cancel_scratch` (with their market tags, as a
     /// margin call may cancel orders on other markets) and returns an empty
     /// `forced_cancels`. Internal callers route the scratch into the event stream.
+    ///
+    /// Does not acquire the user's order rate limiter: public callers do that first, and
+    /// elected stop-limit children placed inside `update_market` must not be rejected for
+    /// it, as the user already paid a rate-limit slot when submitting the stop.
     #[allow(
         clippy::too_many_lines,
         reason = "keeping all TIF and reduce-only admission branches in one place preserves clarity"
@@ -882,10 +947,6 @@ where
         }
 
         let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
-        self.markets[idx]
-            .order_rate_limiter
-            .aquire(ts_ns)
-            .map_err(SubmitLimitOrderError::from)?;
         self.markets[idx]
             .contract_spec
             .quantity_filter()
@@ -931,7 +992,7 @@ where
             self.markets[idx].contract_spec.notional_filter(),
             order.remaining_quantity(),
             notional_price,
-            strictly_reducing,
+            order.reduce_only(),
         )
         .map_err(SubmitLimitOrderError::from)?;
 
@@ -1042,7 +1103,9 @@ where
         if self.markets[idx].is_marketable(&order) && !is_post_only(&order) {
             return Err(SubmitLimitOrderError::WouldExecuteImmediately.into());
         }
-        match self.submit_limit_order_with_execution(market_id, order)? {
+        // A resting order never settles a fill, so it cannot liquidate or emit stop events.
+        self.acquire_submit_rate_limit(market_id)?;
+        match self.submit_limit_order_no_rate_limit(market_id, order)? {
             crate::exchange::LimitOrderSubmission::Resting(pending) => {
                 assert!(pending.remaining_quantity() > BaseOrQuote::zero());
                 Ok(pending)
@@ -1444,18 +1507,16 @@ where
                 let mut drained = Vec::with_capacity(slot.pending_stops.len());
                 slot.pending_stops.drain_all(&mut drained);
                 for stop in drained {
-                    if self.stop_events.len() < self.stop_events.capacity() {
-                        self.stop_events
-                            .push_within_capacity(PortfolioStopEvent {
-                                market_id,
-                                event: StopOrderEvent::Cancelled {
-                                    stop_order_id: stop.id(),
-                                    user_order_id: stop.user_order_id(),
-                                    reason: StopCancelReason::ForcedCancel,
-                                },
-                            })
-                            .expect(EXPECT_CAPACITY);
-                    }
+                    self.stop_events
+                        .push_within_capacity(PortfolioStopEvent {
+                            market_id,
+                            event: StopOrderEvent::Cancelled {
+                                stop_order_id: stop.id(),
+                                user_order_id: stop.user_order_id(),
+                                reason: StopCancelReason::ForcedCancel,
+                            },
+                        })
+                        .expect("each pending stop yields at most one event per call");
                 }
             }
         }
@@ -2088,17 +2149,33 @@ where
         }
     }
 
+    /// Clear `stop_events` at the start of a public call which can emit stop events.
+    ///
+    /// Also restores the capacity bound (one event per possible pending stop of every
+    /// market), because `#[derive(Clone)]` does not keep spare `Vec` capacity.
+    /// Allocation-free except on the first call after a clone.
+    #[inline]
+    fn reset_stop_events(&mut self) {
+        self.stop_events.clear();
+        if self.stop_events.capacity() < self.max_pending_stops {
+            core::hint::cold_path();
+            self.stop_events.reserve_exact(self.max_pending_stops);
+        }
+        assert!(self.stop_events.capacity() >= self.max_pending_stops);
+        assert!(self.stop_events.is_empty());
+    }
+
+    /// Record a stop event. Cannot overflow: see the `stop_events` field docs.
     #[inline]
     fn push_stop_event(
         &mut self,
         market_id: MarketId,
         event: StopOrderEvent<I, D, BaseOrQuote, UserOrderIdT>,
     ) {
-        if self.stop_events.len() < self.stop_events.capacity() {
-            self.stop_events
-                .push_within_capacity(PortfolioStopEvent { market_id, event })
-                .expect(EXPECT_CAPACITY);
-        }
+        assert2::debug_assert!(self.stop_events.len() < self.max_pending_stops);
+        self.stop_events
+            .push_within_capacity(PortfolioStopEvent { market_id, event })
+            .expect("each pending stop yields at most one event per call");
     }
 }
 

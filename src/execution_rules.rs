@@ -126,17 +126,19 @@ where
 
 /// Validate the notional of an order of `quantity` executing (or resting) at `price`.
 ///
-/// `strictly_reducing` orders skip the filter, so a dust position below `min_notional`
-/// can always be closed.
+/// A `reduce_only` order skips `min_notional`, so a dust position below it can always be
+/// closed; it cannot add risk because it is clamped to the position. `max_notional`
+/// always applies: a plain order which happens to reduce the position is not exempt,
+/// and no order may exceed the venue's size cap.
 ///
 /// # Errors
-/// [`ValidateOrderNotionalError`] if the notional is outside the filter bounds.
+/// [`ValidateOrderNotionalError`] if the notional is outside the applicable bounds.
 #[inline]
 pub(crate) fn validate_order_notional<I, const D: u8, BaseOrQuote>(
     filter: &NotionalFilter<I, D, BaseOrQuote::PairedCurrency>,
     quantity: BaseOrQuote,
     price: QuoteCurrency<I, D>,
-    strictly_reducing: bool,
+    reduce_only: bool,
 ) -> Result<(), ValidateOrderNotionalError>
 where
     I: Mon<D>,
@@ -145,10 +147,16 @@ where
 {
     assert2::debug_assert!(quantity > BaseOrQuote::zero());
     assert2::debug_assert!(price > QuoteCurrency::zero());
-    if strictly_reducing {
-        return Ok(());
+    let notional = BaseOrQuote::PairedCurrency::convert_from(quantity, price);
+    if !reduce_only {
+        return filter.validate_order_notional(notional);
     }
-    filter.validate_order_notional(BaseOrQuote::PairedCurrency::convert_from(quantity, price))
+    if let Some(max_notional) = filter.max_notional()
+        && notional > max_notional
+    {
+        return Err(ValidateOrderNotionalError::NotionalTooHigh);
+    }
+    Ok(())
 }
 
 /// Cap the liquidation clearance fee at the equity left once the liquidation's realized
