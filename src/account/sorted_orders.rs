@@ -46,6 +46,10 @@ where
     orders: Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
     #[getset(get_copy = "pub(crate)")]
     notional_sum: BaseOrQuote::PairedCurrency,
+    /// Number of resting `reduce_only` orders, so the reduce-only cap enforcement after
+    /// every position change costs a single branch when there are none.
+    #[getset(get_copy = "pub(crate)")]
+    num_reduce_only: usize,
     _side: PhantomData<SideT>,
 }
 
@@ -64,6 +68,7 @@ where
         Self {
             orders,
             notional_sum: self.notional_sum,
+            num_reduce_only: self.num_reduce_only,
             _side: PhantomData,
         }
     }
@@ -84,6 +89,7 @@ where
         Self {
             orders: Vec::with_capacity(cap.get().into()),
             notional_sum: Zero::zero(),
+            num_reduce_only: 0,
             _side: PhantomData,
         }
     }
@@ -137,7 +143,12 @@ where
 
                 order.remaining_quantity().is_zero()
             })
-            .map(|order| order.into_filled(ts_ns))
+            .map(|order| {
+                if order.reduce_only() {
+                    self.num_reduce_only -= 1;
+                }
+                order.into_filled(ts_ns)
+            })
     }
 
     /// Get a `LimitOrder` by the given `OrderId` if any.
@@ -157,6 +168,7 @@ where
         out: &mut Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
     ) {
         self.notional_sum = Zero::zero();
+        self.num_reduce_only = 0;
         for order in self.orders.drain(..) {
             out.push_within_capacity(order)
                 .expect("caller pre-allocated capacity for drained orders");
@@ -177,6 +189,9 @@ where
                 let order = self.orders.remove(idx);
                 self.notional_sum -= order.notional();
                 assert2::debug_assert!(self.notional_sum >= Zero::zero());
+                if order.reduce_only() {
+                    self.num_reduce_only -= 1;
+                }
                 order
             })
     }
@@ -195,6 +210,9 @@ where
                 let order = self.orders.remove(idx);
                 self.notional_sum -= order.notional();
                 assert2::debug_assert!(self.notional_sum >= Zero::zero());
+                if order.reduce_only() {
+                    self.num_reduce_only -= 1;
+                }
                 order
             })
     }
@@ -218,6 +236,9 @@ where
             ));
         }
         self.notional_sum += order.notional();
+        if order.reduce_only() {
+            self.num_reduce_only += 1;
+        }
 
         use std::cmp::Ordering::*;
         let idx = self
@@ -234,6 +255,63 @@ where
         }
 
         Ok(())
+    }
+
+    /// Sum of the remaining quantity of all resting `reduce_only` orders.
+    #[must_use]
+    pub(crate) fn reduce_only_remaining(&self) -> BaseOrQuote {
+        if self.num_reduce_only == 0 {
+            return BaseOrQuote::zero();
+        }
+        let total = self
+            .orders
+            .iter()
+            .filter(|o| o.reduce_only())
+            .fold(BaseOrQuote::zero(), |acc, o| acc + o.remaining_quantity());
+        assert2::debug_assert!(total > BaseOrQuote::zero());
+        total
+    }
+
+    /// Remove the resting `reduce_only` orders which do not fit within `cap`, passing each
+    /// removed order to `on_cancel`, from the one furthest from the touch to the closest.
+    ///
+    /// Reduce-only orders are kept from the touch outwards (most likely to fill first)
+    /// while their cumulative remaining quantity stays within `cap`; the first one that
+    /// does not fit and every reduce-only order behind it is removed. Cancelling instead
+    /// of shrinking the straddling order keeps every change observable through the
+    /// existing forced-cancel events. Runs in O(n) and returns immediately without
+    /// reduce-only orders.
+    pub(crate) fn cancel_reduce_only_beyond<F>(&mut self, cap: BaseOrQuote, mut on_cancel: F)
+    where
+        F: FnMut(LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>),
+    {
+        assert2::debug_assert!(cap >= BaseOrQuote::zero());
+        if self.num_reduce_only == 0 {
+            return;
+        }
+        let mut kept = BaseOrQuote::zero();
+        // The best order is the last element, so walk backwards from the touch.
+        let Some(boundary) = self.orders.iter().rposition(|o| {
+            if !o.reduce_only() {
+                return false;
+            }
+            kept += o.remaining_quantity();
+            kept > cap
+        }) else {
+            return;
+        };
+        let n_before = self.orders.len();
+        for order in self.orders.extract_if(..=boundary, |o| o.reduce_only()) {
+            self.notional_sum -= order.notional();
+            assert2::debug_assert!(self.notional_sum >= Zero::zero());
+            self.num_reduce_only -= 1;
+            on_cancel(order);
+        }
+        assert!(
+            self.orders.len() < n_before,
+            "the boundary order is removed"
+        );
+        assert2::debug_assert!(self.reduce_only_remaining() <= cap);
     }
 }
 
@@ -296,6 +374,60 @@ mod tests {
         },
         utils::NoUserOrderId,
     };
+
+    #[test]
+    fn cancel_reduce_only_beyond_keeps_orders_closest_to_touch_and_bookkeeping() {
+        let mut asks =
+            SortedOrders::<i64, 6, BaseCurrency<_, 6>, NoUserOrderId, Asks>::with_capacity(
+                NonZeroU16::new(8).unwrap(),
+            );
+        // (price, qty, reduce_only), ids in admission order.
+        let specs = [
+            (103, 2, true),
+            (101, 3, true),
+            (102, 1, false),
+            (104, 5, true),
+        ];
+        for (id, (price, qty, ro)) in (0_u64..).zip(specs) {
+            let order = LimitOrder::new(
+                Side::Sell,
+                QuoteCurrency::new(price, 0),
+                BaseCurrency::new(qty, 0),
+            )
+            .unwrap()
+            .with_reduce_only(ro)
+            .into_pending(ExchangeOrderMeta::new(id.into(), 0.into()));
+            asks.try_insert(order).unwrap();
+        }
+        assert_eq!(asks.num_reduce_only(), 3);
+        assert_eq!(asks.reduce_only_remaining(), BaseCurrency::new(10, 0));
+
+        // Cap 6: keep 3 @ 101 and 2 @ 103 (cumulative 5); 5 @ 104 would exceed the cap.
+        let mut cancelled = Vec::with_capacity(4);
+        asks.cancel_reduce_only_beyond(BaseCurrency::new(6, 0), |o| {
+            cancelled.push_within_capacity(o.id()).unwrap();
+        });
+        assert_eq!(cancelled, vec![3.into()]);
+        assert_eq!(asks.num_reduce_only(), 2);
+        assert_eq!(asks.reduce_only_remaining(), BaseCurrency::new(5, 0));
+        assert_eq!(asks.notional_sum(), QuoteCurrency::new(303 + 102 + 206, 0));
+
+        // Cap 4: 3 @ 101 fits, 2 @ 103 does not; the plain order is never touched.
+        cancelled.clear();
+        asks.cancel_reduce_only_beyond(BaseCurrency::new(4, 0), |o| {
+            cancelled.push_within_capacity(o.id()).unwrap();
+        });
+        assert_eq!(cancelled, vec![0.into()]);
+        assert_eq!(asks.len(), 2);
+        assert_eq!(asks.notional_sum(), QuoteCurrency::new(303 + 102, 0));
+
+        // Cap 0 (position closed): every reduce-only order goes, the counter reaches zero.
+        asks.cancel_reduce_only_beyond(BaseCurrency::new(0, 0), |_| {});
+        assert_eq!(asks.num_reduce_only(), 0);
+        assert_eq!(asks.len(), 1);
+        assert_eq!(asks.notional_sum(), QuoteCurrency::new(102, 0));
+        assert!(!asks.best().unwrap().reduce_only());
+    }
 
     #[test]
     fn sorted_orders_bids() {
