@@ -187,10 +187,6 @@ where
 
     /// Change a position while doing proper accounting and balance transfers.
     #[inline]
-    #[allow(
-        clippy::too_many_lines,
-        reason = "keeping all position transitions together makes the accounting easier to verify"
-    )]
     pub fn change(
         &mut self,
         filled_qty: BaseOrQuote,
@@ -198,15 +194,37 @@ where
         side: Side,
         balances: &mut Balances<I, D, BaseOrQuote::PairedCurrency>,
     ) {
-        use Side::*;
-
         tracing::trace!(
             "Position.change {self}, {side} {filled_qty} @ {fill_price}, balances: {balances}"
         );
+        let realized = self.change_realizing(filled_qty, fill_price, side);
+        if !realized.is_zero() {
+            balances.apply_pnl(realized);
+        }
+    }
+
+    /// Change a position and return the realized profit and loss instead of applying it,
+    /// so a cross-margin portfolio can book it against its shared wallet without the
+    /// single-account bankruptcy floor of `Balances::apply_pnl`.
+    #[inline]
+    #[must_use]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "keeping all position transitions together makes the accounting easier to verify"
+    )]
+    pub(crate) fn change_realizing(
+        &mut self,
+        filled_qty: BaseOrQuote,
+        fill_price: QuoteCurrency<I, D>,
+        side: Side,
+    ) -> BaseOrQuote::PairedCurrency {
+        use Side::*;
+
         assert2::debug_assert!(
             filled_qty > BaseOrQuote::zero(),
             "The filled_qty must be greater than zero"
         );
+        let mut realized = BaseOrQuote::PairedCurrency::zero();
 
         // TODO: simplify.
         use std::cmp::Ordering::*;
@@ -236,28 +254,28 @@ where
                     Less => {
                         self.quantity -= filled_qty;
                         assert2::debug_assert!(self.quantity > Zero::zero());
-                        balances.apply_pnl(BaseOrQuote::PairedCurrency::pnl(
+                        realized = BaseOrQuote::PairedCurrency::pnl(
                             self.entry_price,
                             fill_price,
                             filled_qty,
-                        ));
+                        );
                     }
                     Equal => {
-                        balances.apply_pnl(BaseOrQuote::PairedCurrency::pnl(
+                        realized = BaseOrQuote::PairedCurrency::pnl(
                             self.entry_price,
                             fill_price,
                             filled_qty,
-                        ));
+                        );
                         self.quantity -= filled_qty;
                         debug_assert_eq!(self.quantity, Zero::zero());
                         self.entry_price = Zero::zero();
                     }
                     Greater => {
-                        balances.apply_pnl(BaseOrQuote::PairedCurrency::pnl(
+                        realized = BaseOrQuote::PairedCurrency::pnl(
                             self.entry_price,
                             fill_price,
                             self.quantity,
-                        ));
+                        );
                         self.quantity -= filled_qty;
                         assert2::debug_assert!(self.quantity < Zero::zero());
                         self.entry_price = fill_price;
@@ -268,30 +286,30 @@ where
             Less => match side {
                 Buy => match filled_qty.cmp(&self.quantity().abs()) {
                     Less => {
-                        balances.apply_pnl(-BaseOrQuote::PairedCurrency::pnl(
+                        realized = -BaseOrQuote::PairedCurrency::pnl(
                             self.entry_price,
                             fill_price,
                             filled_qty,
-                        ));
+                        );
                         self.quantity += filled_qty;
                         assert2::debug_assert!(self.quantity < Zero::zero());
                     }
                     Equal => {
-                        balances.apply_pnl(-BaseOrQuote::PairedCurrency::pnl(
+                        realized = -BaseOrQuote::PairedCurrency::pnl(
                             self.entry_price,
                             fill_price,
                             filled_qty,
-                        ));
+                        );
                         self.quantity += filled_qty;
                         debug_assert_eq!(self.quantity, Zero::zero());
                         self.entry_price = Zero::zero();
                     }
                     Greater => {
-                        balances.apply_pnl(-BaseOrQuote::PairedCurrency::pnl(
+                        realized = -BaseOrQuote::PairedCurrency::pnl(
                             self.entry_price,
                             fill_price,
                             self.quantity.abs(),
-                        ));
+                        );
                         self.quantity += filled_qty;
                         assert2::debug_assert!(self.quantity > Zero::zero());
                         self.entry_price = fill_price;
@@ -310,6 +328,7 @@ where
         }
         let position_is_valid = !self.quantity.is_zero() || self.entry_price.is_zero();
         debug_assert!(position_is_valid);
+        realized
     }
 }
 

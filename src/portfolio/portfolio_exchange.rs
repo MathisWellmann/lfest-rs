@@ -346,6 +346,8 @@ where
         self.ledger.as_ref()
     }
 
+    /// Record the shared wallet change since `equity_before`.
+    /// Bad debt is recorded separately by `Self::settle_bad_debt`.
     #[inline]
     fn record_ledger_delta(
         &mut self,
@@ -354,26 +356,14 @@ where
         order_id: Option<OrderId>,
         kind: LedgerEntryKind,
         equity_before: BaseOrQuote::PairedCurrency,
-        bad_debt_before: BaseOrQuote::PairedCurrency,
     ) {
         let Some(ledger) = self.ledger.as_mut() else {
             return;
         };
         let equity_after = self.balances.equity();
-        let bad_debt_after = self.balances.bad_debt();
         let delta = equity_after - equity_before;
         if !delta.is_zero() {
             ledger.record(ts_ns, market_id, order_id, kind, delta, equity_after);
-        }
-        if bad_debt_after > bad_debt_before {
-            ledger.record(
-                ts_ns,
-                market_id,
-                order_id,
-                LedgerEntryKind::BadDebtAbsorption,
-                Zero::zero(),
-                equity_after,
-            );
         }
     }
 
@@ -549,37 +539,36 @@ where
         let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
         let settled_quantity = self.markets[idx].position.quantity();
         let realized_pnl = if !settled_quantity.is_zero() {
-            let pnl = BaseOrQuote::PairedCurrency::pnl(
-                self.markets[idx].position.entry_price(),
-                settlement_price,
-                settled_quantity,
-            );
             let close_side = if settled_quantity.is_positive() {
                 Sell
             } else {
                 Buy
             };
-            self.markets[idx].position.change(
+            let pnl = self.book_fill(
+                idx,
                 settled_quantity.abs(),
                 settlement_price,
                 close_side,
-                &mut self.balances,
+                Zero::zero(),
             );
+            // Fee-free settlement: the wallet moves by exactly the realized pnl. Bad debt,
+            // if any, is booked afterwards in `reconcile_portfolio_margin`.
+            assert_eq!(self.balances.equity() - eq_before, pnl);
             self.record_ledger_delta(
                 ts_ns,
                 Some(market_id),
                 None,
                 LedgerEntryKind::DelistSettlement,
                 eq_before,
-                bad_debt_before,
             );
             pnl
         } else {
             Zero::zero()
         };
+        assert!(self.markets[idx].position.quantity().is_zero());
 
         self.markets[idx].status = MarketStatus::Delisted;
-        let solvency = self.reconcile_portfolio_margin(bad_debt_before);
+        let solvency = self.reconcile_portfolio_margin(bad_debt_before, ts_ns);
         let forced_cancels = self.take_forced_cancels();
 
         Ok(DelistSettlement {
@@ -685,17 +674,16 @@ where
         let bad_debt_before = self.balances.bad_debt();
         let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
         if !cashflow.is_zero() {
-            self.balances.apply_funding(cashflow);
+            self.balances.apply_shared_wallet_funding(cashflow);
             self.record_ledger_delta(
                 ts_ns,
                 Some(market_id),
                 None,
                 LedgerEntryKind::Funding,
                 eq_before,
-                bad_debt_before,
             );
         }
-        let solvency = self.reconcile_portfolio_margin(bad_debt_before);
+        let solvency = self.reconcile_portfolio_margin(bad_debt_before, ts_ns);
         let forced_cancels = self.take_forced_cancels();
 
         Ok(PortfolioFundingSettlement {
@@ -785,23 +773,22 @@ where
 
         let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
-        self.markets[idx].position.change(
+        self.book_fill(
+            idx,
             filled_order.quantity(),
             fill_price,
             filled_order.side(),
-            &mut self.balances,
+            fee,
         );
-        self.balances.account_for_fee(fee);
         self.record_ledger_delta(
             ts_ns,
             Some(market_id),
             Some(filled_order.state().meta().id()),
             LedgerEntryKind::RealizedPnl,
             eq_before,
-            bad_debt_before,
         );
 
-        let solvency = self.reconcile_portfolio_margin(bad_debt_before);
+        let solvency = self.reconcile_portfolio_margin(bad_debt_before, ts_ns);
         let forced_cancels = self.take_forced_cancels();
 
         Ok(PortfolioMarketOrderSettlement {
@@ -953,22 +940,15 @@ where
             let fee = notional * *self.markets[idx].contract_spec.fee_taker().as_ref();
             let eq_before = self.balances.equity();
             let bad_debt_before = self.balances.bad_debt();
-            self.markets[idx].position.change(
-                filled_qty,
-                fill_price,
-                pending.side(),
-                &mut self.balances,
-            );
-            self.balances.account_for_fee(fee);
+            self.book_fill(idx, filled_qty, fill_price, pending.side(), fee);
             self.record_ledger_delta(
                 ts_ns,
                 Some(market_id),
                 Some(pending.id()),
                 LedgerEntryKind::RealizedPnl,
                 eq_before,
-                bad_debt_before,
             );
-            let solvency = self.reconcile_portfolio_margin(bad_debt_before);
+            let solvency = self.reconcile_portfolio_margin(bad_debt_before, ts_ns);
             let filled_order = pending.into_filled_at_price(fill_price, ts_ns);
             return Ok(crate::exchange::LimitOrderSubmission::ImmediatelyFilled {
                 filled_order,
@@ -1367,17 +1347,13 @@ where
         let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
 
-        self.markets[idx]
-            .position
-            .change(filled_quantity, limit_price, side, &mut self.balances);
-        self.balances.account_for_fee(fee);
+        self.book_fill(idx, filled_quantity, limit_price, side, fee);
         self.record_ledger_delta(
             ts_ns,
             Some(market_id),
             Some(order.id()),
             LedgerEntryKind::RealizedPnl,
             eq_before,
-            bad_debt_before,
         );
 
         let fill_event =
@@ -1408,7 +1384,7 @@ where
             })
             .expect(EXPECT_CAPACITY);
 
-        let solvency = self.reconcile_portfolio_margin(bad_debt_before);
+        let solvency = self.reconcile_portfolio_margin(bad_debt_before, ts_ns);
         self.drain_forced_cancels_into_events();
         if matches!(solvency, Solvency::Liquidated | Solvency::Bankrupt) {
             core::hint::cold_path();
@@ -1482,27 +1458,96 @@ where
                 + self.markets[idx].contract_spec.liquidation_fee();
             let fee = notional * fee_rate;
             let eq_before = self.balances.equity();
-            let bd_before = self.balances.bad_debt();
-            self.markets[idx]
-                .position
-                .change(qty, fill_price, side, &mut self.balances);
-            self.balances.account_for_fee(fee);
+            // Booked without a bankruptcy floor so the net result of closing every leg
+            // does not depend on the order in which the legs are closed.
+            self.book_fill(idx, qty, fill_price, side, fee);
             self.record_ledger_delta(
                 ts_ns,
                 Some(market_id),
                 None,
                 LedgerEntryKind::Liquidation,
                 eq_before,
-                bd_before,
             );
         }
+        assert!(
+            !self.has_any_open_position(),
+            "portfolio liquidation must close every position"
+        );
+        // All legs are closed, so the wallet is all that is left of the portfolio:
+        // net the combined result against it once.
+        let ts_ns = self
+            .markets
+            .iter()
+            .map(|slot| slot.market_state.current_timestamp_ns())
+            .max()
+            .unwrap_or_default();
+        self.settle_bad_debt(ts_ns, None);
+        assert!(self.balances.equity() >= Zero::zero());
         info!("balances after portfolio liquidation: {}", self.balances);
     }
 
+    /// Apply a fill on market `idx` to its position and the shared wallet, returning the
+    /// realized pnl (excluding `fee`).
+    ///
+    /// The shared wallet is not floored at zero here: a loss on one leg may be covered by
+    /// unrealized profit on the others. Bad debt is only booked by
+    /// `Self::settle_bad_debt` once the portfolio is actually insolvent.
+    #[inline]
+    fn book_fill(
+        &mut self,
+        idx: usize,
+        quantity: BaseOrQuote,
+        fill_price: QuoteCurrency<I, D>,
+        side: Side,
+        fee: BaseOrQuote::PairedCurrency,
+    ) -> BaseOrQuote::PairedCurrency {
+        assert2::debug_assert!(quantity > BaseOrQuote::zero());
+        assert2::debug_assert!(fill_price > QuoteCurrency::zero());
+        let realized = self.markets[idx]
+            .position
+            .change_realizing(quantity, fill_price, side);
+        self.balances.apply_shared_wallet_pnl(realized);
+        self.balances.account_for_shared_wallet_fee(fee);
+        realized
+    }
+
+    /// Move a negative shared wallet into bad debt (absorbed by the venue) and record it.
+    ///
+    /// Only valid once no position is open, because otherwise unrealized profit on an
+    /// open leg could still cover the deficit.
+    fn settle_bad_debt(&mut self, ts_ns: TimestampNs, market_id: Option<MarketId>) {
+        assert!(
+            !self.has_any_open_position(),
+            "bad debt can only be settled once every position is closed"
+        );
+        let absorbed = self.balances.settle_negative_equity();
+        assert!(absorbed >= Zero::zero());
+        if absorbed.is_zero() {
+            return;
+        }
+        core::hint::cold_path();
+        if let Some(ledger) = self.ledger.as_mut() {
+            // A positive delta keeps `starting_balance + net_cashflow == equity` exact:
+            // the venue credits the wallet back to zero.
+            ledger.record(
+                ts_ns,
+                market_id,
+                None,
+                LedgerEntryKind::BadDebtAbsorption,
+                absorbed,
+                self.balances.equity(),
+            );
+        }
+    }
+
+    /// Liquidate the portfolio if it fell below maintenance margin, book bad debt if the
+    /// portfolio is insolvent, force-cancel orders until initial margin is covered, and
+    /// report the resulting [`Solvency`] relative to `bad_debt_before`.
     #[must_use]
     fn reconcile_portfolio_margin(
         &mut self,
         bad_debt_before: BaseOrQuote::PairedCurrency,
+        ts_ns: TimestampNs,
     ) -> Solvency {
         let liquidated = if self.has_any_open_position()
             && self.total_equity() < self.total_maintenance_margin()
@@ -1511,9 +1556,18 @@ where
             self.force_liquidate_portfolio();
             true
         } else {
+            if !self.has_any_open_position() {
+                // Closing the last leg can leave the shared wallet negative; with no
+                // unrealized profit left to cover it the portfolio is insolvent.
+                self.settle_bad_debt(ts_ns, None);
+            }
             self.prune_stale_reduce_only_orders();
             false
         };
+        // With open positions above maintenance margin, total equity is non-negative
+        // even if the shared wallet itself is temporarily negative.
+        assert2::debug_assert!(self.total_equity() >= Zero::zero());
+        assert2::debug_assert!(self.balances.bad_debt() >= bad_debt_before);
 
         while self.margin_excess() < Zero::zero() {
             core::hint::cold_path();
@@ -1867,19 +1921,15 @@ where
         let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
         let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
-        self.markets[idx]
-            .position
-            .change(exec_qty, fill_price, stop.side(), &mut self.balances);
-        self.balances.account_for_fee(fee);
+        self.book_fill(idx, exec_qty, fill_price, stop.side(), fee);
         self.record_ledger_delta(
             ts_ns,
             Some(market_id),
             Some(stop.id()),
             LedgerEntryKind::RealizedPnl,
             eq_before,
-            bad_debt_before,
         );
-        let solvency = self.reconcile_portfolio_margin(bad_debt_before);
+        let solvency = self.reconcile_portfolio_margin(bad_debt_before, ts_ns);
         self.drain_forced_cancels_into_events();
 
         self.push_stop_event(
