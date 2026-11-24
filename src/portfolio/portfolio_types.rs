@@ -25,6 +25,7 @@ use crate::{
         MarketStatus,
         Mon,
         Pending,
+        RiskError,
         Solvency,
         SubmitLimitOrderError,
         SubmitMarketOrderError,
@@ -172,6 +173,15 @@ pub enum PortfolioError<UserOrderIdT> {
 
     #[error("maximum number of markets ({0}) reached")]
     MaxMarketsReached(usize),
+
+    #[error("another market already uses the ticker {0:?}")]
+    DuplicateTicker(String),
+
+    #[error("market {0} can only be delisted via `delist_market`, which settles its position")]
+    UseDelistMarket(MarketId),
+
+    #[error(transparent)]
+    Risk(#[from] RiskError),
 
     #[error(transparent)]
     RateLimitReached(#[from] RateLimitReached),

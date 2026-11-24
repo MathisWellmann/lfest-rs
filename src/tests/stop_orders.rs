@@ -560,7 +560,7 @@ fn portfolio_liquidation_mid_stop_cascade_reports_remaining_elected_stops() {
 
     assert_eq!(
         pf.update_market(m, &crash_candle()).unwrap_err(),
-        RiskError::Liquidate
+        PortfolioError::Risk(RiskError::Liquidate)
     );
     assert!(pf.market(m).unwrap().position.quantity().is_zero());
     assert!(pf.pending_stops(m).unwrap().is_empty());

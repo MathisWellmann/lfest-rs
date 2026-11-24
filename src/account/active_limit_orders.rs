@@ -352,6 +352,26 @@ where
         assert2::debug_assert!(self.asks.reduce_only_remaining() <= ask_cap);
     }
 
+    /// Remove every resting order that is not `reduce_only` and could increase or flip
+    /// `position_qty` on its own, passing each to `on_cancel`: all such orders on the
+    /// side of the position (or on both sides when flat), and those on the reducing side
+    /// whose remaining quantity exceeds `|position_qty|`. Used for markets in
+    /// reduce-only status, where only position-reducing orders may fill.
+    pub(crate) fn cancel_risk_increasing<F>(&mut self, position_qty: BaseOrQuote, mut on_cancel: F)
+    where
+        F: FnMut(LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>),
+    {
+        let (bid_cap, ask_cap) = if position_qty.is_negative() {
+            (position_qty.abs(), BaseOrQuote::zero())
+        } else {
+            (BaseOrQuote::zero(), position_qty)
+        };
+        self.bids
+            .cancel_non_reduce_only_above(bid_cap, &mut on_cancel);
+        self.asks
+            .cancel_non_reduce_only_above(ask_cap, &mut on_cancel);
+    }
+
     /// fill an existing limit order, reduces order margin.
     #[inline]
     pub(crate) fn fill_best(

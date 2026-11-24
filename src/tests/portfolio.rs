@@ -125,7 +125,7 @@ fn portfolio_cross_margin_winning_leg_offsets_losing_leg_and_prevents_liquidatio
             timestamp_exchange_ns: 3.into(),
         },
     );
-    assert_eq!(res, Err(RiskError::Liquidate));
+    assert_eq!(res, Err(RiskError::Liquidate.into()));
     assert!(pf.market(btc).unwrap().position.quantity().is_zero());
     assert!(pf.market(eth).unwrap().position.quantity().is_zero());
 }
@@ -184,8 +184,12 @@ fn portfolio_reduce_only_and_delist_market_settle_position_and_cancel_orders() {
     )
     .unwrap();
 
-    // Switch to ReduceOnly: buying more fails, selling 1 succeeds.
-    pf.set_market_status(ftm, MarketStatus::ReduceOnly).unwrap();
+    // Switch to ReduceOnly: the resting buy (it would grow the long) is cancelled, the
+    // reducing sell stays; buying more fails, selling 1 succeeds.
+    let cancelled = pf.set_market_status(ftm, MarketStatus::ReduceOnly).unwrap();
+    assert_eq!(cancelled.len(), 1);
+    assert_eq!(cancelled[0].side(), Side::Buy);
+    assert_eq!(pf.market(ftm).unwrap().active_limit_orders.len(), 1);
     assert_eq!(
         pf.submit_market_order(
             ftm,
@@ -205,11 +209,11 @@ fn portfolio_reduce_only_and_delist_market_settle_position_and_cancel_orders() {
     );
 
     // Delist FTM at settlement price 120:
-    // Cancels 2 resting orders, force-settles long 2 @ 120 (realized PnL = +40, zero fee).
+    // Cancels the resting sell, force-settles long 2 @ 120 (realized PnL = +40, zero fee).
     let settlement = pf.delist_market(ftm, QuoteCurrency::new(120, 0)).unwrap();
     assert_eq!(settlement.settled_quantity, BaseCurrency::new(2, 0));
     assert_eq!(settlement.realized_pnl, QuoteCurrency::new(40, 0));
-    assert_eq!(settlement.cancelled_orders.len(), 2);
+    assert_eq!(settlement.cancelled_orders.len(), 1);
     assert_eq!(settlement.solvency, Solvency::Solvent);
     assert_eq!(pf.market(ftm).unwrap().status, MarketStatus::Delisted);
     assert!(pf.market(ftm).unwrap().position.quantity().is_zero());
@@ -444,7 +448,7 @@ fn portfolio_real_insolvency_still_books_bad_debt() {
     // Gap down: closing at 80 loses 200 against a wallet of 100.
     assert_eq!(
         pf.update_market(a, &bba(80, 81, 2)),
-        Err(RiskError::Liquidate)
+        Err(RiskError::Liquidate.into())
     );
     assert!(pf.market(a).unwrap().position.quantity().is_zero());
     assert!(pf.balances().equity().is_zero());
@@ -508,7 +512,7 @@ fn liquidate_hedged_portfolio(
     pf.update_market(btc, &bba(140, 141, 2)).unwrap();
     assert_eq!(
         pf.update_market(eth, &bba(162, 163, 2)),
-        Err(RiskError::Liquidate)
+        Err(RiskError::Liquidate.into())
     );
     assert!(pf.market(btc).unwrap().position.quantity().is_zero());
     assert!(pf.market(eth).unwrap().position.quantity().is_zero());
@@ -585,4 +589,218 @@ fn inverse_portfolio_closing_losing_leg_with_profitable_other_leg_is_not_bankrup
     .unwrap();
     assert_eq!(pf.balances().equity(), BaseCurrency::new(225, 2));
     assert!(pf.balances().bad_debt().is_zero());
+}
+
+#[test]
+fn portfolio_set_market_status_rejects_delisted() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![make_linear_market_cfg("AAA", 2)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        pf.set_market_status(a, MarketStatus::Delisted),
+        Err(PortfolioError::UseDelistMarket(a))
+    );
+    // The position is untouched and can still be closed.
+    assert_eq!(pf.market(a).unwrap().status, MarketStatus::Active);
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Sell, BaseCurrency::new(1, 0)).unwrap(),
+    )
+    .unwrap();
+    assert!(pf.market(a).unwrap().position.quantity().is_zero());
+    assert_eq!(
+        pf.set_market_status(MarketId::new(1), MarketStatus::ReduceOnly),
+        Err(PortfolioError::UnknownMarket(MarketId::new(1)))
+    );
+}
+
+fn rest_limit(pf: &mut LinearPortfolio, m: MarketId, side: Side, price: i64, qty: i64) -> OrderId {
+    pf.submit_limit_order(
+        m,
+        LimitOrder::new(
+            side,
+            QuoteCurrency::new(price, 0),
+            BaseCurrency::new(qty, 0),
+        )
+        .unwrap(),
+    )
+    .unwrap()
+    .id()
+}
+
+#[test]
+fn portfolio_reduce_only_status_cancels_risk_increasing_resting_orders() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(10_000, 0),
+        vec![
+            make_linear_market_cfg("AAA", 2),
+            make_linear_market_cfg("BBB", 2),
+        ],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let (a, b) = (MarketId::new(0), MarketId::new(1));
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.update_market(b, &bba(99, 100, 1)).unwrap();
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap(),
+    )
+    .unwrap();
+    let grow = rest_limit(&mut pf, a, Side::Buy, 90, 1);
+    let flip = rest_limit(&mut pf, a, Side::Sell, 110, 3);
+    let reduce = rest_limit(&mut pf, a, Side::Sell, 111, 2);
+    // Flat market: every order would open a position.
+    rest_limit(&mut pf, b, Side::Buy, 90, 1);
+    rest_limit(&mut pf, b, Side::Sell, 110, 1);
+
+    let cancelled = pf.set_market_status(a, MarketStatus::ReduceOnly).unwrap();
+    let mut ids: Vec<OrderId> = cancelled.iter().map(|o| o.id()).collect();
+    ids.sort();
+    assert_eq!(ids, vec![grow, flip]);
+    let remaining = &pf.market(a).unwrap().active_limit_orders;
+    assert_eq!(remaining.len(), 1);
+    assert!(remaining.get_by_id(reduce, Side::Sell).is_some());
+
+    assert_eq!(
+        pf.set_market_status(b, MarketStatus::ReduceOnly)
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(pf.market(b).unwrap().active_limit_orders.is_empty());
+    // Switching back to active cancels nothing.
+    assert!(
+        pf.set_market_status(a, MarketStatus::Active)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn portfolio_reduce_only_market_fills_never_increase_the_position() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(10_000, 0),
+        vec![make_linear_market_cfg("AAA", 2)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap(),
+    )
+    .unwrap();
+    // Each sell alone fits within the long, so both survive the status switch.
+    rest_limit(&mut pf, a, Side::Sell, 110, 2);
+    let second = rest_limit(&mut pf, a, Side::Sell, 111, 2);
+    assert!(
+        pf.set_market_status(a, MarketStatus::ReduceOnly)
+            .unwrap()
+            .is_empty()
+    );
+
+    // A taker buy sweeping both: the first closes the long, the second must not open a short.
+    let events = pf
+        .update_market(
+            a,
+            &Trade {
+                price: QuoteCurrency::new(112, 0),
+                quantity: BaseCurrency::new(10, 0),
+                side: Side::Buy,
+                timestamp_exchange_ns: 2.into(),
+            },
+        )
+        .unwrap()
+        .clone();
+    assert!(pf.market(a).unwrap().position.quantity().is_zero());
+    assert!(pf.market(a).unwrap().active_limit_orders.is_empty());
+    assert!(events.iter().any(|e| matches!(
+        &e.event,
+        LimitOrderEvent::ForcedCancel(o) if o.id() == second
+    )));
+}
+
+#[test]
+fn portfolio_update_market_rejects_unknown_market() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![make_linear_market_cfg("AAA", 2)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let unknown = MarketId::new(1);
+    assert_eq!(
+        pf.update_market(unknown, &bba(99, 100, 1)),
+        Err(PortfolioError::UnknownMarket(unknown))
+    );
+}
+
+#[test]
+fn portfolio_rejects_duplicate_tickers() {
+    assert_eq!(
+        PortfolioConfig::new(
+            QuoteCurrency::<i64, DECIMALS>::new(1000, 0),
+            vec![
+                make_linear_market_cfg("AAA", 2),
+                make_linear_market_cfg("AAA", 3),
+            ],
+        )
+        .unwrap_err(),
+        ConfigError::DuplicateMarketTicker
+    );
+
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![
+            make_linear_market_cfg("AAA", 2),
+            // Untickered markets are only addressed by id, so they may repeat.
+            make_linear_market_cfg("", 2),
+            make_linear_market_cfg("", 2),
+        ],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    assert_eq!(
+        pf.add_market(make_linear_market_cfg("AAA", 5)),
+        Err(PortfolioError::DuplicateTicker("AAA".to_string()))
+    );
+    assert_eq!(pf.market_count(), 3);
+    assert_eq!(pf.market_id_by_ticker("AAA"), Some(MarketId::new(0)));
+    assert_eq!(
+        pf.add_market(make_linear_market_cfg("", 2)),
+        Ok(MarketId::new(3))
+    );
+}
+
+#[test]
+fn portfolio_supports_one_market_per_market_id() {
+    let market = make_linear_market_cfg("", 2);
+    let mut markets = vec![market.clone(); MarketId::COUNT + 1];
+    assert_eq!(
+        PortfolioConfig::new(QuoteCurrency::new(1000, 0), markets.clone()).unwrap_err(),
+        ConfigError::TooManyMarkets
+    );
+
+    // `MarketId(u16::MAX)` is a valid id, so exactly `MarketId::COUNT` markets fit.
+    markets.pop();
+    let mut pf =
+        LinearPortfolio::new(PortfolioConfig::new(QuoteCurrency::new(1000, 0), markets).unwrap());
+    assert_eq!(pf.market_count(), MarketId::COUNT);
+    assert!(pf.market(MarketId::new(u16::MAX)).is_some());
+    assert_eq!(
+        pf.add_market(market),
+        Err(PortfolioError::MaxMarketsReached(MarketId::COUNT))
+    );
 }

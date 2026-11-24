@@ -48,4 +48,10 @@ pub enum ConfigError {
 
     #[error("The slippage / market-impact model parameters are invalid")]
     InvalidSlippageModel,
+
+    #[error("Two markets of a portfolio use the same ticker")]
+    DuplicateMarketTicker,
+
+    #[error("A portfolio supports at most 65536 markets (one per `MarketId`)")]
+    TooManyMarkets,
 }
