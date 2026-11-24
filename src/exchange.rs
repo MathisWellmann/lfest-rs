@@ -33,7 +33,6 @@ use crate::{
         MarketUpdate,
         Mon,
         QuoteCurrency,
-        RePricing,
     },
     risk_engine::{
         CrossMarginRiskEngine,
@@ -949,10 +948,10 @@ where
     }
 
     /// Submit a limit order with full support for [`TimeInForce`] (`GTX`, `GTC`, `IOC`, `FOK`),
-    /// [`RePricing::Marketable`], and `reduce_only`.
+    /// [`crate::prelude::RePricing::Marketable`], and `reduce_only`.
     ///
     /// - If the order crosses the spread and uses `GoodTilCancelled`, `ImmediateOrCancel`,
-    ///   `FillOrKill`, or [`RePricing::Marketable`], it executes immediately at the best
+    ///   `FillOrKill`, or [`crate::prelude::RePricing::Marketable`], it executes immediately at the best
     ///   opposite quote plus the contract's [`crate::prelude::SlippageModel`] impact
     ///   (never beyond `limit_price`), paying the taker fee, and returns
     ///   [`LimitOrderSubmission::ImmediatelyFilled`].
@@ -1010,7 +1009,7 @@ where
         }
 
         let marketable = self.is_marketable(&order);
-        let is_post_only = Self::is_post_only(&order);
+        let is_post_only = order.is_post_only();
         if !marketable || is_post_only {
             // An executing order is validated at its fill price instead, see
             // `execute_marketable_limit_order`.
@@ -1154,13 +1153,6 @@ where
         }
     }
 
-    /// `true` for post-only orders, which are rejected instead of executed when crossing.
-    #[inline]
-    fn is_post_only(order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>) -> bool {
-        order.re_pricing() == RePricing::GoodTilCrossing
-            && order.time_in_force() == TimeInForce::GoodTilCrossing
-    }
-
     /// Submit a resting passive limit order.
     ///
     /// This API never trades: an order which would execute immediately (it crosses the
@@ -1186,7 +1178,7 @@ where
         LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         SubmitLimitOrderError,
     > {
-        if self.is_marketable(&order) && !Self::is_post_only(&order) {
+        if self.is_marketable(&order) && !order.is_post_only() {
             return Err(SubmitLimitOrderError::WouldExecuteImmediately);
         }
         // A resting order never settles a fill, so it cannot liquidate or emit stop events.
@@ -1257,7 +1249,7 @@ where
             return Err(AmendQtyAlreadyFilled);
         }
         // Validate what does not depend on the original order before cancelling it.
-        if self.is_marketable(&new_order) && !Self::is_post_only(&new_order) {
+        if self.is_marketable(&new_order) && !new_order.is_post_only() {
             return Err(SubmitLimitOrderError::WouldExecuteImmediately.into());
         }
 

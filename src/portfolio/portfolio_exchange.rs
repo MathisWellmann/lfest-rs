@@ -69,7 +69,6 @@ use crate::{
         OrderId,
         Pending,
         QuoteCurrency,
-        RePricing,
         RiskError,
         Side::{
             self,
@@ -980,7 +979,7 @@ where
             return Err(PortfolioError::MarketReduceOnly(market_id));
         }
         let marketable = self.markets[idx].is_marketable(&order);
-        let is_post_only = is_post_only(&order);
+        let is_post_only = order.is_post_only();
         // An executing order is validated at its fill price, a resting one at its limit.
         let notional_price = if marketable && !is_post_only {
             crate::execution_rules::marketable_limit_fill_price(
@@ -1106,7 +1105,7 @@ where
     ) -> Result<PendingLimitOrder<I, D, BaseOrQuote, UserOrderIdT>, PortfolioError<UserOrderIdT>>
     {
         let idx = self.validate_market_index(market_id)?;
-        if self.markets[idx].is_marketable(&order) && !is_post_only(&order) {
+        if self.markets[idx].is_marketable(&order) && !order.is_post_only() {
             return Err(SubmitLimitOrderError::WouldExecuteImmediately.into());
         }
         // A resting order never settles a fill, so it cannot liquidate or emit stop events.
@@ -1190,7 +1189,7 @@ where
             return Err(AmendLimitOrderError::AmendQtyAlreadyFilled.into());
         }
         // Validate what does not depend on the original order before cancelling it.
-        if self.markets[idx].is_marketable(&new_order) && !is_post_only(&new_order) {
+        if self.markets[idx].is_marketable(&new_order) && !new_order.is_post_only() {
             return Err(
                 AmendLimitOrderError::from(SubmitLimitOrderError::WouldExecuteImmediately).into(),
             );
@@ -2160,18 +2159,4 @@ where
             .push_within_capacity(PortfolioStopEvent { market_id, event })
             .expect("each pending stop yields at most one event per call");
     }
-}
-
-/// `true` for post-only orders, which are rejected instead of executed when crossing.
-#[inline]
-fn is_post_only<I, const D: u8, BaseOrQuote, UserOrderIdT>(
-    order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
-) -> bool
-where
-    I: Mon<D>,
-    BaseOrQuote: Currency<I, D>,
-    UserOrderIdT: UserOrderId,
-{
-    order.re_pricing() == RePricing::GoodTilCrossing
-        && order.time_in_force() == TimeInForce::GoodTilCrossing
 }
