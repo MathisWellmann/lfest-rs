@@ -18,6 +18,10 @@ use crate::{
         Balances,
     },
     config::Config,
+    ledger::{
+        Ledger,
+        LedgerEntryKind,
+    },
     market_state::MarketState,
     order_rate_limiter::OrderRateLimiter,
     prelude::{
@@ -205,6 +209,9 @@ where
         QuoteCurrency<I, D>,
     )>,
 
+    /// Optional cashflow / accounting ledger (disabled by default for zero hot-path overhead).
+    ledger: Option<Ledger<I, D, BaseOrQuote::PairedCurrency>>,
+
     order_rate_limiter: OrderRateLimiter,
 }
 
@@ -248,7 +255,55 @@ where
             pending_stops: PendingStops::with_capacity(max_active_orders),
             stop_order_events: Vec::with_capacity(usize::from(max_active_orders.get())),
             elected_stops_scratch: Vec::with_capacity(usize::from(max_active_orders.get())),
+            ledger: None,
             order_rate_limiter,
+        }
+    }
+
+    /// Enable the opt-in cashflow [`Ledger`] with initial capacity `capacity`, anchored at
+    /// the current wallet equity.
+    pub fn enable_ledger(&mut self, capacity: usize) {
+        self.ledger = Some(Ledger::with_capacity(
+            self.account.balances().equity(),
+            capacity,
+        ));
+    }
+
+    /// Borrow the cashflow [`Ledger`] if enabled.
+    #[inline]
+    #[must_use]
+    pub fn ledger(&self) -> Option<&Ledger<I, D, BaseOrQuote::PairedCurrency>> {
+        self.ledger.as_ref()
+    }
+
+    #[inline]
+    fn record_ledger_delta(
+        &mut self,
+        order_id: Option<OrderId>,
+        kind: LedgerEntryKind,
+        equity_before: BaseOrQuote::PairedCurrency,
+        bad_debt_before: BaseOrQuote::PairedCurrency,
+    ) {
+        let Some(ledger) = self.ledger.as_mut() else {
+            return;
+        };
+        let ts = self.market_state.current_timestamp_ns();
+        let equity_after = self.account.balances().equity();
+        let bad_debt_after = self.account.balances().bad_debt();
+        let equity_delta = equity_after - equity_before;
+        if !equity_delta.is_zero() {
+            ledger.record(ts, None, order_id, kind, equity_delta, equity_after);
+        }
+        let new_bad_debt = bad_debt_after - bad_debt_before;
+        if !new_bad_debt.is_zero() {
+            ledger.record(
+                ts,
+                None,
+                order_id,
+                LedgerEntryKind::BadDebtAbsorption,
+                Zero::zero(),
+                equity_after,
+            );
         }
     }
 
@@ -390,8 +445,11 @@ where
         let fee_rate = *self.config.contract_spec().fee_taker().as_ref()
             + self.config.contract_spec().liquidation_fee();
         let fee = notional * fee_rate;
+        let eq_before = self.account.balances().equity();
+        let bd_before = self.account.balances().bad_debt();
         self.account
             .change_position(quantity, fill_price, side, fee);
+        self.record_ledger_delta(None, LedgerEntryKind::Liquidation, eq_before, bd_before);
         info!("balances after liquidation: {}", self.account.balances());
     }
 
@@ -574,9 +632,11 @@ where
         mark_price: QuoteCurrency<I, D>,
     ) -> FundingSettlement<I, D, BaseOrQuote, UserOrderIdT> {
         let cashflow = self.account.funding_cashflow(rate, mark_price);
+        let eq_before = self.account.balances().equity();
         let bad_debt_before = self.account.balances().bad_debt();
         if !cashflow.is_zero() {
             self.account.apply_funding(cashflow);
+            self.record_ledger_delta(None, LedgerEntryKind::Funding, eq_before, bad_debt_before);
         }
         let solvency = self.reconcile_margin(bad_debt_before);
         let forced_cancels = self.take_forced_cancels();
@@ -633,10 +693,12 @@ where
 
         assert2::debug_assert!(self.market_state.ask() > QuoteCurrency::zero());
         assert2::debug_assert!(self.market_state.bid() > QuoteCurrency::zero());
-        let fill_price = match order.side() {
-            Buy => self.market_state.ask(),
-            Sell => self.market_state.bid(),
-        };
+        let impact_quote = self.config.contract_spec().slippage_model().quote(
+            &self.market_state,
+            order.side(),
+            order.quantity(),
+        );
+        let fill_price = impact_quote.execution_price();
         if !self.is_strictly_reducing(order.side(), order.quantity()) {
             let notional = BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
             self.config
@@ -681,9 +743,16 @@ where
         let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price);
         let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
 
+        let eq_before = self.account.balances().equity();
         let bad_debt_before = self.account.balances().bad_debt();
         self.account
             .change_position(filled_qty, fill_price, order.side(), fee);
+        self.record_ledger_delta(
+            Some(order.state().meta().id()),
+            LedgerEntryKind::RealizedPnl,
+            eq_before,
+            bad_debt_before,
+        );
 
         // A position-reducing fill settles without a prior risk check; the venue
         // reconciles any collateral shortfall instead of rejecting the reduction.
@@ -969,9 +1038,16 @@ where
         let filled_qty = pending.remaining_quantity();
         let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price);
         let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
+        let eq_before = self.account.balances().equity();
         let bad_debt_before = self.account.balances().bad_debt();
         self.account
             .change_position(filled_qty, fill_price, pending.side(), fee);
+        self.record_ledger_delta(
+            Some(pending.id()),
+            LedgerEntryKind::RealizedPnl,
+            eq_before,
+            bad_debt_before,
+        );
         let solvency = self.reconcile_margin(bad_debt_before);
         let forced_cancels = self.take_forced_cancels();
         let filled_order = pending.into_filled_at_price(fill_price, ts_ns);
@@ -1285,8 +1361,10 @@ where
         let limit_price = order.limit_price();
         let notional = BaseOrQuote::PairedCurrency::convert_from(filled_quantity, limit_price);
         let fee = notional * *self.config().contract_spec().fee_maker().as_ref();
+        let eq_before = self.account.balances().equity();
+        let bd_before = self.account.balances().bad_debt();
 
-        match self
+        let res = match self
             .account
             .fill_best(side, filled_quantity, limit_price, fee, ts_ns)
         {
@@ -1305,7 +1383,14 @@ where
                     .cloned()
                     .expect("Has this active order"),
             },
-        }
+        };
+        self.record_ledger_delta(
+            Some(order.id()),
+            LedgerEntryKind::RealizedPnl,
+            eq_before,
+            bd_before,
+        );
+        res
     }
 
     /// Submit a conditional / stop order (`StopMarket`, `StopLimit`, `TakeProfitMarket`,
@@ -1488,10 +1573,12 @@ where
             stop.quantity()
         };
 
-        let quote_fill = match stop.side() {
-            Buy => self.market_state.ask(),
-            Sell => self.market_state.bid(),
-        };
+        let quote_fill = self
+            .config
+            .contract_spec()
+            .slippage_model()
+            .quote(&self.market_state, stop.side(), exec_qty)
+            .execution_price();
         // On intrabar candle triggers, fill conservatively at the worse of stop_price and
         // the closing top-of-book quote; on tick/BBA/mark triggers, fill at top-of-book.
         let fill_price = if from_candle {
@@ -1549,9 +1636,16 @@ where
 
         let notional = BaseOrQuote::PairedCurrency::convert_from(exec_qty, fill_price);
         let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
+        let eq_before = self.account.balances().equity();
         let bad_debt_before = self.account.balances().bad_debt();
         self.account
             .change_position(exec_qty, fill_price, stop.side(), fee);
+        self.record_ledger_delta(
+            Some(stop.id()),
+            LedgerEntryKind::RealizedPnl,
+            eq_before,
+            bad_debt_before,
+        );
         let solvency = self.reconcile_margin(bad_debt_before);
         self.drain_forced_cancels_into_events();
 

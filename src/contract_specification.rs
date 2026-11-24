@@ -95,6 +95,11 @@ where
     /// orders on this contract unless overridden on the individual stop order.
     #[getset(get_copy = "pub", set = "pub")]
     stop_protection: Option<crate::stop_orders::StopProtection<I, D>>,
+
+    /// Market-impact / slippage model applied to aggressive market order fills
+    /// (defaults to [`crate::slippage::SlippageModel::ZeroImpact`]).
+    #[getset(get_copy = "pub", set = "pub")]
+    slippage_model: crate::slippage::SlippageModel<I, D>,
 }
 
 impl<I, const D: u8, BaseOrQuote> ContractSpecification<I, D, BaseOrQuote>
@@ -146,7 +151,18 @@ where
             fee_taker,
             liquidation_fee: Decimal::zero(),
             stop_protection: None,
+            slippage_model: crate::slippage::SlippageModel::ZeroImpact,
         })
+    }
+
+    /// Configure a [`crate::slippage::SlippageModel`] for aggressive market fills.
+    #[must_use]
+    pub fn with_slippage_model(
+        mut self,
+        slippage_model: crate::slippage::SlippageModel<I, D>,
+    ) -> Self {
+        self.slippage_model = slippage_model;
+        self
     }
 
     /// Attach a default [`crate::stop_orders::StopProtection`] collar to this contract.

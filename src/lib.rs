@@ -8,6 +8,7 @@ mod config;
 mod contract_specification;
 mod exchange;
 mod expect_messages;
+mod ledger;
 mod load_trades_from_csv;
 mod market_state;
 mod market_update;
@@ -16,6 +17,7 @@ mod order_filters;
 pub mod order_rate_limiter;
 mod portfolio;
 mod risk_engine;
+mod slippage;
 mod stop_orders;
 #[cfg(test)]
 mod tests;
@@ -55,6 +57,11 @@ pub mod prelude {
             LimitOrderSubmission,
             MarketOrderSettlement,
         },
+        ledger::{
+            Ledger,
+            LedgerEntry,
+            LedgerEntryKind,
+        },
         leverage,
         market_state::MarketState,
         market_update::*,
@@ -69,6 +76,10 @@ pub mod prelude {
             MaintenanceMarginSchedule,
             MaintenanceMarginTier,
             MarginMode,
+        },
+        slippage::{
+            MarketImpactQuote,
+            SlippageModel,
         },
         stop_orders::*,
         types::*,

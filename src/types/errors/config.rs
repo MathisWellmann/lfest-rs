@@ -45,4 +45,7 @@ pub enum ConfigError {
 
     #[error("The stop protection collar must be strictly positive")]
     InvalidStopProtection,
+
+    #[error("The slippage / market-impact model parameters are invalid")]
+    InvalidSlippageModel,
 }
