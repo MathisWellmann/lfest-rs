@@ -17,7 +17,9 @@ use crate::{
         ConfigError,
         Currency,
         Maker,
+        MarginCurrency,
         Mon,
+        NotionalFilter,
         PriceFilter,
         QuantityFilter,
         Taker,
@@ -38,6 +40,7 @@ pub struct ContractSpecification<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     /// Identifying ticker symbol
     #[getset(get = "pub", set = "pub")]
@@ -66,19 +69,29 @@ where
     #[getset(get = "pub")]
     quantity_filter: QuantityFilter<I, D, BaseOrQuote>,
 
-    /// The maker fee as parts per 100_000
+    /// Optional order notional rules (measured in margin currency).
+    #[getset(get = "pub", set = "pub")]
+    notional_filter: NotionalFilter<I, D, BaseOrQuote::PairedCurrency>,
+
+    /// The maker fee rate (negative values represent maker rebates).
     #[getset(get_copy = "pub")]
     fee_maker: Fee<I, D, Maker>,
 
-    /// The taker fee as parts per 100_000
+    /// The taker fee rate (must be non-negative).
     #[getset(get_copy = "pub")]
     fee_taker: Fee<I, D, Taker>,
+
+    /// Optional extra clearance fee rate charged on forced liquidations in addition to `fee_taker`.
+    /// Defaults to zero for backwards compatibility.
+    #[getset(get_copy = "pub")]
+    liquidation_fee: Decimal<I, D>,
 }
 
 impl<I, const D: u8, BaseOrQuote> ContractSpecification<I, D, BaseOrQuote>
 where
-    I: Mon<D> + Mon<D>,
+    I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     /// Create a new `ContractSpecification` from the most basic parameters.
     ///
@@ -89,8 +102,8 @@ where
     /// `maintenance_margin_fraction`: The fraction (in range [0..1]) that the maintenance margin will be relative to the computed `initial_margin`.
     /// `price_filter`: The rules for prices in the market
     /// `quantity_filter`: The rules for quantities in the market.
-    /// `fee_maker`: The fee a maker pays.
-    /// `fee_taker`: The fee a taker pays.
+    /// `fee_maker`: The fee a maker pays (negative values are maker rebates).
+    /// `fee_taker`: The fee a taker pays (must be non-negative).
     pub fn new(
         leverage: Leverage<I, D>,
         maintenance_margin: Decimal<I, D>,
@@ -102,6 +115,9 @@ where
         if maintenance_margin > Decimal::one() || maintenance_margin <= Decimal::zero() {
             return Err(ConfigError::InvalidMaintenanceMarginFraction);
         }
+        if *fee_taker.as_ref() < Decimal::zero() {
+            return Err(ConfigError::InvalidTakerFee);
+        }
 
         let init_margin_req = leverage.init_margin_req();
 
@@ -112,9 +128,48 @@ where
             mark_method: MarkMethod::default(),
             price_filter,
             quantity_filter,
+            notional_filter: NotionalFilter::default(),
             fee_maker,
             fee_taker,
+            liquidation_fee: Decimal::zero(),
         })
+    }
+
+    /// Configure an optional extra liquidation clearance fee rate (in `[0, 1)`),
+    /// charged in addition to `fee_taker` during forced liquidations.
+    ///
+    /// # Errors
+    /// Returns [`ConfigError::InvalidLiquidationFee`] if `fee < 0` or `fee >= 1`.
+    pub fn with_liquidation_fee(mut self, fee: Decimal<I, D>) -> Result<Self, ConfigError> {
+        if fee < Decimal::zero() || fee >= Decimal::one() {
+            return Err(ConfigError::InvalidLiquidationFee);
+        }
+        self.liquidation_fee = fee;
+        Ok(self)
+    }
+
+    /// Attach a [`NotionalFilter`] to this contract specification.
+    #[must_use]
+    pub fn with_notional_filter(
+        mut self,
+        notional_filter: NotionalFilter<I, D, BaseOrQuote::PairedCurrency>,
+    ) -> Self {
+        self.notional_filter = notional_filter;
+        self
+    }
+
+    /// Configure the [`MarkMethod`] used for mark-to-market pricing.
+    #[must_use]
+    pub fn with_mark_method(mut self, mark_method: MarkMethod) -> Self {
+        self.mark_method = mark_method;
+        self
+    }
+
+    /// Configure the identifying ticker symbol.
+    #[must_use]
+    pub fn with_ticker(mut self, ticker: impl Into<String>) -> Self {
+        self.ticker = ticker.into();
+        self
     }
 }
 
@@ -122,6 +177,7 @@ impl<I, const D: u8, BaseOrQuote> Default for ContractSpecification<I, D, BaseOr
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     fn default() -> Self {
         Self::new(
@@ -142,9 +198,8 @@ where
     }
 }
 
-// TODO: actually switch between the methods.
 /// Which price to use in `mark-to-market` calculations
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum MarkMethod {
     /// Take the last mid price of the market.
     MidPrice,

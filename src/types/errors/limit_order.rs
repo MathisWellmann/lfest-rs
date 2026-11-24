@@ -9,6 +9,7 @@ use crate::{
         OrderIdNotFound,
         OrderQuantityLTEZero,
         PriceFilterError,
+        ValidateOrderNotionalError,
         ValidateOrderQuantityError,
     },
 };
@@ -39,6 +40,9 @@ pub enum SubmitLimitOrderError {
 
     #[error(transparent)]
     ValidateOrderQuantity(#[from] ValidateOrderQuantityError),
+
+    #[error(transparent)]
+    ValidateOrderNotional(#[from] ValidateOrderNotionalError),
 }
 
 #[derive(Error, Debug, Clone, Eq, PartialEq)]

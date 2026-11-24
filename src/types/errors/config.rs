@@ -30,4 +30,13 @@ pub enum ConfigError {
 
     #[error("Invalid order limits")]
     InvalidOrderLimits,
+
+    #[error("The notional filter bounds are invalid")]
+    InvalidNotionalFilter,
+
+    #[error("The liquidation fee rate must be non-negative and less than 1")]
+    InvalidLiquidationFee,
+
+    #[error("The taker fee rate must be non-negative")]
+    InvalidTakerFee,
 }

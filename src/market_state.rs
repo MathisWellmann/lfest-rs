@@ -37,6 +37,14 @@ where
     #[getset(get_copy = "pub", set = "pub")]
     last_trade_price: QuoteCurrency<I, D>,
 
+    /// Optional external fair / mark price (used when `MarkMethod::FairPrice` is configured).
+    #[getset(get_copy = "pub", set = "pub")]
+    fair_price: Option<QuoteCurrency<I, D>>,
+
+    /// Optional external index price accompanying fair-price feeds.
+    #[getset(get_copy = "pub", set = "pub")]
+    index_price: Option<QuoteCurrency<I, D>>,
+
     /// The current timestamp in nanoseconds
     #[getset(get_copy = "pub")]
     current_ts_ns: TimestampNs,
@@ -100,13 +108,60 @@ where
         (self.bid + self.ask) / Decimal::TWO
     }
 
+    /// Resolve the contract's mark price according to `method`.
+    ///
+    /// - `MarkMethod::MidPrice`: `(bid + ask) / 2`.
+    /// - `MarkMethod::BidAsk`: `(bid + ask) / 2` as a side-neutral reference
+    ///   (use [`Self::mark_price_for_position`] for side-specific bid/ask marking).
+    /// - `MarkMethod::FairPrice`: `fair_price` if set, falling back to `mid_price()`.
+    #[inline]
+    #[must_use]
+    pub fn mark_price(
+        &self,
+        method: crate::contract_specification::MarkMethod,
+    ) -> QuoteCurrency<I, D> {
+        use crate::contract_specification::MarkMethod::*;
+        match method {
+            MidPrice | BidAsk => self.mid_price(),
+            FairPrice => self.fair_price.unwrap_or_else(|| self.mid_price()),
+        }
+    }
+
+    /// Resolve the mark price used to value or liquidate a position on `position_side`.
+    ///
+    /// - `MarkMethod::BidAsk`: `best_bid()` for longs, `best_ask()` for shorts,
+    ///   `mid_price()` when neutral.
+    /// - `MarkMethod::MidPrice`: `mid_price()`.
+    /// - `MarkMethod::FairPrice`: `fair_price` if set, falling back to `mid_price()`.
+    #[inline]
+    #[must_use]
+    pub fn mark_price_for_position(
+        &self,
+        method: crate::contract_specification::MarkMethod,
+        position_side: crate::account::PositionSide,
+    ) -> QuoteCurrency<I, D> {
+        use crate::{
+            account::PositionSide::*,
+            contract_specification::MarkMethod::*,
+        };
+        match method {
+            MidPrice => self.mid_price(),
+            BidAsk => match position_side {
+                Long => self.bid,
+                Short => self.ask,
+                Neutral => self.mid_price(),
+            },
+            FairPrice => self.fair_price.unwrap_or_else(|| self.mid_price()),
+        }
+    }
+
     /// Get the last observed timestamp in nanoseconts
     #[inline(always)]
     pub fn current_timestamp_ns(&self) -> TimestampNs {
         self.current_ts_ns
     }
 
-    #[allow(missing_docs)]
+    #[allow(missing_docs, reason = "test helper")]
     #[cfg(test)]
     pub fn from_components(
         bid: QuoteCurrency<I, D>,
@@ -119,6 +174,8 @@ where
             bid,
             ask,
             last_trade_price,
+            fair_price: None,
+            index_price: None,
             current_ts_ns,
             step,
         }

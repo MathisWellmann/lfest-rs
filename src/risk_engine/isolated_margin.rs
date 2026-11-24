@@ -31,6 +31,7 @@ pub(crate) struct IsolatedMarginRiskEngine<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     contract_spec: ContractSpecification<I, D, BaseOrQuote>,
 }
@@ -39,6 +40,7 @@ impl<I, const D: u8, BaseOrQuote> IsolatedMarginRiskEngine<I, D, BaseOrQuote>
 where
     I: Mon<D>,
     BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     pub(crate) fn new(contract_spec: ContractSpecification<I, D, BaseOrQuote>) -> Self {
         Self { contract_spec }
@@ -90,12 +92,15 @@ where
         position: &Position<I, D, BaseOrQuote>,
     ) -> Result<(), RiskError> {
         use std::cmp::Ordering::*;
+        let mark_method = self.contract_spec.mark_method();
         match position.quantity().cmp(&Zero::zero()) {
             Less => {
                 let liquidation_price = position
                     .entry_price()
                     .liquidation_price_short(self.contract_spec.maintenance_margin());
-                if market_state.ask() > liquidation_price {
+                let reference_price = market_state
+                    .mark_price_for_position(mark_method, crate::account::PositionSide::Short);
+                if reference_price > liquidation_price {
                     return Err(RiskError::Liquidate);
                 }
             }
@@ -104,7 +109,9 @@ where
                 let liquidation_price = position
                     .entry_price()
                     .liquidation_price_long(self.contract_spec.maintenance_margin());
-                if market_state.bid() < liquidation_price {
+                let reference_price = market_state
+                    .mark_price_for_position(mark_method, crate::account::PositionSide::Long);
+                if reference_price < liquidation_price {
                     return Err(RiskError::Liquidate);
                 }
             }
