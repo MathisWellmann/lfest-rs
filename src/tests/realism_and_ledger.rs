@@ -150,10 +150,18 @@ fn slippage_model_and_ledger_reconcile_exact_equity_on_exchange_and_portfolio() 
     // 1% fixed slippage, 0.1% taker fee.
     let slip =
         SlippageModel::fixed_rate(Decimal::try_from_scaled(1, 2).expect(EXPECT_DECIMAL)).unwrap();
+    // A tick of 0.01, so the 1% impact is not snapped to whole prices.
     let spec = ContractSpecification::new(
         leverage!(2),
         Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
-        PriceFilter::default(),
+        PriceFilter::new(
+            None,
+            None,
+            QuoteCurrency::new(1, 2),
+            Decimal::TWO,
+            Decimal::zero(),
+        )
+        .expect("valid price filter"),
         QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
         Fee::from(Decimal::zero()),
         Fee::from(Decimal::try_from_scaled(1, 3).expect(EXPECT_DECIMAL)),

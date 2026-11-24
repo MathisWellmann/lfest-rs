@@ -94,6 +94,7 @@ where
 #[must_use]
 pub(crate) fn marketable_limit_fill_price<I, const D: u8, BaseOrQuote>(
     slippage_model: SlippageModel<I, D>,
+    tick_size: QuoteCurrency<I, D>,
     market_state: &MarketState<I, D>,
     side: Side,
     quantity: BaseOrQuote,
@@ -105,7 +106,7 @@ where
 {
     assert!(limit_price > QuoteCurrency::zero());
     let impacted = slippage_model
-        .quote(market_state, side, quantity)
+        .quote(market_state, side, quantity, tick_size)
         .execution_price();
     let fill_price = match side {
         Side::Buy => crate::utils::min(impacted, limit_price),
@@ -123,6 +124,45 @@ where
         }
     }
     assert!(fill_price > QuoteCurrency::zero());
+    fill_price
+}
+
+/// The fill price of an elected market-type stop of `(side, quantity)`.
+///
+/// The stop executes like a market order, paying the `slippage_model` impact. If a
+/// candle's intrabar trades elected it (`intrabar`), the trigger happened at an unknown
+/// time inside the bar while the quotes are those at its close, so it fills at the
+/// worse of its `stop_price` and the impacted closing quote.
+#[inline]
+#[must_use]
+pub(crate) fn market_stop_fill_price<I, const D: u8, BaseOrQuote>(
+    slippage_model: SlippageModel<I, D>,
+    tick_size: QuoteCurrency<I, D>,
+    market_state: &MarketState<I, D>,
+    side: Side,
+    quantity: BaseOrQuote,
+    stop_price: QuoteCurrency<I, D>,
+    intrabar: bool,
+) -> QuoteCurrency<I, D>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+{
+    assert!(stop_price > QuoteCurrency::zero());
+    let quote_fill = slippage_model
+        .quote(market_state, side, quantity, tick_size)
+        .execution_price();
+    if !intrabar {
+        return quote_fill;
+    }
+    let fill_price = match side {
+        Side::Buy => crate::utils::max(stop_price, quote_fill),
+        Side::Sell => crate::utils::min(stop_price, quote_fill),
+    };
+    match side {
+        Side::Buy => assert!(fill_price >= stop_price),
+        Side::Sell => assert!(fill_price <= stop_price),
+    }
     fill_price
 }
 
@@ -397,23 +437,52 @@ mod tests {
         )
         .expect("valid slippage");
         let qty = BaseCurrency::<i64, 5>::new(1, 0);
+        let tick = QuoteCurrency::new(1, 2);
         // 101 * 1.01 = 102.01 below the limit.
         assert_eq!(
-            marketable_limit_fill_price(slip, &ms, Side::Buy, qty, QuoteCurrency::new(105, 0)),
+            marketable_limit_fill_price(
+                slip,
+                tick,
+                &ms,
+                Side::Buy,
+                qty,
+                QuoteCurrency::new(105, 0)
+            ),
             QuoteCurrency::new(10201, 2)
         );
         // Capped at the limit.
         assert_eq!(
-            marketable_limit_fill_price(slip, &ms, Side::Buy, qty, QuoteCurrency::new(1015, 1)),
+            marketable_limit_fill_price(
+                slip,
+                tick,
+                &ms,
+                Side::Buy,
+                qty,
+                QuoteCurrency::new(1015, 1)
+            ),
             QuoteCurrency::new(1015, 1)
         );
         // 100 * 0.99 = 99 above the limit.
         assert_eq!(
-            marketable_limit_fill_price(slip, &ms, Side::Sell, qty, QuoteCurrency::new(95, 0)),
+            marketable_limit_fill_price(
+                slip,
+                tick,
+                &ms,
+                Side::Sell,
+                qty,
+                QuoteCurrency::new(95, 0)
+            ),
             QuoteCurrency::new(99, 0)
         );
         assert_eq!(
-            marketable_limit_fill_price(slip, &ms, Side::Sell, qty, QuoteCurrency::new(995, 1)),
+            marketable_limit_fill_price(
+                slip,
+                tick,
+                &ms,
+                Side::Sell,
+                qty,
+                QuoteCurrency::new(995, 1)
+            ),
             QuoteCurrency::new(995, 1)
         );
     }

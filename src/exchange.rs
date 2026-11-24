@@ -722,6 +722,7 @@ where
             &self.market_state,
             order.side(),
             order.quantity(),
+            self.config.contract_spec().price_filter().tick_size(),
         );
         let fill_price = impact_quote.execution_price();
         execution_rules::validate_order_notional(
@@ -1060,6 +1061,7 @@ where
         assert!(self.is_marketable(&order));
         let fill_price = execution_rules::marketable_limit_fill_price(
             self.config.contract_spec().slippage_model(),
+            self.config.contract_spec().price_filter().tick_size(),
             &self.market_state,
             order.side(),
             order.remaining_quantity(),
@@ -1684,22 +1686,16 @@ where
             stop.quantity()
         };
 
-        let quote_fill = self
-            .config
-            .contract_spec()
-            .slippage_model()
-            .quote(&self.market_state, stop.side(), exec_qty)
-            .execution_price();
-        // On intrabar candle triggers, fill conservatively at the worse of stop_price and
-        // the closing top-of-book quote; on tick/BBA/mark triggers, fill at top-of-book.
-        let fill_price = if from_candle {
-            match stop.side() {
-                Buy => crate::utils::max(stop.stop_price(), quote_fill),
-                Sell => crate::utils::min(stop.stop_price(), quote_fill),
-            }
-        } else {
-            quote_fill
-        };
+        let spec = self.config.contract_spec();
+        let fill_price = execution_rules::market_stop_fill_price(
+            spec.slippage_model(),
+            spec.price_filter().tick_size(),
+            &self.market_state,
+            stop.side(),
+            exec_qty,
+            stop.stop_price(),
+            from_candle,
+        );
 
         // Check StopProtection collar (order override wins over contract default).
         let protection = stop

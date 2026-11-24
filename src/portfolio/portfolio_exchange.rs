@@ -800,6 +800,7 @@ where
                 &self.markets[idx].market_state,
                 order.side(),
                 order.quantity(),
+                self.markets[idx].contract_spec.price_filter().tick_size(),
             )
             .execution_price();
         crate::execution_rules::validate_order_notional(
@@ -980,6 +981,7 @@ where
         let notional_price = if marketable && !is_post_only {
             crate::execution_rules::marketable_limit_fill_price(
                 self.markets[idx].contract_spec.slippage_model(),
+                self.markets[idx].contract_spec.price_filter().tick_size(),
                 &self.markets[idx].market_state,
                 order.side(),
                 order.remaining_quantity(),
@@ -1948,19 +1950,16 @@ where
             stop.quantity()
         };
 
-        let quote_fill = self.markets[idx]
-            .contract_spec
-            .slippage_model()
-            .quote(&self.markets[idx].market_state, stop.side(), exec_qty)
-            .execution_price();
-        let fill_price = if from_candle {
-            match stop.side() {
-                Buy => crate::utils::max(stop.stop_price(), quote_fill),
-                Sell => crate::utils::min(stop.stop_price(), quote_fill),
-            }
-        } else {
-            quote_fill
-        };
+        let slot = &self.markets[idx];
+        let fill_price = crate::execution_rules::market_stop_fill_price(
+            slot.contract_spec.slippage_model(),
+            slot.contract_spec.price_filter().tick_size(),
+            &slot.market_state,
+            stop.side(),
+            exec_qty,
+            stop.stop_price(),
+            from_candle,
+        );
 
         let protection = stop
             .protection()
