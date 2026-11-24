@@ -49,6 +49,11 @@ pub enum SubmitLimitOrderError {
 
     #[error("Immediate-or-cancel or fill-or-kill order did not cross the spread")]
     ImmediateExecutionNotMarketable,
+
+    #[error(
+        "The limit order crosses the spread and would execute immediately; use `submit_limit_order_with_execution` for marketable limit orders"
+    )]
+    WouldExecuteImmediately,
 }
 
 #[derive(Error, Debug, Clone, Eq, PartialEq)]

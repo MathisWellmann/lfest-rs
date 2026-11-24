@@ -961,12 +961,8 @@ where
                 .validate_order_notional(notional)?;
         }
 
-        let marketable = match order.side() {
-            Buy => order.limit_price() >= self.market_state.ask(),
-            Sell => order.limit_price() <= self.market_state.bid(),
-        };
-        let is_post_only = order.re_pricing() == RePricing::GoodTilCrossing
-            && order.time_in_force() == TimeInForce::GoodTilCrossing;
+        let marketable = self.is_marketable(&order);
+        let is_post_only = Self::is_post_only(&order);
 
         if marketable && is_post_only {
             let meta = ExchangeOrderMeta::new(
@@ -1079,11 +1075,33 @@ where
         })
     }
 
+    /// `true` if `order` crosses (or locks) the current top of book.
+    #[inline]
+    fn is_marketable(&self, order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>) -> bool {
+        match order.side() {
+            Buy => order.limit_price() >= self.market_state.ask(),
+            Sell => order.limit_price() <= self.market_state.bid(),
+        }
+    }
+
+    /// `true` for post-only orders, which are rejected instead of executed when crossing.
+    #[inline]
+    fn is_post_only(order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>) -> bool {
+        order.re_pricing() == RePricing::GoodTilCrossing
+            && order.time_in_force() == TimeInForce::GoodTilCrossing
+    }
+
     /// Submit a resting passive limit order.
     ///
-    /// For orders that may cross the spread and execute immediately (`RePricing::Marketable`,
-    /// `TimeInForce::GoodTilCancelled`, `ImmediateOrCancel`, `FillOrKill`), prefer
-    /// [`Self::submit_limit_order_with_execution`].
+    /// This API never trades: an order which would execute immediately (it crosses the
+    /// spread and is not post-only) is rejected with
+    /// [`SubmitLimitOrderError::WouldExecuteImmediately`] without touching the account,
+    /// because the returned pending order could not report the fill, its taker fee, the
+    /// resulting forced cancels or the solvency. Use
+    /// [`Self::submit_limit_order_with_execution`] for marketable limit orders
+    /// (`RePricing::Marketable`, crossing `GoodTilCancelled`, `ImmediateOrCancel`,
+    /// `FillOrKill`). Crossing post-only orders keep their
+    /// [`SubmitLimitOrderError::GoodTillCrossingRejectedOrder`] rejection.
     ///
     /// # Arguments:
     /// `order`: The order that is being submitted.
@@ -1098,25 +1116,16 @@ where
         LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         SubmitLimitOrderError,
     > {
+        if self.is_marketable(&order) && !Self::is_post_only(&order) {
+            return Err(SubmitLimitOrderError::WouldExecuteImmediately);
+        }
         match self.submit_limit_order_with_execution(order)? {
-            LimitOrderSubmission::Resting(pending) => Ok(pending),
-            LimitOrderSubmission::ImmediatelyFilled { filled_order, .. } => {
-                // Convert immediately-filled order into a zero-remaining Pending wrapper
-                // only if a caller invoked the legacy resting-only API with a Marketable order.
-                let meta = filled_order.state().meta().clone();
-                let mut pending = LimitOrder::new_with_user_order_id(
-                    filled_order.side(),
-                    filled_order.limit_price(),
-                    filled_order.total_quantity(),
-                    filled_order.user_order_id(),
-                )
-                .expect("filled order had positive price and quantity")
-                .with_re_pricing(filled_order.re_pricing())
-                .with_time_in_force(filled_order.time_in_force())
-                .with_reduce_only(filled_order.reduce_only())
-                .into_pending(meta);
-                pending.fill(filled_order.total_quantity());
+            LimitOrderSubmission::Resting(pending) => {
+                assert!(pending.remaining_quantity() > BaseOrQuote::zero());
                 Ok(pending)
+            }
+            LimitOrderSubmission::ImmediatelyFilled { .. } => {
+                unreachable!("marketable orders are rejected before submission")
             }
         }
     }
@@ -1124,7 +1133,12 @@ where
     /// Amend an existing limit order.
     ///
     /// The amend message will only be accepted if the original order can be successfully removed.
-    /// Requests which cannot be processed will be rejected with an error.
+    /// Requests which cannot be processed will be rejected with an error; the original
+    /// order then stays on the book unchanged (same id and queue priority). The only
+    /// exception is [`AmendLimitOrderError::AmendQtyAlreadyFilled`], which cancels it.
+    ///
+    /// Like [`Self::submit_limit_order`], an amend never trades: a new limit price
+    /// crossing the spread is rejected with [`SubmitLimitOrderError::WouldExecuteImmediately`].
     ///
     /// The new order get a new `OrderId` as well.
     pub fn amend_limit_order(
@@ -1169,13 +1183,34 @@ where
                 .expect("Can cancel this order");
             return Err(AmendQtyAlreadyFilled);
         }
+        // Validate what does not depend on the original order before cancelling it.
+        if self.is_marketable(&new_order) && !Self::is_post_only(&new_order) {
+            return Err(SubmitLimitOrderError::WouldExecuteImmediately.into());
+        }
 
         new_order.set_remaining_quantity(new_leaves_qty);
 
-        self.cancel_limit_order_no_rate_limit(CancelBy::OrderId(existing_order_id))
+        let original = self
+            .cancel_limit_order_no_rate_limit(CancelBy::OrderId(existing_order_id))
             .expect("Can always cancel the order here");
-        let order = self.submit_limit_order(new_order)?;
-        Ok(order)
+        // The admission checks (margin, reduce-only room) must see the book without the
+        // original order, so it is removed first and restored if the replacement fails.
+        let side = new_order.side();
+        match self.submit_limit_order(new_order) {
+            Ok(order) => Ok(order),
+            Err(e) => {
+                self.account
+                    .try_insert_order(original)
+                    .expect("the slot of the original order was just freed");
+                assert!(
+                    self.account
+                        .active_limit_orders()
+                        .get_by_id(existing_order_id, side)
+                        .is_some()
+                );
+                Err(e.into())
+            }
+        }
     }
 
     /// Append a new limit order as active order.

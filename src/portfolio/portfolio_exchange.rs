@@ -191,6 +191,15 @@ where
         }
     }
 
+    /// `true` if `order` crosses (or locks) the market's current top of book.
+    #[inline]
+    fn is_marketable(&self, order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>) -> bool {
+        match order.side() {
+            Buy => order.limit_price() >= self.market_state.ask(),
+            Sell => order.limit_price() <= self.market_state.bid(),
+        }
+    }
+
     #[inline]
     fn clamp_reduce_only_quantity(&self, side: Side, quantity: BaseOrQuote) -> Option<BaseOrQuote> {
         let pos_qty = self.position.quantity();
@@ -906,12 +915,8 @@ where
                 .map_err(SubmitLimitOrderError::from)?;
         }
 
-        let marketable = match order.side() {
-            Buy => order.limit_price() >= self.markets[idx].market_state.ask(),
-            Sell => order.limit_price() <= self.markets[idx].market_state.bid(),
-        };
-        let is_post_only = order.re_pricing() == RePricing::GoodTilCrossing
-            && order.time_in_force() == TimeInForce::GoodTilCrossing;
+        let marketable = self.markets[idx].is_marketable(&order);
+        let is_post_only = is_post_only(&order);
 
         if marketable && is_post_only {
             let meta = ExchangeOrderMeta::new(self.next_order_id(), ts_ns);
@@ -1011,32 +1016,32 @@ where
 
     /// Submit a passive limit order on `market_id`.
     ///
+    /// This API never trades: an order which would execute immediately (it crosses the
+    /// spread and is not post-only) is rejected with
+    /// [`SubmitLimitOrderError::WouldExecuteImmediately`] without touching the portfolio,
+    /// because the returned pending order could not report the fill, fee, forced cancels
+    /// or solvency. Use [`Self::submit_limit_order_with_execution`] for marketable orders.
+    ///
     /// # Errors
     /// Returns [`PortfolioError`] on unknown/delisted/reduce-only market, rate limit,
-    /// filter violation, crossing GTX order, capacity limit, or insufficient cross-margin.
+    /// filter violation, crossing order, capacity limit, or insufficient cross-margin.
     pub fn submit_limit_order(
         &mut self,
         market_id: MarketId,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
     ) -> Result<PendingLimitOrder<I, D, BaseOrQuote, UserOrderIdT>, PortfolioError<UserOrderIdT>>
     {
+        let idx = self.validate_market_index(market_id)?;
+        if self.markets[idx].is_marketable(&order) && !is_post_only(&order) {
+            return Err(SubmitLimitOrderError::WouldExecuteImmediately.into());
+        }
         match self.submit_limit_order_with_execution(market_id, order)? {
-            crate::exchange::LimitOrderSubmission::Resting(pending) => Ok(pending),
-            crate::exchange::LimitOrderSubmission::ImmediatelyFilled { filled_order, .. } => {
-                let meta = filled_order.state().meta().clone();
-                let mut pending = LimitOrder::new_with_user_order_id(
-                    filled_order.side(),
-                    filled_order.limit_price(),
-                    filled_order.total_quantity(),
-                    filled_order.user_order_id(),
-                )
-                .expect("filled order had positive price and quantity")
-                .with_re_pricing(filled_order.re_pricing())
-                .with_time_in_force(filled_order.time_in_force())
-                .with_reduce_only(filled_order.reduce_only())
-                .into_pending(meta);
-                pending.fill(filled_order.total_quantity());
+            crate::exchange::LimitOrderSubmission::Resting(pending) => {
+                assert!(pending.remaining_quantity() > BaseOrQuote::zero());
                 Ok(pending)
+            }
+            crate::exchange::LimitOrderSubmission::ImmediatelyFilled { .. } => {
+                unreachable!("marketable orders are rejected before submission")
             }
         }
     }
@@ -1108,12 +1113,34 @@ where
                 .expect("existing active order can be cancelled");
             return Err(AmendLimitOrderError::AmendQtyAlreadyFilled.into());
         }
+        // Validate what does not depend on the original order before cancelling it.
+        if self.markets[idx].is_marketable(&new_order) && !is_post_only(&new_order) {
+            return Err(
+                AmendLimitOrderError::from(SubmitLimitOrderError::WouldExecuteImmediately).into(),
+            );
+        }
         new_order.set_remaining_quantity(new_leaves_qty);
-        self.markets[idx]
+        let original = self.markets[idx]
             .active_limit_orders
             .remove_limit_order(CancelBy::OrderId(existing_order_id))
             .expect("existing active order can be cancelled");
-        self.submit_limit_order(market_id, new_order)
+        // The admission checks must see the book without the original order, so it is
+        // removed first and restored (same id and queue priority) if the replacement fails.
+        let side = new_order.side();
+        let result = self.submit_limit_order(market_id, new_order);
+        if result.is_err() {
+            self.markets[idx]
+                .active_limit_orders
+                .try_insert(original)
+                .expect("the slot of the original order was just freed");
+            assert!(
+                self.markets[idx]
+                    .active_limit_orders
+                    .get_by_id(existing_order_id, side)
+                    .is_some()
+            );
+        }
+        result
     }
 
     /// Cancel all active limit orders on a single `market_id` (optionally filtered by `side`).
@@ -1977,4 +2004,18 @@ where
                 .expect(EXPECT_CAPACITY);
         }
     }
+}
+
+/// `true` for post-only orders, which are rejected instead of executed when crossing.
+#[inline]
+fn is_post_only<I, const D: u8, BaseOrQuote, UserOrderIdT>(
+    order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+) -> bool
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    order.re_pricing() == RePricing::GoodTilCrossing
+        && order.time_in_force() == TimeInForce::GoodTilCrossing
 }
