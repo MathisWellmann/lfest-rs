@@ -56,6 +56,8 @@ fn stop_market_protects_short_intrabar_and_rejects_immediate_trigger() {
                 NoUserOrderId,
             )
             .unwrap()
+            // Only `Last` stops watch the intrabar trade range of a candle.
+            .with_trigger_price_type(TriggerPriceType::Last)
             .with_reduce_only(true),
         )
         .unwrap();
@@ -877,4 +879,284 @@ fn cloned_portfolio_reports_every_stop_cancelled_by_a_liquidation() {
         .unwrap();
     assert_eq!(settlement.solvency, Solvency::Liquidated);
     assert_eq!(cloned.stop_events().len(), 2);
+}
+
+/// Linear mock contract marked at an external fair price of 100, quoted 100 / 101,
+/// with a long 2 @ 101 open.
+fn fair_price_exchange_long_2()
+-> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+    let spec = mock_exchange_linear()
+        .config()
+        .contract_spec()
+        .clone()
+        .with_mark_method(MarkMethod::FairPrice);
+    let config = Config::new(
+        QuoteCurrency::new(1000, 0),
+        NonZeroU16::new(10).expect(EXPECT_NON_ZERO),
+        spec,
+        OrderRateLimits::default(),
+    )
+    .unwrap();
+    let mut ex = Exchange::new(config);
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(100, 0),
+        ask: QuoteCurrency::new(101, 0),
+        timestamp_exchange_ns: 1.into(),
+    })
+    .unwrap();
+    ex.update_state(&MarkPriceUpdate::new(QuoteCurrency::new(100, 0), 2.into()))
+        .unwrap();
+    ex.submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap())
+        .unwrap();
+    ex
+}
+
+fn sell_stop_1(
+    stop_price: i64,
+    price_type: TriggerPriceType,
+) -> StopOrder<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+    StopOrder::stop_market(
+        Side::Sell,
+        QuoteCurrency::new(stop_price, 0),
+        BaseCurrency::new(1, 0),
+        NoUserOrderId,
+    )
+    .unwrap()
+    .with_trigger_price_type(price_type)
+    .with_reduce_only(true)
+}
+
+/// A candle whose trades wick down to 80 while the quotes close at 99 / 100.
+fn wick_candle() -> Candle<i64, DECIMALS> {
+    Candle::new(
+        QuoteCurrency::new(99, 0),
+        QuoteCurrency::new(100, 0),
+        QuoteCurrency::new(80, 0),
+        QuoteCurrency::new(101, 0),
+        3.into(),
+    )
+    .unwrap()
+}
+
+fn filled_stop_id<I, const D: u8, B, U>(event: &StopOrderEvent<I, D, B, U>) -> Option<OrderId>
+where
+    I: Mon<D>,
+    B: Currency<I, D>,
+    B::PairedCurrency: MarginCurrency<I, D>,
+    U: UserOrderId,
+{
+    match event {
+        StopOrderEvent::Filled { stop_order_id, .. } => Some(*stop_order_id),
+        _ => None,
+    }
+}
+
+#[test]
+fn fair_price_mark_stop_ignores_a_trade_wick() {
+    let mut ex = fair_price_exchange_long_2();
+    let mark_stop = ex
+        .submit_stop_order(sell_stop_1(95, TriggerPriceType::Mark))
+        .unwrap();
+    let last_stop = ex
+        .submit_stop_order(sell_stop_1(95, TriggerPriceType::Last))
+        .unwrap();
+
+    // The wick prints trades at 80, but the fair price stays at 100: only the stop
+    // watching trades may fire.
+    ex.update_state(&wick_candle()).unwrap();
+    let events = ex.stop_order_events();
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(filled_stop_id(&events[0]), Some(last_stop.id()));
+    assert!(ex.pending_stops().get_by_id(mark_stop.id()).is_some());
+    assert_eq!(ex.account().position().quantity(), BaseCurrency::new(1, 0));
+
+    // The mark itself falls through the stop.
+    ex.update_state(&MarkPriceUpdate::new(QuoteCurrency::new(94, 0), 4.into()))
+        .unwrap();
+    let events = ex.stop_order_events();
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(filled_stop_id(&events[0]), Some(mark_stop.id()));
+    match &events[0] {
+        StopOrderEvent::Filled { trigger_price, .. } => {
+            assert_eq!(*trigger_price, QuoteCurrency::new(94, 0));
+        }
+        other => panic!("expected fill, got {other:?}"),
+    }
+    assert!(ex.account().position().quantity().is_zero());
+}
+
+#[test]
+fn portfolio_fair_price_mark_stop_ignores_a_trade_wick() {
+    let spec = levered_spec()
+        .with_ticker("BTCUSDT")
+        .with_mark_method(MarkMethod::FairPrice);
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![MarketConfig::new(
+            NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+            spec,
+            OrderRateLimits::default(),
+        )],
+    )
+    .unwrap();
+    let mut pf =
+        PortfolioExchange::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>::new(cfg);
+    let m = MarketId::new(0);
+    pf.update_market(
+        m,
+        &Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 1.into(),
+        },
+    )
+    .unwrap();
+    pf.update_market(
+        m,
+        &MarkPriceUpdate::new(QuoteCurrency::new(100, 0), 2.into()),
+    )
+    .unwrap();
+    pf.submit_market_order(
+        m,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap(),
+    )
+    .unwrap();
+    let mark_stop = pf
+        .submit_stop_order(m, sell_stop_1(95, TriggerPriceType::Mark))
+        .unwrap();
+    let last_stop = pf
+        .submit_stop_order(m, sell_stop_1(95, TriggerPriceType::Last))
+        .unwrap();
+
+    pf.update_market(m, &wick_candle()).unwrap();
+    let events = pf.stop_events();
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(filled_stop_id(&events[0].event), Some(last_stop.id()));
+    assert!(
+        pf.pending_stops(m)
+            .unwrap()
+            .get_by_id(mark_stop.id())
+            .is_some()
+    );
+
+    pf.update_market(
+        m,
+        &MarkPriceUpdate::new(QuoteCurrency::new(94, 0), 4.into()),
+    )
+    .unwrap();
+    let events = pf.stop_events();
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(filled_stop_id(&events[0].event), Some(mark_stop.id()));
+    assert!(pf.market(m).unwrap().position.quantity().is_zero());
+}
+
+#[test]
+fn best_bid_ask_stop_watches_the_quotes_not_the_trades() {
+    let mut ex = mock_exchange_linear();
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(100, 0),
+        ask: QuoteCurrency::new(101, 0),
+        timestamp_exchange_ns: 1.into(),
+    })
+    .unwrap();
+    ex.submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap())
+        .unwrap();
+    let stop = ex
+        .submit_stop_order(sell_stop_1(95, TriggerPriceType::BestBidAsk))
+        .unwrap();
+
+    // Trades wick to 80 but the bid closes at 99, above the stop.
+    ex.update_state(&wick_candle()).unwrap();
+    assert!(ex.stop_order_events().is_empty());
+    assert_eq!(ex.pending_stops().len(), 1);
+
+    // The ask touching 95 is not the sell stop's feed either.
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(96, 0),
+        ask: QuoteCurrency::new(97, 0),
+        timestamp_exchange_ns: 4.into(),
+    })
+    .unwrap();
+    assert!(ex.stop_order_events().is_empty());
+
+    // The bid reaching the stop elects it at the bid.
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(95, 0),
+        ask: QuoteCurrency::new(96, 0),
+        timestamp_exchange_ns: 5.into(),
+    })
+    .unwrap();
+    let events = ex.stop_order_events();
+    assert_eq!(events.len(), 1, "{events:?}");
+    match &events[0] {
+        StopOrderEvent::Filled {
+            stop_order_id,
+            trigger_price,
+            fill_price,
+            ..
+        } => {
+            assert_eq!(*stop_order_id, stop.id());
+            assert_eq!(*trigger_price, QuoteCurrency::new(95, 0));
+            assert_eq!(*fill_price, QuoteCurrency::new(95, 0));
+        }
+        other => panic!("expected fill, got {other:?}"),
+    }
+}
+
+/// Sell trail 5 from watermark 100 (stop 95). A bar with high 110 and low 101 may have
+/// rallied to 110 first (stop 105) and then fallen to 101, so it must elect the stop.
+#[test]
+fn trailing_stop_on_a_candle_trails_before_testing_the_adverse_extreme() {
+    let mut ex = mock_exchange_linear();
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(100, 0),
+        ask: QuoteCurrency::new(101, 0),
+        timestamp_exchange_ns: 1.into(),
+    })
+    .unwrap();
+    ex.submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap())
+        .unwrap();
+    let ts = ex
+        .submit_stop_order(
+            StopOrder::trailing_stop(
+                Side::Sell,
+                QuoteCurrency::new(100, 0),
+                TrailDistance::Absolute(QuoteCurrency::new(5, 0)),
+                BaseCurrency::new(2, 0),
+                NoUserOrderId,
+            )
+            .unwrap()
+            .with_trigger_price_type(TriggerPriceType::Last)
+            .with_reduce_only(true),
+        )
+        .unwrap();
+    assert_eq!(ts.stop_price(), QuoteCurrency::new(95, 0));
+
+    let bar = Candle::new(
+        QuoteCurrency::new(106, 0),
+        QuoteCurrency::new(107, 0),
+        QuoteCurrency::new(101, 0),
+        QuoteCurrency::new(110, 0),
+        2.into(),
+    )
+    .unwrap();
+    ex.update_state(&bar).unwrap();
+    assert!(ex.pending_stops().is_empty());
+    assert!(ex.account().position().quantity().is_zero());
+    let events = ex.stop_order_events();
+    assert_eq!(events.len(), 1, "{events:?}");
+    match &events[0] {
+        StopOrderEvent::Filled {
+            stop_order_id,
+            trigger_price,
+            fill_price,
+            ..
+        } => {
+            assert_eq!(*stop_order_id, ts.id());
+            assert_eq!(*trigger_price, QuoteCurrency::new(101, 0));
+            // The worse of the trailed stop (105) and the closing bid (106).
+            assert_eq!(*fill_price, QuoteCurrency::new(105, 0));
+        }
+        other => panic!("expected fill, got {other:?}"),
+    }
 }

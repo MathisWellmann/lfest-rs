@@ -7,9 +7,11 @@
 use num_traits::Zero;
 
 use crate::{
+    contract_specification::MarkMethod,
     market_state::MarketState,
     order_filters::NotionalFilter,
     slippage::SlippageModel,
+    stop_orders::TriggerPriceType,
     types::{
         Currency,
         LimitOrder,
@@ -189,6 +191,85 @@ where
     capped
 }
 
+/// The current point reference price of a stop of `(price_type, side)`, or `None` if the
+/// market has not provided that price yet.
+#[inline]
+#[must_use]
+pub(crate) fn stop_reference_price<I, const D: u8>(
+    market_state: &MarketState<I, D>,
+    mark_method: MarkMethod,
+    price_type: TriggerPriceType,
+    side: Side,
+) -> Option<QuoteCurrency<I, D>>
+where
+    I: Mon<D>,
+{
+    let price = match price_type {
+        TriggerPriceType::Mark => market_state.mark_price(mark_method),
+        TriggerPriceType::Last => {
+            let last = market_state.last_trade_price();
+            if last > QuoteCurrency::zero() {
+                last
+            } else {
+                market_state.mid_price()
+            }
+        }
+        TriggerPriceType::BestBidAsk => match side {
+            Side::Buy => market_state.ask(),
+            Side::Sell => market_state.bid(),
+        },
+    };
+    (price > QuoteCurrency::zero()).then_some(price)
+}
+
+/// The `(low, high)` band of reference prices a stop of `(price_type, side)` observed
+/// during the current market update, or `None` if its reference price is unknown.
+///
+/// `trade_range` is the intrabar trade range of a candle update. Only a
+/// [`TriggerPriceType::Last`] stop watches trades, so only it is tested against the
+/// whole range. A `Mark` stop watches the mark price, which none of the [`MarkMethod`]s
+/// derives from trades (a trade wick must not elect it, which is the point of fair-price
+/// marking), and a `BestBidAsk` stop watches the quotes. Both use the current point
+/// value of their feed.
+#[inline]
+#[must_use]
+pub(crate) fn stop_trigger_band<I, const D: u8>(
+    market_state: &MarketState<I, D>,
+    mark_method: MarkMethod,
+    price_type: TriggerPriceType,
+    side: Side,
+    trade_range: Option<(QuoteCurrency<I, D>, QuoteCurrency<I, D>)>,
+) -> Option<(QuoteCurrency<I, D>, QuoteCurrency<I, D>)>
+where
+    I: Mon<D>,
+{
+    if price_type == TriggerPriceType::Last
+        && let Some((low, high)) = trade_range
+    {
+        assert!(low <= high, "candle range must be ordered");
+        assert!(low > QuoteCurrency::zero(), "candle low must be positive");
+        return Some((low, high));
+    }
+    let p = stop_reference_price(market_state, mark_method, price_type, side)?;
+    assert!(p > QuoteCurrency::zero());
+    Some((p, p))
+}
+
+/// Whether a stop of `price_type` elected during an update with `trade_range` was elected
+/// by an intrabar trade (so it fills at the worse of its stop price and the closing quote)
+/// rather than by a point price.
+#[inline]
+#[must_use]
+pub(crate) fn elected_intrabar<I, const D: u8>(
+    price_type: TriggerPriceType,
+    trade_range: Option<(QuoteCurrency<I, D>, QuoteCurrency<I, D>)>,
+) -> bool
+where
+    I: Mon<D>,
+{
+    trade_range.is_some() && price_type == TriggerPriceType::Last
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,6 +278,83 @@ mod tests {
         Bba,
         PriceFilter,
     };
+
+    fn quoted_market(bid: i64, ask: i64) -> MarketState<i64, 5> {
+        let mut ms = MarketState::<i64, 5>::default();
+        ms.update_state::<_, BaseCurrency<i64, 5>>(
+            &Bba {
+                bid: QuoteCurrency::new(bid, 0),
+                ask: QuoteCurrency::new(ask, 0),
+                timestamp_exchange_ns: 1.into(),
+            },
+            &PriceFilter::default(),
+        );
+        ms
+    }
+
+    #[test]
+    fn stop_trigger_band_uses_the_trade_range_only_for_last_stops() {
+        let mut ms = quoted_market(98, 100);
+        ms.set_fair_price(Some(QuoteCurrency::new(105, 0)));
+        let range = Some((QuoteCurrency::new(80, 0), QuoteCurrency::new(120, 0)));
+        let point = |p: i64| Some((QuoteCurrency::new(p, 0), QuoteCurrency::new(p, 0)));
+
+        let band = |m, t, s| stop_trigger_band(&ms, m, t, s, range);
+        assert_eq!(
+            band(MarkMethod::BidAsk, TriggerPriceType::Last, Side::Sell),
+            range
+        );
+        assert_eq!(
+            band(MarkMethod::FairPrice, TriggerPriceType::Mark, Side::Sell),
+            point(105)
+        );
+        assert_eq!(
+            band(MarkMethod::MidPrice, TriggerPriceType::Mark, Side::Buy),
+            point(99)
+        );
+        assert_eq!(
+            band(
+                MarkMethod::FairPrice,
+                TriggerPriceType::BestBidAsk,
+                Side::Sell
+            ),
+            point(98)
+        );
+        assert_eq!(
+            band(
+                MarkMethod::FairPrice,
+                TriggerPriceType::BestBidAsk,
+                Side::Buy
+            ),
+            point(100)
+        );
+        // Without a candle range a `Last` stop falls back to the mid price.
+        assert_eq!(
+            stop_trigger_band(
+                &ms,
+                MarkMethod::BidAsk,
+                TriggerPriceType::Last,
+                Side::Sell,
+                None
+            ),
+            point(99)
+        );
+        // No quotes yet: no reference price, so nothing can be elected.
+        assert_eq!(
+            stop_trigger_band(
+                &MarketState::<i64, 5>::default(),
+                MarkMethod::BidAsk,
+                TriggerPriceType::BestBidAsk,
+                Side::Sell,
+                range
+            ),
+            None
+        );
+        assert!(elected_intrabar(TriggerPriceType::Last, range));
+        assert!(!elected_intrabar(TriggerPriceType::Mark, range));
+        assert!(!elected_intrabar(TriggerPriceType::BestBidAsk, range));
+        assert!(!elected_intrabar::<i64, 5>(TriggerPriceType::Last, None));
+    }
 
     #[test]
     fn capped_clearance_fee_never_exceeds_the_equity_left() {
