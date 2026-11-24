@@ -1255,14 +1255,16 @@ where
     }
 
     /// Checks for the execution of active limit orders in the account.
+    ///
+    /// The resulting events are appended to [`Exchange::limit_order_events`] without
+    /// clearing it first: `update_state` clears the buffer once per update, so events
+    /// emitted earlier in the same update (e.g. forced cancels caused by elected stops)
+    /// survive. Direct callers must clear the buffer themselves if they need that.
     /// NOTE: only public for benchmarking purposes.
     pub fn check_active_orders<U>(&mut self, mut market_update: U)
     where
         U: MarketUpdate<I, D, BaseOrQuote>,
     {
-        // Clear any potential order events from the previous iteration.
-        self.limit_order_events.clear();
-
         if !U::CAN_FILL_LIMIT_ORDERS {
             return;
         }
@@ -1523,6 +1525,18 @@ where
             let (stop, trigger_price) = self.elected_stops_scratch[i];
             self.execute_elected_stop(stop, trigger_price, candle_range.is_some());
             if self.liquidated_during_fills {
+                core::hint::cold_path();
+                // The remaining elected stops were already removed from `pending_stops`,
+                // so the liquidation's own stop cancellation does not see them. Report
+                // them here, otherwise the user never learns their fate.
+                for j in (i + 1)..n_elected {
+                    let (left, _) = self.elected_stops_scratch[j];
+                    self.push_stop_event(StopOrderEvent::Cancelled {
+                        stop_order_id: left.id(),
+                        user_order_id: left.user_order_id(),
+                        reason: StopCancelReason::ForcedCancel,
+                    });
+                }
                 break;
             }
         }
@@ -1700,9 +1714,16 @@ where
             Ok(LimitOrderSubmission::ImmediatelyFilled {
                 filled_order,
                 fee,
+                forced_cancels,
                 solvency,
-                ..
             }) => {
+                // Orders the venue cancelled while settling the child fill must reach the
+                // event stream like any other forced cancel of this update.
+                for cancelled in forced_cancels {
+                    self.limit_order_events
+                        .push_within_capacity(LimitOrderEvent::ForcedCancel(cancelled))
+                        .expect(EXPECT_CAPACITY);
+                }
                 self.push_stop_event(StopOrderEvent::Filled {
                     stop_order_id: stop.id(),
                     user_order_id: stop.user_order_id(),
