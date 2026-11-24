@@ -461,3 +461,222 @@ fn portfolio_resting_reduce_only_orders_are_capped_by_position_in_total() {
         BaseCurrency::new(3, 0)
     );
 }
+
+fn crossing_gtc_buy(
+    qty: i64,
+) -> LimitOrder<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId, NewOrder> {
+    LimitOrder::new(
+        Side::Buy,
+        QuoteCurrency::new(105, 0),
+        BaseCurrency::new(qty, 0),
+    )
+    .unwrap()
+    .with_time_in_force(TimeInForce::GoodTilCancelled)
+}
+
+fn bba_exchange() -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+    let mut ex = mock_exchange_linear();
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(100, 0),
+        ask: QuoteCurrency::new(101, 0),
+        timestamp_exchange_ns: 1.into(),
+    })
+    .unwrap();
+    ex
+}
+
+#[test]
+fn legacy_submit_limit_order_rejects_marketable_orders_without_trading() {
+    let mut ex = bba_exchange();
+    let balances_before = ex.account().balances().clone();
+    let marketable_orders = [
+        crossing_gtc_buy(2),
+        crossing_gtc_buy(2).with_time_in_force(TimeInForce::ImmediateOrCancel),
+        crossing_gtc_buy(2).with_time_in_force(TimeInForce::FillOrKill),
+        crossing_gtc_buy(2)
+            .with_time_in_force(TimeInForce::GoodTilCrossing)
+            .with_re_pricing(RePricing::Marketable),
+    ];
+    for order in marketable_orders {
+        assert_eq!(
+            ex.submit_limit_order(order).unwrap_err(),
+            SubmitLimitOrderError::WouldExecuteImmediately
+        );
+    }
+    assert_eq!(ex.account().balances(), &balances_before);
+    assert!(ex.account().position().quantity().is_zero());
+    assert!(ex.account().active_limit_orders().is_empty());
+
+    // Crossing post-only keeps its dedicated rejection, passive orders still rest.
+    assert!(matches!(
+        ex.submit_limit_order(crossing_gtc_buy(2).with_time_in_force(TimeInForce::GoodTilCrossing)),
+        Err(SubmitLimitOrderError::GoodTillCrossingRejectedOrder { .. })
+    ));
+    let passive = ex
+        .submit_limit_order(
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(99, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap()
+            .with_time_in_force(TimeInForce::GoodTilCancelled),
+        )
+        .unwrap();
+    assert_eq!(passive.remaining_quantity(), BaseCurrency::new(2, 0));
+
+    // The execution API fills the same order and reports fee and solvency.
+    match ex
+        .submit_limit_order_with_execution(crossing_gtc_buy(2))
+        .unwrap()
+    {
+        LimitOrderSubmission::ImmediatelyFilled { fee, solvency, .. } => {
+            assert!(fee > QuoteCurrency::zero());
+            assert_eq!(solvency, Solvency::Solvent);
+        }
+        other => panic!("expected an immediate fill, got {other:?}"),
+    }
+    assert_eq!(ex.account().position().quantity(), BaseCurrency::new(2, 0));
+}
+
+#[test]
+fn amend_to_crossing_price_is_rejected_and_keeps_original_order() {
+    let mut ex = bba_exchange();
+    let original = ex
+        .submit_limit_order(
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(99, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap()
+            .with_time_in_force(TimeInForce::GoodTilCancelled),
+        )
+        .unwrap();
+    let balances_before = ex.account().balances().clone();
+
+    assert_eq!(
+        ex.amend_limit_order(original.id(), crossing_gtc_buy(3))
+            .unwrap_err(),
+        AmendLimitOrderError::SubmitLimitOrder(SubmitLimitOrderError::WouldExecuteImmediately)
+    );
+    assert!(ex.account().position().quantity().is_zero());
+    assert_eq!(ex.account().balances(), &balances_before);
+    assert_eq!(
+        ex.account()
+            .active_limit_orders()
+            .get_by_id(original.id(), Side::Buy),
+        Some(&original)
+    );
+}
+
+#[test]
+fn failed_amend_restores_original_order() {
+    let mut ex = bba_exchange();
+    let original = ex
+        .submit_limit_order(
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(99, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    // Far more than the 1000 quote wallet can collateralize at 1x leverage.
+    let too_large = LimitOrder::new(
+        Side::Buy,
+        QuoteCurrency::new(99, 0),
+        BaseCurrency::new(50, 0),
+    )
+    .unwrap();
+    assert!(matches!(
+        ex.amend_limit_order(original.id(), too_large).unwrap_err(),
+        AmendLimitOrderError::SubmitLimitOrder(SubmitLimitOrderError::NotEnoughAvailableBalance(_))
+    ));
+    assert_eq!(ex.account().active_limit_orders().len(), 1);
+    assert_eq!(
+        ex.account()
+            .active_limit_orders()
+            .get_by_id(original.id(), Side::Buy),
+        Some(&original)
+    );
+}
+
+#[test]
+fn portfolio_legacy_limit_apis_reject_marketable_orders_without_trading() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![MarketConfig::new(
+            NonZeroU16::new(10).expect(EXPECT_NON_ZERO),
+            mock_exchange_linear().config().contract_spec().clone(),
+            OrderRateLimits::default(),
+        )],
+    )
+    .unwrap();
+    let mut pf =
+        PortfolioExchange::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>::new(cfg);
+    let m = MarketId::new(0);
+    pf.update_market(
+        m,
+        &Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 1.into(),
+        },
+    )
+    .unwrap();
+    let balances_before = pf.balances().clone();
+
+    assert!(matches!(
+        pf.submit_limit_order(m, crossing_gtc_buy(2)).unwrap_err(),
+        PortfolioError::SubmitLimitOrder(SubmitLimitOrderError::WouldExecuteImmediately)
+    ));
+    assert_eq!(pf.balances(), &balances_before);
+    assert!(pf.market(m).unwrap().position.quantity().is_zero());
+
+    let original = pf
+        .submit_limit_order(
+            m,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(99, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    assert!(matches!(
+        pf.amend_limit_order(m, original.id(), crossing_gtc_buy(3))
+            .unwrap_err(),
+        PortfolioError::AmendLimitOrder(AmendLimitOrderError::SubmitLimitOrder(
+            SubmitLimitOrderError::WouldExecuteImmediately
+        ))
+    ));
+    let too_large = LimitOrder::new(
+        Side::Buy,
+        QuoteCurrency::new(99, 0),
+        BaseCurrency::new(50, 0),
+    )
+    .unwrap();
+    assert!(pf.amend_limit_order(m, original.id(), too_large).is_err());
+    assert!(pf.market(m).unwrap().position.quantity().is_zero());
+    assert_eq!(pf.balances(), &balances_before);
+    assert_eq!(
+        pf.market(m)
+            .unwrap()
+            .active_limit_orders
+            .get_by_id(original.id(), Side::Buy),
+        Some(&original)
+    );
+
+    assert!(matches!(
+        pf.submit_limit_order_with_execution(m, crossing_gtc_buy(2))
+            .unwrap(),
+        LimitOrderSubmission::ImmediatelyFilled { .. }
+    ));
+    assert_eq!(
+        pf.market(m).unwrap().position.quantity(),
+        BaseCurrency::new(2, 0)
+    );
+}
