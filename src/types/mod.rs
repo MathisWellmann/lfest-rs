@@ -15,6 +15,7 @@ mod re_pricing;
 mod side;
 mod smol_currency;
 mod solvency;
+mod time_in_force;
 mod timestamp_ns;
 
 pub use errors::*;
@@ -56,6 +57,7 @@ pub use smol_currency::{
     QuoteCurrency,
 };
 pub use solvency::Solvency;
+pub use time_in_force::TimeInForce;
 pub(crate) use timestamp_ns::NANOS_PER_SECOND;
 pub use timestamp_ns::TimestampNs;
 

@@ -43,6 +43,12 @@ pub enum SubmitLimitOrderError {
 
     #[error(transparent)]
     ValidateOrderNotional(#[from] ValidateOrderNotionalError),
+
+    #[error("Reduce-only order rejected: no opposite open position to reduce")]
+    ReduceOnlyRejected,
+
+    #[error("Immediate-or-cancel or fill-or-kill order did not cross the spread")]
+    ImmediateExecutionNotMarketable,
 }
 
 #[derive(Error, Debug, Clone, Eq, PartialEq)]

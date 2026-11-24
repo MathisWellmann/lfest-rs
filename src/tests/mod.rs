@@ -3,6 +3,7 @@ mod cancel_limit_order;
 mod cross_margin;
 mod funding;
 mod mark_price_and_filters;
+mod order_flags_and_tif;
 mod partial_order_fill;
 mod portfolio;
 mod reduce_position_order_margin;
