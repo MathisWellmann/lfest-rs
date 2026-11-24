@@ -288,6 +288,16 @@ where
         self.active_limit_orders.cancel_all(side)
     }
 
+    /// Cancel the resting `reduce_only` orders which no longer fit within the open
+    /// position, see [`ActiveLimitOrders::cancel_excess_reduce_only`].
+    pub(crate) fn cancel_excess_reduce_only_orders<F>(&mut self, on_cancel: F)
+    where
+        F: FnMut(LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>),
+    {
+        self.active_limit_orders
+            .cancel_excess_reduce_only(self.position.quantity(), on_cancel);
+    }
+
     /// Remove a limit order.
     #[allow(clippy::complexity, reason = "How is this hard to read?")]
     #[inline(always)]

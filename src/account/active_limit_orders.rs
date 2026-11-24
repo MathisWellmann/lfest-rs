@@ -308,6 +308,50 @@ where
         }
     }
 
+    /// Number of resting `reduce_only` orders on both sides.
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn num_reduce_only(&self) -> usize {
+        self.bids.num_reduce_only() + self.asks.num_reduce_only()
+    }
+
+    /// Sum of the remaining quantity of the resting `reduce_only` orders on `side`.
+    #[inline]
+    #[must_use]
+    pub(crate) fn reduce_only_remaining(&self, side: Side) -> BaseOrQuote {
+        match side {
+            Buy => self.bids.reduce_only_remaining(),
+            Sell => self.asks.reduce_only_remaining(),
+        }
+    }
+
+    /// Keep the resting `reduce_only` orders within the open position: on the side that
+    /// reduces `position_qty`, their total remaining quantity may not exceed
+    /// `|position_qty|`; on the other side none may rest. Excess orders are removed
+    /// (furthest from the touch first, see [`SortedOrders::cancel_reduce_only_beyond`])
+    /// and passed to `on_cancel`. Must run after every position change so a resting
+    /// reduce-only order can never increase or flip the position.
+    pub(crate) fn cancel_excess_reduce_only<F>(
+        &mut self,
+        position_qty: BaseOrQuote,
+        mut on_cancel: F,
+    ) where
+        F: FnMut(LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>),
+    {
+        if self.num_reduce_only() == 0 {
+            return;
+        }
+        let (bid_cap, ask_cap) = if position_qty.is_negative() {
+            (position_qty.abs(), BaseOrQuote::zero())
+        } else {
+            (BaseOrQuote::zero(), position_qty)
+        };
+        self.bids.cancel_reduce_only_beyond(bid_cap, &mut on_cancel);
+        self.asks.cancel_reduce_only_beyond(ask_cap, &mut on_cancel);
+        assert2::debug_assert!(self.bids.reduce_only_remaining() <= bid_cap);
+        assert2::debug_assert!(self.asks.reduce_only_remaining() <= ask_cap);
+    }
+
     /// fill an existing limit order, reduces order margin.
     #[inline]
     pub(crate) fn fill_best(

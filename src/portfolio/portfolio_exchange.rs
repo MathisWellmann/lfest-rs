@@ -981,6 +981,22 @@ where
             return Err(SubmitLimitOrderError::ImmediateExecutionNotMarketable.into());
         }
 
+        if order.reduce_only() {
+            // Resting reduce-only orders on one side may jointly never exceed the
+            // position; clamp the new one to the room the existing ones leave.
+            let slot = &self.markets[idx];
+            let resting = slot.active_limit_orders.reduce_only_remaining(order.side());
+            // The reduce-only check above guarantees the position is on the opposite side.
+            let room = slot.position.quantity().abs() - resting;
+            if room <= BaseOrQuote::zero() {
+                return Err(SubmitLimitOrderError::ReduceOnlyRejected.into());
+            }
+            if room < order.remaining_quantity() {
+                order.set_remaining_quantity(room);
+            }
+            assert2::debug_assert!(order.remaining_quantity() <= room);
+        }
+
         let meta = ExchangeOrderMeta::new(self.next_order_id(), ts_ns);
         let pending = order.into_pending(meta);
         self.check_portfolio_limit_order(idx, &pending)
@@ -1301,6 +1317,16 @@ where
         ts_ns: TimestampNs,
     ) -> bool {
         let side = order.side();
+        // Defence in depth: `reconcile_portfolio_margin` keeps resting reduce-only orders
+        // within the position, but a fill must never increase or flip it anyway.
+        let filled_quantity = if order.reduce_only() {
+            self.markets[idx]
+                .clamp_reduce_only_quantity(side, filled_quantity)
+                .expect("resting reduce-only orders are pruned after every position change")
+        } else {
+            filled_quantity
+        };
+        assert2::debug_assert!(filled_quantity > BaseOrQuote::zero());
         let limit_price = order.limit_price();
         let market_id = self.markets[idx].market_id;
         debug!(
@@ -1458,6 +1484,7 @@ where
             self.force_liquidate_portfolio();
             true
         } else {
+            self.prune_stale_reduce_only_orders();
             false
         };
 
@@ -1499,6 +1526,24 @@ where
             Solvency::InitialMarginDeficit
         } else {
             Solvency::Solvent
+        }
+    }
+
+    /// Force-cancel resting `reduce_only` limit orders which no longer fit within their
+    /// market's open position, see `ActiveLimitOrders::cancel_excess_reduce_only`.
+    /// Costs one branch per market without resting reduce-only orders.
+    fn prune_stale_reduce_only_orders(&mut self) {
+        let scratch = &mut self.forced_cancel_scratch;
+        for slot in &mut self.markets {
+            let market_id = slot.market_id;
+            slot.active_limit_orders.cancel_excess_reduce_only(
+                slot.position.quantity(),
+                |cancelled| {
+                    scratch
+                        .push_within_capacity((market_id, cancelled))
+                        .expect(EXPECT_CAPACITY);
+                },
+            );
         }
     }
 
