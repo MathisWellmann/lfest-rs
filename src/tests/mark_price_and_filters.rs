@@ -426,10 +426,31 @@ fn portfolio_liquidation_clearance_fee_is_capped_at_the_equity_left() {
     assert_eq!(pf.balances().total_fees_paid(), QuoteCurrency::new(10, 0));
 }
 
+/// Slippage fills snap to the tick grid, so the slippage tests use a tick of 0.01 to
+/// see the unsnapped 1% impact.
+fn cent_tick_spec() -> ContractSpecification<i64, DECIMALS, BaseCurrency<i64, DECIMALS>> {
+    ContractSpecification::new(
+        leverage!(1),
+        Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+        PriceFilter::new(
+            None,
+            None,
+            QuoteCurrency::new(1, 2),
+            Decimal::TWO,
+            Decimal::zero(),
+        )
+        .expect("valid price filter"),
+        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
+        Fee::from(Decimal::zero()),
+        Fee::from(Decimal::zero()),
+    )
+    .expect(EXPECT_CONTRACT_SPEC)
+}
+
 fn slippage_exchange(
     notional_filter: NotionalFilter<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>,
 ) -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
-    let spec = mark_price_spec()
+    let spec = cent_tick_spec()
         .with_slippage_model(
             SlippageModel::fixed_rate(Decimal::try_from_scaled(1, 2).expect(EXPECT_DECIMAL))
                 .unwrap(),
@@ -526,7 +547,7 @@ fn marketable_limit_notional_filter_uses_the_fill_price() {
 
 #[test]
 fn portfolio_marketable_limit_fill_applies_slippage_and_validates_fill_notional() {
-    let spec = mark_price_spec()
+    let spec = cent_tick_spec()
         .with_slippage_model(
             SlippageModel::fixed_rate(Decimal::try_from_scaled(1, 2).expect(EXPECT_DECIMAL))
                 .unwrap(),
@@ -685,4 +706,44 @@ fn portfolio_notional_filter_only_exempts_reduce_only_from_min() {
     pf.submit_market_order(m, sell(BaseCurrency::new(3, 1), true))
         .unwrap();
     assert!(pf.market(m).unwrap().position.quantity().is_zero());
+}
+
+#[test]
+fn market_order_slippage_fill_snaps_to_the_tick_away_from_the_trader() {
+    // Tick 1: ask 101 + 1% = 102.01 -> 103, bid 100 - 1.5% = 98.5 -> 98.
+    let spec = mark_price_spec().with_slippage_model(
+        SlippageModel::fixed_rate(Decimal::try_from_scaled(1, 2).expect(EXPECT_DECIMAL)).unwrap(),
+    );
+    let mut ex = build_linear_exchange(spec, QuoteCurrency::new(1000, 0));
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(100, 0),
+        ask: QuoteCurrency::new(101, 0),
+        timestamp_exchange_ns: 1.into(),
+    })
+    .unwrap();
+    let buy = ex
+        .submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap())
+        .unwrap();
+    assert_eq!(
+        buy.filled_order.state().avg_fill_price(),
+        QuoteCurrency::new(103, 0)
+    );
+
+    let spec = mark_price_spec().with_slippage_model(
+        SlippageModel::fixed_rate(Decimal::try_from_scaled(15, 3).expect(EXPECT_DECIMAL)).unwrap(),
+    );
+    let mut ex = build_linear_exchange(spec, QuoteCurrency::new(1000, 0));
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(100, 0),
+        ask: QuoteCurrency::new(101, 0),
+        timestamp_exchange_ns: 1.into(),
+    })
+    .unwrap();
+    let sell = ex
+        .submit_market_order(MarketOrder::new(Side::Sell, BaseCurrency::new(1, 0)).unwrap())
+        .unwrap();
+    assert_eq!(
+        sell.filled_order.state().avg_fill_price(),
+        QuoteCurrency::new(98, 0)
+    );
 }
