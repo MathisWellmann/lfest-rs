@@ -12,8 +12,18 @@
 //!    The risk engine enforces position limits on each futures contract to prevent excessive speculation and manipulation of prices.
 //!    Position limits are set by the exchange and restrict the maximum number of contracts that any trader can hold for a particular futures contract.
 
+mod cross_margin;
 mod isolated_margin;
+mod margin_tiers;
 mod risk_engine_trait;
 
+pub use cross_margin::{
+    CrossMarginRiskEngine,
+    MarginMode,
+};
 pub(crate) use isolated_margin::IsolatedMarginRiskEngine;
+pub use margin_tiers::{
+    MaintenanceMarginSchedule,
+    MaintenanceMarginTier,
+};
 pub(crate) use risk_engine_trait::RiskEngine;

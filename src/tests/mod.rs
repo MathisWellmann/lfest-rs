@@ -1,5 +1,6 @@
 mod amend;
 mod cancel_limit_order;
+mod cross_margin;
 mod funding;
 mod mark_price_and_filters;
 mod partial_order_fill;

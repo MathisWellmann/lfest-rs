@@ -28,7 +28,9 @@ use crate::{
         RePricing,
     },
     risk_engine::{
+        CrossMarginRiskEngine,
         IsolatedMarginRiskEngine,
+        MarginMode,
         RiskEngine,
     },
     types::{
@@ -127,6 +129,8 @@ where
 
     risk_engine: IsolatedMarginRiskEngine<I, D, BaseOrQuote>,
 
+    cross_risk_engine: CrossMarginRiskEngine<I, D, BaseOrQuote>,
+
     next_order_id: OrderId,
 
     /// The account contains the position and balance.
@@ -172,6 +176,7 @@ where
     pub fn new(config: Config<I, D, BaseOrQuote::PairedCurrency>) -> Self {
         let market_state = MarketState::default();
         let risk_engine = IsolatedMarginRiskEngine::new(config.contract_spec().clone());
+        let cross_risk_engine = CrossMarginRiskEngine::new(config.contract_spec().clone());
 
         let max_active_orders = config.max_num_open_orders();
         let order_rate_limiter =
@@ -183,6 +188,7 @@ where
             config,
             market_state,
             risk_engine,
+            cross_risk_engine,
             next_order_id: OrderId::default(),
             account: Account::new(balances, max_active_orders, init_margin_req, maker_fee),
             // Bids and asks each have a capacity of `max_active_orders`, so one update
@@ -221,16 +227,22 @@ where
         self.market_state
             .update_state(market_update, self.config.contract_spec().price_filter());
 
-        if let Err(e) = <IsolatedMarginRiskEngine<I, D, BaseOrQuote> as RiskEngine<
-            I,
-            D,
-            BaseOrQuote,
-            UserOrderIdT,
-        >>::check_maintenance_margin(
-            &self.risk_engine,
-            &self.market_state,
-            self.account.position(),
-        ) {
+        let mm_check = match self.config.margin_mode() {
+            MarginMode::Isolated => <IsolatedMarginRiskEngine<I, D, BaseOrQuote> as RiskEngine<
+                I,
+                D,
+                BaseOrQuote,
+                UserOrderIdT,
+            >>::check_maintenance_margin(
+                &self.risk_engine,
+                &self.market_state,
+                self.account.position(),
+            ),
+            MarginMode::Cross => self
+                .cross_risk_engine
+                .check_mark_to_market_maintenance_margin(&self.market_state, &self.account),
+        };
+        if let Err(e) = mm_check {
             core::hint::cold_path();
             self.force_liquidate();
             self.drain_forced_cancels_into_events();
@@ -326,11 +338,38 @@ where
     /// or the event stream).
     #[must_use]
     fn reconcile_margin(&mut self, bad_debt_before: BaseOrQuote::PairedCurrency) -> Solvency {
-        let maintenance_margin_req = self.config.contract_spec().maintenance_margin();
-        let liquidated = if !self.account.position().quantity().is_zero()
-            && self.account.balances().equity()
-                < self.account.position().notional() * maintenance_margin_req
-        {
+        let should_liquidate = match self.config.margin_mode() {
+            MarginMode::Isolated => {
+                let maintenance_margin_req = self.config.contract_spec().maintenance_margin();
+                !self.account.position().quantity().is_zero()
+                    && self.account.balances().equity()
+                        < self.account.position().notional() * maintenance_margin_req
+            }
+            MarginMode::Cross => {
+                if self.account.position().quantity().is_zero() {
+                    false
+                } else {
+                    let has_positive_quotes = self.market_state.bid() > QuoteCurrency::zero()
+                        && self.market_state.ask() > QuoteCurrency::zero();
+                    if has_positive_quotes {
+                        self.cross_risk_engine
+                            .check_mark_to_market_maintenance_margin(
+                                &self.market_state,
+                                &self.account,
+                            )
+                            .is_err()
+                    } else {
+                        let mm = self
+                            .config
+                            .contract_spec()
+                            .maintenance_margin_schedule()
+                            .maintenance_margin(self.account.position().notional());
+                        self.account.balances().equity() < mm
+                    }
+                }
+            }
+        };
+        let liquidated = if should_liquidate {
             core::hint::cold_path();
             self.force_liquidate();
             true
@@ -338,7 +377,29 @@ where
             false
         };
 
-        while self.account.margin_excess() < Zero::zero() {
+        let effective_excess =
+            |account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
+             market_state: &MarketState<I, D>,
+             config: &Config<I, D, BaseOrQuote::PairedCurrency>| {
+                match config.margin_mode() {
+                    MarginMode::Isolated => account.margin_excess(),
+                    MarginMode::Cross => {
+                        let has_positive_quotes = market_state.bid() > QuoteCurrency::zero()
+                            && market_state.ask() > QuoteCurrency::zero();
+                        let upnl = if has_positive_quotes {
+                            account.position().unrealized_pnl_marked(
+                                market_state,
+                                config.contract_spec().mark_method(),
+                            )
+                        } else {
+                            Zero::zero()
+                        };
+                        account.margin_excess() + upnl
+                    }
+                }
+            };
+
+        while effective_excess(&self.account, &self.market_state, &self.config) < Zero::zero() {
             core::hint::cold_path();
             let Some(victim_id) = self.account.largest_collateral_contributor() else {
                 // No resting orders remain; the equity is below the position's initial
@@ -366,7 +427,7 @@ where
         } else if liquidated {
             core::hint::cold_path();
             Solvency::Liquidated
-        } else if self.account.margin_excess() < Zero::zero() {
+        } else if effective_excess(&self.account, &self.market_state, &self.config) < Zero::zero() {
             core::hint::cold_path();
             Solvency::InitialMarginDeficit
         } else {
@@ -495,8 +556,18 @@ where
                 .notional_filter()
                 .validate_order_notional(notional)?;
         }
-        self.risk_engine
-            .check_market_order(&self.account, &order, fill_price)?;
+        match self.config.margin_mode() {
+            MarginMode::Isolated => {
+                self.risk_engine
+                    .check_market_order(&self.account, &order, fill_price)?
+            }
+            MarginMode::Cross => self.cross_risk_engine.check_market_order_with_market(
+                &self.account,
+                &self.market_state,
+                &order,
+                fill_price,
+            )?,
+        }
 
         let filled_order = order.into_filled(fill_price, self.market_state.current_timestamp_ns());
         let (forced_cancels, solvency) = self.settle_filled_market_order(filled_order.clone());
@@ -551,6 +622,48 @@ where
             &self.market_state,
             self.config.contract_spec().mark_method(),
         )
+    }
+
+    /// Return live mark-to-market account equity (`wallet_equity + unrealized_pnl`).
+    #[inline]
+    #[must_use]
+    pub fn mark_to_market_equity(&self) -> BaseOrQuote::PairedCurrency {
+        self.account.balances().equity() + self.unrealized_pnl()
+    }
+
+    /// Estimate the liquidation price of the current position.
+    ///
+    /// - Under [`MarginMode::Isolated`], returns the static entry-price liquidation
+    ///   threshold derived from `contract_spec.maintenance_margin()`.
+    /// - Under [`MarginMode::Cross`], returns the dynamic liquidation price accounting
+    ///   for actual wallet equity and the active [`crate::prelude::MaintenanceMarginSchedule`]
+    ///   bracket (`None` if the position is fully collateralized or neutral).
+    #[must_use]
+    pub fn estimated_liquidation_price(&self) -> Option<QuoteCurrency<I, D>> {
+        let pos = self.account.position();
+        if pos.quantity().is_zero() {
+            return None;
+        }
+        match self.config.margin_mode() {
+            MarginMode::Isolated => {
+                let mm = self.config.contract_spec().maintenance_margin();
+                let liq = if pos.is_long() {
+                    pos.entry_price().liquidation_price_long(mm)
+                } else {
+                    pos.entry_price().liquidation_price_short(mm)
+                };
+                if liq > QuoteCurrency::zero() {
+                    Some(liq)
+                } else {
+                    None
+                }
+            }
+            MarginMode::Cross => self.cross_risk_engine.estimated_liquidation_price(
+                self.account.balances().equity(),
+                pos,
+                self.mark_price(),
+            ),
+        }
     }
 
     /// Return `true` when an order of `(side, quantity)` strictly reduces or closes
@@ -617,7 +730,14 @@ where
         );
         let order = order.into_pending(meta);
 
-        self.risk_engine.check_limit_order(&self.account, &order)?;
+        match self.config.margin_mode() {
+            MarginMode::Isolated => self.risk_engine.check_limit_order(&self.account, &order)?,
+            MarginMode::Cross => self.cross_risk_engine.check_limit_order_with_market(
+                &self.account,
+                &self.market_state,
+                &order,
+            )?,
+        }
 
         // If a limit order is marketable, it will take liquidity from the book at the `limit_price` price level and pay the taker fee,
         let marketable = match order.side() {
