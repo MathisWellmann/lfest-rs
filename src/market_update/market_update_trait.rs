@@ -51,4 +51,16 @@ where
 
     /// The nanosecond timestamp when the market update occurred at the exchange.
     fn timestamp_exchange_ns(&self) -> TimestampNs;
+
+    /// Optional intrabar `(low, high)` price range for range-based updates (`Candle`, `SmartCandle`).
+    /// Point updates (`Bba`, `Trade`, `MarkPriceUpdate`) return `None`.
+    #[inline(always)]
+    fn price_range(
+        &self,
+    ) -> Option<(
+        crate::types::QuoteCurrency<I, D>,
+        crate::types::QuoteCurrency<I, D>,
+    )> {
+        None
+    }
 }

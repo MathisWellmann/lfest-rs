@@ -46,6 +46,21 @@ where
     pub event: LimitOrderEvent<I, D, BaseOrQuote, UserOrderIdT>,
 }
 
+/// A stop order event tagged with the [`MarketId`] on which it occurred.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PortfolioStopEvent<I, const D: u8, BaseOrQuote, UserOrderIdT>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    /// The market where this stop event occurred.
+    pub market_id: MarketId,
+    /// The stop execution / placement / cancellation event.
+    pub event: crate::stop_orders::StopOrderEvent<I, D, BaseOrQuote, UserOrderIdT>,
+}
+
 /// A pending limit order alias used across portfolio APIs.
 pub type PendingLimitOrder<I, const D: u8, BaseOrQuote, UserOrderIdT> =
     LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>;
@@ -170,4 +185,7 @@ pub enum PortfolioError<UserOrderIdT> {
 
     #[error(transparent)]
     CancelLimitOrder(#[from] CancelLimitOrderError<UserOrderIdT>),
+
+    #[error(transparent)]
+    StopOrder(#[from] crate::stop_orders::StopOrderError),
 }

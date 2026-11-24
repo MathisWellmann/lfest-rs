@@ -16,6 +16,7 @@ mod order_filters;
 pub mod order_rate_limiter;
 mod portfolio;
 mod risk_engine;
+mod stop_orders;
 #[cfg(test)]
 mod tests;
 #[cfg(feature = "trade_aggregation")]
@@ -69,6 +70,7 @@ pub mod prelude {
             MaintenanceMarginTier,
             MarginMode,
         },
+        stop_orders::*,
         types::*,
         utils::{
             NoUserOrderId,

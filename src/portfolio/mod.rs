@@ -22,5 +22,6 @@ pub use portfolio_types::{
     PortfolioFundingSettlement,
     PortfolioMarketOrderSettlement,
     PortfolioOrderEvent,
+    PortfolioStopEvent,
     TaggedForcedCancels,
 };

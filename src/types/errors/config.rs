@@ -42,4 +42,7 @@ pub enum ConfigError {
 
     #[error("The maintenance margin tier configuration is invalid")]
     InvalidMaintenanceMarginTier,
+
+    #[error("The stop protection collar must be strictly positive")]
+    InvalidStopProtection,
 }
