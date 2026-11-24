@@ -315,3 +315,274 @@ fn single_exchange_and_portfolio_mass_cancel_operations() {
     assert_eq!(cancelled[1].0, eth);
     assert!(pf.total_required_collateral().is_zero());
 }
+
+type LinearPortfolio = PortfolioExchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>;
+
+fn bba(bid: i64, ask: i64, ts: i64) -> Bba<i64, DECIMALS> {
+    Bba {
+        bid: QuoteCurrency::new(bid, 0),
+        ask: QuoteCurrency::new(ask, 0),
+        timestamp_exchange_ns: ts.into(),
+    }
+}
+
+/// Wallet 100 at 50x (IM 2%, MM 1%): long 10 `AAA` @ 100 and short 10 `BBB` @ 100,
+/// then `BBB` falls to 79/80 (short uPnL +200) and `AAA` to `aaa_bid`/`aaa_bid + 1`.
+fn hedged_linear_portfolio(aaa_bid: i64) -> (LinearPortfolio, MarketId, MarketId) {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(100, 0),
+        vec![
+            make_linear_market_cfg("AAA", 50),
+            make_linear_market_cfg("BBB", 50),
+        ],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    pf.enable_ledger(64);
+    let (a, b) = (MarketId::new(0), MarketId::new(1));
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.update_market(b, &bba(100, 101, 1)).unwrap();
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap(),
+    )
+    .unwrap();
+    pf.submit_market_order(
+        b,
+        MarketOrder::new(Side::Sell, BaseCurrency::new(10, 0)).unwrap(),
+    )
+    .unwrap();
+    // Move the winner first so no intermediate state is below maintenance margin.
+    pf.update_market(b, &bba(79, 80, 2)).unwrap();
+    pf.update_market(a, &bba(aaa_bid, aaa_bid + 1, 2)).unwrap();
+    (pf, a, b)
+}
+
+#[test]
+fn portfolio_closing_losing_leg_with_profitable_other_leg_is_not_bankrupt() {
+    // AAA uPnL = -150, BBB uPnL = +200, total equity = 150 (healthy).
+    let (mut pf, a, b) = hedged_linear_portfolio(85);
+    assert_eq!(pf.total_equity(), QuoteCurrency::new(150, 0));
+
+    let closed = pf
+        .submit_market_order(
+            a,
+            MarketOrder::new(Side::Sell, BaseCurrency::new(10, 0)).unwrap(),
+        )
+        .unwrap();
+    // The shared wallet carries the realized loss while BBB's profit covers it.
+    assert_eq!(closed.solvency, Solvency::Solvent);
+    assert_eq!(pf.balances().equity(), QuoteCurrency::new(-50, 0));
+    assert!(pf.balances().bad_debt().is_zero());
+    assert_eq!(pf.total_equity(), QuoteCurrency::new(150, 0));
+
+    let closed = pf
+        .submit_market_order(
+            b,
+            MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap(),
+        )
+        .unwrap();
+    assert_eq!(closed.solvency, Solvency::Solvent);
+    assert_eq!(pf.balances().equity(), QuoteCurrency::new(150, 0));
+    assert!(pf.balances().bad_debt().is_zero());
+    assert!(pf.ledger().unwrap().reconciles_to(pf.balances().equity()));
+}
+
+#[test]
+fn portfolio_funding_on_losing_leg_with_profitable_other_leg_books_no_bad_debt() {
+    let (mut pf, a, b) = hedged_linear_portfolio(99);
+    // Long 10 @ mark 100 pays 15% funding = 150 > wallet 100.
+    let rate = FundingRate::from(Decimal::try_from_scaled(15, 2).expect(EXPECT_DECIMAL));
+    let funding = pf
+        .apply_funding(a, rate, QuoteCurrency::new(100, 0))
+        .unwrap();
+    assert_eq!(funding.cashflow, QuoteCurrency::new(-150, 0));
+    assert_eq!(funding.solvency, Solvency::Solvent);
+    assert_eq!(pf.balances().equity(), QuoteCurrency::new(-50, 0));
+    assert_eq!(
+        pf.balances().cumulative_funding(),
+        QuoteCurrency::new(-150, 0)
+    );
+    assert!(pf.balances().bad_debt().is_zero());
+
+    for (m, side) in [(a, Side::Sell), (b, Side::Buy)] {
+        pf.submit_market_order(m, MarketOrder::new(side, BaseCurrency::new(10, 0)).unwrap())
+            .unwrap();
+    }
+    // -50 wallet - 10 (AAA sold @ 99) + 200 (BBB bought back @ 80).
+    assert_eq!(pf.balances().equity(), QuoteCurrency::new(140, 0));
+    assert!(pf.balances().bad_debt().is_zero());
+    assert!(pf.ledger().unwrap().reconciles_to(pf.balances().equity()));
+}
+
+#[test]
+fn portfolio_delist_of_losing_leg_reports_actual_wallet_change() {
+    let (mut pf, a, _) = hedged_linear_portfolio(99);
+    let settlement = pf.delist_market(a, QuoteCurrency::new(85, 0)).unwrap();
+    assert_eq!(settlement.realized_pnl, QuoteCurrency::new(-150, 0));
+    assert_eq!(settlement.solvency, Solvency::Solvent);
+    assert_eq!(pf.balances().equity(), QuoteCurrency::new(-50, 0));
+    assert!(pf.balances().bad_debt().is_zero());
+}
+
+#[test]
+fn portfolio_real_insolvency_still_books_bad_debt() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(100, 0),
+        vec![make_linear_market_cfg("AAA", 50)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    pf.enable_ledger(16);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap(),
+    )
+    .unwrap();
+    // Gap down: closing at 80 loses 200 against a wallet of 100.
+    assert_eq!(
+        pf.update_market(a, &bba(80, 81, 2)),
+        Err(RiskError::Liquidate)
+    );
+    assert!(pf.market(a).unwrap().position.quantity().is_zero());
+    assert!(pf.balances().equity().is_zero());
+    assert_eq!(pf.balances().bad_debt(), QuoteCurrency::new(100, 0));
+    let ledger = pf.ledger().unwrap();
+    assert!(ledger.reconciles_to(pf.balances().equity()));
+    assert_eq!(
+        ledger.entries().last().unwrap().kind(),
+        LedgerEntryKind::BadDebtAbsorption
+    );
+
+    // Closing the last leg at a loss beyond the wallet also books bad debt.
+    let mut pf = LinearPortfolio::new(
+        PortfolioConfig::new(
+            QuoteCurrency::new(100, 0),
+            vec![make_linear_market_cfg("AAA", 50)],
+        )
+        .unwrap(),
+    );
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap(),
+    )
+    .unwrap();
+    let settlement = pf.delist_market(a, QuoteCurrency::new(80, 0)).unwrap();
+    assert_eq!(settlement.realized_pnl, QuoteCurrency::new(-200, 0));
+    assert_eq!(settlement.solvency, Solvency::Bankrupt);
+    assert!(pf.balances().equity().is_zero());
+    assert_eq!(pf.balances().bad_debt(), QuoteCurrency::new(100, 0));
+}
+
+/// Wallet 100 at 10x (IM 10%, MM 5%): long 4 `BTC` @ 100, short 4 `ETH` @ 100, `BTC`
+/// rallies to 140 (+160), then `ETH` gaps to 163 (-252): equity 8 < MM -> liquidation.
+fn liquidate_hedged_portfolio(
+    tickers: [&str; 2],
+) -> Balances<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>> {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(100, 0),
+        tickers
+            .iter()
+            .map(|t| make_linear_market_cfg(t, 10))
+            .collect(),
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let btc = pf.market_id_by_ticker("BTC").unwrap();
+    let eth = pf.market_id_by_ticker("ETH").unwrap();
+    pf.update_market(btc, &bba(99, 100, 1)).unwrap();
+    pf.update_market(eth, &bba(100, 101, 1)).unwrap();
+    pf.submit_market_order(
+        btc,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(4, 0)).unwrap(),
+    )
+    .unwrap();
+    pf.submit_market_order(
+        eth,
+        MarketOrder::new(Side::Sell, BaseCurrency::new(4, 0)).unwrap(),
+    )
+    .unwrap();
+    pf.update_market(btc, &bba(140, 141, 2)).unwrap();
+    assert_eq!(
+        pf.update_market(eth, &bba(162, 163, 2)),
+        Err(RiskError::Liquidate)
+    );
+    assert!(pf.market(btc).unwrap().position.quantity().is_zero());
+    assert!(pf.market(eth).unwrap().position.quantity().is_zero());
+    pf.balances().clone()
+}
+
+#[test]
+fn portfolio_liquidation_outcome_is_independent_of_market_registration_order() {
+    let btc_first = liquidate_hedged_portfolio(["BTC", "ETH"]);
+    let eth_first = liquidate_hedged_portfolio(["ETH", "BTC"]);
+    assert_eq!(btc_first, eth_first);
+    // 100 + 160 - 252: the portfolio was still solvent, so no bad debt.
+    assert_eq!(btc_first.equity(), QuoteCurrency::new(8, 0));
+    assert!(btc_first.bad_debt().is_zero());
+}
+
+#[test]
+fn inverse_portfolio_closing_losing_leg_with_profitable_other_leg_is_not_bankrupt() {
+    let make_cfg = |ticker: &str| {
+        let spec = ContractSpecification::new(
+            Leverage::new(50).unwrap(),
+            Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+            PriceFilter::default(),
+            QuantityFilter::new(None, None, QuoteCurrency::new(1, 0))
+                .expect(EXPECT_QUANTITY_FILTER),
+            Fee::from(Decimal::zero()),
+            Fee::from(Decimal::zero()),
+        )
+        .expect(EXPECT_CONTRACT_SPEC)
+        .with_ticker(ticker);
+        MarketConfig::new(
+            NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+            spec,
+            OrderRateLimits::default(),
+        )
+    };
+    let cfg = PortfolioConfig::new(
+        BaseCurrency::new(1, 0),
+        vec![make_cfg("AAAUSD"), make_cfg("BBBUSD")],
+    )
+    .unwrap();
+    let mut pf =
+        PortfolioExchange::<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>, NoUserOrderId>::new(cfg);
+    let (a, b) = (MarketId::new(0), MarketId::new(1));
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.update_market(b, &bba(100, 101, 1)).unwrap();
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Buy, QuoteCurrency::new(500, 0)).unwrap(),
+    )
+    .unwrap();
+    pf.submit_market_order(
+        b,
+        MarketOrder::new(Side::Sell, QuoteCurrency::new(1000, 0)).unwrap(),
+    )
+    .unwrap();
+    pf.update_market(b, &bba(79, 80, 2)).unwrap();
+    pf.update_market(a, &bba(80, 81, 2)).unwrap();
+
+    // Long 500 USD 100 -> 80 loses 1.25 BTC > wallet 1 BTC; short 1000 USD 100 -> 80 earns 2.5 BTC.
+    let closed = pf
+        .submit_market_order(
+            a,
+            MarketOrder::new(Side::Sell, QuoteCurrency::new(500, 0)).unwrap(),
+        )
+        .unwrap();
+    assert_eq!(closed.solvency, Solvency::Solvent);
+    assert_eq!(pf.balances().equity(), BaseCurrency::new(-25, 2));
+    assert!(pf.balances().bad_debt().is_zero());
+    pf.submit_market_order(
+        b,
+        MarketOrder::new(Side::Buy, QuoteCurrency::new(1000, 0)).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(pf.balances().equity(), BaseCurrency::new(225, 2));
+    assert!(pf.balances().bad_debt().is_zero());
+}

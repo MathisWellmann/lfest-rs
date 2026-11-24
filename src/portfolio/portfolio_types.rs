@@ -122,6 +122,8 @@ where
     /// Signed position quantity that was settled (zero if neutral).
     pub settled_quantity: BaseOrQuote,
     /// Realized PnL credited/debited to the shared wallet (zero if neutral).
+    /// Equals the wallet change of the settlement itself; if it leaves the portfolio
+    /// insolvent, the absorbed bad debt is reported via [`Self::solvency`].
     pub realized_pnl: BaseOrQuote::PairedCurrency,
     /// Every resting limit order on the delisted market that was cancelled.
     pub cancelled_orders:

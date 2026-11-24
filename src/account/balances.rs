@@ -17,6 +17,10 @@ where
     BaseOrQuote: MarginCurrency<I, D>,
 {
     /// The wallet balance that is used to provide margin for positions and orders.
+    ///
+    /// Never negative for a single-market account. The shared wallet of a cross-margin
+    /// `PortfolioExchange` may be temporarily negative while other legs carry enough
+    /// unrealized profit to keep the portfolio solvent.
     #[getset(get_copy = "pub")]
     equity: BaseOrQuote,
 
@@ -38,6 +42,8 @@ where
     /// The cumulative losses which exceeded the account equity and were absorbed by the
     /// venue (insurance fund / auto-deleveraging on a real exchange).
     /// Non-zero bad debt means the account went bankrupt; its equity is floored at zero.
+    /// A cross-margin portfolio books bad debt only once the whole portfolio is insolvent,
+    /// see `Balances::settle_negative_equity`.
     #[getset(get_copy = "pub")]
     #[builder(default)]
     bad_debt: BaseOrQuote,
@@ -135,6 +141,56 @@ where
             self.equity = new_equity;
         }
     }
+
+    /// Apply a realized pnl to a cross-margin shared wallet without the bankruptcy floor.
+    ///
+    /// A loss on one leg may be covered by unrealized profit on other legs, so the wallet
+    /// can go temporarily negative; the portfolio calls `Balances::settle_negative_equity`
+    /// once it is actually insolvent.
+    #[inline(always)]
+    pub(crate) fn apply_shared_wallet_pnl(&mut self, pnl: BaseOrQuote) {
+        trace!("apply_shared_wallet_pnl: {pnl}");
+        self.equity += pnl;
+    }
+
+    /// Charge a fee (negative: rebate) to a cross-margin shared wallet without the
+    /// bankruptcy floor; see `Balances::apply_shared_wallet_pnl`.
+    #[inline(always)]
+    pub(crate) fn account_for_shared_wallet_fee(&mut self, fee: BaseOrQuote) {
+        self.equity -= fee;
+        self.total_fees_paid += fee;
+    }
+
+    /// Apply a signed funding cashflow to a cross-margin shared wallet without the
+    /// bankruptcy floor; see `Balances::apply_shared_wallet_pnl`.
+    #[inline(always)]
+    pub(crate) fn apply_shared_wallet_funding(&mut self, cashflow: BaseOrQuote) {
+        trace!("apply_shared_wallet_funding: {cashflow}");
+        self.equity += cashflow;
+        self.cumulative_funding += cashflow;
+    }
+
+    /// Move a negative wallet balance into [`Balances::bad_debt`] and floor the wallet at
+    /// zero, returning the absorbed amount (zero if the wallet is not negative).
+    ///
+    /// Only call this when the shared wallet is all that is left of the portfolio
+    /// (no open positions), otherwise unrealized profit could still cover the deficit.
+    #[inline]
+    #[must_use]
+    pub(crate) fn settle_negative_equity(&mut self) -> BaseOrQuote {
+        let bad_debt_before = self.bad_debt;
+        if self.equity >= BaseOrQuote::zero() {
+            return BaseOrQuote::zero();
+        }
+        core::hint::cold_path();
+        let absorbed = -self.equity;
+        tracing::warn!("portfolio is bankrupt: the venue absorbs {absorbed} of bad debt");
+        self.bad_debt += absorbed;
+        self.equity = BaseOrQuote::zero();
+        assert2::debug_assert!(absorbed > BaseOrQuote::zero());
+        assert2::debug_assert!(self.bad_debt - bad_debt_before == absorbed);
+        absorbed
+    }
 }
 
 #[cfg(test)]
@@ -194,6 +250,26 @@ mod test {
         assert!(balances.equity().is_zero());
         assert_eq!(balances.bad_debt(), QuoteCurrency::new(1, 0));
         assert_eq!(balances.total_fees_paid(), QuoteCurrency::new(101, 0));
+    }
+
+    #[test]
+    fn shared_wallet_goes_negative_until_settled() {
+        let mut balances = Balances::new(QuoteCurrency::<i64, 5>::new(100, 0));
+        balances.apply_shared_wallet_pnl(QuoteCurrency::new(-150, 0));
+        balances.account_for_shared_wallet_fee(QuoteCurrency::new(5, 0));
+        balances.apply_shared_wallet_funding(QuoteCurrency::new(-5, 0));
+        assert_eq!(balances.equity(), QuoteCurrency::new(-60, 0));
+        assert!(balances.bad_debt().is_zero());
+        assert_eq!(balances.total_fees_paid(), QuoteCurrency::new(5, 0));
+        assert_eq!(balances.cumulative_funding(), QuoteCurrency::new(-5, 0));
+
+        assert_eq!(balances.settle_negative_equity(), QuoteCurrency::new(60, 0));
+        assert!(balances.equity().is_zero());
+        assert_eq!(balances.bad_debt(), QuoteCurrency::new(60, 0));
+        // Settling a non-negative wallet is a no-op.
+        assert!(balances.settle_negative_equity().is_zero());
+        assert_eq!(balances.bad_debt(), QuoteCurrency::new(60, 0));
+        balances.debug_assert_state();
     }
 
     #[test]
