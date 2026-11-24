@@ -680,3 +680,83 @@ fn portfolio_legacy_limit_apis_reject_marketable_orders_without_trading() {
         BaseCurrency::new(2, 0)
     );
 }
+
+fn reduce_only_sell_with_tif(
+    qty: i64,
+    tif: TimeInForce,
+) -> LimitOrder<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId, NewOrder> {
+    // Limit 99 crosses the bid of 100.
+    reduce_only_sell(99, qty).with_time_in_force(tif)
+}
+
+#[test]
+fn fill_or_kill_reduce_only_larger_than_position_is_rejected() {
+    let mut ex = long_10_exchange();
+    let equity = ex.account().balances().equity();
+    assert_eq!(
+        ex.submit_limit_order_with_execution(reduce_only_sell_with_tif(
+            15,
+            TimeInForce::FillOrKill
+        ))
+        .unwrap_err(),
+        SubmitLimitOrderError::FillOrKillNotFullyFillable
+    );
+    assert_eq!(ex.account().position().quantity(), BaseCurrency::new(10, 0));
+    assert_eq!(ex.account().balances().equity(), equity);
+
+    // IOC may fill partially, so it is clamped to the position instead.
+    let sub = ex
+        .submit_limit_order_with_execution(reduce_only_sell_with_tif(
+            15,
+            TimeInForce::ImmediateOrCancel,
+        ))
+        .unwrap();
+    assert!(matches!(
+        sub,
+        LimitOrderSubmission::ImmediatelyFilled { filled_order, .. }
+            if filled_order.total_quantity() == BaseCurrency::new(10, 0)
+    ));
+    assert!(ex.account().position().quantity().is_zero());
+}
+
+#[test]
+fn fill_or_kill_reduce_only_within_position_fills() {
+    let mut ex = long_10_exchange();
+    let sub = ex
+        .submit_limit_order_with_execution(reduce_only_sell_with_tif(10, TimeInForce::FillOrKill))
+        .unwrap();
+    assert!(matches!(
+        sub,
+        LimitOrderSubmission::ImmediatelyFilled { .. }
+    ));
+    assert!(ex.account().position().quantity().is_zero());
+}
+
+#[test]
+fn portfolio_fill_or_kill_reduce_only_larger_than_position_is_rejected() {
+    let mut pf = long_10_portfolio();
+    let m = MarketId::new(0);
+    assert!(matches!(
+        pf.submit_limit_order_with_execution(
+            m,
+            reduce_only_sell_with_tif(15, TimeInForce::FillOrKill)
+        )
+        .unwrap_err(),
+        PortfolioError::SubmitLimitOrder(SubmitLimitOrderError::FillOrKillNotFullyFillable)
+    ));
+    assert_eq!(
+        pf.market(m).unwrap().position.quantity(),
+        BaseCurrency::new(10, 0)
+    );
+    let sub = pf
+        .submit_limit_order_with_execution(
+            m,
+            reduce_only_sell_with_tif(10, TimeInForce::FillOrKill),
+        )
+        .unwrap();
+    assert!(matches!(
+        sub,
+        LimitOrderSubmission::ImmediatelyFilled { .. }
+    ));
+    assert!(pf.market(m).unwrap().position.quantity().is_zero());
+}

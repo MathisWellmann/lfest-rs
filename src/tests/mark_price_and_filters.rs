@@ -299,3 +299,260 @@ fn liquidation_clearance_fee_charged_in_addition_to_taker_fee() {
         QuoteCurrency::new(634, 2)
     );
 }
+
+fn liquidation_fee_spec() -> ContractSpecification<i64, DECIMALS, BaseCurrency<i64, DECIMALS>> {
+    ContractSpecification::new(
+        leverage!(5),
+        Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL), // mm = 10%
+        PriceFilter::default(),
+        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
+        Fee::from(Decimal::zero()),
+        Fee::from(Decimal::try_from_scaled(1, 3).expect(EXPECT_DECIMAL)), // 0.1%
+    )
+    .expect(EXPECT_CONTRACT_SPEC)
+    .with_liquidation_fee(Decimal::try_from_scaled(5, 2).expect(EXPECT_DECIMAL)) // 5%
+    .unwrap()
+}
+
+/// Long 10 @ 100 from a 210 wallet: equity 209 after the 1.0 taker fee.
+fn long_10_liquidation_fee_exchange()
+-> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+    let mut exchange = build_linear_exchange(liquidation_fee_spec(), QuoteCurrency::new(210, 0));
+    exchange
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(99, 0),
+            ask: QuoteCurrency::new(100, 0),
+            timestamp_exchange_ns: 1.into(),
+        })
+        .unwrap();
+    exchange
+        .submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap())
+        .unwrap();
+    assert_eq!(
+        exchange.account().balances().equity(),
+        QuoteCurrency::new(209, 0)
+    );
+    exchange
+}
+
+#[test]
+fn liquidation_clearance_fee_is_capped_at_the_equity_left() {
+    let mut exchange = long_10_liquidation_fee_exchange();
+    // Gap to bid 80: realized pnl = -200, taker fee = 0.8 -> 8.2 left, which caps the
+    // 800 * 5% = 40 clearance fee. Without the cap the fee would create 31.8 bad debt.
+    let res = exchange.update_state(&Bba {
+        bid: QuoteCurrency::new(80, 0),
+        ask: QuoteCurrency::new(81, 0),
+        timestamp_exchange_ns: 2.into(),
+    });
+    assert_eq!(res, Err(RiskError::Liquidate));
+    let balances = exchange.account().balances();
+    assert!(balances.equity().is_zero());
+    assert!(balances.bad_debt().is_zero());
+    assert_eq!(balances.total_fees_paid(), QuoteCurrency::new(10, 0));
+}
+
+#[test]
+fn liquidation_clearance_fee_is_waived_when_the_close_already_bankrupts() {
+    let mut exchange = long_10_liquidation_fee_exchange();
+    // Gap to bid 70: realized pnl = -300, taker fee = 0.7 -> 91.7 bad debt from the
+    // close itself; the clearance fee must not add to it.
+    let res = exchange.update_state(&Bba {
+        bid: QuoteCurrency::new(70, 0),
+        ask: QuoteCurrency::new(71, 0),
+        timestamp_exchange_ns: 2.into(),
+    });
+    assert_eq!(res, Err(RiskError::Liquidate));
+    let balances = exchange.account().balances();
+    assert!(balances.equity().is_zero());
+    assert_eq!(balances.bad_debt(), QuoteCurrency::new(917, 1));
+}
+
+#[test]
+fn portfolio_liquidation_clearance_fee_is_capped_at_the_equity_left() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(210, 0),
+        vec![MarketConfig::new(
+            NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+            liquidation_fee_spec(),
+            OrderRateLimits::default(),
+        )],
+    )
+    .unwrap();
+    let mut pf =
+        PortfolioExchange::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>::new(cfg);
+    let m = MarketId::new(0);
+    pf.update_market(
+        m,
+        &Bba {
+            bid: QuoteCurrency::new(99, 0),
+            ask: QuoteCurrency::new(100, 0),
+            timestamp_exchange_ns: 1.into(),
+        },
+    )
+    .unwrap();
+    pf.submit_market_order(
+        m,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap(),
+    )
+    .unwrap();
+
+    let res = pf.update_market(
+        m,
+        &Bba {
+            bid: QuoteCurrency::new(80, 0),
+            ask: QuoteCurrency::new(81, 0),
+            timestamp_exchange_ns: 2.into(),
+        },
+    );
+    assert!(matches!(
+        res,
+        Err(PortfolioError::Risk(RiskError::Liquidate))
+    ));
+    assert!(pf.market(m).unwrap().position.quantity().is_zero());
+    assert!(pf.balances().equity().is_zero());
+    assert!(pf.balances().bad_debt().is_zero());
+    assert_eq!(pf.balances().total_fees_paid(), QuoteCurrency::new(10, 0));
+}
+
+fn slippage_exchange(
+    notional_filter: NotionalFilter<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>>,
+) -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+    let spec = mark_price_spec()
+        .with_slippage_model(
+            SlippageModel::fixed_rate(Decimal::try_from_scaled(1, 2).expect(EXPECT_DECIMAL))
+                .unwrap(),
+        )
+        .with_notional_filter(notional_filter);
+    let mut exchange = build_linear_exchange(spec, QuoteCurrency::new(1000, 0));
+    exchange
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 1.into(),
+        })
+        .unwrap();
+    exchange
+}
+
+fn mark_price_spec() -> ContractSpecification<i64, DECIMALS, BaseCurrency<i64, DECIMALS>> {
+    ContractSpecification::new(
+        leverage!(1),
+        Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+        PriceFilter::default(),
+        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
+        Fee::from(Decimal::zero()),
+        Fee::from(Decimal::zero()),
+    )
+    .expect(EXPECT_CONTRACT_SPEC)
+}
+
+fn gtc(
+    side: Side,
+    limit_price: QuoteCurrency<i64, DECIMALS>,
+) -> LimitOrder<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId, NewOrder> {
+    LimitOrder::new(side, limit_price, BaseCurrency::new(1, 0))
+        .unwrap()
+        .with_time_in_force(TimeInForce::GoodTilCancelled)
+}
+
+fn fill_price(
+    submission: LimitOrderSubmission<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>,
+) -> QuoteCurrency<i64, DECIMALS> {
+    match submission {
+        LimitOrderSubmission::ImmediatelyFilled { filled_order, .. } => {
+            filled_order.state().avg_fill_price()
+        }
+        LimitOrderSubmission::Resting(order) => panic!("expected a fill, got resting {order}"),
+    }
+}
+
+#[test]
+fn marketable_limit_fill_applies_slippage_capped_at_limit_price() {
+    let mut ex = slippage_exchange(NotionalFilter::default());
+    // Ask 101 + 1% = 102.01, within the limit of 105.
+    let sub = ex
+        .submit_limit_order_with_execution(gtc(Side::Buy, QuoteCurrency::new(105, 0)))
+        .unwrap();
+    assert_eq!(fill_price(sub), QuoteCurrency::new(10201, 2));
+    // 102.01 is beyond the limit of 102, so the fill is capped there.
+    let sub = ex
+        .submit_limit_order_with_execution(gtc(Side::Buy, QuoteCurrency::new(102, 0)))
+        .unwrap();
+    assert_eq!(fill_price(sub), QuoteCurrency::new(102, 0));
+    // Bid 100 - 1% = 99, within the limit of 95.
+    let sub = ex
+        .submit_limit_order_with_execution(gtc(Side::Sell, QuoteCurrency::new(95, 0)))
+        .unwrap();
+    assert_eq!(fill_price(sub), QuoteCurrency::new(99, 0));
+    // 99 is beyond the limit of 100, so the fill is capped there.
+    let sub = ex
+        .submit_limit_order_with_execution(gtc(Side::Sell, QuoteCurrency::new(100, 0)))
+        .unwrap();
+    assert_eq!(fill_price(sub), QuoteCurrency::new(100, 0));
+}
+
+#[test]
+fn marketable_limit_notional_filter_uses_the_fill_price() {
+    // Fill at 102.01 is below min 103, although the limit 105 is above it.
+    let mut ex =
+        slippage_exchange(NotionalFilter::new(Some(QuoteCurrency::new(103, 0)), None).unwrap());
+    assert_eq!(
+        ex.submit_limit_order_with_execution(gtc(Side::Buy, QuoteCurrency::new(105, 0)))
+            .unwrap_err(),
+        SubmitLimitOrderError::ValidateOrderNotional(ValidateOrderNotionalError::NotionalTooLow)
+    );
+    assert!(ex.account().position().quantity().is_zero());
+
+    // Fill at 102.01 is below max 103, although the limit 105 is above it.
+    let mut ex =
+        slippage_exchange(NotionalFilter::new(None, Some(QuoteCurrency::new(103, 0))).unwrap());
+    let sub = ex
+        .submit_limit_order_with_execution(gtc(Side::Buy, QuoteCurrency::new(105, 0)))
+        .unwrap();
+    assert_eq!(fill_price(sub), QuoteCurrency::new(10201, 2));
+}
+
+#[test]
+fn portfolio_marketable_limit_fill_applies_slippage_and_validates_fill_notional() {
+    let spec = mark_price_spec()
+        .with_slippage_model(
+            SlippageModel::fixed_rate(Decimal::try_from_scaled(1, 2).expect(EXPECT_DECIMAL))
+                .unwrap(),
+        )
+        .with_notional_filter(NotionalFilter::new(None, Some(QuoteCurrency::new(103, 0))).unwrap());
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![MarketConfig::new(
+            NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+            spec,
+            OrderRateLimits::default(),
+        )],
+    )
+    .unwrap();
+    let mut pf =
+        PortfolioExchange::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>::new(cfg);
+    let m = MarketId::new(0);
+    pf.update_market(
+        m,
+        &Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 1.into(),
+        },
+    )
+    .unwrap();
+    // Limit 105 notional exceeds max 103, the 102.01 fill does not.
+    let sub = pf
+        .submit_limit_order_with_execution(m, gtc(Side::Buy, QuoteCurrency::new(105, 0)))
+        .unwrap();
+    assert_eq!(fill_price(sub), QuoteCurrency::new(10201, 2));
+    let sub = pf
+        .submit_limit_order_with_execution(m, gtc(Side::Buy, QuoteCurrency::new(102, 0)))
+        .unwrap();
+    assert_eq!(fill_price(sub), QuoteCurrency::new(102, 0));
+    assert_eq!(
+        pf.market(m).unwrap().position.quantity(),
+        BaseCurrency::new(2, 0)
+    );
+}

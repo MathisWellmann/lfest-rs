@@ -18,6 +18,7 @@ use crate::{
         Balances,
     },
     config::Config,
+    execution_rules,
     ledger::{
         Ledger,
         LedgerEntryKind,
@@ -390,6 +391,10 @@ where
     /// because a forced liquidation must never fail. A realized loss exceeding the
     /// account equity is absorbed by the venue as `Balances::bad_debt`, so this
     /// method cannot panic on bankrupting fills either.
+    ///
+    /// The taker fee is charged in full, the liquidation clearance fee only up to the
+    /// equity left after the realized PnL and the taker fee (see
+    /// `execution_rules::capped_clearance_fee`).
     fn force_liquidate(&mut self) {
         warn!("liquidating position {}", self.account.position());
         assert2::debug_assert!(self.market_state.ask() > QuoteCurrency::zero());
@@ -442,13 +447,22 @@ where
         };
         let quantity = position_qty.abs();
         let notional = BaseOrQuote::PairedCurrency::convert_from(quantity, fill_price);
-        let fee_rate = *self.config.contract_spec().fee_taker().as_ref()
-            + self.config.contract_spec().liquidation_fee();
-        let fee = notional * fee_rate;
+        let taker_fee = notional * *self.config.contract_spec().fee_taker().as_ref();
         let eq_before = self.account.balances().equity();
         let bd_before = self.account.balances().bad_debt();
         self.account
-            .change_position(quantity, fill_price, side, fee);
+            .change_position(quantity, fill_price, side, taker_fee);
+        assert!(self.account.position().quantity().is_zero());
+        // Charged after the close, so the cap sees the exact equity left.
+        let bd_after_close = self.account.balances().bad_debt();
+        let clearance_fee = execution_rules::capped_clearance_fee(
+            notional * self.config.contract_spec().liquidation_fee(),
+            self.account.balances().equity(),
+        );
+        self.account.account_for_fee(clearance_fee);
+        // The clearance fee alone never creates bad debt.
+        assert!(self.account.balances().bad_debt() == bd_after_close);
+        assert!(self.account.balances().equity() >= Zero::zero());
         self.record_ledger_delta(None, LedgerEntryKind::Liquidation, eq_before, bd_before);
         info!("balances after liquidation: {}", self.account.balances());
     }
@@ -842,13 +856,11 @@ where
         side: crate::types::Side,
         quantity: BaseOrQuote,
     ) -> Option<BaseOrQuote> {
-        let pos_qty = self.account.position().quantity();
-        let opposite_size = match side {
-            Buy if pos_qty.is_negative() => pos_qty.abs(),
-            Sell if pos_qty.is_positive() => pos_qty,
-            _ => return None,
-        };
-        Some(crate::utils::min(quantity, opposite_size))
+        execution_rules::clamp_reduce_only_quantity(
+            self.account.position().quantity(),
+            side,
+            quantity,
+        )
     }
 
     /// Clamp a `reduce_only` order which is about to rest to the room the already resting
@@ -907,8 +919,11 @@ where
     ///
     /// - If the order crosses the spread and uses `GoodTilCancelled`, `ImmediateOrCancel`,
     ///   `FillOrKill`, or [`RePricing::Marketable`], it executes immediately at the best
-    ///   opposite quote paying the taker fee and returns
+    ///   opposite quote plus the contract's [`crate::prelude::SlippageModel`] impact
+    ///   (never beyond `limit_price`), paying the taker fee, and returns
     ///   [`LimitOrderSubmission::ImmediatelyFilled`].
+    /// - A `reduce_only` `FillOrKill` order larger than the open position is rejected with
+    ///   [`SubmitLimitOrderError::FillOrKillNotFullyFillable`] instead of filling partially.
     /// - If the order does not cross the spread:
     ///   - `ImmediateOrCancel` / `FillOrKill` return
     ///     [`SubmitLimitOrderError::ImmediateExecutionNotMarketable`] without resting.
@@ -939,30 +954,24 @@ where
             .validate_limit_price(order.limit_price(), mark_price)?;
 
         if order.reduce_only() {
-            let Some(clamped) =
-                self.clamp_reduce_only_quantity(order.side(), order.remaining_quantity())
-            else {
-                return Err(SubmitLimitOrderError::ReduceOnlyRejected);
-            };
-            if clamped < order.remaining_quantity() {
-                order.set_remaining_quantity(clamped);
-            }
-        }
-
-        let strictly_reducing = self.is_strictly_reducing(order.side(), order.remaining_quantity());
-        if !strictly_reducing {
-            let notional = BaseOrQuote::PairedCurrency::convert_from(
-                order.remaining_quantity(),
-                order.limit_price(),
-            );
-            self.config
-                .contract_spec()
-                .notional_filter()
-                .validate_order_notional(notional)?;
+            execution_rules::clamp_reduce_only_limit_order(
+                &mut order,
+                self.account.position().quantity(),
+            )?;
         }
 
         let marketable = self.is_marketable(&order);
         let is_post_only = Self::is_post_only(&order);
+        if !marketable || is_post_only {
+            // An executing order is validated at its fill price instead, see
+            // `execute_marketable_limit_order`.
+            execution_rules::validate_order_notional(
+                self.config.contract_spec().notional_filter(),
+                order.remaining_quantity(),
+                order.limit_price(),
+                self.is_strictly_reducing(order.side(), order.remaining_quantity()),
+            )?;
+        }
 
         if marketable && is_post_only {
             let meta = ExchangeOrderMeta::new(
@@ -1025,10 +1034,20 @@ where
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
     ) -> Result<LimitOrderSubmission<I, D, BaseOrQuote, UserOrderIdT>, SubmitLimitOrderError> {
-        let fill_price = match order.side() {
-            Buy => self.market_state.ask(),
-            Sell => self.market_state.bid(),
-        };
+        assert!(self.is_marketable(&order));
+        let fill_price = execution_rules::marketable_limit_fill_price(
+            self.config.contract_spec().slippage_model(),
+            &self.market_state,
+            order.side(),
+            order.remaining_quantity(),
+            order.limit_price(),
+        );
+        execution_rules::validate_order_notional(
+            self.config.contract_spec().notional_filter(),
+            order.remaining_quantity(),
+            fill_price,
+            self.is_strictly_reducing(order.side(), order.remaining_quantity()),
+        )?;
         let ts_ns = self.market_state.current_timestamp_ns();
         let meta = ExchangeOrderMeta::new(self.next_order_id(), ts_ns);
         let mkt_probe = MarketOrder::new_with_user_order_id(

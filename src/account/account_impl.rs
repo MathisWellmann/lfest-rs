@@ -250,6 +250,13 @@ where
         self.balances.account_for_fee(fee);
     }
 
+    /// Charge a fee which is not tied to a fill, e.g. the liquidation clearance fee.
+    #[inline]
+    pub(crate) fn account_for_fee(&mut self, fee: BaseOrQuote::PairedCurrency) {
+        assert2::debug_assert!(fee >= BaseOrQuote::PairedCurrency::zero());
+        self.balances.account_for_fee(fee);
+    }
+
     /// Try to insert a new limit order.
     #[inline(always)]
     pub fn try_insert_order(
