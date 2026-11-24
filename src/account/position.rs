@@ -131,6 +131,38 @@ where
         }
     }
 
+    /// Return the position's unrealized profit and loss evaluated at an explicit `mark_price`.
+    ///
+    /// Returns zero when the position is neutral.
+    #[must_use]
+    #[inline(always)]
+    pub fn unrealized_pnl_at_price(
+        &self,
+        mark_price: QuoteCurrency<I, D>,
+    ) -> BaseOrQuote::PairedCurrency {
+        assert2::debug_assert!(mark_price > Zero::zero());
+        if self.quantity.is_zero() {
+            Zero::zero()
+        } else {
+            BaseOrQuote::PairedCurrency::pnl(self.entry_price, mark_price, self.quantity)
+        }
+    }
+
+    /// Return the position's unrealized profit and loss using `market_state` and `mark_method`.
+    #[must_use]
+    #[inline]
+    pub fn unrealized_pnl_marked(
+        &self,
+        market_state: &crate::market_state::MarketState<I, D>,
+        mark_method: crate::contract_specification::MarkMethod,
+    ) -> BaseOrQuote::PairedCurrency {
+        if self.quantity.is_zero() {
+            return Zero::zero();
+        }
+        let price = market_state.mark_price_for_position(mark_method, self.side());
+        self.unrealized_pnl_at_price(price)
+    }
+
     /// The total value of the position which is composed of quantity and avg. entry price.
     #[must_use]
     #[inline]
@@ -139,6 +171,17 @@ where
             Zero::zero()
         } else {
             BaseOrQuote::PairedCurrency::convert_from(self.quantity.abs(), self.entry_price)
+        }
+    }
+
+    /// The notional value of the position evaluated at an explicit `price` (e.g. live mark price).
+    #[must_use]
+    #[inline]
+    pub fn notional_at_price(&self, price: QuoteCurrency<I, D>) -> BaseOrQuote::PairedCurrency {
+        if self.quantity.is_zero() || price.is_zero() {
+            Zero::zero()
+        } else {
+            BaseOrQuote::PairedCurrency::convert_from(self.quantity.abs(), price)
         }
     }
 

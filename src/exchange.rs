@@ -298,7 +298,9 @@ where
         };
         let quantity = position_qty.abs();
         let notional = BaseOrQuote::PairedCurrency::convert_from(quantity, fill_price);
-        let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
+        let fee_rate = *self.config.contract_spec().fee_taker().as_ref()
+            + self.config.contract_spec().liquidation_fee();
+        let fee = notional * fee_rate;
         self.account
             .change_position(quantity, fill_price, side, fee);
         info!("balances after liquidation: {}", self.account.balances());
@@ -486,6 +488,13 @@ where
             Buy => self.market_state.ask(),
             Sell => self.market_state.bid(),
         };
+        if !self.is_strictly_reducing(order.side(), order.quantity()) {
+            let notional = BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
+            self.config
+                .contract_spec()
+                .notional_filter()
+                .validate_order_notional(notional)?;
+        }
         self.risk_engine
             .check_market_order(&self.account, &order, fill_price)?;
 
@@ -524,6 +533,37 @@ where
         (forced_cancels, solvency)
     }
 
+    /// Return the current mark price of the market using the contract's configured
+    /// [`crate::prelude::MarkMethod`].
+    #[inline]
+    #[must_use]
+    pub fn mark_price(&self) -> QuoteCurrency<I, D> {
+        self.market_state
+            .mark_price(self.config.contract_spec().mark_method())
+    }
+
+    /// Return the position's current unrealized PnL evaluated under the contract's
+    /// [`crate::prelude::MarkMethod`].
+    #[inline]
+    #[must_use]
+    pub fn unrealized_pnl(&self) -> BaseOrQuote::PairedCurrency {
+        self.account.position().unrealized_pnl_marked(
+            &self.market_state,
+            self.config.contract_spec().mark_method(),
+        )
+    }
+
+    /// Return `true` when an order of `(side, quantity)` strictly reduces or closes
+    /// the current open position without flipping its direction.
+    #[inline]
+    fn is_strictly_reducing(&self, side: crate::types::Side, quantity: BaseOrQuote) -> bool {
+        let pos_qty = self.account.position().quantity();
+        match side {
+            Buy => pos_qty.is_negative() && quantity <= pos_qty.abs(),
+            Sell => pos_qty.is_positive() && quantity <= pos_qty,
+        }
+    }
+
     #[inline(always)]
     fn next_order_id(&mut self) -> OrderId {
         let oid = self.next_order_id;
@@ -553,10 +593,23 @@ where
             .contract_spec()
             .quantity_filter()
             .validate_order_quantity(order.remaining_quantity())?;
+        let mark_price = self
+            .market_state
+            .mark_price(self.config.contract_spec().mark_method());
         self.config
             .contract_spec()
             .price_filter()
-            .validate_limit_price(order.limit_price(), self.market_state.mid_price())?;
+            .validate_limit_price(order.limit_price(), mark_price)?;
+        if !self.is_strictly_reducing(order.side(), order.remaining_quantity()) {
+            let notional = BaseOrQuote::PairedCurrency::convert_from(
+                order.remaining_quantity(),
+                order.limit_price(),
+            );
+            self.config
+                .contract_spec()
+                .notional_filter()
+                .validate_order_notional(notional)?;
+        }
 
         let meta = ExchangeOrderMeta::new(
             self.next_order_id(),

@@ -38,6 +38,16 @@ pub enum ValidateOrderQuantityError {
     InvalidQuantityStepSize,
 }
 
+#[derive(Debug, Clone, Copy, Error, Eq, PartialEq)]
+#[allow(missing_docs, reason = "Self documenting")]
+pub enum ValidateOrderNotionalError {
+    #[error("The order notional value is below the configured minimum notional")]
+    NotionalTooLow,
+
+    #[error("The order notional value exceeds the configured maximum notional")]
+    NotionalTooHigh,
+}
+
 #[derive(Debug, Clone, Error, Eq, PartialEq)]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum SubmitMarketOrderError {
@@ -49,6 +59,9 @@ pub enum SubmitMarketOrderError {
 
     #[error(transparent)]
     ValidateOrderQuantity(#[from] ValidateOrderQuantityError),
+
+    #[error(transparent)]
+    ValidateOrderNotional(#[from] ValidateOrderNotionalError),
 }
 
 #[derive(Error, Debug, Clone, Eq, PartialEq, derive_more::Display)]

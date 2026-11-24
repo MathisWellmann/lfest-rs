@@ -56,6 +56,7 @@ pub mod prelude {
         market_state::MarketState,
         market_update::*,
         order_filters::{
+            NotionalFilter,
             PriceFilter,
             QuantityFilter,
         },
