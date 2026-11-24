@@ -313,6 +313,31 @@ where
         );
         assert2::debug_assert!(self.reduce_only_remaining() <= cap);
     }
+
+    /// Remove every resting order which is not `reduce_only` and whose remaining quantity
+    /// exceeds `cap`, passing each removed order to `on_cancel`. A `cap` of zero removes
+    /// every non-reduce-only order.
+    pub(crate) fn cancel_non_reduce_only_above<F>(&mut self, cap: BaseOrQuote, mut on_cancel: F)
+    where
+        F: FnMut(LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>),
+    {
+        assert2::debug_assert!(cap >= BaseOrQuote::zero());
+        let n_reduce_only_before = self.num_reduce_only;
+        for order in self
+            .orders
+            .extract_if(.., |o| !o.reduce_only() && o.remaining_quantity() > cap)
+        {
+            self.notional_sum -= order.notional();
+            assert2::debug_assert!(self.notional_sum >= Zero::zero());
+            on_cancel(order);
+        }
+        assert_eq!(self.num_reduce_only, n_reduce_only_before);
+        assert2::debug_assert!(
+            self.orders
+                .iter()
+                .all(|o| o.reduce_only() || o.remaining_quantity() <= cap)
+        );
+    }
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT, SideT>

@@ -11,6 +11,10 @@ use std::fmt::Display;
 pub struct MarketId(u16);
 
 impl MarketId {
+    /// Number of distinct [`MarketId`]s, i.e. the maximum number of markets a portfolio can
+    /// hold: every `u16` value (`0..=u16::MAX`) is a valid id.
+    pub const COUNT: usize = 1 << u16::BITS;
+
     /// Create a [`MarketId`] from a raw `u16` index.
     #[inline(always)]
     #[must_use]

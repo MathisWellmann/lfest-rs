@@ -1,6 +1,9 @@
 //! Configuration types for [`crate::portfolio::PortfolioExchange`].
 
-use std::num::NonZeroU16;
+use std::{
+    collections::HashSet,
+    num::NonZeroU16,
+};
 
 use getset::{
     CopyGetters,
@@ -14,7 +17,10 @@ use crate::{
         MarginCurrency,
         Mon,
     },
-    types::OrderRateLimits,
+    types::{
+        MarketId,
+        OrderRateLimits,
+    },
 };
 
 /// Configuration for a single market inside a [`crate::portfolio::PortfolioExchange`].
@@ -81,13 +87,26 @@ where
     /// Create a new [`PortfolioConfig`].
     ///
     /// # Errors
-    /// Returns [`ConfigError::InvalidStartingBalance`] if `starting_wallet_balance <= 0`.
+    /// Returns [`ConfigError::InvalidStartingBalance`] if `starting_wallet_balance <= 0`,
+    /// [`ConfigError::TooManyMarkets`] if there are more than [`MarketId::COUNT`] markets, or
+    /// [`ConfigError::DuplicateMarketTicker`] if two markets share a non-empty ticker,
+    /// because ticker lookups must stay unambiguous.
     pub fn new(
         starting_wallet_balance: Margin,
         markets: Vec<MarketConfig<I, D, Margin>>,
     ) -> Result<Self, ConfigError> {
         if starting_wallet_balance <= Margin::zero() {
             return Err(ConfigError::InvalidStartingBalance);
+        }
+        if markets.len() > MarketId::COUNT {
+            return Err(ConfigError::TooManyMarkets);
+        }
+        let mut tickers = HashSet::with_capacity(markets.len());
+        for market in &markets {
+            let ticker = market.contract_spec().ticker();
+            if !ticker.is_empty() && !tickers.insert(ticker.as_str()) {
+                return Err(ConfigError::DuplicateMarketTicker);
+            }
         }
         Ok(Self {
             starting_wallet_balance,

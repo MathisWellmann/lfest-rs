@@ -297,9 +297,10 @@ where
     #[must_use]
     pub fn new(config: PortfolioConfig<I, D, BaseOrQuote::PairedCurrency>) -> Self {
         let n_markets = config.markets().len();
+        // `PortfolioConfig::new` validated both, so these only guard against programmer errors.
         assert!(
-            n_markets <= usize::from(u16::MAX),
-            "number of markets exceeds u16::MAX"
+            n_markets <= MarketId::COUNT,
+            "number of markets exceeds MarketId::COUNT"
         );
         let balances = Balances::new(config.starting_wallet_balance());
         let mut markets = Vec::with_capacity(n_markets);
@@ -307,12 +308,17 @@ where
         let mut total_order_cap: usize = 0;
 
         for (idx, market_cfg) in config.markets().iter().enumerate() {
-            let market_id =
-                MarketId::new(u16::try_from(idx).expect("n_markets was asserted <= u16::MAX"));
+            let market_id = MarketId::new(
+                u16::try_from(idx).expect("n_markets was asserted <= MarketId::COUNT"),
+            );
             total_order_cap += usize::from(market_cfg.max_num_open_orders().get());
             let ticker = market_cfg.contract_spec().ticker();
             if !ticker.is_empty() {
-                ticker_index.insert(ticker.clone(), market_id);
+                let previous = ticker_index.insert(ticker.clone(), market_id);
+                assert!(
+                    previous.is_none(),
+                    "PortfolioConfig rejects duplicate tickers"
+                );
             }
             markets
                 .push_within_capacity(MarketSlot::new(market_id, market_cfg.clone()))
@@ -370,17 +376,24 @@ where
     /// Dynamically register a new market and return its assigned [`MarketId`].
     ///
     /// # Errors
-    /// Returns [`PortfolioError::MaxMarketsReached`] if `u16::MAX` markets are already registered.
+    /// Returns [`PortfolioError::MaxMarketsReached`] if [`MarketId::COUNT`] markets are
+    /// already registered, or [`PortfolioError::DuplicateTicker`] if another market
+    /// already uses the (non-empty) ticker, because ticker lookups must stay unambiguous.
     pub fn add_market(
         &mut self,
         market_cfg: MarketConfig<I, D, BaseOrQuote::PairedCurrency>,
     ) -> Result<MarketId, PortfolioError<UserOrderIdT>> {
+        assert!(self.markets.len() <= MarketId::COUNT);
         let Ok(raw_id) = u16::try_from(self.markets.len()) else {
-            return Err(PortfolioError::MaxMarketsReached(usize::from(u16::MAX)));
+            assert_eq!(self.markets.len(), MarketId::COUNT);
+            return Err(PortfolioError::MaxMarketsReached(MarketId::COUNT));
         };
         let market_id = MarketId::new(raw_id);
         let ticker = market_cfg.contract_spec().ticker();
         if !ticker.is_empty() {
+            if self.ticker_index.contains_key(ticker) {
+                return Err(PortfolioError::DuplicateTicker(ticker.clone()));
+            }
             self.ticker_index.insert(ticker.clone(), market_id);
         }
         let add_cap = usize::from(market_cfg.max_num_open_orders().get()) * 2;
@@ -478,21 +491,42 @@ where
 
     /// Transition a market between [`MarketStatus::Active`] and [`MarketStatus::ReduceOnly`].
     ///
+    /// In reduce-only status only position-reducing orders may fill, so switching to
+    /// [`MarketStatus::ReduceOnly`] cancels and returns every resting order on the market
+    /// that is not `reduce_only` and could increase or flip the position (see
+    /// `ActiveLimitOrders::cancel_risk_increasing`). Switching to `Active` cancels nothing.
+    ///
     /// To delist a market and settle any open position, call [`Self::delist_market`].
     ///
     /// # Errors
-    /// Returns [`PortfolioError::UnknownMarket`] or [`PortfolioError::MarketDelisted`] if already delisted.
+    /// Returns [`PortfolioError::UnknownMarket`], [`PortfolioError::MarketDelisted`] if
+    /// already delisted, or [`PortfolioError::UseDelistMarket`] for
+    /// [`MarketStatus::Delisted`], because delisting must settle the open position.
     pub fn set_market_status(
         &mut self,
         market_id: MarketId,
         status: MarketStatus,
-    ) -> Result<(), PortfolioError<UserOrderIdT>> {
+    ) -> Result<Vec<PendingLimitOrder<I, D, BaseOrQuote, UserOrderIdT>>, PortfolioError<UserOrderIdT>>
+    {
         let slot = self.slot_mut(market_id)?;
         if slot.status == MarketStatus::Delisted {
             return Err(PortfolioError::MarketDelisted(market_id));
         }
+        if status == MarketStatus::Delisted {
+            return Err(PortfolioError::UseDelistMarket(market_id));
+        }
         slot.status = status;
-        Ok(())
+        let mut cancelled = Vec::with_capacity(slot.active_limit_orders.len());
+        if status == MarketStatus::ReduceOnly {
+            slot.active_limit_orders
+                .cancel_risk_increasing(slot.position.quantity(), |order| {
+                    cancelled
+                        .push_within_capacity(order)
+                        .expect(EXPECT_CAPACITY);
+                });
+        }
+        assert!(slot.status != MarketStatus::Delisted);
+        Ok(cancelled)
     }
 
     /// Delist `market_id`: cancel every resting limit order on that market,
@@ -585,26 +619,25 @@ where
     /// maintenance checks, and evaluate resting limit orders on `market_id`.
     ///
     /// # Errors
-    /// Returns [`RiskError::Liquidate`] if the portfolio fell below maintenance margin
-    /// (all positions were force-liquidated and resting orders cancelled, recorded in
-    /// [`Self::order_events`]).
-    ///
-    /// # Panics
-    /// Panics if `market_id` is out of range.
+    /// Returns [`PortfolioError::UnknownMarket`] if `market_id` is invalid (nothing is
+    /// changed), or [`PortfolioError::Risk`] with [`RiskError::Liquidate`] if the portfolio
+    /// fell below maintenance margin (all positions were force-liquidated and resting
+    /// orders cancelled, recorded in [`Self::order_events`]).
     pub fn update_market<U>(
         &mut self,
         market_id: MarketId,
         market_update: &U,
-    ) -> Result<&Vec<PortfolioOrderEvent<I, D, BaseOrQuote, UserOrderIdT>>, RiskError>
+    ) -> Result<
+        &Vec<PortfolioOrderEvent<I, D, BaseOrQuote, UserOrderIdT>>,
+        PortfolioError<UserOrderIdT>,
+    >
     where
         U: MarketUpdate<I, D, BaseOrQuote>,
     {
+        let idx = self.validate_market_index(market_id)?;
         self.order_events.clear();
         self.stop_events.clear();
         self.liquidated_during_fills = false;
-
-        let idx = market_id.as_usize();
-        assert!(idx < self.markets.len(), "unknown market id {market_id}");
 
         {
             let slot = &mut self.markets[idx];
@@ -618,7 +651,7 @@ where
             self.evaluate_pending_stops_for_market(idx, market_update.price_range());
             if self.liquidated_during_fills {
                 core::hint::cold_path();
-                return Err(RiskError::Liquidate);
+                return Err(RiskError::Liquidate.into());
             }
         }
 
@@ -626,14 +659,14 @@ where
             core::hint::cold_path();
             self.force_liquidate_portfolio();
             self.drain_forced_cancels_into_events();
-            return Err(RiskError::Liquidate);
+            return Err(RiskError::Liquidate.into());
         }
 
         if U::CAN_FILL_LIMIT_ORDERS && self.markets[idx].status != MarketStatus::Delisted {
             self.check_active_orders_for_market(idx, market_update.clone());
             if self.liquidated_during_fills {
                 core::hint::cold_path();
-                return Err(RiskError::Liquidate);
+                return Err(RiskError::Liquidate.into());
             }
         }
 
@@ -1325,14 +1358,16 @@ where
     ) -> bool {
         let side = order.side();
         // Defence in depth: `reconcile_portfolio_margin` keeps resting reduce-only orders
-        // within the position, but a fill must never increase or flip it anyway.
-        let filled_quantity = if order.reduce_only() {
-            self.markets[idx]
-                .clamp_reduce_only_quantity(side, filled_quantity)
-                .expect("resting reduce-only orders are pruned after every position change")
-        } else {
-            filled_quantity
-        };
+        // (and every order on a reduce-only market) within the position, but such a fill
+        // must never increase or flip it anyway.
+        let filled_quantity =
+            if order.reduce_only() || self.markets[idx].status == MarketStatus::ReduceOnly {
+                self.markets[idx]
+                    .clamp_reduce_only_quantity(side, filled_quantity)
+                    .expect("risk-increasing resting orders are pruned after every position change")
+            } else {
+                filled_quantity
+            };
         assert2::debug_assert!(filled_quantity > BaseOrQuote::zero());
         let limit_price = order.limit_price();
         let market_id = self.markets[idx].market_id;
@@ -1611,20 +1646,26 @@ where
     }
 
     /// Force-cancel resting `reduce_only` limit orders which no longer fit within their
-    /// market's open position, see `ActiveLimitOrders::cancel_excess_reduce_only`.
-    /// Costs one branch per market without resting reduce-only orders.
+    /// market's open position, see `ActiveLimitOrders::cancel_excess_reduce_only`, and on
+    /// markets in [`MarketStatus::ReduceOnly`] every other order which could now increase
+    /// the position, see `ActiveLimitOrders::cancel_risk_increasing`.
+    /// Costs two branches per active market without resting reduce-only orders.
     fn prune_stale_reduce_only_orders(&mut self) {
         let scratch = &mut self.forced_cancel_scratch;
         for slot in &mut self.markets {
             let market_id = slot.market_id;
-            slot.active_limit_orders.cancel_excess_reduce_only(
-                slot.position.quantity(),
-                |cancelled| {
-                    scratch
-                        .push_within_capacity((market_id, cancelled))
-                        .expect(EXPECT_CAPACITY);
-                },
-            );
+            let mut on_cancel = |cancelled| {
+                scratch
+                    .push_within_capacity((market_id, cancelled))
+                    .expect(EXPECT_CAPACITY);
+            };
+            let pos_qty = slot.position.quantity();
+            slot.active_limit_orders
+                .cancel_excess_reduce_only(pos_qty, &mut on_cancel);
+            if slot.status == MarketStatus::ReduceOnly {
+                slot.active_limit_orders
+                    .cancel_risk_increasing(pos_qty, &mut on_cancel);
+            }
         }
     }
 
