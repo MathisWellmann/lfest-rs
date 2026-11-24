@@ -7,6 +7,7 @@ mod account;
 mod config;
 mod contract_specification;
 mod exchange;
+mod execution_rules;
 mod expect_messages;
 mod ledger;
 mod load_trades_from_csv;

@@ -202,13 +202,7 @@ where
 
     #[inline]
     fn clamp_reduce_only_quantity(&self, side: Side, quantity: BaseOrQuote) -> Option<BaseOrQuote> {
-        let pos_qty = self.position.quantity();
-        let opposite_size = match side {
-            Buy if pos_qty.is_negative() => pos_qty.abs(),
-            Sell if pos_qty.is_positive() => pos_qty,
-            _ => return None,
-        };
-        Some(crate::utils::min(quantity, opposite_size))
+        crate::execution_rules::clamp_reduce_only_quantity(self.position.quantity(), side, quantity)
     }
 
     #[inline]
@@ -908,14 +902,10 @@ where
             .map_err(SubmitLimitOrderError::from)?;
 
         if order.reduce_only() {
-            let Some(clamped) = self.markets[idx]
-                .clamp_reduce_only_quantity(order.side(), order.remaining_quantity())
-            else {
-                return Err(SubmitLimitOrderError::ReduceOnlyRejected.into());
-            };
-            if clamped < order.remaining_quantity() {
-                order.set_remaining_quantity(clamped);
-            }
+            crate::execution_rules::clamp_reduce_only_limit_order(
+                &mut order,
+                self.markets[idx].position.quantity(),
+            )?;
         }
 
         let strictly_reducing =
@@ -923,20 +913,27 @@ where
         if status == MarketStatus::ReduceOnly && !strictly_reducing {
             return Err(PortfolioError::MarketReduceOnly(market_id));
         }
-        if !strictly_reducing {
-            let notional = BaseOrQuote::PairedCurrency::convert_from(
-                order.remaining_quantity(),
-                order.limit_price(),
-            );
-            self.markets[idx]
-                .contract_spec
-                .notional_filter()
-                .validate_order_notional(notional)
-                .map_err(SubmitLimitOrderError::from)?;
-        }
-
         let marketable = self.markets[idx].is_marketable(&order);
         let is_post_only = is_post_only(&order);
+        // An executing order is validated at its fill price, a resting one at its limit.
+        let notional_price = if marketable && !is_post_only {
+            crate::execution_rules::marketable_limit_fill_price(
+                self.markets[idx].contract_spec.slippage_model(),
+                &self.markets[idx].market_state,
+                order.side(),
+                order.remaining_quantity(),
+                order.limit_price(),
+            )
+        } else {
+            order.limit_price()
+        };
+        crate::execution_rules::validate_order_notional(
+            self.markets[idx].contract_spec.notional_filter(),
+            order.remaining_quantity(),
+            notional_price,
+            strictly_reducing,
+        )
+        .map_err(SubmitLimitOrderError::from)?;
 
         if marketable && is_post_only {
             let meta = ExchangeOrderMeta::new(self.next_order_id(), ts_ns);
@@ -954,10 +951,7 @@ where
         }
 
         if marketable {
-            let fill_price = match order.side() {
-                Buy => self.markets[idx].market_state.ask(),
-                Sell => self.markets[idx].market_state.bid(),
-            };
+            let fill_price = notional_price;
             self.check_portfolio_market_order(
                 idx,
                 order.side(),
@@ -1431,7 +1425,8 @@ where
 
     /// Force-liquidate the entire cross-margin portfolio: cancel every resting order across
     /// all markets, then close every non-zero position at its current bid/ask charging
-    /// `fee_taker + liquidation_fee`.
+    /// `fee_taker`, and finally charge the summed `liquidation_fee` capped at the equity
+    /// the closed portfolio has left.
     fn force_liquidate_portfolio(&mut self) {
         warn!(
             "liquidating cross-margin portfolio: equity={}, mm={}",
@@ -1465,6 +1460,7 @@ where
             }
         }
         let n_markets = self.markets.len();
+        let mut clearance_fee = BaseOrQuote::PairedCurrency::zero();
         for idx in 0..n_markets {
             let pos_qty = self.markets[idx].position.quantity();
             if pos_qty.is_zero() {
@@ -1489,9 +1485,8 @@ where
             };
             let qty = pos_qty.abs();
             let notional = BaseOrQuote::PairedCurrency::convert_from(qty, fill_price);
-            let fee_rate = *self.markets[idx].contract_spec.fee_taker().as_ref()
-                + self.markets[idx].contract_spec.liquidation_fee();
-            let fee = notional * fee_rate;
+            let fee = notional * *self.markets[idx].contract_spec.fee_taker().as_ref();
+            clearance_fee += notional * self.markets[idx].contract_spec.liquidation_fee();
             let eq_before = self.balances.equity();
             // Booked without a bankruptcy floor so the net result of closing every leg
             // does not depend on the order in which the legs are closed.
@@ -1516,6 +1511,16 @@ where
             .map(|slot| slot.market_state.current_timestamp_ns())
             .max()
             .unwrap_or_default();
+        // The clearance fee is collected only from the equity the closed portfolio has
+        // left, so the fee alone never turns into bad debt the venue absorbs itself.
+        let clearance_fee =
+            crate::execution_rules::capped_clearance_fee(clearance_fee, self.balances.equity());
+        if !clearance_fee.is_zero() {
+            let eq_before = self.balances.equity();
+            self.balances.account_for_shared_wallet_fee(clearance_fee);
+            assert!(self.balances.equity() >= Zero::zero());
+            self.record_ledger_delta(ts_ns, None, None, LedgerEntryKind::Liquidation, eq_before);
+        }
         self.settle_bad_debt(ts_ns, None);
         assert!(self.balances.equity() >= Zero::zero());
         info!("balances after portfolio liquidation: {}", self.balances);

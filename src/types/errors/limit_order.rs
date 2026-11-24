@@ -51,6 +51,11 @@ pub enum SubmitLimitOrderError {
     ImmediateExecutionNotMarketable,
 
     #[error(
+        "Fill-or-kill reduce-only order rejected: the open position is smaller than the order quantity, so it could only fill partially"
+    )]
+    FillOrKillNotFullyFillable,
+
+    #[error(
         "The limit order crosses the spread and would execute immediately; use `submit_limit_order_with_execution` for marketable limit orders"
     )]
     WouldExecuteImmediately,
