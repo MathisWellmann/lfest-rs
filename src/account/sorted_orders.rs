@@ -162,11 +162,18 @@ where
     }
 
     /// Remove and return all resting orders from this side, resetting `notional_sum` to zero.
+    ///
+    /// Crate-internal because it panics unless `out` has spare capacity for every order,
+    /// a precondition external callers could not know about.
     #[inline]
-    pub fn drain_all(
+    pub(crate) fn drain_all(
         &mut self,
         out: &mut Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
     ) {
+        assert!(
+            out.capacity() - out.len() >= self.orders.len(),
+            "caller pre-allocated capacity for drained orders"
+        );
         self.notional_sum = Zero::zero();
         self.num_reduce_only = 0;
         for order in self.orders.drain(..) {

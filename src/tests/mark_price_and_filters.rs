@@ -90,7 +90,7 @@ fn mark_method_fair_price_prevents_wick_liquidation_and_tracks_fair_unrealized_p
 }
 
 #[test]
-fn notional_filter_rejects_small_open_orders_but_allows_strictly_reducing_dust_close() {
+fn notional_filter_rejects_small_open_orders_but_allows_reduce_only_dust_close() {
     let notional_filter = NotionalFilter::new(
         Some(QuoteCurrency::new(50, 0)),
         Some(QuoteCurrency::new(500, 0)),
@@ -159,9 +159,20 @@ fn notional_filter_rejects_small_open_orders_but_allows_strictly_reducing_dust_c
     exchange
         .submit_market_order(MarketOrder::new(Side::Sell, BaseCurrency::new(7, 1)).unwrap())
         .unwrap();
-    // Strictly reducing dust close of 0.3 succeeds despite notional < 50.
+    // Only a reduce-only order is exempt from min_notional, not a plain reducing one.
+    assert_eq!(
+        exchange
+            .submit_market_order(MarketOrder::new(Side::Sell, BaseCurrency::new(3, 1)).unwrap())
+            .unwrap_err(),
+        SubmitMarketOrderError::ValidateOrderNotional(ValidateOrderNotionalError::NotionalTooLow)
+    );
+    // Reduce-only dust close of 0.3 succeeds despite notional < 50.
     exchange
-        .submit_market_order(MarketOrder::new(Side::Sell, BaseCurrency::new(3, 1)).unwrap())
+        .submit_market_order(
+            MarketOrder::new(Side::Sell, BaseCurrency::new(3, 1))
+                .unwrap()
+                .with_reduce_only(true),
+        )
         .unwrap();
     assert!(exchange.account().position().quantity().is_zero());
 }
@@ -555,4 +566,123 @@ fn portfolio_marketable_limit_fill_applies_slippage_and_validates_fill_notional(
         pf.market(m).unwrap().position.quantity(),
         BaseCurrency::new(2, 0)
     );
+}
+
+fn notional_filter_spec() -> ContractSpecification<i64, DECIMALS, BaseCurrency<i64, DECIMALS>> {
+    mark_price_spec().with_notional_filter(
+        NotionalFilter::new(
+            Some(QuoteCurrency::new(50, 0)),
+            Some(QuoteCurrency::new(500, 0)),
+        )
+        .unwrap(),
+    )
+}
+
+fn sell(
+    qty: BaseCurrency<i64, DECIMALS>,
+    reduce_only: bool,
+) -> MarketOrder<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId, NewOrder> {
+    MarketOrder::new(Side::Sell, qty)
+        .unwrap()
+        .with_reduce_only(reduce_only)
+}
+
+#[test]
+fn notional_filter_max_applies_to_reducing_orders() {
+    let mut ex = build_linear_exchange(notional_filter_spec(), QuoteCurrency::new(1000, 0));
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(100, 0),
+        ask: QuoteCurrency::new(101, 0),
+        timestamp_exchange_ns: 1.into(),
+    })
+    .unwrap();
+    for _ in 0..2 {
+        ex.submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(4, 0)).unwrap())
+            .unwrap();
+    }
+    assert_eq!(ex.account().position().quantity(), BaseCurrency::new(8, 0));
+
+    // Closing 6 (notional 600 > 500) is rejected, plain or reduce-only.
+    for reduce_only in [false, true] {
+        assert_eq!(
+            ex.submit_market_order(sell(BaseCurrency::new(6, 0), reduce_only))
+                .unwrap_err(),
+            SubmitMarketOrderError::ValidateOrderNotional(
+                ValidateOrderNotionalError::NotionalTooHigh
+            )
+        );
+    }
+    // The same holds for a reducing limit order.
+    for reduce_only in [false, true] {
+        let order = LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(110, 0),
+            BaseCurrency::new(6, 0),
+        )
+        .unwrap()
+        .with_reduce_only(reduce_only);
+        assert_eq!(
+            ex.submit_limit_order(order).unwrap_err(),
+            SubmitLimitOrderError::ValidateOrderNotional(
+                ValidateOrderNotionalError::NotionalTooHigh
+            )
+        );
+    }
+    assert_eq!(ex.account().position().quantity(), BaseCurrency::new(8, 0));
+}
+
+#[test]
+fn portfolio_notional_filter_only_exempts_reduce_only_from_min() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![MarketConfig::new(
+            NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+            notional_filter_spec(),
+            OrderRateLimits::default(),
+        )],
+    )
+    .unwrap();
+    let mut pf =
+        PortfolioExchange::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>::new(cfg);
+    let m = MarketId::new(0);
+    pf.update_market(
+        m,
+        &Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 1.into(),
+        },
+    )
+    .unwrap();
+    for _ in 0..2 {
+        pf.submit_market_order(
+            m,
+            MarketOrder::new(Side::Buy, BaseCurrency::new(4, 0)).unwrap(),
+        )
+        .unwrap();
+    }
+    let too_high = PortfolioError::SubmitMarketOrder(
+        SubmitMarketOrderError::ValidateOrderNotional(ValidateOrderNotionalError::NotionalTooHigh),
+    );
+    for reduce_only in [false, true] {
+        assert_eq!(
+            pf.submit_market_order(m, sell(BaseCurrency::new(6, 0), reduce_only))
+                .unwrap_err(),
+            too_high
+        );
+    }
+    // Reduce to 0.3 dust, then only a reduce-only order may close it.
+    for qty in [BaseCurrency::new(4, 0), BaseCurrency::new(37, 1)] {
+        pf.submit_market_order(m, sell(qty, false)).unwrap();
+    }
+    assert_eq!(
+        pf.submit_market_order(m, sell(BaseCurrency::new(3, 1), false))
+            .unwrap_err(),
+        PortfolioError::SubmitMarketOrder(SubmitMarketOrderError::ValidateOrderNotional(
+            ValidateOrderNotionalError::NotionalTooLow,
+        ))
+    );
+    pf.submit_market_order(m, sell(BaseCurrency::new(3, 1), true))
+        .unwrap();
+    assert!(pf.market(m).unwrap().position.quantity().is_zero());
 }

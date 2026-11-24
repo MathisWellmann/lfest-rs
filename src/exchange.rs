@@ -200,7 +200,11 @@ where
     #[getset(get = "pub")]
     pending_stops: PendingStops<I, D, BaseOrQuote, UserOrderIdT>,
 
-    /// Conditional / stop order events emitted during the most recent `update_state`.
+    /// Conditional / stop order events emitted during the most recent call which can
+    /// elect or force-cancel stops: [`Exchange::update_state`], or a liquidation triggered
+    /// by [`Exchange::submit_market_order`], [`Exchange::submit_limit_order_with_execution`]
+    /// or [`Exchange::apply_funding`]. Each of these calls clears the buffer first, so it
+    /// never holds more events than there can be pending stops and never drops one.
     #[getset(get = "pub")]
     stop_order_events: Vec<StopOrderEvent<I, D, BaseOrQuote, UserOrderIdT>>,
 
@@ -241,6 +245,10 @@ where
         let balances = Balances::new(config.starting_wallet_balance());
         let init_margin_req = config.contract_spec().init_margin_req();
         let maker_fee = *config.contract_spec().fee_maker().as_ref();
+        let pending_stops = PendingStops::with_capacity(max_active_orders);
+        // Every pending stop yields at most one event per public call (it is elected or
+        // force-cancelled once), and the buffer is cleared at the start of every such call.
+        let stop_order_events = Vec::with_capacity(usize::from(max_active_orders.get()));
         Self {
             config,
             market_state,
@@ -253,8 +261,8 @@ where
             limit_order_events: Vec::with_capacity(usize::from(max_active_orders.get()) * 4),
             forced_cancel_scratch: Vec::with_capacity(usize::from(max_active_orders.get()) * 2),
             liquidated_during_fills: false,
-            pending_stops: PendingStops::with_capacity(max_active_orders),
-            stop_order_events: Vec::with_capacity(usize::from(max_active_orders.get())),
+            pending_stops,
+            stop_order_events,
             elected_stops_scratch: Vec::with_capacity(usize::from(max_active_orders.get())),
             ledger: None,
             order_rate_limiter,
@@ -330,7 +338,7 @@ where
         U: MarketUpdate<I, D, BaseOrQuote>,
     {
         self.limit_order_events.clear();
-        self.stop_order_events.clear();
+        self.reset_stop_order_events();
         self.liquidated_during_fills = false;
 
         self.market_state
@@ -366,7 +374,7 @@ where
             return Err(e);
         };
 
-        self.check_active_orders(market_update.clone());
+        self.fill_active_orders(market_update.clone());
         if self.liquidated_during_fills {
             core::hint::cold_path();
             return Err(RiskError::Liquidate);
@@ -427,15 +435,11 @@ where
             let mut drained = Vec::with_capacity(self.pending_stops.len());
             self.pending_stops.drain_all(&mut drained);
             for stop in drained {
-                if self.stop_order_events.len() < self.stop_order_events.capacity() {
-                    self.stop_order_events
-                        .push_within_capacity(StopOrderEvent::Cancelled {
-                            stop_order_id: stop.id(),
-                            user_order_id: stop.user_order_id(),
-                            reason: StopCancelReason::ForcedCancel,
-                        })
-                        .expect(EXPECT_CAPACITY);
-                }
+                self.push_stop_event(StopOrderEvent::Cancelled {
+                    stop_order_id: stop.id(),
+                    user_order_id: stop.user_order_id(),
+                    reason: StopCancelReason::ForcedCancel,
+                });
             }
         }
 
@@ -645,6 +649,8 @@ where
         rate: FundingRate<I, D>,
         mark_price: QuoteCurrency<I, D>,
     ) -> FundingSettlement<I, D, BaseOrQuote, UserOrderIdT> {
+        // A liquidation reports its stop cancellations in `stop_order_events`.
+        self.reset_stop_order_events();
         let cashflow = self.account.funding_cashflow(rate, mark_price);
         let eq_before = self.account.balances().equity();
         let bad_debt_before = self.account.balances().bad_debt();
@@ -681,6 +687,8 @@ where
         mut order: MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
     ) -> Result<MarketOrderSettlement<I, D, BaseOrQuote, UserOrderIdT>, SubmitMarketOrderError>
     {
+        // A liquidation reports its stop cancellations in `stop_order_events`.
+        self.reset_stop_order_events();
         self.order_rate_limiter
             .aquire(self.market_state.current_ts_ns())?;
         // Basic checks
@@ -713,13 +721,12 @@ where
             order.quantity(),
         );
         let fill_price = impact_quote.execution_price();
-        if !self.is_strictly_reducing(order.side(), order.quantity()) {
-            let notional = BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
-            self.config
-                .contract_spec()
-                .notional_filter()
-                .validate_order_notional(notional)?;
-        }
+        execution_rules::validate_order_notional(
+            self.config.contract_spec().notional_filter(),
+            order.quantity(),
+            fill_price,
+            order.reduce_only(),
+        )?;
         match self.config.margin_mode() {
             MarginMode::Isolated => {
                 self.risk_engine
@@ -930,17 +937,32 @@ where
     ///   - `GoodTilCrossing` / `GoodTilCancelled` rest on the book and return
     ///     [`LimitOrderSubmission::Resting`].
     ///
+    /// A liquidation caused by an immediate fill reports the cancelled stop orders in
+    /// [`Exchange::stop_order_events`], which this call clears first.
+    ///
     /// # Errors
     /// Returns [`SubmitLimitOrderError`] if rate-limited, filter validation fails,
     /// `reduce_only` has no opposite position, margin is insufficient, or TIF rejects.
     pub fn submit_limit_order_with_execution(
         &mut self,
-        mut order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
     ) -> Result<LimitOrderSubmission<I, D, BaseOrQuote, UserOrderIdT>, SubmitLimitOrderError> {
         trace!("submit_limit_order_with_execution: {}", order);
-
+        self.reset_stop_order_events();
         self.order_rate_limiter
             .aquire(self.market_state.current_ts_ns())?;
+        self.submit_limit_order_no_rate_limit(order)
+    }
+
+    /// [`Self::submit_limit_order_with_execution`] without the order rate limiter and
+    /// without clearing `stop_order_events`, for orders the venue itself places inside
+    /// [`Self::update_state`] (elected stop-limit children): the user's rate limit governs
+    /// the user's requests, and rejecting a triggered stop for it would silently drop the
+    /// protection the user already paid a rate-limit slot for when submitting the stop.
+    fn submit_limit_order_no_rate_limit(
+        &mut self,
+        mut order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Result<LimitOrderSubmission<I, D, BaseOrQuote, UserOrderIdT>, SubmitLimitOrderError> {
         self.config
             .contract_spec()
             .quantity_filter()
@@ -969,7 +991,7 @@ where
                 self.config.contract_spec().notional_filter(),
                 order.remaining_quantity(),
                 order.limit_price(),
-                self.is_strictly_reducing(order.side(), order.remaining_quantity()),
+                order.reduce_only(),
             )?;
         }
 
@@ -1046,7 +1068,7 @@ where
             self.config.contract_spec().notional_filter(),
             order.remaining_quantity(),
             fill_price,
-            self.is_strictly_reducing(order.side(), order.remaining_quantity()),
+            order.reduce_only(),
         )?;
         let ts_ns = self.market_state.current_timestamp_ns();
         let meta = ExchangeOrderMeta::new(self.next_order_id(), ts_ns);
@@ -1138,7 +1160,10 @@ where
         if self.is_marketable(&order) && !Self::is_post_only(&order) {
             return Err(SubmitLimitOrderError::WouldExecuteImmediately);
         }
-        match self.submit_limit_order_with_execution(order)? {
+        // A resting order never settles a fill, so it cannot liquidate or emit stop events.
+        self.order_rate_limiter
+            .aquire(self.market_state.current_ts_ns())?;
+        match self.submit_limit_order_no_rate_limit(order)? {
             LimitOrderSubmission::Resting(pending) => {
                 assert!(pending.remaining_quantity() > BaseOrQuote::zero());
                 Ok(pending)
@@ -1334,8 +1359,20 @@ where
     /// clearing it first: `update_state` clears the buffer once per update, so events
     /// emitted earlier in the same update (e.g. forced cancels caused by elected stops)
     /// survive. Direct callers must clear the buffer themselves if they need that.
+    /// [`Exchange::stop_order_events`] is cleared, as a fill-triggered liquidation reports
+    /// its stop cancellations there.
     /// NOTE: only public for benchmarking purposes.
-    pub fn check_active_orders<U>(&mut self, mut market_update: U)
+    pub fn check_active_orders<U>(&mut self, market_update: U)
+    where
+        U: MarketUpdate<I, D, BaseOrQuote>,
+    {
+        self.reset_stop_order_events();
+        self.fill_active_orders(market_update);
+    }
+
+    /// [`Self::check_active_orders`] without clearing `stop_order_events`, so
+    /// `update_state` keeps the stop events emitted earlier in the same update.
+    fn fill_active_orders<U>(&mut self, mut market_update: U)
     where
         U: MarketUpdate<I, D, BaseOrQuote>,
     {
@@ -1789,7 +1826,7 @@ where
             .with_time_in_force(time_in_force)
             .with_reduce_only(stop.reduce_only());
 
-        match self.submit_limit_order_with_execution(child) {
+        match self.submit_limit_order_no_rate_limit(child) {
             Ok(LimitOrderSubmission::Resting(pending)) => {
                 self.push_stop_event(StopOrderEvent::PlacedLimit {
                     stop_order_id: stop.id(),
@@ -1849,12 +1886,31 @@ where
         }
     }
 
+    /// Clear `stop_order_events` at the start of a public call which can emit stop events.
+    ///
+    /// Also restores the capacity bound (one event per possible pending stop), because
+    /// `#[derive(Clone)]` does not keep spare `Vec` capacity. Allocation-free except on
+    /// the first call after a clone.
+    #[inline]
+    fn reset_stop_order_events(&mut self) {
+        self.stop_order_events.clear();
+        let max_stops = usize::from(self.config.max_num_open_orders().get());
+        if self.stop_order_events.capacity() < max_stops {
+            core::hint::cold_path();
+            self.stop_order_events.reserve_exact(max_stops);
+        }
+        assert!(self.stop_order_events.capacity() >= max_stops);
+        assert!(self.stop_order_events.is_empty());
+    }
+
+    /// Record a stop event. Cannot overflow: see the `stop_order_events` field docs.
     #[inline]
     fn push_stop_event(&mut self, event: StopOrderEvent<I, D, BaseOrQuote, UserOrderIdT>) {
-        if self.stop_order_events.len() < self.stop_order_events.capacity() {
-            self.stop_order_events
-                .push_within_capacity(event)
-                .expect(EXPECT_CAPACITY);
-        }
+        assert2::debug_assert!(
+            self.stop_order_events.len() < usize::from(self.config.max_num_open_orders().get())
+        );
+        self.stop_order_events
+            .push_within_capacity(event)
+            .expect("each pending stop yields at most one event per call");
     }
 }
