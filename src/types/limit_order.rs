@@ -63,11 +63,10 @@ where
     #[getset(get_copy = "pub")]
     remaining_quantity: BaseOrQuote,
 
-    /// Determines the behavior for when the limit price locks or crosses an away market quotation.
-    #[getset(get_copy = "pub", set = "pub")]
-    re_pricing: RePricing,
-
     /// Time-in-force policy governing immediate execution vs resting behavior.
+    ///
+    /// The single source of the order's crossing behavior: the [`RePricing`] view
+    /// ([`LimitOrder::re_pricing`]) is derived from it, so the two can never contradict.
     #[getset(get_copy = "pub", set = "pub")]
     time_in_force: TimeInForce,
 
@@ -134,6 +133,46 @@ where
     }
 }
 
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT, OrderStatus>
+    LimitOrder<I, D, BaseOrQuote, UserOrderIdT, OrderStatus>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    /// What the order does when its limit price locks or crosses the opposite quote,
+    /// derived from [`LimitOrder::time_in_force`]: only `GoodTilCrossing` is
+    /// [`RePricing::GoodTilCrossing`] (post-only), every other time in force is
+    /// [`RePricing::Marketable`].
+    #[inline]
+    #[must_use]
+    pub fn re_pricing(&self) -> RePricing {
+        match self.time_in_force {
+            TimeInForce::GoodTilCrossing => RePricing::GoodTilCrossing,
+            TimeInForce::GoodTilCancelled
+            | TimeInForce::ImmediateOrCancel
+            | TimeInForce::FillOrKill => RePricing::Marketable,
+        }
+    }
+
+    /// `true` for post-only orders, which are rejected instead of executed when crossing.
+    #[inline]
+    #[must_use]
+    pub fn is_post_only(&self) -> bool {
+        self.re_pricing() == RePricing::GoodTilCrossing
+    }
+}
+
+/// The time in force expressing `re_pricing` for an order currently at `current`.
+#[inline]
+fn time_in_force_for(re_pricing: RePricing, current: TimeInForce) -> TimeInForce {
+    match (re_pricing, current) {
+        (RePricing::GoodTilCrossing, _) => TimeInForce::GoodTilCrossing,
+        (RePricing::Marketable, TimeInForce::GoodTilCrossing) => TimeInForce::GoodTilCancelled,
+        (RePricing::Marketable, marketable) => marketable,
+    }
+}
+
 impl<I, const D: u8, BaseOrQuote> LimitOrder<I, D, BaseOrQuote, NoUserOrderId, NewOrder>
 where
     I: Mon<D>,
@@ -166,7 +205,6 @@ where
             limit_price,
             remaining_quantity: quantity,
             side,
-            re_pricing: RePricing::default(),
             time_in_force: TimeInForce::default(),
             reduce_only: false,
         })
@@ -209,39 +247,46 @@ where
             limit_price,
             remaining_quantity: quantity,
             side,
-            re_pricing: RePricing::default(),
             time_in_force: TimeInForce::default(),
             reduce_only: false,
         })
     }
 
-    /// Set the [`TimeInForce`] (builder-style). Automatically switches `re_pricing`
-    /// to [`RePricing::Marketable`] for `GoodTilCancelled`, `ImmediateOrCancel`, and
-    /// `FillOrKill`, and to [`RePricing::GoodTilCrossing`] for `GoodTilCrossing`.
+    /// Set the [`TimeInForce`] (builder-style).
+    ///
+    /// The time in force alone decides the crossing behavior, so this also determines
+    /// [`LimitOrder::re_pricing`]: [`RePricing::GoodTilCrossing`] for `GoodTilCrossing`,
+    /// [`RePricing::Marketable`] otherwise. The last builder call wins.
     #[inline]
     #[must_use]
     pub fn with_time_in_force(mut self, tif: TimeInForce) -> Self {
         self.time_in_force = tif;
-        self.re_pricing = match tif {
-            TimeInForce::GoodTilCrossing => RePricing::GoodTilCrossing,
-            TimeInForce::GoodTilCancelled
-            | TimeInForce::ImmediateOrCancel
-            | TimeInForce::FillOrKill => RePricing::Marketable,
-        };
         self
     }
 
-    /// Set [`RePricing`] (builder-style), syncing `time_in_force` when switching to
-    /// [`RePricing::Marketable`] from the default `GoodTilCrossing`.
+    /// Set the crossing behavior via [`RePricing`] (builder-style), expressed as the
+    /// equivalent [`TimeInForce`] because that is the only stored policy:
+    ///
+    /// - [`RePricing::GoodTilCrossing`] makes the order post-only (`GoodTilCrossing`),
+    ///   whatever time in force was set before.
+    /// - [`RePricing::Marketable`] turns a post-only order into `GoodTilCancelled` and
+    ///   keeps `GoodTilCancelled`, `ImmediateOrCancel` and `FillOrKill`, which are
+    ///   all marketable already.
+    ///
+    /// The last builder call wins, so `with_time_in_force` and `with_re_pricing` can be
+    /// chained in either order without leaving a contradictory order behind.
     #[inline]
     #[must_use]
     pub fn with_re_pricing(mut self, re_pricing: RePricing) -> Self {
-        self.re_pricing = re_pricing;
-        if re_pricing == RePricing::Marketable && self.time_in_force == TimeInForce::GoodTilCrossing
-        {
-            self.time_in_force = TimeInForce::GoodTilCancelled;
-        }
+        self.set_re_pricing(re_pricing);
         self
+    }
+
+    /// Set the crossing behavior via [`RePricing`]; see [`LimitOrder::with_re_pricing`].
+    #[inline]
+    pub fn set_re_pricing(&mut self, re_pricing: RePricing) {
+        self.time_in_force = time_in_force_for(re_pricing, self.time_in_force);
+        assert_eq!(self.re_pricing(), re_pricing);
     }
 
     /// Mark this limit order as reduce-only (builder-style).
@@ -275,7 +320,6 @@ where
             limit_price: self.limit_price,
             remaining_quantity: self.remaining_quantity,
             state: Pending::new(meta),
-            re_pricing: self.re_pricing,
             time_in_force: self.time_in_force,
             reduce_only: self.reduce_only,
         }
@@ -361,7 +405,6 @@ where
             limit_price: self.limit_price,
             remaining_quantity: BaseOrQuote::zero(),
             side: self.side,
-            re_pricing: self.re_pricing,
             time_in_force: self.time_in_force,
             reduce_only: self.reduce_only,
         }
@@ -386,7 +429,6 @@ where
             limit_price: self.limit_price,
             remaining_quantity: BaseOrQuote::zero(),
             side: self.side,
-            re_pricing: self.re_pricing,
             time_in_force: self.time_in_force,
             reduce_only: self.reduce_only,
         }
@@ -572,6 +614,104 @@ mod tests {
         )
         .unwrap();
         assert_eq!(order.user_order_id(), 1);
+    }
+
+    type NewBuy = LimitOrder<i64, 5, BaseCurrency<i64, 5>, NoUserOrderId, NewOrder>;
+
+    fn new_buy() -> NewBuy {
+        LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(100, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap()
+    }
+
+    const ALL_TIF: [TimeInForce; 4] = [
+        TimeInForce::GoodTilCrossing,
+        TimeInForce::GoodTilCancelled,
+        TimeInForce::ImmediateOrCancel,
+        TimeInForce::FillOrKill,
+    ];
+
+    #[test]
+    fn default_limit_order_is_post_only() {
+        let order = new_buy();
+        assert_eq!(order.time_in_force(), TimeInForce::GoodTilCrossing);
+        assert_eq!(order.re_pricing(), RePricing::GoodTilCrossing);
+        assert!(order.is_post_only());
+    }
+
+    #[test]
+    fn re_pricing_after_time_in_force_wins() {
+        // The reported contradiction: GTC then GTX re-pricing used to keep GTC, so the
+        // order claimed to be post-only but was not treated as such.
+        let order = new_buy()
+            .with_time_in_force(TimeInForce::GoodTilCancelled)
+            .with_re_pricing(RePricing::GoodTilCrossing);
+        assert_eq!(order.time_in_force(), TimeInForce::GoodTilCrossing);
+        assert_eq!(order.re_pricing(), RePricing::GoodTilCrossing);
+        assert!(order.is_post_only());
+
+        for tif in ALL_TIF {
+            let post_only = new_buy()
+                .with_time_in_force(tif)
+                .with_re_pricing(RePricing::GoodTilCrossing);
+            assert!(post_only.is_post_only(), "{tif:?}");
+            assert_eq!(post_only.time_in_force(), TimeInForce::GoodTilCrossing);
+
+            let marketable = new_buy()
+                .with_time_in_force(tif)
+                .with_re_pricing(RePricing::Marketable);
+            assert!(!marketable.is_post_only(), "{tif:?}");
+            assert_eq!(marketable.re_pricing(), RePricing::Marketable);
+            // A marketable time in force is kept, only post-only becomes GTC.
+            let expected = match tif {
+                TimeInForce::GoodTilCrossing => TimeInForce::GoodTilCancelled,
+                other => other,
+            };
+            assert_eq!(marketable.time_in_force(), expected);
+        }
+    }
+
+    #[test]
+    fn time_in_force_after_re_pricing_wins() {
+        for re_pricing in [RePricing::GoodTilCrossing, RePricing::Marketable] {
+            for tif in ALL_TIF {
+                let order = new_buy()
+                    .with_re_pricing(re_pricing)
+                    .with_time_in_force(tif);
+                assert_eq!(order.time_in_force(), tif);
+                assert_eq!(
+                    order.is_post_only(),
+                    tif == TimeInForce::GoodTilCrossing,
+                    "{re_pricing:?} then {tif:?}"
+                );
+                assert_eq!(
+                    order.re_pricing() == RePricing::GoodTilCrossing,
+                    order.is_post_only()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn setters_cannot_create_a_contradiction() {
+        let mut order = new_buy();
+        order.set_time_in_force(TimeInForce::FillOrKill);
+        assert_eq!(order.re_pricing(), RePricing::Marketable);
+        order.set_re_pricing(RePricing::GoodTilCrossing);
+        assert_eq!(order.time_in_force(), TimeInForce::GoodTilCrossing);
+        assert!(order.is_post_only());
+        order.set_re_pricing(RePricing::Marketable);
+        assert_eq!(order.time_in_force(), TimeInForce::GoodTilCancelled);
+
+        // The derived view survives the state transitions.
+        let pending = new_buy()
+            .with_time_in_force(TimeInForce::ImmediateOrCancel)
+            .into_pending(ExchangeOrderMeta::new(0.into(), 0.into()));
+        assert_eq!(pending.re_pricing(), RePricing::Marketable);
+        assert!(!pending.is_post_only());
     }
 
     proptest! {

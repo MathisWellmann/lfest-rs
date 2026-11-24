@@ -760,3 +760,43 @@ fn portfolio_fill_or_kill_reduce_only_larger_than_position_is_rejected() {
     ));
     assert!(pf.market(m).unwrap().position.quantity().is_zero());
 }
+
+#[test]
+fn gtc_then_post_only_re_pricing_is_rejected_when_crossing_on_both_venues() {
+    // GTC first, post-only re-pricing last: the order must behave as post-only. Before
+    // the fix it kept GTC and traded as a taker although `re_pricing()` said post-only.
+    let order = || crossing_gtc_buy(1).with_re_pricing(RePricing::GoodTilCrossing);
+
+    let mut ex = bba_exchange();
+    assert!(matches!(
+        ex.submit_limit_order_with_execution(order()),
+        Err(SubmitLimitOrderError::GoodTillCrossingRejectedOrder { .. })
+    ));
+    assert!(ex.account().position().quantity().is_zero());
+
+    let mut pf = long_10_portfolio();
+    let m = MarketId::new(0);
+    let position_before = pf.market(m).unwrap().position.quantity();
+    assert!(matches!(
+        pf.submit_limit_order_with_execution(m, order()),
+        Err(PortfolioError::SubmitLimitOrder(
+            SubmitLimitOrderError::GoodTillCrossingRejectedOrder { .. }
+        ))
+    ));
+    assert_eq!(pf.market(m).unwrap().position.quantity(), position_before);
+}
+
+#[test]
+fn post_only_then_gtc_time_in_force_executes_when_crossing() {
+    let order = || {
+        crossing_gtc_buy(1)
+            .with_re_pricing(RePricing::GoodTilCrossing)
+            .with_time_in_force(TimeInForce::GoodTilCancelled)
+    };
+    let mut ex = bba_exchange();
+    assert!(matches!(
+        ex.submit_limit_order_with_execution(order()).unwrap(),
+        LimitOrderSubmission::ImmediatelyFilled { .. }
+    ));
+    assert_eq!(ex.account().position().quantity(), BaseCurrency::new(1, 0));
+}
