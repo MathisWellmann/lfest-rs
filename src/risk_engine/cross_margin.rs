@@ -7,7 +7,10 @@ use num_traits::{
 };
 use tracing::trace;
 
-use super::RiskEngine;
+use super::{
+    RiskEngine,
+    isolated_margin::isolated_liquidation_price,
+};
 use crate::{
     account::{
         Account,
@@ -231,70 +234,104 @@ where
         if position.quantity().is_zero() || reference_price <= Zero::zero() {
             return None;
         }
-        let ref_notional = position.notional_at_price(reference_price);
-        let tier = self
-            .contract_spec
-            .maintenance_margin_schedule()
-            .tier_for_notional(ref_notional);
-        let mm = tier.maintenance_margin_rate();
-        let maint_amount = tier.maintenance_amount();
+        let schedule = self.contract_spec.maintenance_margin_schedule();
+        let tiers = schedule.tiers();
+        let side = position.side();
         let qty_abs = *position.quantity().abs().as_ref();
         let entry = *position.entry_price().as_ref();
         let equity = *wallet_equity.as_ref();
-        let cum = *maint_amount.as_ref();
-
-        let liq_dec: Decimal<I, D> = match BaseOrQuote::PairedCurrency::KIND {
-            crate::types::CurrencyKind::Quote => {
-                // Linear: qty in Base, margin/equity in Quote
-                match position.side() {
-                    PositionSide::Long => {
-                        let denom = qty_abs * (Decimal::one() - mm);
-                        if denom <= Decimal::zero() {
-                            return None;
-                        }
-                        let numer = qty_abs * entry - equity - cum;
-                        numer / denom
-                    }
-                    PositionSide::Short => {
-                        let denom = qty_abs * (Decimal::one() + mm);
-                        if denom <= Decimal::zero() {
-                            return None;
-                        }
-                        let numer = qty_abs * entry + equity + cum;
-                        numer / denom
-                    }
-                    PositionSide::Neutral => return None,
-                }
+        // The bracket applies to the notional AT the liquidation price, not at the
+        // reference price. Start at the reference tier and move to the tier of the
+        // computed price until both agree. The maintenance curve is continuous and
+        // monotone in notional, so the fixed point exists; the step bound guards
+        // against rounding ping-pong at a bracket edge.
+        let mut idx = schedule.tier_index_for_notional(position.notional_at_price(reference_price));
+        let mut liq = None;
+        for _ in 0..=tiers.len() {
+            let tier = &tiers[idx];
+            liq = liquidation_price_for_tier::<I, D, BaseOrQuote::PairedCurrency>(
+                side,
+                qty_abs,
+                entry,
+                equity,
+                tier.maintenance_margin_rate(),
+                *tier.maintenance_amount().as_ref(),
+            );
+            let price = liq?;
+            let liq_idx = schedule.tier_index_for_notional(position.notional_at_price(price));
+            if liq_idx == idx {
+                break;
             }
-            crate::types::CurrencyKind::Base => {
-                // Inverse: qty in Quote, margin/equity in Base
-                let entry_base = qty_abs / entry;
-                match position.side() {
-                    PositionSide::Long => {
-                        let denom = equity + cum + entry_base;
-                        if denom <= Decimal::zero() {
-                            return None;
-                        }
-                        (qty_abs * (Decimal::one() + mm)) / denom
-                    }
-                    PositionSide::Short => {
-                        let denom = entry_base - equity - cum;
-                        if denom <= Decimal::zero() {
-                            return None;
-                        }
-                        (qty_abs * (Decimal::one() - mm)) / denom
-                    }
-                    PositionSide::Neutral => return None,
-                }
-            }
-        };
-
-        if liq_dec <= Decimal::zero() {
-            None
-        } else {
-            Some(QuoteCurrency::from(liq_dec))
+            idx = liq_idx;
         }
+        if let Some(price) = liq {
+            assert!(price > Zero::zero());
+        }
+        liq
     }
+}
+
+/// Liquidation price of a single position under one maintenance tier (`mm`, `cum`),
+/// see [`CrossMarginRiskEngine::estimated_liquidation_price`] for the formulas.
+/// Returns `None` if the price is non-positive or undefined.
+fn liquidation_price_for_tier<I, const D: u8, Margin>(
+    side: PositionSide,
+    qty_abs: Decimal<I, D>,
+    entry: Decimal<I, D>,
+    equity: Decimal<I, D>,
+    mm: Decimal<I, D>,
+    cum: Decimal<I, D>,
+) -> Option<QuoteCurrency<I, D>>
+where
+    I: Mon<D>,
+    Margin: MarginCurrency<I, D>,
+{
+    assert2::debug_assert!(qty_abs > Decimal::zero());
+    assert2::debug_assert!(cum >= Decimal::zero());
+    let liq_dec: Decimal<I, D> = match Margin::KIND {
+        crate::types::CurrencyKind::Quote => {
+            // Linear: qty in Base, margin/equity in Quote
+            match side {
+                PositionSide::Long => {
+                    let denom = qty_abs * (Decimal::one() - mm);
+                    if denom <= Decimal::zero() {
+                        return None;
+                    }
+                    (qty_abs * entry - equity - cum) / denom
+                }
+                PositionSide::Short => {
+                    let denom = qty_abs * (Decimal::one() + mm);
+                    if denom <= Decimal::zero() {
+                        return None;
+                    }
+                    (qty_abs * entry + equity + cum) / denom
+                }
+                PositionSide::Neutral => return None,
+            }
+        }
+        crate::types::CurrencyKind::Base => {
+            // Inverse: qty in Quote, margin/equity in Base
+            let entry_base = qty_abs / entry;
+            match side {
+                PositionSide::Long => {
+                    let denom = equity + cum + entry_base;
+                    if denom <= Decimal::zero() {
+                        return None;
+                    }
+                    (qty_abs * (Decimal::one() + mm)) / denom
+                }
+                PositionSide::Short => {
+                    let denom = entry_base - equity - cum;
+                    if denom <= Decimal::zero() {
+                        return None;
+                    }
+                    (qty_abs * (Decimal::one() - mm)) / denom
+                }
+                PositionSide::Neutral => return None,
+            }
+        }
+    };
+    (liq_dec > Decimal::zero()).then(|| QuoteCurrency::from(liq_dec))
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> RiskEngine<I, D, BaseOrQuote, UserOrderIdT>
@@ -341,9 +378,7 @@ where
         let mark_method = self.contract_spec.mark_method();
         match position.quantity().cmp(&Zero::zero()) {
             Less => {
-                let liquidation_price = position
-                    .entry_price()
-                    .liquidation_price_short(self.contract_spec.maintenance_margin());
+                let liquidation_price = isolated_liquidation_price(&self.contract_spec, position);
                 let reference_price =
                     market_state.mark_price_for_position(mark_method, PositionSide::Short);
                 if reference_price > liquidation_price {
@@ -352,9 +387,7 @@ where
             }
             Equal => return Ok(()),
             Greater => {
-                let liquidation_price = position
-                    .entry_price()
-                    .liquidation_price_long(self.contract_spec.maintenance_margin());
+                let liquidation_price = isolated_liquidation_price(&self.contract_spec, position);
                 let reference_price =
                     market_state.mark_price_for_position(mark_method, PositionSide::Long);
                 if reference_price < liquidation_price {
@@ -363,5 +396,117 @@ where
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        DECIMALS,
+        leverage,
+        prelude::*,
+        test_fee_maker,
+        test_fee_taker,
+    };
+
+    fn engine<BaseOrQuote>(
+        brackets: &[(Option<BaseOrQuote::PairedCurrency>, Decimal<i64, DECIMALS>)],
+    ) -> CrossMarginRiskEngine<i64, DECIMALS, BaseOrQuote>
+    where
+        BaseOrQuote: Currency<i64, DECIMALS>,
+        BaseOrQuote::PairedCurrency: MarginCurrency<i64, DECIMALS>,
+    {
+        let spec = ContractSpecification::new(
+            leverage!(2),
+            Decimal::try_from_scaled(5, 1).unwrap(),
+            PriceFilter::default(),
+            QuantityFilter::default(),
+            test_fee_maker(),
+            test_fee_taker(),
+        )
+        .unwrap()
+        .with_maintenance_margin_schedule(
+            MaintenanceMarginSchedule::from_brackets(brackets).unwrap(),
+        )
+        .unwrap();
+        CrossMarginRiskEngine::new(spec)
+    }
+
+    fn rate(scaled: i64, scale: u8) -> Decimal<i64, DECIMALS> {
+        Decimal::try_from_scaled(scaled, scale).unwrap()
+    }
+
+    #[test]
+    fn linear_long_liquidation_price_drops_into_lower_tier() {
+        // Reference notional 1000 is in tier 2 (20%, amount 75), but the tier-2 price
+        // 37.5 has notional 375 (tier 1). Tier 1: P = (1000 - 625) / (10 * 0.95).
+        let re = engine::<BaseCurrency<i64, DECIMALS>>(&[
+            (Some(QuoteCurrency::new(500, 0)), rate(5, 2)),
+            (None, rate(2, 1)),
+        ]);
+        let pos = Position::new(BaseCurrency::new(10, 0), QuoteCurrency::new(100, 0)).unwrap();
+        let liq = re
+            .estimated_liquidation_price(
+                QuoteCurrency::new(625, 0),
+                &pos,
+                QuoteCurrency::new(100, 0),
+            )
+            .unwrap();
+        assert_eq!(liq, QuoteCurrency::new(3_947_368, 5));
+        assert!(pos.notional_at_price(liq) <= QuoteCurrency::new(500, 0));
+    }
+
+    #[test]
+    fn linear_short_liquidation_price_rises_into_higher_tier() {
+        // Reference notional 400 is in tier 1, the tier-1 price 130.95 has notional 523.8
+        // (tier 2). Tier 2: P = (400 + 150 + 75) / (4 * 1.2) = 130.208333.
+        let re = engine::<BaseCurrency<i64, DECIMALS>>(&[
+            (Some(QuoteCurrency::new(500, 0)), rate(5, 2)),
+            (None, rate(2, 1)),
+        ]);
+        let pos = Position::new(-BaseCurrency::new(4, 0), QuoteCurrency::new(100, 0)).unwrap();
+        let liq = re
+            .estimated_liquidation_price(
+                QuoteCurrency::new(150, 0),
+                &pos,
+                QuoteCurrency::new(100, 0),
+            )
+            .unwrap();
+        assert_eq!(liq, QuoteCurrency::new(13_020_833, 5));
+        assert!(pos.notional_at_price(liq) > QuoteCurrency::new(500, 0));
+    }
+
+    #[test]
+    fn inverse_long_liquidation_price_rises_into_higher_tier() {
+        // Notional = 300 / P grows as the price falls. Reference notional 3 BTC is tier 1,
+        // the tier-1 price 78.75 has notional 3.81 (tier 2, 20%, amount 0.525).
+        // Tier 2: P = 300 * 1.2 / (1 + 0.525 + 3) = 79.55801.
+        let re = engine::<QuoteCurrency<i64, DECIMALS>>(&[
+            (Some(BaseCurrency::new(35, 1)), rate(5, 2)),
+            (None, rate(2, 1)),
+        ]);
+        let pos = Position::new(QuoteCurrency::new(300, 0), QuoteCurrency::new(100, 0)).unwrap();
+        let liq = re
+            .estimated_liquidation_price(BaseCurrency::new(1, 0), &pos, QuoteCurrency::new(100, 0))
+            .unwrap();
+        assert_eq!(liq, QuoteCurrency::new(7_955_801, 5));
+        assert!(pos.notional_at_price(liq) > BaseCurrency::new(35, 1));
+    }
+
+    #[test]
+    fn inverse_short_liquidation_price_drops_into_lower_tier() {
+        // Reference notional 3 BTC is tier 2 (20%, amount 0.375), the tier-2 price 147.69
+        // has notional 2.03 (tier 1). Tier 1: P = 300 * 0.95 / (3 - 1) = 142.5.
+        let re = engine::<QuoteCurrency<i64, DECIMALS>>(&[
+            (Some(BaseCurrency::new(25, 1)), rate(5, 2)),
+            (None, rate(2, 1)),
+        ]);
+        let pos = Position::new(-QuoteCurrency::new(300, 0), QuoteCurrency::new(100, 0)).unwrap();
+        let liq = re
+            .estimated_liquidation_price(BaseCurrency::new(1, 0), &pos, QuoteCurrency::new(100, 0))
+            .unwrap();
+        assert_eq!(liq, QuoteCurrency::new(1425, 1));
+        assert!(pos.notional_at_price(liq) <= BaseCurrency::new(25, 1));
     }
 }

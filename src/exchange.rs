@@ -493,10 +493,13 @@ where
     fn reconcile_margin(&mut self, bad_debt_before: BaseOrQuote::PairedCurrency) -> Solvency {
         let should_liquidate = match self.config.margin_mode() {
             MarginMode::Isolated => {
-                let maintenance_margin_req = self.config.contract_spec().maintenance_margin();
                 !self.account.position().quantity().is_zero()
                     && self.account.balances().equity()
-                        < self.account.position().notional() * maintenance_margin_req
+                        < self
+                            .config
+                            .contract_spec()
+                            .maintenance_margin_schedule()
+                            .maintenance_margin(self.account.position().notional())
             }
             MarginMode::Cross => {
                 if self.account.position().quantity().is_zero() {
@@ -812,7 +815,7 @@ where
     /// Estimate the liquidation price of the current position.
     ///
     /// - Under [`MarginMode::Isolated`], returns the static entry-price liquidation
-    ///   threshold derived from `contract_spec.maintenance_margin()`.
+    ///   threshold derived from the tiered maintenance margin schedule at the entry notional.
     /// - Under [`MarginMode::Cross`], returns the dynamic liquidation price accounting
     ///   for actual wallet equity and the active [`crate::prelude::MaintenanceMarginSchedule`]
     ///   bracket (`None` if the position is fully collateralized or neutral).
@@ -824,12 +827,10 @@ where
         }
         match self.config.margin_mode() {
             MarginMode::Isolated => {
-                let mm = self.config.contract_spec().maintenance_margin();
-                let liq = if pos.is_long() {
-                    pos.entry_price().liquidation_price_long(mm)
-                } else {
-                    pos.entry_price().liquidation_price_short(mm)
-                };
+                let liq = crate::risk_engine::isolated_liquidation_price(
+                    self.config.contract_spec(),
+                    pos,
+                );
                 if liq > QuoteCurrency::zero() {
                     Some(liq)
                 } else {

@@ -176,14 +176,25 @@ where
     }
 
     /// Replace the flat maintenance margin schedule with a tiered bracket schedule.
-    #[must_use]
+    ///
+    /// `maintenance_margin()` then reports the tier-0 rate; risk checks use the full schedule.
+    ///
+    /// # Errors
+    /// Returns [`ConfigError::InvalidMaintenanceMarginTier`] if any tier's maintenance rate is
+    /// `>=` the initial margin rate, because a position of that size would be liquidatable
+    /// right at open.
     pub fn with_maintenance_margin_schedule(
         mut self,
         schedule: MaintenanceMarginSchedule<I, D, BaseOrQuote::PairedCurrency>,
-    ) -> Self {
+    ) -> Result<Self, ConfigError> {
+        // Rates are non-decreasing (schedule invariant), so the last tier is the maximum.
+        if schedule.max_maintenance_margin_rate() >= self.init_margin_req {
+            return Err(ConfigError::InvalidMaintenanceMarginTier);
+        }
         self.maintenance_margin = schedule.tiers()[0].maintenance_margin_rate();
+        assert!(self.maintenance_margin < self.init_margin_req);
         self.maintenance_margin_schedule = schedule;
-        self
+        Ok(self)
     }
 
     /// Configure an optional extra liquidation clearance fee rate (in `[0, 1)`),

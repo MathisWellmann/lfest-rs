@@ -21,7 +21,10 @@ pub use cross_margin::{
     CrossMarginRiskEngine,
     MarginMode,
 };
-pub(crate) use isolated_margin::IsolatedMarginRiskEngine;
+pub(crate) use isolated_margin::{
+    IsolatedMarginRiskEngine,
+    isolated_liquidation_price,
+};
 pub use margin_tiers::{
     MaintenanceMarginSchedule,
     MaintenanceMarginTier,

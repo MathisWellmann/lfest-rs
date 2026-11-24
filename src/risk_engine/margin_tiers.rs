@@ -174,30 +174,46 @@ where
 
     /// Construct a schedule from explicit [`MaintenanceMarginTier`] entries.
     ///
+    /// The offsets must make the maintenance margin curve continuous, otherwise the
+    /// requirement jumps (or turns negative) at a bracket boundary:
+    /// `amount_0 == 0` and `amount_i == amount_{i-1} + cap_{i-1} * (rate_i - rate_{i-1})`.
+    ///
     /// # Errors
-    /// Returns [`ConfigError::InvalidMaintenanceMarginTier`] if the slice is empty
-    /// or tiers violate ordering invariants.
+    /// Returns [`ConfigError::InvalidMaintenanceMarginTier`] if the slice is empty,
+    /// caps are not strictly increasing, rates decrease, a non-final tier is unbounded,
+    /// or any `maintenance_amount` breaks continuity.
     pub fn from_tiers(tiers: &[MaintenanceMarginTier<I, D, Margin>]) -> Result<Self, ConfigError> {
         if tiers.is_empty() {
             return Err(ConfigError::InvalidMaintenanceMarginTier);
         }
-        let mut prev_cap: Option<Margin> = None;
-        let mut prev_rate = Decimal::zero();
+        let mut prev: Option<&MaintenanceMarginTier<I, D, Margin>> = None;
         for (idx, tier) in tiers.iter().enumerate() {
-            if idx > 0 && tier.maintenance_margin_rate < prev_rate {
-                return Err(ConfigError::InvalidMaintenanceMarginTier);
-            }
             let is_last = idx + 1 == tiers.len();
             if !is_last && tier.notional_cap.is_none() {
                 return Err(ConfigError::InvalidMaintenanceMarginTier);
             }
-            if let (Some(pc), Some(c)) = (prev_cap, tier.notional_cap)
-                && c <= pc
-            {
+            let expected_amount = match prev {
+                None => Margin::zero(),
+                Some(p) => {
+                    if tier.maintenance_margin_rate < p.maintenance_margin_rate {
+                        return Err(ConfigError::InvalidMaintenanceMarginTier);
+                    }
+                    let pc = p
+                        .notional_cap
+                        .expect("only the final tier may be unbounded, checked above");
+                    if let Some(c) = tier.notional_cap
+                        && c <= pc
+                    {
+                        return Err(ConfigError::InvalidMaintenanceMarginTier);
+                    }
+                    p.maintenance_amount
+                        + pc * (tier.maintenance_margin_rate - p.maintenance_margin_rate)
+                }
+            };
+            if tier.maintenance_amount != expected_amount {
                 return Err(ConfigError::InvalidMaintenanceMarginTier);
             }
-            prev_cap = tier.notional_cap;
-            prev_rate = tier.maintenance_margin_rate;
+            prev = Some(tier);
         }
         Ok(Self {
             tiers: Box::from(tiers),
@@ -215,17 +231,49 @@ where
     #[inline]
     #[must_use]
     pub fn tier_for_notional(&self, notional: Margin) -> &MaintenanceMarginTier<I, D, Margin> {
+        &self.tiers[self.tier_index_for_notional(notional)]
+    }
+
+    /// Index of the active tier for a non-negative position `notional`.
+    #[inline]
+    #[must_use]
+    pub(crate) fn tier_index_for_notional(&self, notional: Margin) -> usize {
         assert2::debug_assert!(notional >= Margin::zero());
-        for tier in &self.tiers {
-            match tier.notional_cap {
-                Some(cap) if notional <= cap => return tier,
-                None => return tier,
-                Some(_) => {}
-            }
-        }
+        assert!(!self.tiers.is_empty());
+        self.tiers
+            .iter()
+            .position(|tier| tier.notional_cap.is_none_or(|cap| notional <= cap))
+            // Notionals above the top cap use the top tier.
+            .unwrap_or(self.tiers.len() - 1)
+    }
+
+    /// The highest maintenance margin rate of any tier (the rate of the last tier).
+    #[inline]
+    #[must_use]
+    pub fn max_maintenance_margin_rate(&self) -> Decimal<I, D> {
         self.tiers
             .last()
             .expect("MaintenanceMarginSchedule always has at least one tier")
+            .maintenance_margin_rate
+    }
+
+    /// The maintenance margin for a positive `notional` expressed as a rate of that notional
+    /// (`maintenance_margin(notional) / notional`).
+    ///
+    /// Returns the tier rate unchanged when the tier has no continuity offset, so a flat
+    /// schedule loses no precision to the division.
+    #[inline]
+    #[must_use]
+    pub fn effective_rate(&self, notional: Margin) -> Decimal<I, D> {
+        assert2::debug_assert!(notional > Margin::zero());
+        let tier = self.tier_for_notional(notional);
+        if tier.maintenance_amount.is_zero() {
+            return tier.maintenance_margin_rate;
+        }
+        let rate = *self.maintenance_margin(notional).as_ref() / *notional.as_ref();
+        assert2::debug_assert!(rate >= Decimal::zero());
+        assert2::debug_assert!(rate <= tier.maintenance_margin_rate);
+        rate
     }
 
     /// Compute the required maintenance margin for a non-negative `notional`.
@@ -239,8 +287,14 @@ where
             return Margin::zero();
         }
         let tier = self.tier_for_notional(notional);
-        let raw = notional * tier.maintenance_margin_rate - tier.maintenance_amount;
-        raw.max(Margin::zero())
+        let mm = notional * tier.maintenance_margin_rate - tier.maintenance_amount;
+        // Continuity (validated at construction) keeps the curve non-negative:
+        // `mm(n) = mm(cap_{i-1}) + (n - cap_{i-1}) * rate_i` for `n` inside tier `i`.
+        assert!(
+            mm >= Margin::zero(),
+            "maintenance margin must not be negative"
+        );
+        mm
     }
 }
 
@@ -324,6 +378,84 @@ mod tests {
                 (None, r1),
             ]),
             Err(ConfigError::InvalidMaintenanceMarginTier)
+        );
+    }
+}
+
+#[cfg(test)]
+mod from_tiers_tests {
+    use super::*;
+    use crate::prelude::QuoteCurrency;
+
+    type Tier = MaintenanceMarginTier<i64, 5, QuoteCurrency<i64, 5>>;
+
+    fn tier(cap: Option<i64>, rate_permille: i64, amount: i64) -> Tier {
+        MaintenanceMarginTier::new(
+            cap.map(|c| QuoteCurrency::new(c, 0)),
+            Decimal::try_from_scaled(rate_permille, 3).unwrap(),
+            QuoteCurrency::new(amount, 0),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn from_tiers_accepts_continuous_offsets() {
+        // amount_1 = 0 + 10_000 * (0.010 - 0.005) = 50.
+        let sched =
+            MaintenanceMarginSchedule::from_tiers(&[tier(Some(10_000), 5, 0), tier(None, 10, 50)])
+                .unwrap();
+        assert_eq!(
+            sched.maintenance_margin(QuoteCurrency::new(20_000, 0)),
+            QuoteCurrency::new(150, 0)
+        );
+    }
+
+    #[test]
+    fn from_tiers_rejects_discontinuous_offsets() {
+        let err = Err(ConfigError::InvalidMaintenanceMarginTier);
+        // Non-zero first offset.
+        assert_eq!(
+            MaintenanceMarginSchedule::from_tiers(&[tier(None, 5, 1)]),
+            err
+        );
+        // Offset too large: would make the requirement negative just above the boundary.
+        assert_eq!(
+            MaintenanceMarginSchedule::from_tiers(&[tier(Some(10_000), 5, 0), tier(None, 10, 500)]),
+            err
+        );
+        // Offset too small (jump at the boundary), one unit off the continuous value.
+        assert_eq!(
+            MaintenanceMarginSchedule::from_tiers(&[tier(Some(10_000), 5, 0), tier(None, 10, 49)]),
+            err
+        );
+        // Equal caps.
+        assert_eq!(
+            MaintenanceMarginSchedule::from_tiers(&[
+                tier(Some(10_000), 5, 0),
+                tier(Some(10_000), 10, 50),
+            ]),
+            err
+        );
+        // Decreasing rate.
+        assert_eq!(
+            MaintenanceMarginSchedule::from_tiers(&[tier(Some(10_000), 10, 0), tier(None, 5, 0)]),
+            err
+        );
+    }
+
+    #[test]
+    fn effective_rate_reflects_offset() {
+        let sched =
+            MaintenanceMarginSchedule::from_tiers(&[tier(Some(10_000), 5, 0), tier(None, 10, 50)])
+                .unwrap();
+        // (20_000 * 0.01 - 50) / 20_000 = 0.0075
+        assert_eq!(
+            sched.effective_rate(QuoteCurrency::new(20_000, 0)),
+            Decimal::try_from_scaled(75, 4).unwrap()
+        );
+        assert_eq!(
+            sched.effective_rate(QuoteCurrency::new(1_000, 0)),
+            Decimal::try_from_scaled(5, 3).unwrap()
         );
     }
 }
