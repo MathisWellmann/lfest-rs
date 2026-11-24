@@ -1292,7 +1292,9 @@ where
                         return;
                     }
                     if exhausted {
-                        return;
+                        // Only this side's taker flow is used up; a two-sided update
+                        // (e.g. `SmartCandle`) may still fill the other side.
+                        break;
                     }
                 } else {
                     // We can be sure that no other bid can be filled if this one could not be filled.
@@ -1323,7 +1325,9 @@ where
                         return;
                     }
                     if exhausted {
-                        return;
+                        // Only this side's taker flow is used up; a two-sided update
+                        // (e.g. `SmartCandle`) may still fill the other side.
+                        break;
                     }
                 } else {
                     // We can be sure that no other ask can be filled if this one could not be filled.
