@@ -1258,7 +1258,9 @@ where
                         return;
                     }
                     if exhausted {
-                        return;
+                        // Only this side's taker flow is used up; a two-sided update
+                        // (e.g. `SmartCandle`) may still fill the other side.
+                        break;
                     }
                 } else {
                     break;
@@ -1278,7 +1280,9 @@ where
                         return;
                     }
                     if exhausted {
-                        return;
+                        // Only this side's taker flow is used up; a two-sided update
+                        // (e.g. `SmartCandle`) may still fill the other side.
+                        break;
                     }
                 } else {
                     break;

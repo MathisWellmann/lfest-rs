@@ -247,3 +247,107 @@ fn slippage_model_and_ledger_reconcile_exact_equity_on_exchange_and_portfolio() 
     assert_eq!(pf_ledger.len(), 3);
     assert!(pf_ledger.reconciles_to(pf.balances().equity()));
 }
+
+/// Sell flow of exactly 2 below the resting bid (exhausting the bid side) and buy flow
+/// of 2 above the resting ask.
+fn two_sided_smart_candle(
+    price_filter: &PriceFilter<i64, DECIMALS>,
+) -> SmartCandle<i64, DECIMALS, BaseCurrency<i64, DECIMALS>> {
+    let trades = &[
+        Trade {
+            timestamp_exchange_ns: 2.into(),
+            price: QuoteCurrency::new(98, 0),
+            quantity: BaseCurrency::new(2, 0),
+            side: Side::Sell,
+        },
+        Trade {
+            timestamp_exchange_ns: 3.into(),
+            price: QuoteCurrency::new(103, 0),
+            quantity: BaseCurrency::new(2, 0),
+            side: Side::Buy,
+        },
+    ];
+    let bba = Bba {
+        bid: QuoteCurrency::new(100, 0),
+        ask: QuoteCurrency::new(101, 0),
+        timestamp_exchange_ns: 3.into(),
+    };
+    SmartCandle::new(trades, bba, price_filter)
+}
+
+fn resting_bid_and_ask()
+-> [LimitOrder<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId, NewOrder>; 2] {
+    [
+        LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(99, 0),
+            BaseCurrency::new(2, 0),
+        )
+        .unwrap(),
+        LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(102, 0),
+            BaseCurrency::new(2, 0),
+        )
+        .unwrap(),
+    ]
+}
+
+#[test]
+fn smart_candle_bid_exhaustion_still_fills_resting_asks() {
+    let mut ex = mock_exchange_linear();
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(100, 0),
+        ask: QuoteCurrency::new(101, 0),
+        timestamp_exchange_ns: 1.into(),
+    })
+    .unwrap();
+    for order in resting_bid_and_ask() {
+        ex.submit_limit_order(order).unwrap();
+    }
+
+    let sc = two_sided_smart_candle(ex.config().contract_spec().price_filter());
+    let events = ex.update_state(&sc).unwrap();
+    assert_eq!(events.len(), 2, "{events:?}");
+    assert!(
+        events
+            .iter()
+            .all(|e| matches!(e, LimitOrderEvent::Fill(LimitOrderFill::FullyFilled { .. })))
+    );
+    assert!(ex.account().active_limit_orders().is_empty());
+    assert!(ex.account().position().quantity().is_zero());
+}
+
+#[test]
+fn portfolio_smart_candle_bid_exhaustion_still_fills_resting_asks() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![MarketConfig::new(
+            NonZeroU16::new(10).expect(EXPECT_NON_ZERO),
+            mock_exchange_linear().config().contract_spec().clone(),
+            OrderRateLimits::default(),
+        )],
+    )
+    .unwrap();
+    let mut pf =
+        PortfolioExchange::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>::new(cfg);
+    let m = MarketId::new(0);
+    pf.update_market(
+        m,
+        &Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 1.into(),
+        },
+    )
+    .unwrap();
+    for order in resting_bid_and_ask() {
+        pf.submit_limit_order(m, order).unwrap();
+    }
+
+    let sc = two_sided_smart_candle(&PriceFilter::default());
+    let events = pf.update_market(m, &sc).unwrap();
+    assert_eq!(events.len(), 2, "{events:?}");
+    assert!(pf.market(m).unwrap().active_limit_orders.is_empty());
+    assert!(pf.market(m).unwrap().position.quantity().is_zero());
+}
