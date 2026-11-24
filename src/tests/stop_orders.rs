@@ -335,3 +335,311 @@ fn portfolio_exchange_stop_orders_fire_per_market() {
         other => panic!("expected portfolio stop fill, got {other:?}"),
     }
 }
+
+/// Long 2 with a resting reduce-only take-profit; a stop closes the position, so the
+/// venue force-cancels the stale reduce-only order during the stop execution.
+fn exchange_with_stale_reduce_only_after_stop(
+    stop: StopOrder<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>,
+) -> (
+    Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>,
+    OrderId,
+) {
+    let mut ex = mock_exchange_linear();
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(100, 0),
+        ask: QuoteCurrency::new(101, 0),
+        timestamp_exchange_ns: 1.into(),
+    })
+    .unwrap();
+    ex.submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap())
+        .unwrap();
+    let tp = ex
+        .submit_limit_order(
+            LimitOrder::new(
+                Side::Sell,
+                QuoteCurrency::new(110, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap()
+            .with_reduce_only(true),
+        )
+        .unwrap();
+    ex.submit_stop_order(stop).unwrap();
+    (ex, tp.id())
+}
+
+#[test]
+fn forced_cancel_from_elected_market_stop_survives_update_state() {
+    let stop = StopOrder::stop_market(
+        Side::Sell,
+        QuoteCurrency::new(95, 0),
+        BaseCurrency::new(2, 0),
+        NoUserOrderId,
+    )
+    .unwrap();
+    let (mut ex, tp_id) = exchange_with_stale_reduce_only_after_stop(stop);
+
+    let events = ex
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(94, 0),
+            ask: QuoteCurrency::new(95, 0),
+            timestamp_exchange_ns: 2.into(),
+        })
+        .unwrap()
+        .clone();
+    assert!(ex.account().position().quantity().is_zero());
+    assert!(ex.account().active_limit_orders().is_empty());
+    assert!(matches!(
+        ex.stop_order_events().as_slice(),
+        [StopOrderEvent::Filled { .. }]
+    ));
+    assert_eq!(events.len(), 1);
+    match &events[0] {
+        LimitOrderEvent::ForcedCancel(order) => assert_eq!(order.id(), tp_id),
+        other => panic!("expected forced cancel, got {other:?}"),
+    }
+}
+
+#[test]
+fn forced_cancel_from_immediately_filled_stop_limit_child_is_reported() {
+    // Marketable child (limit 90 below the bid) fills immediately on election.
+    let stop = StopOrder::stop_limit(
+        Side::Sell,
+        QuoteCurrency::new(95, 0),
+        QuoteCurrency::new(90, 0),
+        BaseCurrency::new(2, 0),
+        TimeInForce::GoodTilCancelled,
+        NoUserOrderId,
+    )
+    .unwrap();
+    let (mut ex, tp_id) = exchange_with_stale_reduce_only_after_stop(stop);
+
+    let events = ex
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(94, 0),
+            ask: QuoteCurrency::new(95, 0),
+            timestamp_exchange_ns: 2.into(),
+        })
+        .unwrap()
+        .clone();
+    assert!(ex.account().position().quantity().is_zero());
+    assert!(ex.account().active_limit_orders().is_empty());
+    assert!(matches!(
+        ex.stop_order_events().as_slice(),
+        [StopOrderEvent::Filled { .. }]
+    ));
+    assert_eq!(events.len(), 1);
+    match &events[0] {
+        LimitOrderEvent::ForcedCancel(order) => assert_eq!(order.id(), tp_id),
+        other => panic!("expected forced cancel, got {other:?}"),
+    }
+}
+
+/// 10x leverage, 5% maintenance margin, no fees.
+fn levered_spec() -> ContractSpecification<i64, DECIMALS, BaseCurrency<i64, DECIMALS>> {
+    ContractSpecification::new(
+        leverage!(10),
+        Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+        PriceFilter::default(),
+        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
+        Fee::from(Decimal::zero()),
+        Fee::from(Decimal::zero()),
+    )
+    .expect(EXPECT_CONTRACT_SPEC)
+}
+
+/// Two sell stops below a long 10 @ 100; the candle elects both and the first fill
+/// (5 @ 80, realizing -100) liquidates the account.
+fn cascade_stops() -> [StopOrder<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>; 2] {
+    [
+        StopOrder::stop_market(
+            Side::Sell,
+            QuoteCurrency::new(95, 0),
+            BaseCurrency::new(5, 0),
+            NoUserOrderId,
+        )
+        .unwrap(),
+        StopOrder::stop_market(
+            Side::Sell,
+            QuoteCurrency::new(90, 0),
+            BaseCurrency::new(1, 0),
+            NoUserOrderId,
+        )
+        .unwrap(),
+    ]
+}
+
+fn crash_candle() -> Candle<i64, DECIMALS> {
+    Candle::new(
+        QuoteCurrency::new(80, 0),
+        QuoteCurrency::new(81, 0),
+        QuoteCurrency::new(79, 0),
+        QuoteCurrency::new(101, 0),
+        2.into(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn liquidation_mid_stop_cascade_reports_remaining_elected_stops() {
+    let config = Config::new(
+        QuoteCurrency::new(110, 0),
+        NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+        levered_spec(),
+        OrderRateLimits::default(),
+    )
+    .unwrap();
+    let mut ex = Exchange::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>::new(config);
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(99, 0),
+        ask: QuoteCurrency::new(100, 0),
+        timestamp_exchange_ns: 1.into(),
+    })
+    .unwrap();
+    ex.submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap())
+        .unwrap();
+    let [first, second] = cascade_stops().map(|s| ex.submit_stop_order(s).unwrap());
+
+    assert_eq!(
+        ex.update_state(&crash_candle()).unwrap_err(),
+        RiskError::Liquidate
+    );
+    assert!(ex.account().position().quantity().is_zero());
+    assert!(ex.pending_stops().is_empty());
+    let events = ex.stop_order_events();
+    assert_eq!(events.len(), 2, "{events:?}");
+    assert!(matches!(
+        events[0],
+        StopOrderEvent::Filled { stop_order_id, .. } if stop_order_id == first.id()
+    ));
+    assert_eq!(
+        events[1],
+        StopOrderEvent::Cancelled {
+            stop_order_id: second.id(),
+            user_order_id: NoUserOrderId,
+            reason: StopCancelReason::ForcedCancel,
+        }
+    );
+}
+
+fn levered_portfolio(
+    balance: QuoteCurrency<i64, DECIMALS>,
+) -> PortfolioExchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+    let cfg = PortfolioConfig::new(
+        balance,
+        vec![MarketConfig::new(
+            NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+            levered_spec().with_ticker("BTCUSDT"),
+            OrderRateLimits::default(),
+        )],
+    )
+    .unwrap();
+    let mut pf = PortfolioExchange::new(cfg);
+    pf.update_market(
+        MarketId::new(0),
+        &Bba {
+            bid: QuoteCurrency::new(99, 0),
+            ask: QuoteCurrency::new(100, 0),
+            timestamp_exchange_ns: 1.into(),
+        },
+    )
+    .unwrap();
+    pf
+}
+
+#[test]
+fn portfolio_liquidation_mid_stop_cascade_reports_remaining_elected_stops() {
+    let mut pf = levered_portfolio(QuoteCurrency::new(110, 0));
+    let m = MarketId::new(0);
+    pf.submit_market_order(
+        m,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap(),
+    )
+    .unwrap();
+    let [first, second] = cascade_stops().map(|s| pf.submit_stop_order(m, s).unwrap());
+
+    assert_eq!(
+        pf.update_market(m, &crash_candle()).unwrap_err(),
+        RiskError::Liquidate
+    );
+    assert!(pf.market(m).unwrap().position.quantity().is_zero());
+    assert!(pf.pending_stops(m).unwrap().is_empty());
+    let events = pf.stop_events();
+    assert_eq!(events.len(), 2, "{events:?}");
+    assert!(matches!(
+        events[0].event,
+        StopOrderEvent::Filled { stop_order_id, .. } if stop_order_id == first.id()
+    ));
+    assert_eq!(
+        events[1].event,
+        StopOrderEvent::Cancelled {
+            stop_order_id: second.id(),
+            user_order_id: NoUserOrderId,
+            reason: StopCancelReason::ForcedCancel,
+        }
+    );
+}
+
+#[test]
+fn portfolio_forced_cancel_from_immediately_filled_stop_limit_child_is_reported() {
+    let mut pf = levered_portfolio(QuoteCurrency::new(200, 0));
+    let m = MarketId::new(0);
+    pf.submit_market_order(
+        m,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap(),
+    )
+    .unwrap();
+    // Resting bid adding 50 of order margin: required collateral 150 <= equity 200.
+    let bid = pf
+        .submit_limit_order(
+            m,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(50, 0),
+                BaseCurrency::new(10, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    pf.submit_stop_order(
+        m,
+        StopOrder::stop_limit(
+            Side::Sell,
+            QuoteCurrency::new(95, 0),
+            QuoteCurrency::new(90, 0),
+            BaseCurrency::new(1, 0),
+            TimeInForce::GoodTilCancelled,
+            NoUserOrderId,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    // The child sells 1 @ 92 (marketable); the unrealized loss leaves the equity below
+    // the required collateral, so the venue force-cancels the resting bid.
+    let events = pf
+        .update_market(
+            m,
+            &Bba {
+                bid: QuoteCurrency::new(92, 0),
+                ask: QuoteCurrency::new(93, 0),
+                timestamp_exchange_ns: 2.into(),
+            },
+        )
+        .unwrap()
+        .clone();
+    assert_eq!(
+        pf.market(m).unwrap().position.quantity(),
+        BaseCurrency::new(9, 0)
+    );
+    assert!(matches!(
+        pf.stop_events()[0].event,
+        StopOrderEvent::Filled { .. }
+    ));
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(events[0].market_id, m);
+    match &events[0].event {
+        LimitOrderEvent::ForcedCancel(order) => assert_eq!(order.id(), bid.id()),
+        other => panic!("expected forced cancel, got {other:?}"),
+    }
+}

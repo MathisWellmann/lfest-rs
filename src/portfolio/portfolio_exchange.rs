@@ -809,11 +809,42 @@ where
     /// # Errors
     /// Returns [`PortfolioError`] on unknown/delisted/reduce-only market, rate limit,
     /// filter violation, crossing GTX order, capacity limit, or insufficient cross-margin.
+    pub fn submit_limit_order_with_execution(
+        &mut self,
+        market_id: MarketId,
+        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Result<
+        crate::exchange::LimitOrderSubmission<I, D, BaseOrQuote, UserOrderIdT>,
+        PortfolioError<UserOrderIdT>,
+    > {
+        assert!(self.forced_cancel_scratch.is_empty());
+        let mut submission = self.submit_limit_order_keep_cancels(market_id, order);
+        if let Ok(crate::exchange::LimitOrderSubmission::ImmediatelyFilled {
+            forced_cancels, ..
+        }) = &mut submission
+        {
+            assert!(forced_cancels.is_empty());
+            let tagged_cancels = self.take_forced_cancels();
+            forced_cancels.reserve_exact(tagged_cancels.len());
+            for (_, o) in tagged_cancels {
+                forced_cancels
+                    .push_within_capacity(o)
+                    .expect(EXPECT_CAPACITY);
+            }
+        }
+        assert!(self.forced_cancel_scratch.is_empty());
+        submission
+    }
+
+    /// Like [`Self::submit_limit_order_with_execution`], but an immediate fill leaves its
+    /// forced cancellations in `forced_cancel_scratch` (with their market tags, as a
+    /// margin call may cancel orders on other markets) and returns an empty
+    /// `forced_cancels`. Internal callers route the scratch into the event stream.
     #[allow(
         clippy::too_many_lines,
         reason = "keeping all TIF and reduce-only admission branches in one place preserves clarity"
     )]
-    pub fn submit_limit_order_with_execution(
+    fn submit_limit_order_keep_cancels(
         &mut self,
         market_id: MarketId,
         mut order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
@@ -933,18 +964,12 @@ where
                 bad_debt_before,
             );
             let solvency = self.reconcile_portfolio_margin(bad_debt_before);
-            let tagged_cancels = self.take_forced_cancels();
-            let mut forced_cancels = Vec::with_capacity(tagged_cancels.len());
-            for (_, o) in tagged_cancels {
-                forced_cancels
-                    .push_within_capacity(o)
-                    .expect(EXPECT_CAPACITY);
-            }
             let filled_order = pending.into_filled_at_price(fill_price, ts_ns);
             return Ok(crate::exchange::LimitOrderSubmission::ImmediatelyFilled {
                 filled_order,
                 fee,
-                forced_cancels,
+                // Left in `forced_cancel_scratch`, see the doc comment.
+                forced_cancels: Vec::with_capacity(0),
                 solvency,
             });
         }
@@ -1636,6 +1661,22 @@ where
             let (stop, trigger_price) = self.elected_stops_scratch[i];
             self.execute_elected_stop_for_market(idx, stop, trigger_price, candle_range.is_some());
             if self.liquidated_during_fills {
+                core::hint::cold_path();
+                // The remaining elected stops were already removed from `pending_stops`,
+                // so the liquidation's own stop cancellation does not see them. Report
+                // them here, otherwise the user never learns their fate.
+                let market_id = self.markets[idx].market_id;
+                for j in (i + 1)..n {
+                    let (left, _) = self.elected_stops_scratch[j];
+                    self.push_stop_event(
+                        market_id,
+                        StopOrderEvent::Cancelled {
+                            stop_order_id: left.id(),
+                            user_order_id: left.user_order_id(),
+                            reason: StopCancelReason::ForcedCancel,
+                        },
+                    );
+                }
                 break;
             }
         }
@@ -1811,7 +1852,12 @@ where
         let child = child
             .with_time_in_force(time_in_force)
             .with_reduce_only(stop.reduce_only());
-        match self.submit_limit_order_with_execution(market_id, child) {
+        assert!(self.forced_cancel_scratch.is_empty());
+        let submission = self.submit_limit_order_keep_cancels(market_id, child);
+        // Orders the venue cancelled while settling an immediate child fill must reach the
+        // event stream (with their own market tags) like any other forced cancel.
+        self.drain_forced_cancels_into_events();
+        match submission {
             Ok(crate::exchange::LimitOrderSubmission::Resting(pending)) => {
                 self.push_stop_event(
                     market_id,
@@ -1826,9 +1872,10 @@ where
             Ok(crate::exchange::LimitOrderSubmission::ImmediatelyFilled {
                 filled_order,
                 fee,
+                forced_cancels,
                 solvency,
-                ..
             }) => {
+                assert!(forced_cancels.is_empty(), "routed via the scratch buffer");
                 self.push_stop_event(
                     market_id,
                     StopOrderEvent::Filled {
