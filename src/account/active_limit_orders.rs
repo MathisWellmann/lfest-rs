@@ -264,6 +264,29 @@ where
         None
     }
 
+    /// Cancel and return all active limit orders on `side` (or both sides if `side` is `None`).
+    #[must_use]
+    pub(crate) fn cancel_all(
+        &mut self,
+        side: Option<Side>,
+    ) -> Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+        let count = match side {
+            Some(Buy) => self.bids.len(),
+            Some(Sell) => self.asks.len(),
+            None => self.len(),
+        };
+        let mut out = Vec::with_capacity(count);
+        match side {
+            Some(Buy) => self.bids.drain_all(&mut out),
+            Some(Sell) => self.asks.drain_all(&mut out),
+            None => {
+                self.bids.drain_all(&mut out);
+                self.asks.drain_all(&mut out);
+            }
+        }
+        out
+    }
+
     /// Remove an order from being tracked for margin purposes.
     #[allow(clippy::complexity, reason = "How is this hard to read?")]
     pub(crate) fn remove_limit_order(

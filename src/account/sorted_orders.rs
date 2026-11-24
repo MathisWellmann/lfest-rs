@@ -150,6 +150,19 @@ where
         self.orders.iter().find(|order| order.id() == order_id)
     }
 
+    /// Remove and return all resting orders from this side, resetting `notional_sum` to zero.
+    #[inline]
+    pub fn drain_all(
+        &mut self,
+        out: &mut Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>>,
+    ) {
+        self.notional_sum = Zero::zero();
+        for order in self.orders.drain(..) {
+            out.push_within_capacity(order)
+                .expect("caller pre-allocated capacity for drained orders");
+        }
+    }
+
     /// Remove a limit order based on its `OrderId`
     #[inline(always)]
     #[must_use]

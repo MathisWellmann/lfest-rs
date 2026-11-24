@@ -839,6 +839,48 @@ where
         Ok(())
     }
 
+    /// Cancel every active limit order on the exchange in deterministic order,
+    /// charging a single rate-limit slot.
+    ///
+    /// # Errors
+    /// Returns [`crate::order_rate_limiter::RateLimitReached`] if the order rate limit
+    /// has been exceeded.
+    pub fn cancel_all_limit_orders(
+        &mut self,
+    ) -> Result<
+        crate::types::MassCancelResult<I, D, BaseOrQuote, UserOrderIdT>,
+        crate::order_rate_limiter::RateLimitReached,
+    > {
+        self.order_rate_limiter
+            .aquire(self.market_state.current_ts_ns())?;
+        let cancelled = self.account.cancel_all_limit_orders(None);
+        assert!(self.account.active_limit_orders().is_empty());
+        assert!(self.account.order_margin().is_zero());
+        Ok(crate::types::MassCancelResult::new(cancelled))
+    }
+
+    /// Cancel every active limit order on `side` in deterministic order,
+    /// charging a single rate-limit slot.
+    ///
+    /// # Errors
+    /// Returns [`crate::order_rate_limiter::RateLimitReached`] if the order rate limit
+    /// has been exceeded.
+    pub fn cancel_limit_orders_by_side(
+        &mut self,
+        side: crate::types::Side,
+    ) -> Result<
+        crate::types::MassCancelResult<I, D, BaseOrQuote, UserOrderIdT>,
+        crate::order_rate_limiter::RateLimitReached,
+    > {
+        self.order_rate_limiter
+            .aquire(self.market_state.current_ts_ns())?;
+        let cancelled = self.account.cancel_all_limit_orders(Some(side));
+        if self.account.active_limit_orders().is_empty() {
+            assert!(self.account.order_margin().is_zero());
+        }
+        Ok(crate::types::MassCancelResult::new(cancelled))
+    }
+
     /// Cancel an active limit order.
     /// returns Some order if successful with given order_id
     #[allow(clippy::complexity, reason = "How is this hard to read?")]

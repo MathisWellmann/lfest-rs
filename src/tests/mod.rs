@@ -4,6 +4,7 @@ mod cross_margin;
 mod funding;
 mod mark_price_and_filters;
 mod partial_order_fill;
+mod portfolio;
 mod reduce_position_order_margin;
 mod submit_limit_buy_order;
 mod submit_limit_sell_order;

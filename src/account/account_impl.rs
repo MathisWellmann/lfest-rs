@@ -279,6 +279,15 @@ where
             .fill_best(side, filled_quantity, ts_ns)
     }
 
+    /// Cancel all active limit orders on `side`, or both sides when `side` is `None`.
+    #[must_use]
+    pub fn cancel_all_limit_orders(
+        &mut self,
+        side: Option<Side>,
+    ) -> Vec<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
+        self.active_limit_orders.cancel_all(side)
+    }
+
     /// Remove a limit order.
     #[allow(clippy::complexity, reason = "How is this hard to read?")]
     #[inline(always)]
