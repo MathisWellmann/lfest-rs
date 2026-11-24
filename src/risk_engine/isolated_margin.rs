@@ -1,3 +1,4 @@
+use const_decimal::Decimal;
 use num::Zero;
 use tracing::trace;
 
@@ -34,6 +35,44 @@ where
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
 {
     contract_spec: ContractSpecification<I, D, BaseOrQuote>,
+}
+
+/// Static entry-price liquidation threshold of a non-neutral `position` in isolated mode.
+///
+/// The maintenance rate comes from the contract's tiered schedule, evaluated at the
+/// position's entry notional, so large positions use their bracket's (higher) rate
+/// instead of the tier-0 rate.
+#[must_use]
+pub(crate) fn isolated_liquidation_price<I, const D: u8, BaseOrQuote>(
+    contract_spec: &ContractSpecification<I, D, BaseOrQuote>,
+    position: &Position<I, D, BaseOrQuote>,
+) -> QuoteCurrency<I, D>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+{
+    assert!(!position.quantity().is_zero());
+    let notional = position.notional();
+    assert!(notional > Zero::zero());
+    let mm_rate = contract_spec
+        .maintenance_margin_schedule()
+        .effective_rate(notional);
+    let init_rate = contract_spec.init_margin_req();
+    // `<=`: `ContractSpecification::new` accepts a maintenance fraction of 1.
+    assert!(mm_rate <= init_rate, "validated by the contract spec");
+    // Isolated margin posts `imr` of the notional and liquidates once the loss eats into
+    // the maintenance part, i.e. after a relative move of `imr - mmr`. A higher tier rate
+    // must therefore move the liquidation price CLOSER to the entry. The former
+    // `entry * (1 -/+ mmr)` only coincided with this for `mmr == imr / 2` (the default
+    // maintenance fraction) and moved it the wrong way for higher tiers.
+    let max_move = init_rate - mm_rate;
+    assert!(max_move >= Decimal::zero());
+    if position.quantity() > Zero::zero() {
+        position.entry_price().liquidation_price_long(max_move)
+    } else {
+        position.entry_price().liquidation_price_short(max_move)
+    }
 }
 
 impl<I, const D: u8, BaseOrQuote> IsolatedMarginRiskEngine<I, D, BaseOrQuote>
@@ -95,9 +134,7 @@ where
         let mark_method = self.contract_spec.mark_method();
         match position.quantity().cmp(&Zero::zero()) {
             Less => {
-                let liquidation_price = position
-                    .entry_price()
-                    .liquidation_price_short(self.contract_spec.maintenance_margin());
+                let liquidation_price = isolated_liquidation_price(&self.contract_spec, position);
                 let reference_price = market_state
                     .mark_price_for_position(mark_method, crate::account::PositionSide::Short);
                 if reference_price > liquidation_price {
@@ -106,9 +143,7 @@ where
             }
             Equal => return Ok(()),
             Greater => {
-                let liquidation_price = position
-                    .entry_price()
-                    .liquidation_price_long(self.contract_spec.maintenance_margin());
+                let liquidation_price = isolated_liquidation_price(&self.contract_spec, position);
                 let reference_price = market_state
                     .mark_price_for_position(mark_method, crate::account::PositionSide::Long);
                 if reference_price < liquidation_price {

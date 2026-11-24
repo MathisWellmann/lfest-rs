@@ -133,14 +133,14 @@ fn cross_margin_liquidates_at_dynamic_liquidation_price_and_reflects_funding_ero
 #[test]
 fn cross_margin_tiered_brackets_raise_maintenance_margin_for_large_positions() {
     // Tier 1: notional <= 500 -> 5% MM
-    // Tier 2: notional > 500  -> 20% MM (continuity offset = 500 * (0.20 - 0.05) = 75)
-    // At mark notional 1000: MM = 1000 * 0.20 - 75 = 125 (vs 50 under flat 5%).
+    // Tier 2: notional > 500  -> 9% MM (continuity offset = 500 * (0.09 - 0.05) = 20)
+    // Tier rates must stay below the 10% initial margin rate.
     let schedule = MaintenanceMarginSchedule::from_brackets(&[
         (
             Some(QuoteCurrency::new(500, 0)),
             Decimal::try_from_scaled(5, 2).expect(EXPECT_DECIMAL),
         ),
-        (None, Decimal::try_from_scaled(2, 1).expect(EXPECT_DECIMAL)),
+        (None, Decimal::try_from_scaled(9, 2).expect(EXPECT_DECIMAL)),
     ])
     .unwrap();
 
@@ -153,11 +153,10 @@ fn cross_margin_tiered_brackets_raise_maintenance_margin_for_large_positions() {
         Fee::from(Decimal::zero()),
     )
     .expect(EXPECT_CONTRACT_SPEC)
-    .with_maintenance_margin_schedule(schedule);
+    .with_maintenance_margin_schedule(schedule)
+    .expect(EXPECT_CONTRACT_SPEC);
 
     // Wallet = 150, open long 10 @ 100 (notional = 1000).
-    // At bid = 95: mark notional = 950 -> tier 2 MM = 950 * 0.20 - 75 = 115.
-    // MTM equity = 150 - 50 = 100 < 115 -> LIQUIDATED (flat 5% would only need 47.5)!
     let mut exchange = build_cross_linear(spec, QuoteCurrency::new(150, 0));
     exchange
         .update_state(&Bba {
@@ -171,10 +170,20 @@ fn cross_margin_tiered_brackets_raise_maintenance_margin_for_large_positions() {
         .submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap())
         .unwrap();
 
+    // At bid = 92: tier 2 MM = 920 * 0.09 - 20 = 62.8 <= MTM equity 70.
+    exchange
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(92, 0),
+            ask: QuoteCurrency::new(93, 0),
+            timestamp_exchange_ns: 2.into(),
+        })
+        .unwrap();
+    // At bid = 91: MM = 910 * 0.09 - 20 = 61.9 > MTM equity 60 -> LIQUIDATED
+    // (flat 5% would only need 45.5)!
     let res = exchange.update_state(&Bba {
-        bid: QuoteCurrency::new(95, 0),
-        ask: QuoteCurrency::new(96, 0),
-        timestamp_exchange_ns: 2.into(),
+        bid: QuoteCurrency::new(91, 0),
+        ask: QuoteCurrency::new(92, 0),
+        timestamp_exchange_ns: 3.into(),
     });
     assert_eq!(res, Err(RiskError::Liquidate));
 }
@@ -271,5 +280,160 @@ fn cross_margin_unrealized_profit_expands_order_capacity_and_inverse_liq_price_w
             timestamp_exchange_ns: 3.into(),
         }),
         Err(RiskError::Liquidate)
+    );
+}
+
+fn two_tier_spec_2x() -> ContractSpecification<i64, DECIMALS, BaseCurrency<i64, DECIMALS>> {
+    // Tier 1: notional <= 500 -> 5%, tier 2: 20% with continuity offset 75.
+    let schedule = MaintenanceMarginSchedule::from_brackets(&[
+        (
+            Some(QuoteCurrency::new(500, 0)),
+            Decimal::try_from_scaled(5, 2).expect(EXPECT_DECIMAL),
+        ),
+        (None, Decimal::try_from_scaled(2, 1).expect(EXPECT_DECIMAL)),
+    ])
+    .unwrap();
+    ContractSpecification::new(
+        leverage!(2),
+        Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+        PriceFilter::default(),
+        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
+        Fee::from(Decimal::zero()),
+        Fee::from(Decimal::zero()),
+    )
+    .expect(EXPECT_CONTRACT_SPEC)
+    .with_maintenance_margin_schedule(schedule)
+    .expect(EXPECT_CONTRACT_SPEC)
+}
+
+#[test]
+fn isolated_margin_uses_tiered_maintenance_schedule() {
+    // Long 10 @ 100 (notional 1000, tier 2): MM = 1000 * 0.2 - 75 = 125 -> effective rate
+    // 12.5%. With 50% initial margin the position survives a move of 50% - 12.5% = 37.5%,
+    // so it liquidates below 62.5. The tier-0 rate (5%) alone would allow a 45% move (55).
+    let config = Config::new(
+        QuoteCurrency::new(1000, 0),
+        NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+        two_tier_spec_2x(),
+        OrderRateLimits::default(),
+    )
+    .expect(EXPECT_CONFIG);
+    assert_eq!(config.margin_mode(), MarginMode::Isolated);
+    let mut exchange =
+        Exchange::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>::new(config);
+    exchange
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(99, 0),
+            ask: QuoteCurrency::new(100, 0),
+            timestamp_exchange_ns: 1.into(),
+        })
+        .unwrap();
+    exchange
+        .submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(10, 0)).unwrap())
+        .unwrap();
+    assert_eq!(
+        exchange.estimated_liquidation_price(),
+        Some(QuoteCurrency::new(625, 1))
+    );
+    exchange
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(63, 0),
+            ask: QuoteCurrency::new(64, 0),
+            timestamp_exchange_ns: 2.into(),
+        })
+        .unwrap();
+    // Between the tiered (62.5) and the tier-0 (55) threshold: only the schedule liquidates.
+    assert_eq!(
+        exchange.update_state(&Bba {
+            bid: QuoteCurrency::new(62, 0),
+            ask: QuoteCurrency::new(63, 0),
+            timestamp_exchange_ns: 3.into(),
+        }),
+        Err(RiskError::Liquidate)
+    );
+}
+
+#[test]
+fn isolated_short_uses_tiered_maintenance_schedule() {
+    // Short 10 @ 100 (notional 1000, tier 2, effective MM rate 12.5%) liquidates above 137.5.
+    let config = Config::new(
+        QuoteCurrency::new(1000, 0),
+        NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+        two_tier_spec_2x(),
+        OrderRateLimits::default(),
+    )
+    .expect(EXPECT_CONFIG);
+    let mut exchange =
+        Exchange::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>::new(config);
+    exchange
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 1.into(),
+        })
+        .unwrap();
+    exchange
+        .submit_market_order(MarketOrder::new(Side::Sell, BaseCurrency::new(10, 0)).unwrap())
+        .unwrap();
+    assert_eq!(
+        exchange.estimated_liquidation_price(),
+        Some(QuoteCurrency::new(1375, 1))
+    );
+    exchange
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(136, 0),
+            ask: QuoteCurrency::new(137, 0),
+            timestamp_exchange_ns: 2.into(),
+        })
+        .unwrap();
+    assert_eq!(
+        exchange.update_state(&Bba {
+            bid: QuoteCurrency::new(137, 0),
+            ask: QuoteCurrency::new(138, 0),
+            timestamp_exchange_ns: 3.into(),
+        }),
+        Err(RiskError::Liquidate)
+    );
+}
+
+#[test]
+fn maintenance_schedule_must_stay_below_initial_margin_rate() {
+    let spec = || {
+        ContractSpecification::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>>::new(
+            leverage!(5), // imr = 20%
+            Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+            PriceFilter::default(),
+            QuantityFilter::default(),
+            Fee::from(Decimal::zero()),
+            Fee::from(Decimal::zero()),
+        )
+        .expect(EXPECT_CONTRACT_SPEC)
+    };
+    let schedule = |top_rate| {
+        MaintenanceMarginSchedule::from_brackets(&[
+            (
+                Some(QuoteCurrency::new(500, 0)),
+                Decimal::try_from_scaled(5, 2).expect(EXPECT_DECIMAL),
+            ),
+            (None, top_rate),
+        ])
+        .unwrap()
+    };
+    // Top tier at exactly the initial margin rate: liquidatable at open.
+    assert!(matches!(
+        spec().with_maintenance_margin_schedule(schedule(
+            Decimal::try_from_scaled(2, 1).expect(EXPECT_DECIMAL)
+        )),
+        Err(ConfigError::InvalidMaintenanceMarginTier)
+    ));
+    // Just below the initial margin rate is valid.
+    let ok = spec()
+        .with_maintenance_margin_schedule(schedule(
+            Decimal::try_from_scaled(19, 2).expect(EXPECT_DECIMAL),
+        ))
+        .expect(EXPECT_CONTRACT_SPEC);
+    assert_eq!(
+        ok.maintenance_margin(),
+        Decimal::try_from_scaled(5, 2).expect(EXPECT_DECIMAL)
     );
 }
