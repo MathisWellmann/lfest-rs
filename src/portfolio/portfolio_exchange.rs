@@ -32,6 +32,10 @@ use crate::{
         Position,
     },
     contract_specification::ContractSpecification,
+    ledger::{
+        Ledger,
+        LedgerEntryKind,
+    },
     market_state::MarketState,
     market_update::MarketUpdate,
     order_rate_limiter::OrderRateLimiter,
@@ -266,6 +270,9 @@ where
 
     /// Whether a fill-triggered reconciliation liquidated the portfolio during `update_market`.
     liquidated_during_fills: bool,
+
+    /// Optional cashflow / accounting ledger across all markets (disabled by default).
+    ledger: Option<Ledger<I, D, BaseOrQuote::PairedCurrency>>,
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> PortfolioExchange<I, D, BaseOrQuote, UserOrderIdT>
@@ -314,6 +321,50 @@ where
             elected_stops_scratch: Vec::with_capacity(scratch_cap),
             forced_cancel_scratch: Vec::with_capacity(scratch_cap),
             liquidated_during_fills: false,
+            ledger: None,
+        }
+    }
+
+    /// Enable the opt-in portfolio cashflow [`Ledger`] anchored at current wallet equity.
+    pub fn enable_ledger(&mut self, capacity: usize) {
+        self.ledger = Some(Ledger::with_capacity(self.balances.equity(), capacity));
+    }
+
+    /// Borrow the portfolio cashflow [`Ledger`] if enabled.
+    #[inline]
+    #[must_use]
+    pub fn ledger(&self) -> Option<&Ledger<I, D, BaseOrQuote::PairedCurrency>> {
+        self.ledger.as_ref()
+    }
+
+    #[inline]
+    fn record_ledger_delta(
+        &mut self,
+        ts_ns: TimestampNs,
+        market_id: Option<MarketId>,
+        order_id: Option<OrderId>,
+        kind: LedgerEntryKind,
+        equity_before: BaseOrQuote::PairedCurrency,
+        bad_debt_before: BaseOrQuote::PairedCurrency,
+    ) {
+        let Some(ledger) = self.ledger.as_mut() else {
+            return;
+        };
+        let equity_after = self.balances.equity();
+        let bad_debt_after = self.balances.bad_debt();
+        let delta = equity_after - equity_before;
+        if !delta.is_zero() {
+            ledger.record(ts_ns, market_id, order_id, kind, delta, equity_after);
+        }
+        if bad_debt_after > bad_debt_before {
+            ledger.record(
+                ts_ns,
+                market_id,
+                order_id,
+                LedgerEntryKind::BadDebtAbsorption,
+                Zero::zero(),
+                equity_after,
+            );
         }
     }
 
@@ -484,7 +535,9 @@ where
                 );
             }
         }
+        let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
+        let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
         let settled_quantity = self.markets[idx].position.quantity();
         let realized_pnl = if !settled_quantity.is_zero() {
             let pnl = BaseOrQuote::PairedCurrency::pnl(
@@ -502,6 +555,14 @@ where
                 settlement_price,
                 close_side,
                 &mut self.balances,
+            );
+            self.record_ledger_delta(
+                ts_ns,
+                Some(market_id),
+                None,
+                LedgerEntryKind::DelistSettlement,
+                eq_before,
+                bad_debt_before,
             );
             pnl
         } else {
@@ -611,9 +672,19 @@ where
             -(signed_val * *rate.as_ref())
         };
 
+        let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
+        let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
         if !cashflow.is_zero() {
             self.balances.apply_funding(cashflow);
+            self.record_ledger_delta(
+                ts_ns,
+                Some(market_id),
+                None,
+                LedgerEntryKind::Funding,
+                eq_before,
+                bad_debt_before,
+            );
         }
         let solvency = self.reconcile_portfolio_margin(bad_debt_before);
         let forced_cancels = self.take_forced_cancels();
@@ -675,10 +746,15 @@ where
 
         assert2::debug_assert!(self.markets[idx].market_state.ask() > QuoteCurrency::zero());
         assert2::debug_assert!(self.markets[idx].market_state.bid() > QuoteCurrency::zero());
-        let fill_price = match order.side() {
-            Buy => self.markets[idx].market_state.ask(),
-            Sell => self.markets[idx].market_state.bid(),
-        };
+        let fill_price = self.markets[idx]
+            .contract_spec
+            .slippage_model()
+            .quote(
+                &self.markets[idx].market_state,
+                order.side(),
+                order.quantity(),
+            )
+            .execution_price();
         if !strictly_reducing {
             let notional = BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
             self.markets[idx]
@@ -698,6 +774,7 @@ where
             BaseOrQuote::PairedCurrency::convert_from(filled_order.quantity(), fill_price);
         let fee = notional * *self.markets[idx].contract_spec.fee_taker().as_ref();
 
+        let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
         self.markets[idx].position.change(
             filled_order.quantity(),
@@ -706,6 +783,14 @@ where
             &mut self.balances,
         );
         self.balances.account_for_fee(fee);
+        self.record_ledger_delta(
+            ts_ns,
+            Some(market_id),
+            Some(filled_order.state().meta().id()),
+            LedgerEntryKind::RealizedPnl,
+            eq_before,
+            bad_debt_before,
+        );
 
         let solvency = self.reconcile_portfolio_margin(bad_debt_before);
         let forced_cancels = self.take_forced_cancels();
@@ -830,6 +915,7 @@ where
             let filled_qty = pending.remaining_quantity();
             let notional = BaseOrQuote::PairedCurrency::convert_from(filled_qty, fill_price);
             let fee = notional * *self.markets[idx].contract_spec.fee_taker().as_ref();
+            let eq_before = self.balances.equity();
             let bad_debt_before = self.balances.bad_debt();
             self.markets[idx].position.change(
                 filled_qty,
@@ -838,6 +924,14 @@ where
                 &mut self.balances,
             );
             self.balances.account_for_fee(fee);
+            self.record_ledger_delta(
+                ts_ns,
+                Some(market_id),
+                Some(pending.id()),
+                LedgerEntryKind::RealizedPnl,
+                eq_before,
+                bad_debt_before,
+            );
             let solvency = self.reconcile_portfolio_margin(bad_debt_before);
             let tagged_cancels = self.take_forced_cancels();
             let mut forced_cancels = Vec::with_capacity(tagged_cancels.len());
@@ -1188,12 +1282,21 @@ where
 
         let notional = BaseOrQuote::PairedCurrency::convert_from(filled_quantity, limit_price);
         let fee = notional * *self.markets[idx].contract_spec.fee_maker().as_ref();
+        let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
 
         self.markets[idx]
             .position
             .change(filled_quantity, limit_price, side, &mut self.balances);
         self.balances.account_for_fee(fee);
+        self.record_ledger_delta(
+            ts_ns,
+            Some(market_id),
+            Some(order.id()),
+            LedgerEntryKind::RealizedPnl,
+            eq_before,
+            bad_debt_before,
+        );
 
         let fill_event =
             match self.markets[idx]
@@ -1268,34 +1371,48 @@ where
                 }
             }
         }
-        for slot in &mut self.markets {
-            let pos_qty = slot.position.quantity();
+        let n_markets = self.markets.len();
+        for idx in 0..n_markets {
+            let pos_qty = self.markets[idx].position.quantity();
             if pos_qty.is_zero() {
                 continue;
             }
+            let market_id = self.markets[idx].market_id;
+            let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
             let (side, fill_price) = if pos_qty.is_negative() {
-                let p = if slot.market_state.ask() > QuoteCurrency::zero() {
-                    slot.market_state.ask()
+                let p = if self.markets[idx].market_state.ask() > QuoteCurrency::zero() {
+                    self.markets[idx].market_state.ask()
                 } else {
-                    slot.position.entry_price()
+                    self.markets[idx].position.entry_price()
                 };
                 (Buy, p)
             } else {
-                let p = if slot.market_state.bid() > QuoteCurrency::zero() {
-                    slot.market_state.bid()
+                let p = if self.markets[idx].market_state.bid() > QuoteCurrency::zero() {
+                    self.markets[idx].market_state.bid()
                 } else {
-                    slot.position.entry_price()
+                    self.markets[idx].position.entry_price()
                 };
                 (Sell, p)
             };
             let qty = pos_qty.abs();
             let notional = BaseOrQuote::PairedCurrency::convert_from(qty, fill_price);
-            let fee_rate =
-                *slot.contract_spec.fee_taker().as_ref() + slot.contract_spec.liquidation_fee();
+            let fee_rate = *self.markets[idx].contract_spec.fee_taker().as_ref()
+                + self.markets[idx].contract_spec.liquidation_fee();
             let fee = notional * fee_rate;
-            slot.position
+            let eq_before = self.balances.equity();
+            let bd_before = self.balances.bad_debt();
+            self.markets[idx]
+                .position
                 .change(qty, fill_price, side, &mut self.balances);
             self.balances.account_for_fee(fee);
+            self.record_ledger_delta(
+                ts_ns,
+                Some(market_id),
+                None,
+                LedgerEntryKind::Liquidation,
+                eq_before,
+                bd_before,
+            );
         }
         info!("balances after portfolio liquidation: {}", self.balances);
     }
@@ -1582,10 +1699,11 @@ where
             stop.quantity()
         };
 
-        let quote_fill = match stop.side() {
-            Buy => self.markets[idx].market_state.ask(),
-            Sell => self.markets[idx].market_state.bid(),
-        };
+        let quote_fill = self.markets[idx]
+            .contract_spec
+            .slippage_model()
+            .quote(&self.markets[idx].market_state, stop.side(), exec_qty)
+            .execution_price();
         let fill_price = if from_candle {
             match stop.side() {
                 Buy => crate::utils::max(stop.stop_price(), quote_fill),
@@ -1629,11 +1747,21 @@ where
 
         let notional = BaseOrQuote::PairedCurrency::convert_from(exec_qty, fill_price);
         let fee = notional * *self.markets[idx].contract_spec.fee_taker().as_ref();
+        let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
+        let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
         self.markets[idx]
             .position
             .change(exec_qty, fill_price, stop.side(), &mut self.balances);
         self.balances.account_for_fee(fee);
+        self.record_ledger_delta(
+            ts_ns,
+            Some(market_id),
+            Some(stop.id()),
+            LedgerEntryKind::RealizedPnl,
+            eq_before,
+            bad_debt_before,
+        );
         let solvency = self.reconcile_portfolio_margin(bad_debt_before);
         self.drain_forced_cancels_into_events();
 

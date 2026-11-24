@@ -160,6 +160,36 @@ where
             bba,
         }
     }
+
+    /// Decrement `consumed` volume from a cumulative level array while preserving
+    /// monotonicity across all price levels.
+    ///
+    /// Levels at indices `0..=pos` hold cumulative volume `<= avail`; consuming
+    /// `consumed` reduces `levels[pos..]` by `consumed` (consuming from the matched
+    /// bucket up through outer cumulative sums) and clamps `levels[0..pos]` to at
+    /// most the new `levels[pos]` so deeper levels never exceed shallower ones.
+    #[inline]
+    fn deplete_cumulative_levels(
+        levels: &mut [(QuoteCurrency<I, D>, BaseOrQuote)],
+        pos: usize,
+        consumed: BaseOrQuote,
+    ) {
+        assert2::debug_assert!(consumed > BaseOrQuote::zero());
+        assert2::debug_assert!(pos < levels.len());
+        let cap_after = levels[pos].1 - consumed;
+        for level in &mut levels[pos..] {
+            level.1 = if level.1 > consumed {
+                level.1 - consumed
+            } else {
+                BaseOrQuote::zero()
+            };
+        }
+        for level in &mut levels[..pos] {
+            if level.1 > cap_after {
+                level.1 = cap_after;
+            }
+        }
+    }
 }
 
 impl<I, const D: u8, BaseOrQuote> std::fmt::Display for SmartCandle<I, D, BaseOrQuote>
@@ -185,8 +215,6 @@ where
 {
     const CAN_FILL_LIMIT_ORDERS: bool = true;
 
-    // TODO: benchmark and optimize this.
-    // TODO: reduce the quantity if a limit order is filled.
     #[inline]
     fn limit_order_filled<UserOrderIdT: UserOrderId>(
         &mut self,
@@ -203,21 +231,41 @@ where
                 if self.low >= limit_order.limit_price() {
                     return None;
                 }
-                self.aggregate_sell_volume
+                let pos = self
+                    .aggregate_sell_volume
                     .iter()
-                    .rev()
-                    .find(|v| v.0 < limit_order.limit_price())
-                    .map(|v| (min(v.1, limit_order.remaining_quantity()), false))
+                    .rposition(|v| v.0 < limit_order.limit_price())?;
+                let avail = self.aggregate_sell_volume[pos].1;
+                if avail <= BaseOrQuote::zero() {
+                    return None;
+                }
+                let filled = min(avail, limit_order.remaining_quantity());
+                Self::deplete_cumulative_levels(&mut self.aggregate_sell_volume, pos, filled);
+                let exhausted = self
+                    .aggregate_sell_volume
+                    .last()
+                    .is_none_or(|v| v.1 <= BaseOrQuote::zero());
+                Some((filled, exhausted))
             }
             Side::Sell => {
                 if self.high <= limit_order.limit_price() {
                     return None;
                 }
-                self.aggregate_buy_volume
+                let pos = self
+                    .aggregate_buy_volume
                     .iter()
-                    .rev()
-                    .find(|v| v.0 > limit_order.limit_price())
-                    .map(|v| (min(v.1, limit_order.remaining_quantity()), false))
+                    .rposition(|v| v.0 > limit_order.limit_price())?;
+                let avail = self.aggregate_buy_volume[pos].1;
+                if avail <= BaseOrQuote::zero() {
+                    return None;
+                }
+                let filled = min(avail, limit_order.remaining_quantity());
+                Self::deplete_cumulative_levels(&mut self.aggregate_buy_volume, pos, filled);
+                let exhausted = self
+                    .aggregate_buy_volume
+                    .last()
+                    .is_none_or(|v| v.1 <= BaseOrQuote::zero());
+                Some((filled, exhausted))
             }
         }
     }
