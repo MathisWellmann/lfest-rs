@@ -2,8 +2,23 @@
 //!
 //! When enabled, every realized PnL fill, trading fee, perpetual funding settlement,
 //! liquidation, delist settlement, and bad-debt absorption is recorded as a typed
-//! [`LedgerEntry`], allowing callers to verify the exact accounting identity:
-//! `starting_balance + net_cashflows + bad_debt == current_wallet_equity`.
+//! [`LedgerEntry`] carrying the full nominal cashflow, allowing callers to verify the
+//! exact accounting identity [`Ledger::reconciles_to`]:
+//!
+//! `starting_balance + net_cashflow() == current_wallet_equity`
+//!
+//! where `net_cashflow()` sums every entry. Spelled out by kind:
+//!
+//! `starting_balance + pnl + fees + funding + delist + liquidation + bad_debt_absorbed
+//! == current_wallet_equity`
+//!
+//! A fill records its realized PnL ([`LedgerEntryKind::RealizedPnl`], or
+//! [`LedgerEntryKind::Liquidation`] for a forced close) and its fee
+//! ([`LedgerEntryKind::TradingFee`]) as separate entries, so neither amount hides the
+//! other. Cashflows are never floored: when a loss exceeds the wallet, the venue's credit
+//! that floors the wallet back at zero is a separate positive
+//! [`LedgerEntryKind::BadDebtAbsorption`] entry, whose sum equals
+//! `Balances::bad_debt` accrued since the ledger was enabled.
 
 use getset::CopyGetters;
 
@@ -59,7 +74,9 @@ where
     #[getset(get_copy = "pub")]
     delta: Margin,
 
-    /// Wallet equity immediately after applying this entry.
+    /// Running wallet equity of the journal immediately after applying this entry.
+    /// It can be negative between a bankrupting cashflow and the following
+    /// [`LedgerEntryKind::BadDebtAbsorption`] entry.
     #[getset(get_copy = "pub")]
     equity_after: Margin,
 
@@ -142,6 +159,47 @@ where
     #[must_use]
     pub fn starting_balance(&self) -> Margin {
         self.starting_balance
+    }
+
+    /// Record the non-zero `flows` of one settlement in order, starting from the
+    /// running `equity_before`, and return the running equity after the last one.
+    ///
+    /// Zero flows are skipped, because they carry no information.
+    pub(crate) fn record_flows(
+        &mut self,
+        timestamp_ns: TimestampNs,
+        market_id: Option<MarketId>,
+        order_id: Option<OrderId>,
+        flows: &[(LedgerEntryKind, Margin)],
+        equity_before: Margin,
+    ) -> Margin {
+        let len_before = self.entries.len();
+        let mut equity = equity_before;
+        for &(kind, delta) in flows {
+            if delta.is_zero() {
+                continue;
+            }
+            if kind == LedgerEntryKind::BadDebtAbsorption {
+                assert!(
+                    delta > Margin::zero(),
+                    "the venue only ever credits bad debt"
+                );
+            }
+            equity += delta;
+            self.record(timestamp_ns, market_id, order_id, kind, delta, equity);
+        }
+        assert!(self.entries.len() - len_before <= flows.len());
+        equity
+    }
+
+    /// Sum of the `delta` of every recorded entry of `kind`.
+    #[must_use]
+    pub fn total_by_kind(&self, kind: LedgerEntryKind) -> Margin {
+        let mut total = Margin::zero();
+        for e in self.entries.iter().filter(|e| e.kind == kind) {
+            total += e.delta;
+        }
+        total
     }
 
     /// Sum of every recorded cashflow `delta`.

@@ -32,6 +32,7 @@ use crate::{
         Position,
     },
     contract_specification::ContractSpecification,
+    execution_rules::fill_flows,
     ledger::{
         Ledger,
         LedgerEntryKind,
@@ -358,25 +359,28 @@ where
         self.ledger.as_ref()
     }
 
-    /// Record the shared wallet change since `equity_before`.
-    /// Bad debt is recorded separately by `Self::settle_bad_debt`.
+    /// Journal the nominal `flows` of one settlement which started at `equity_before`.
+    ///
+    /// The shared wallet is never floored here, so the flows explain the wallet change
+    /// exactly. Bad debt is recorded separately by `Self::settle_bad_debt`.
     #[inline]
-    fn record_ledger_delta(
+    fn record_ledger_flows<const N: usize>(
         &mut self,
         ts_ns: TimestampNs,
         market_id: Option<MarketId>,
         order_id: Option<OrderId>,
-        kind: LedgerEntryKind,
+        flows: [(LedgerEntryKind, BaseOrQuote::PairedCurrency); N],
         equity_before: BaseOrQuote::PairedCurrency,
     ) {
         let Some(ledger) = self.ledger.as_mut() else {
             return;
         };
-        let equity_after = self.balances.equity();
-        let delta = equity_after - equity_before;
-        if !delta.is_zero() {
-            ledger.record(ts_ns, market_id, order_id, kind, delta, equity_after);
-        }
+        let equity_after = ledger.record_flows(ts_ns, market_id, order_id, &flows, equity_before);
+        assert_eq!(
+            equity_after,
+            self.balances.equity(),
+            "the journaled cashflows must explain the wallet change exactly"
+        );
     }
 
     /// Dynamically register a new market and return its assigned [`MarketId`].
@@ -601,11 +605,11 @@ where
             // Fee-free settlement: the wallet moves by exactly the realized pnl. Bad debt,
             // if any, is booked afterwards in `reconcile_portfolio_margin`.
             assert_eq!(self.balances.equity() - eq_before, pnl);
-            self.record_ledger_delta(
+            self.record_ledger_flows(
                 ts_ns,
                 Some(market_id),
                 None,
-                LedgerEntryKind::DelistSettlement,
+                [(LedgerEntryKind::DelistSettlement, pnl)],
                 eq_before,
             );
             pnl
@@ -723,11 +727,11 @@ where
         let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
         if !cashflow.is_zero() {
             self.balances.apply_shared_wallet_funding(cashflow);
-            self.record_ledger_delta(
+            self.record_ledger_flows(
                 ts_ns,
                 Some(market_id),
                 None,
-                LedgerEntryKind::Funding,
+                [(LedgerEntryKind::Funding, cashflow)],
                 eq_before,
             );
         }
@@ -823,18 +827,18 @@ where
 
         let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
-        self.book_fill(
+        let realized = self.book_fill(
             idx,
             filled_order.quantity(),
             fill_price,
             filled_order.side(),
             fee,
         );
-        self.record_ledger_delta(
+        self.record_ledger_flows(
             ts_ns,
             Some(market_id),
             Some(filled_order.state().meta().id()),
-            LedgerEntryKind::RealizedPnl,
+            fill_flows(realized, fee),
             eq_before,
         );
 
@@ -1030,12 +1034,12 @@ where
             let fee = notional * *self.markets[idx].contract_spec.fee_taker().as_ref();
             let eq_before = self.balances.equity();
             let bad_debt_before = self.balances.bad_debt();
-            self.book_fill(idx, filled_qty, fill_price, pending.side(), fee);
-            self.record_ledger_delta(
+            let realized = self.book_fill(idx, filled_qty, fill_price, pending.side(), fee);
+            self.record_ledger_flows(
                 ts_ns,
                 Some(market_id),
                 Some(pending.id()),
-                LedgerEntryKind::RealizedPnl,
+                fill_flows(realized, fee),
                 eq_before,
             );
             let solvency = self.reconcile_portfolio_margin(bad_debt_before, ts_ns);
@@ -1441,12 +1445,12 @@ where
         let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
 
-        self.book_fill(idx, filled_quantity, limit_price, side, fee);
-        self.record_ledger_delta(
+        let realized = self.book_fill(idx, filled_quantity, limit_price, side, fee);
+        self.record_ledger_flows(
             ts_ns,
             Some(market_id),
             Some(order.id()),
-            LedgerEntryKind::RealizedPnl,
+            fill_flows(realized, fee),
             eq_before,
         );
 
@@ -1553,12 +1557,15 @@ where
             let eq_before = self.balances.equity();
             // Booked without a bankruptcy floor so the net result of closing every leg
             // does not depend on the order in which the legs are closed.
-            self.book_fill(idx, qty, fill_price, side, fee);
-            self.record_ledger_delta(
+            let realized = self.book_fill(idx, qty, fill_price, side, fee);
+            self.record_ledger_flows(
                 ts_ns,
                 Some(market_id),
                 None,
-                LedgerEntryKind::Liquidation,
+                [
+                    (LedgerEntryKind::Liquidation, realized),
+                    (LedgerEntryKind::TradingFee, -fee),
+                ],
                 eq_before,
             );
         }
@@ -1582,7 +1589,13 @@ where
             let eq_before = self.balances.equity();
             self.balances.account_for_shared_wallet_fee(clearance_fee);
             assert!(self.balances.equity() >= Zero::zero());
-            self.record_ledger_delta(ts_ns, None, None, LedgerEntryKind::Liquidation, eq_before);
+            self.record_ledger_flows(
+                ts_ns,
+                None,
+                None,
+                [(LedgerEntryKind::Liquidation, -clearance_fee)],
+                eq_before,
+            );
         }
         self.settle_bad_debt(ts_ns, None);
         assert!(self.balances.equity() >= Zero::zero());
@@ -1998,12 +2011,12 @@ where
         let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
         let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
-        self.book_fill(idx, exec_qty, fill_price, stop.side(), fee);
-        self.record_ledger_delta(
+        let realized = self.book_fill(idx, exec_qty, fill_price, stop.side(), fee);
+        self.record_ledger_flows(
             ts_ns,
             Some(market_id),
             Some(stop.id()),
-            LedgerEntryKind::RealizedPnl,
+            fill_flows(realized, fee),
             eq_before,
         );
         let solvency = self.reconcile_portfolio_margin(bad_debt_before, ts_ns);

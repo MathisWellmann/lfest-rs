@@ -18,7 +18,10 @@ use crate::{
         Balances,
     },
     config::Config,
-    execution_rules,
+    execution_rules::{
+        self,
+        fill_flows,
+    },
     ledger::{
         Ledger,
         LedgerEntryKind,
@@ -285,11 +288,18 @@ where
         self.ledger.as_ref()
     }
 
+    /// Journal the nominal `flows` of one settlement which started at `equity_before` /
+    /// `bad_debt_before`, followed by the venue's credit for any bad debt it created.
+    ///
+    /// `Balances` floors the equity at zero on a bankrupting cashflow, so the flows alone
+    /// would overshoot the wallet; the separate positive
+    /// [`LedgerEntryKind::BadDebtAbsorption`] entry keeps every cashflow nominal while
+    /// `starting_balance + net_cashflow == equity` stays exact.
     #[inline]
-    fn record_ledger_delta(
+    fn record_ledger_flows<const N: usize>(
         &mut self,
         order_id: Option<OrderId>,
-        kind: LedgerEntryKind,
+        flows: [(LedgerEntryKind, BaseOrQuote::PairedCurrency); N],
         equity_before: BaseOrQuote::PairedCurrency,
         bad_debt_before: BaseOrQuote::PairedCurrency,
     ) {
@@ -297,23 +307,22 @@ where
             return;
         };
         let ts = self.market_state.current_timestamp_ns();
-        let equity_after = self.account.balances().equity();
-        let bad_debt_after = self.account.balances().bad_debt();
-        let equity_delta = equity_after - equity_before;
-        if !equity_delta.is_zero() {
-            ledger.record(ts, None, order_id, kind, equity_delta, equity_after);
-        }
-        let new_bad_debt = bad_debt_after - bad_debt_before;
-        if !new_bad_debt.is_zero() {
-            ledger.record(
-                ts,
-                None,
-                order_id,
-                LedgerEntryKind::BadDebtAbsorption,
-                Zero::zero(),
-                equity_after,
-            );
-        }
+        let balances = self.account.balances();
+        let new_bad_debt = balances.bad_debt() - bad_debt_before;
+        assert!(new_bad_debt >= Zero::zero(), "bad debt never decreases");
+        let after_flows = ledger.record_flows(ts, None, order_id, &flows, equity_before);
+        let equity_after = ledger.record_flows(
+            ts,
+            None,
+            order_id,
+            &[(LedgerEntryKind::BadDebtAbsorption, new_bad_debt)],
+            after_flows,
+        );
+        assert_eq!(
+            equity_after,
+            balances.equity(),
+            "the journaled cashflows must explain the wallet change exactly"
+        );
     }
 
     /// Update the exchange state with new information
@@ -454,8 +463,9 @@ where
         let taker_fee = notional * *self.config.contract_spec().fee_taker().as_ref();
         let eq_before = self.account.balances().equity();
         let bd_before = self.account.balances().bad_debt();
-        self.account
-            .change_position(quantity, fill_price, side, taker_fee);
+        let realized = self
+            .account
+            .change_position_realizing(quantity, fill_price, side, taker_fee);
         assert!(self.account.position().quantity().is_zero());
         // Charged after the close, so the cap sees the exact equity left.
         let bd_after_close = self.account.balances().bad_debt();
@@ -467,7 +477,16 @@ where
         // The clearance fee alone never creates bad debt.
         assert!(self.account.balances().bad_debt() == bd_after_close);
         assert!(self.account.balances().equity() >= Zero::zero());
-        self.record_ledger_delta(None, LedgerEntryKind::Liquidation, eq_before, bd_before);
+        self.record_ledger_flows(
+            None,
+            [
+                (LedgerEntryKind::Liquidation, realized),
+                (LedgerEntryKind::TradingFee, -taker_fee),
+                (LedgerEntryKind::Liquidation, -clearance_fee),
+            ],
+            eq_before,
+            bd_before,
+        );
         info!("balances after liquidation: {}", self.account.balances());
     }
 
@@ -659,7 +678,12 @@ where
         let bad_debt_before = self.account.balances().bad_debt();
         if !cashflow.is_zero() {
             self.account.apply_funding(cashflow);
-            self.record_ledger_delta(None, LedgerEntryKind::Funding, eq_before, bad_debt_before);
+            self.record_ledger_flows(
+                None,
+                [(LedgerEntryKind::Funding, cashflow)],
+                eq_before,
+                bad_debt_before,
+            );
         }
         let solvency = self.reconcile_margin(bad_debt_before);
         let forced_cancels = self.take_forced_cancels();
@@ -770,11 +794,12 @@ where
 
         let eq_before = self.account.balances().equity();
         let bad_debt_before = self.account.balances().bad_debt();
-        self.account
-            .change_position(filled_qty, fill_price, order.side(), fee);
-        self.record_ledger_delta(
+        let realized =
+            self.account
+                .change_position_realizing(filled_qty, fill_price, order.side(), fee);
+        self.record_ledger_flows(
             Some(order.state().meta().id()),
-            LedgerEntryKind::RealizedPnl,
+            fill_flows(realized, fee),
             eq_before,
             bad_debt_before,
         );
@@ -1100,11 +1125,12 @@ where
         let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
         let eq_before = self.account.balances().equity();
         let bad_debt_before = self.account.balances().bad_debt();
-        self.account
-            .change_position(filled_qty, fill_price, pending.side(), fee);
-        self.record_ledger_delta(
+        let realized =
+            self.account
+                .change_position_realizing(filled_qty, fill_price, pending.side(), fee);
+        self.record_ledger_flows(
             Some(pending.id()),
-            LedgerEntryKind::RealizedPnl,
+            fill_flows(realized, fee),
             eq_before,
             bad_debt_before,
         );
@@ -1493,10 +1519,10 @@ where
         let eq_before = self.account.balances().equity();
         let bd_before = self.account.balances().bad_debt();
 
-        let res = match self
-            .account
-            .fill_best(side, filled_quantity, limit_price, fee, ts_ns)
-        {
+        let (realized, filled) =
+            self.account
+                .fill_best_realizing(side, filled_quantity, limit_price, fee, ts_ns);
+        let res = match filled {
             Some(order_after_fill) => LimitOrderFill::FullyFilled {
                 filled_quantity,
                 fee,
@@ -1513,9 +1539,9 @@ where
                     .expect("Has this active order"),
             },
         };
-        self.record_ledger_delta(
+        self.record_ledger_flows(
             Some(order.id()),
-            LedgerEntryKind::RealizedPnl,
+            fill_flows(realized, fee),
             eq_before,
             bd_before,
         );
@@ -1745,11 +1771,12 @@ where
         let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
         let eq_before = self.account.balances().equity();
         let bad_debt_before = self.account.balances().bad_debt();
-        self.account
-            .change_position(exec_qty, fill_price, stop.side(), fee);
-        self.record_ledger_delta(
+        let realized =
+            self.account
+                .change_position_realizing(exec_qty, fill_price, stop.side(), fee);
+        self.record_ledger_flows(
             Some(stop.id()),
-            LedgerEntryKind::RealizedPnl,
+            fill_flows(realized, fee),
             eq_before,
             bad_debt_before,
         );

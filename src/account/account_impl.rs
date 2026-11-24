@@ -67,6 +67,10 @@ where
     active_limit_orders: ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>,
 }
 
+/// A fully filled limit order.
+type FilledLimitOrder<I, const D: u8, BaseOrQuote, UserOrderIdT> =
+    LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>;
+
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Account<I, D, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -242,12 +246,27 @@ where
         side: Side,
         fee: BaseOrQuote::PairedCurrency,
     ) {
+        let _realized = self.change_position_realizing(filled_qty, fill_price, side, fee);
+    }
+
+    /// [`Self::change_position`], returning the nominal realized pnl (excluding `fee`) so
+    /// the venue can journal pnl and fee separately.
+    #[inline]
+    #[must_use]
+    pub(crate) fn change_position_realizing(
+        &mut self,
+        filled_qty: BaseOrQuote,
+        fill_price: QuoteCurrency<I, D>,
+        side: Side,
+        fee: BaseOrQuote::PairedCurrency,
+    ) -> BaseOrQuote::PairedCurrency {
         assert2::debug_assert!(filled_qty > BaseOrQuote::zero());
         assert2::debug_assert!(fill_price > QuoteCurrency::zero());
 
-        self.position
-            .change(filled_qty, fill_price, side, &mut self.balances);
+        let realized = self.position.change_realizing(filled_qty, fill_price, side);
+        self.balances.apply_pnl(realized);
         self.balances.account_for_fee(fee);
+        realized
     }
 
     /// Charge a fee which is not tied to a fill, e.g. the liquidation clearance fee.
@@ -281,9 +300,29 @@ where
         fee: BaseOrQuote::PairedCurrency,
         ts_ns: TimestampNs,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> {
-        self.change_position(filled_quantity, limit_price, side, fee);
-        self.active_limit_orders
-            .fill_best(side, filled_quantity, ts_ns)
+        self.fill_best_realizing(side, filled_quantity, limit_price, fee, ts_ns)
+            .1
+    }
+
+    /// [`Self::fill_best`], also returning the nominal realized pnl (excluding `fee`).
+    #[inline]
+    #[must_use]
+    pub(crate) fn fill_best_realizing(
+        &mut self,
+        side: Side,
+        filled_quantity: BaseOrQuote,
+        limit_price: QuoteCurrency<I, D>,
+        fee: BaseOrQuote::PairedCurrency,
+        ts_ns: TimestampNs,
+    ) -> (
+        BaseOrQuote::PairedCurrency,
+        Option<FilledLimitOrder<I, D, BaseOrQuote, UserOrderIdT>>,
+    ) {
+        let realized = self.change_position_realizing(filled_quantity, limit_price, side, fee);
+        let filled = self
+            .active_limit_orders
+            .fill_best(side, filled_quantity, ts_ns);
+        (realized, filled)
     }
 
     /// Cancel all active limit orders on `side`, or both sides when `side` is `None`.

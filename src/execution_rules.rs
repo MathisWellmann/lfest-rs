@@ -8,6 +8,7 @@ use num_traits::Zero;
 
 use crate::{
     contract_specification::MarkMethod,
+    ledger::LedgerEntryKind,
     market_state::MarketState,
     order_filters::NotionalFilter,
     slippage::SlippageModel,
@@ -164,6 +165,25 @@ where
         Side::Sell => assert!(fill_price <= stop_price),
     }
     fill_price
+}
+
+/// The ledger cashflows of a fill which realized `realized` and charged `fee`
+/// (negative: rebate): the realized pnl and the fee as separate entries, so the
+/// journal shows what the trade made and what it cost.
+#[inline]
+#[must_use]
+pub(crate) fn fill_flows<I, const D: u8, Margin>(
+    realized: Margin,
+    fee: Margin,
+) -> [(LedgerEntryKind, Margin); 2]
+where
+    I: Mon<D>,
+    Margin: MarginCurrency<I, D>,
+{
+    [
+        (LedgerEntryKind::RealizedPnl, realized),
+        (LedgerEntryKind::TradingFee, -fee),
+    ]
 }
 
 /// Validate the notional of an order of `quantity` executing (or resting) at `price`.
