@@ -27,6 +27,8 @@ use crate::{
     },
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(missing_docs, reason = "Self documenting")]
 pub enum NewCandleError {
     BidBelowLow,
     AskBelowLow,
@@ -191,6 +193,11 @@ where
     #[inline(always)]
     fn timestamp_exchange_ns(&self) -> TimestampNs {
         self.timestamp_exchange_ns
+    }
+
+    #[inline(always)]
+    fn price_range(&self) -> Option<(QuoteCurrency<I, D>, QuoteCurrency<I, D>)> {
+        Some((self.low, self.high))
     }
 
     #[inline(always)]

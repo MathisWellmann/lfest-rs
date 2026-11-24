@@ -90,6 +90,11 @@ where
     /// Defaults to zero for backwards compatibility.
     #[getset(get_copy = "pub")]
     liquidation_fee: Decimal<I, D>,
+
+    /// Optional default [`crate::stop_orders::StopProtection`] collar applied to stop-market
+    /// orders on this contract unless overridden on the individual stop order.
+    #[getset(get_copy = "pub", set = "pub")]
+    stop_protection: Option<crate::stop_orders::StopProtection<I, D>>,
 }
 
 impl<I, const D: u8, BaseOrQuote> ContractSpecification<I, D, BaseOrQuote>
@@ -140,7 +145,18 @@ where
             fee_maker,
             fee_taker,
             liquidation_fee: Decimal::zero(),
+            stop_protection: None,
         })
+    }
+
+    /// Attach a default [`crate::stop_orders::StopProtection`] collar to this contract.
+    #[must_use]
+    pub fn with_stop_protection(
+        mut self,
+        protection: crate::stop_orders::StopProtection<I, D>,
+    ) -> Self {
+        self.stop_protection = Some(protection);
+        self
     }
 
     /// Replace the flat maintenance margin schedule with a tiered bracket schedule.

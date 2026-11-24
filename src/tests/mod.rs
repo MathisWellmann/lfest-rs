@@ -7,6 +7,7 @@ mod order_flags_and_tif;
 mod partial_order_fill;
 mod portfolio;
 mod reduce_position_order_margin;
+mod stop_orders;
 mod submit_limit_buy_order;
 mod submit_limit_sell_order;
 mod submit_market_buy_order;

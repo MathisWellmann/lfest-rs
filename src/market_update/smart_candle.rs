@@ -244,6 +244,11 @@ where
     }
 
     #[inline(always)]
+    fn price_range(&self) -> Option<(QuoteCurrency<I, D>, QuoteCurrency<I, D>)> {
+        Some((self.low, self.high))
+    }
+
+    #[inline(always)]
     fn can_fill_bids(&self) -> bool {
         true
     }

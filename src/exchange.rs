@@ -33,6 +33,15 @@ use crate::{
         MarginMode,
         RiskEngine,
     },
+    stop_orders::{
+        PendingStops,
+        StopCancelReason,
+        StopKind,
+        StopOrder,
+        StopOrderError,
+        StopOrderEvent,
+        TriggerPriceType,
+    },
     types::{
         AmendLimitOrderError,
         CancelBy,
@@ -182,6 +191,20 @@ where
     /// during the current `update_state` call.
     liquidated_during_fills: bool,
 
+    /// Off-book pending conditional / stop orders (zero cost when empty).
+    #[getset(get = "pub")]
+    pending_stops: PendingStops<I, D, BaseOrQuote, UserOrderIdT>,
+
+    /// Conditional / stop order events emitted during the most recent `update_state`.
+    #[getset(get = "pub")]
+    stop_order_events: Vec<StopOrderEvent<I, D, BaseOrQuote, UserOrderIdT>>,
+
+    /// Scratch buffer for elected stops during `update_state`.
+    elected_stops_scratch: Vec<(
+        StopOrder<I, D, BaseOrQuote, UserOrderIdT>,
+        QuoteCurrency<I, D>,
+    )>,
+
     order_rate_limiter: OrderRateLimiter,
 }
 
@@ -222,6 +245,9 @@ where
             limit_order_events: Vec::with_capacity(usize::from(max_active_orders.get()) * 4),
             forced_cancel_scratch: Vec::with_capacity(usize::from(max_active_orders.get()) * 2),
             liquidated_during_fills: false,
+            pending_stops: PendingStops::with_capacity(max_active_orders),
+            stop_order_events: Vec::with_capacity(usize::from(max_active_orders.get())),
+            elected_stops_scratch: Vec::with_capacity(usize::from(max_active_orders.get())),
             order_rate_limiter,
         }
     }
@@ -248,10 +274,19 @@ where
         U: MarketUpdate<I, D, BaseOrQuote>,
     {
         self.limit_order_events.clear();
+        self.stop_order_events.clear();
         self.liquidated_during_fills = false;
 
         self.market_state
             .update_state(market_update, self.config.contract_spec().price_filter());
+
+        if !self.pending_stops.is_empty() {
+            self.evaluate_pending_stops(market_update.price_range());
+            if self.liquidated_during_fills {
+                core::hint::cold_path();
+                return Err(RiskError::Liquidate);
+            }
+        }
 
         let mm_check = match self.config.margin_mode() {
             MarginMode::Isolated => <IsolatedMarginRiskEngine<I, D, BaseOrQuote> as RiskEngine<
@@ -326,6 +361,22 @@ where
             self.forced_cancel_scratch
                 .push_within_capacity(cancelled)
                 .expect(EXPECT_CAPACITY);
+        }
+
+        if !self.pending_stops.is_empty() {
+            let mut drained = Vec::with_capacity(self.pending_stops.len());
+            self.pending_stops.drain_all(&mut drained);
+            for stop in drained {
+                if self.stop_order_events.len() < self.stop_order_events.capacity() {
+                    self.stop_order_events
+                        .push_within_capacity(StopOrderEvent::Cancelled {
+                            stop_order_id: stop.id(),
+                            user_order_id: stop.user_order_id(),
+                            reason: StopCancelReason::ForcedCancel,
+                        })
+                        .expect(EXPECT_CAPACITY);
+                }
+            }
         }
 
         let position_qty = self.account.position().quantity();
@@ -1254,6 +1305,354 @@ where
                     .cloned()
                     .expect("Has this active order"),
             },
+        }
+    }
+
+    /// Submit a conditional / stop order (`StopMarket`, `StopLimit`, `TakeProfitMarket`,
+    /// `TakeProfitLimit`, or `TrailingStop`) to the off-book pending-stops store.
+    ///
+    /// Rejects immediately with [`StopOrderError::StopWouldTrigger`] if the current market
+    /// reference price already crosses `order.stop_price()` (matching `OrderBook-rs`).
+    ///
+    /// # Errors
+    /// Returns [`StopOrderError`] on rate limit, quantity filter violation, immediate
+    /// trigger, or capacity exhaustion.
+    pub fn submit_stop_order(
+        &mut self,
+        mut order: StopOrder<I, D, BaseOrQuote, UserOrderIdT>,
+    ) -> Result<StopOrder<I, D, BaseOrQuote, UserOrderIdT>, StopOrderError> {
+        self.order_rate_limiter
+            .aquire(self.market_state.current_ts_ns())?;
+        self.config
+            .contract_spec()
+            .quantity_filter()
+            .validate_order_quantity(order.quantity())?;
+
+        if let Some(ref_price) = self.stop_reference_price(order.trigger_price_type(), order.side())
+            && order.is_triggered_by(ref_price)
+        {
+            return Err(StopOrderError::StopWouldTrigger);
+        }
+
+        let oid = self.next_order_id();
+        let ts_ns = self.market_state.current_timestamp_ns();
+        order.stamp_admitted(oid, ts_ns);
+        self.pending_stops.try_insert(order)?;
+        Ok(order)
+    }
+
+    /// Cancel a pending conditional / stop order by [`CancelBy`].
+    ///
+    /// # Errors
+    /// Returns [`StopOrderError::RateLimitReached`] or [`StopOrderError::NotFound`].
+    pub fn cancel_stop_order(
+        &mut self,
+        cancel_by: CancelBy<UserOrderIdT>,
+    ) -> Result<StopOrder<I, D, BaseOrQuote, UserOrderIdT>, StopOrderError> {
+        self.order_rate_limiter
+            .aquire(self.market_state.current_ts_ns())?;
+        self.pending_stops.remove(cancel_by)
+    }
+
+    /// Cancel every pending conditional / stop order on the exchange.
+    ///
+    /// # Errors
+    /// Returns [`StopOrderError::RateLimitReached`] if rate-limited.
+    pub fn cancel_all_stop_orders(
+        &mut self,
+    ) -> Result<Vec<StopOrder<I, D, BaseOrQuote, UserOrderIdT>>, StopOrderError> {
+        self.order_rate_limiter
+            .aquire(self.market_state.current_ts_ns())?;
+        let mut out = Vec::with_capacity(self.pending_stops.len());
+        self.pending_stops.drain_all(&mut out);
+        Ok(out)
+    }
+
+    #[inline]
+    fn stop_reference_price(
+        &self,
+        price_type: TriggerPriceType,
+        side: crate::types::Side,
+    ) -> Option<QuoteCurrency<I, D>> {
+        let price = match price_type {
+            TriggerPriceType::Mark => self.mark_price(),
+            TriggerPriceType::Last => {
+                let last = self.market_state.last_trade_price();
+                if last > QuoteCurrency::zero() {
+                    last
+                } else {
+                    self.market_state.mid_price()
+                }
+            }
+            TriggerPriceType::BestBidAsk => match side {
+                Buy => self.market_state.ask(),
+                Sell => self.market_state.bid(),
+            },
+        };
+        if price > QuoteCurrency::zero() {
+            Some(price)
+        } else {
+            None
+        }
+    }
+
+    fn evaluate_pending_stops(
+        &mut self,
+        candle_range: Option<(QuoteCurrency<I, D>, QuoteCurrency<I, D>)>,
+    ) {
+        self.elected_stops_scratch.clear();
+        let mark_method = self.config.contract_spec().mark_method();
+        let ms = &self.market_state;
+
+        self.pending_stops.evaluate_and_drain(
+            |stop| {
+                if let Some((low, high)) = candle_range {
+                    return Some((low, high));
+                }
+                let p = match stop.trigger_price_type() {
+                    TriggerPriceType::Mark => ms.mark_price(mark_method),
+                    TriggerPriceType::Last => {
+                        let last = ms.last_trade_price();
+                        if last > QuoteCurrency::zero() {
+                            last
+                        } else {
+                            ms.mid_price()
+                        }
+                    }
+                    TriggerPriceType::BestBidAsk => match stop.side() {
+                        Buy => ms.ask(),
+                        Sell => ms.bid(),
+                    },
+                };
+                if p > QuoteCurrency::zero() {
+                    Some((p, p))
+                } else {
+                    None
+                }
+            },
+            &mut self.elected_stops_scratch,
+        );
+
+        let n_elected = self.elected_stops_scratch.len();
+        for i in 0..n_elected {
+            let (stop, trigger_price) = self.elected_stops_scratch[i];
+            self.execute_elected_stop(stop, trigger_price, candle_range.is_some());
+            if self.liquidated_during_fills {
+                break;
+            }
+        }
+        self.elected_stops_scratch.clear();
+    }
+
+    fn execute_elected_stop(
+        &mut self,
+        stop: StopOrder<I, D, BaseOrQuote, UserOrderIdT>,
+        trigger_price: QuoteCurrency<I, D>,
+        from_candle: bool,
+    ) {
+        match stop.kind() {
+            StopKind::StopMarket | StopKind::TakeProfitMarket | StopKind::TrailingStop { .. } => {
+                self.execute_elected_market_stop(stop, trigger_price, from_candle);
+            }
+            StopKind::StopLimit {
+                limit_price,
+                time_in_force,
+            }
+            | StopKind::TakeProfitLimit {
+                limit_price,
+                time_in_force,
+            } => {
+                self.execute_elected_limit_stop(stop, trigger_price, limit_price, time_in_force);
+            }
+        }
+    }
+
+    fn execute_elected_market_stop(
+        &mut self,
+        stop: StopOrder<I, D, BaseOrQuote, UserOrderIdT>,
+        trigger_price: QuoteCurrency<I, D>,
+        from_candle: bool,
+    ) {
+        let exec_qty = if stop.reduce_only() {
+            let Some(clamped) = self.clamp_reduce_only_quantity(stop.side(), stop.quantity())
+            else {
+                self.push_stop_event(StopOrderEvent::Cancelled {
+                    stop_order_id: stop.id(),
+                    user_order_id: stop.user_order_id(),
+                    reason: StopCancelReason::ReduceOnlyNoPosition,
+                });
+                return;
+            };
+            clamped
+        } else {
+            stop.quantity()
+        };
+
+        let quote_fill = match stop.side() {
+            Buy => self.market_state.ask(),
+            Sell => self.market_state.bid(),
+        };
+        // On intrabar candle triggers, fill conservatively at the worse of stop_price and
+        // the closing top-of-book quote; on tick/BBA/mark triggers, fill at top-of-book.
+        let fill_price = if from_candle {
+            match stop.side() {
+                Buy => crate::utils::max(stop.stop_price(), quote_fill),
+                Sell => crate::utils::min(stop.stop_price(), quote_fill),
+            }
+        } else {
+            quote_fill
+        };
+
+        // Check StopProtection collar (order override wins over contract default).
+        let protection = stop
+            .protection()
+            .or_else(|| self.config.contract_spec().stop_protection());
+        if let Some(collar) = protection
+            && !collar.allows_execution(stop.side(), stop.stop_price(), fill_price)
+        {
+            self.push_stop_event(StopOrderEvent::Cancelled {
+                stop_order_id: stop.id(),
+                user_order_id: stop.user_order_id(),
+                reason: StopCancelReason::StopProtectionBand,
+            });
+            return;
+        }
+
+        let meta = ExchangeOrderMeta::new(stop.id(), self.market_state.current_timestamp_ns());
+        let probe =
+            MarketOrder::new_with_user_order_id(stop.side(), exec_qty, stop.user_order_id())
+                .expect("stop order quantity is strictly positive")
+                .into_pending(meta);
+        let risk_ok = match self.config.margin_mode() {
+            MarginMode::Isolated => self
+                .risk_engine
+                .check_market_order(&self.account, &probe, fill_price)
+                .is_ok(),
+            MarginMode::Cross => self
+                .cross_risk_engine
+                .check_market_order_with_market(
+                    &self.account,
+                    &self.market_state,
+                    &probe,
+                    fill_price,
+                )
+                .is_ok(),
+        };
+        if !risk_ok {
+            self.push_stop_event(StopOrderEvent::Cancelled {
+                stop_order_id: stop.id(),
+                user_order_id: stop.user_order_id(),
+                reason: StopCancelReason::InsufficientMargin,
+            });
+            return;
+        }
+
+        let notional = BaseOrQuote::PairedCurrency::convert_from(exec_qty, fill_price);
+        let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
+        let bad_debt_before = self.account.balances().bad_debt();
+        self.account
+            .change_position(exec_qty, fill_price, stop.side(), fee);
+        let solvency = self.reconcile_margin(bad_debt_before);
+        self.drain_forced_cancels_into_events();
+
+        self.push_stop_event(StopOrderEvent::Filled {
+            stop_order_id: stop.id(),
+            user_order_id: stop.user_order_id(),
+            side: stop.side(),
+            filled_quantity: exec_qty,
+            trigger_price,
+            fill_price,
+            fee,
+            solvency,
+        });
+        if matches!(solvency, Solvency::Liquidated | Solvency::Bankrupt) {
+            self.liquidated_during_fills = true;
+        }
+    }
+
+    fn execute_elected_limit_stop(
+        &mut self,
+        stop: StopOrder<I, D, BaseOrQuote, UserOrderIdT>,
+        trigger_price: QuoteCurrency<I, D>,
+        limit_price: QuoteCurrency<I, D>,
+        time_in_force: TimeInForce,
+    ) {
+        let Ok(child) = LimitOrder::new_with_user_order_id(
+            stop.side(),
+            limit_price,
+            stop.quantity(),
+            stop.user_order_id(),
+        ) else {
+            self.push_stop_event(StopOrderEvent::Cancelled {
+                stop_order_id: stop.id(),
+                user_order_id: stop.user_order_id(),
+                reason: StopCancelReason::ChildLimitRejected,
+            });
+            return;
+        };
+        let child = child
+            .with_time_in_force(time_in_force)
+            .with_reduce_only(stop.reduce_only());
+
+        match self.submit_limit_order_with_execution(child) {
+            Ok(LimitOrderSubmission::Resting(pending)) => {
+                self.push_stop_event(StopOrderEvent::PlacedLimit {
+                    stop_order_id: stop.id(),
+                    user_order_id: stop.user_order_id(),
+                    child_order_id: pending.id(),
+                    trigger_price,
+                });
+            }
+            Ok(LimitOrderSubmission::ImmediatelyFilled {
+                filled_order,
+                fee,
+                solvency,
+                ..
+            }) => {
+                self.push_stop_event(StopOrderEvent::Filled {
+                    stop_order_id: stop.id(),
+                    user_order_id: stop.user_order_id(),
+                    side: stop.side(),
+                    filled_quantity: filled_order.total_quantity(),
+                    trigger_price,
+                    fill_price: filled_order.state().avg_fill_price(),
+                    fee,
+                    solvency,
+                });
+                if matches!(solvency, Solvency::Liquidated | Solvency::Bankrupt) {
+                    self.liquidated_during_fills = true;
+                }
+            }
+            Err(SubmitLimitOrderError::ReduceOnlyRejected) => {
+                self.push_stop_event(StopOrderEvent::Cancelled {
+                    stop_order_id: stop.id(),
+                    user_order_id: stop.user_order_id(),
+                    reason: StopCancelReason::ReduceOnlyNoPosition,
+                });
+            }
+            Err(SubmitLimitOrderError::NotEnoughAvailableBalance(_)) => {
+                self.push_stop_event(StopOrderEvent::Cancelled {
+                    stop_order_id: stop.id(),
+                    user_order_id: stop.user_order_id(),
+                    reason: StopCancelReason::InsufficientMargin,
+                });
+            }
+            Err(_) => {
+                self.push_stop_event(StopOrderEvent::Cancelled {
+                    stop_order_id: stop.id(),
+                    user_order_id: stop.user_order_id(),
+                    reason: StopCancelReason::ChildLimitRejected,
+                });
+            }
+        }
+    }
+
+    #[inline]
+    fn push_stop_event(&mut self, event: StopOrderEvent<I, D, BaseOrQuote, UserOrderIdT>) {
+        if self.stop_order_events.len() < self.stop_order_events.capacity() {
+            self.stop_order_events
+                .push_within_capacity(event)
+                .expect(EXPECT_CAPACITY);
         }
     }
 }
