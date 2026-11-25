@@ -924,3 +924,361 @@ fn cloned_portfolio_reports_a_forced_cancel() {
     assert_eq!(settlement.forced_cancels[0].1.id(), reduce);
     assert!(cloned.market(b).unwrap().active_limit_orders.is_empty());
 }
+
+fn make_linear_market_cfg_with_fees(
+    ticker: &str,
+    lev: u8,
+    maker_fee_bps: i64,
+    taker_fee_bps: i64,
+) -> MarketConfig<i64, DECIMALS, QuoteCurrency<i64, DECIMALS>> {
+    let spec = ContractSpecification::new(
+        Leverage::new(lev).unwrap(),
+        Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+        PriceFilter::default(),
+        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
+        Fee::from(Decimal::try_from_scaled(maker_fee_bps, 4).expect(EXPECT_DECIMAL)),
+        Fee::from(Decimal::try_from_scaled(taker_fee_bps, 4).expect(EXPECT_DECIMAL)),
+    )
+    .expect(EXPECT_CONTRACT_SPEC)
+    .with_ticker(ticker);
+    MarketConfig::new(
+        NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+        spec,
+        OrderRateLimits::default(),
+    )
+}
+
+#[test]
+fn portfolio_market_order_same_direction_enforces_exact_margin_and_fee_boundary() {
+    // 5x (IM=20%), taker fee = 10% (1000 bps) so init_margin + fee = 0.2 + 0.1 = 0.3 of notional.
+    // Buying 1 @ 100 requires 20 IM + 10 fee = 30.
+    let build = |wallet_scaled: i64| {
+        let cfg = PortfolioConfig::new(
+            QuoteCurrency::new(wallet_scaled, 5),
+            vec![make_linear_market_cfg_with_fees("AAA", 5, 0, 1000)],
+        )
+        .unwrap();
+        let mut pf = LinearPortfolio::new(cfg);
+        pf.update_market(MarketId::new(0), &bba(99, 100, 1))
+            .unwrap();
+        pf
+    };
+
+    // Exact boundary: available == init_margin + fee (30.00000) is accepted.
+    // After buying @ ask 100 while bid is 99, the position immediately has -1 uPnL
+    // (marked at bid), so total_equity = 19 < IM 20 -> InitialMarginDeficit.
+    let mut exact = build(3_000_000);
+    let settlement = exact
+        .submit_market_order(
+            MarketId::new(0),
+            MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+        )
+        .unwrap();
+    assert_eq!(settlement.solvency, Solvency::InitialMarginDeficit);
+    assert_eq!(
+        exact.market(MarketId::new(0)).unwrap().position.quantity(),
+        BaseCurrency::new(1, 0)
+    );
+
+    // One unit of precision below (29.99999) is rejected.
+    let mut short = build(2_999_999);
+    assert!(matches!(
+        short.submit_market_order(
+            MarketId::new(0),
+            MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+        ),
+        Err(PortfolioError::SubmitMarketOrder(
+            SubmitMarketOrderError::NotEnoughAvailableBalance(_)
+        ))
+    ));
+}
+
+#[test]
+fn portfolio_market_order_flip_accounts_for_realized_pnl_fees_other_market_and_boundary() {
+    // Market A: 5x (IM=20%), taker fee 10% (1000 bps).
+    // Market B: 5x (IM=20%), 0 fee.
+    // Setup:
+    //   Long 2 A @ ask 100 (entry=100, notional=200, IM=40, fee=20).
+    //   Long 1 B @ ask 100 (entry=100, notional=100, IM=20, fee=0).
+    //   Move A to bid 120 / ask 121 (A uPnL = +40).
+    //   Move B to bid 110 / ask 111 (B uPnL = +10).
+    // Now submit Sell 5 A @ bid 120 -> closes long 2 (realized_pnl = +40) and opens short 3 @ 120
+    // (flip_notional = 360, flip IM = 72). Total sell notional = 600, fee = 60.
+    // Wallet after initial buys = W - 20.
+    // post_equity = (W - 20) + 40 (realized) - 60 (fee) + 10 (other_upnl B) = W - 30.
+    // post_req    = 20 (other_req B) + 72 (flip IM) = 92.
+    // Exact boundary: W - 30 == 92 => W = 122.
+    let setup = |wallet_scaled: i64| {
+        let cfg = PortfolioConfig::new(
+            QuoteCurrency::new(wallet_scaled, 5),
+            vec![
+                make_linear_market_cfg_with_fees("AAA", 5, 0, 1000),
+                make_linear_market_cfg_with_fees("BBB", 5, 0, 0),
+            ],
+        )
+        .unwrap();
+        let mut pf = LinearPortfolio::new(cfg);
+        let (a, b) = (MarketId::new(0), MarketId::new(1));
+        pf.update_market(a, &bba(99, 100, 1)).unwrap();
+        pf.update_market(b, &bba(99, 100, 1)).unwrap();
+        pf.submit_market_order(
+            a,
+            MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap(),
+        )
+        .unwrap();
+        pf.submit_market_order(
+            b,
+            MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+        )
+        .unwrap();
+        pf.update_market(a, &bba(120, 121, 2)).unwrap();
+        pf.update_market(b, &bba(110, 111, 2)).unwrap();
+        (pf, a)
+    };
+
+    // Exact boundary W = 122.00000: flip is admitted; the new short 3 @ 120 marks at ask 121
+    // (uPnL = -3), leaving margin_excess = -3 -> InitialMarginDeficit.
+    let (mut pf_ok, a) = setup(12_200_000);
+    let settlement = pf_ok
+        .submit_market_order(
+            a,
+            MarketOrder::new(Side::Sell, BaseCurrency::new(5, 0)).unwrap(),
+        )
+        .unwrap();
+    assert_eq!(settlement.solvency, Solvency::InitialMarginDeficit);
+    assert!(settlement.forced_cancels.is_empty());
+    assert_eq!(
+        pf_ok.market(a).unwrap().position.quantity(),
+        BaseCurrency::new(-3, 0)
+    );
+    assert_eq!(pf_ok.margin_excess(), QuoteCurrency::new(-3, 0));
+
+    // One unit below (W = 121.99999): flip is rejected without mutating positions.
+    let (mut pf_err, a) = setup(12_199_999);
+    assert!(matches!(
+        pf_err.submit_market_order(
+            a,
+            MarketOrder::new(Side::Sell, BaseCurrency::new(5, 0)).unwrap(),
+        ),
+        Err(PortfolioError::SubmitMarketOrder(
+            SubmitMarketOrderError::NotEnoughAvailableBalance(_)
+        ))
+    ));
+    assert_eq!(
+        pf_err.market(a).unwrap().position.quantity(),
+        BaseCurrency::new(2, 0)
+    );
+}
+
+#[test]
+fn portfolio_market_order_flip_rejects_when_resting_orders_lose_position_offset() {
+    // Long 2 A @ 100 (IM=20%, 0 fees), resting sell limit 2 A @ 110 (fully offset while long 2,
+    // so order_margin = 0). Flipping with Sell 3 A @ bid 100 opens Short 1 A @ 100 (pos IM = 20),
+    // and the resting sell 2 @ 110 is no longer offset by a long, so post_order_margin = 220 * 0.2 = 44.
+    // Total post_req = 20 + 44 = 64. With wallet = 50, equity after flip = 50 < 64 -> must reject.
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(50, 0),
+        vec![make_linear_market_cfg_with_fees("AAA", 5, 0, 0)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap(),
+    )
+    .unwrap();
+    // Move quotes so the long has zero unrealized loss at bid 100 / ask 101.
+    pf.update_market(a, &bba(100, 101, 2)).unwrap();
+    pf.submit_limit_order(
+        a,
+        LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(110, 0),
+            BaseCurrency::new(2, 0),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(pf.total_required_collateral(), QuoteCurrency::new(44, 0));
+
+    assert!(matches!(
+        pf.submit_market_order(
+            a,
+            MarketOrder::new(Side::Sell, BaseCurrency::new(3, 0)).unwrap(),
+        ),
+        Err(PortfolioError::SubmitMarketOrder(
+            SubmitMarketOrderError::NotEnoughAvailableBalance(_)
+        ))
+    ));
+    assert_eq!(
+        pf.market(a).unwrap().position.quantity(),
+        BaseCurrency::new(2, 0)
+    );
+    assert_eq!(pf.market(a).unwrap().active_limit_orders.len(), 1);
+
+    // Confirm a portfolio with wallet = 64 (exact post_req = 20 flip IM + 44 resting ask IM)
+    // is admitted.
+    let cfg_ok = PortfolioConfig::new(
+        QuoteCurrency::new(64, 0),
+        vec![make_linear_market_cfg_with_fees("AAA", 5, 0, 0)],
+    )
+    .unwrap();
+    let mut pf_ok = LinearPortfolio::new(cfg_ok);
+    pf_ok.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf_ok
+        .submit_market_order(
+            a,
+            MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap(),
+        )
+        .unwrap();
+    pf_ok.update_market(a, &bba(100, 101, 2)).unwrap();
+    pf_ok
+        .submit_limit_order(
+            a,
+            LimitOrder::new(
+                Side::Sell,
+                QuoteCurrency::new(110, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let settlement = pf_ok
+        .submit_market_order(
+            a,
+            MarketOrder::new(Side::Sell, BaseCurrency::new(3, 0)).unwrap(),
+        )
+        .unwrap();
+    assert_eq!(
+        pf_ok.market(a).unwrap().position.quantity(),
+        BaseCurrency::new(-1, 0)
+    );
+    // Spread marks short 1 @ 100 against ask 101 (uPnL = -1), so margin_excess = -1 forces
+    // cancellation of the resting ask on reconciliation.
+    assert_eq!(settlement.solvency, Solvency::Solvent);
+    assert_eq!(settlement.forced_cancels.len(), 1);
+}
+
+#[test]
+fn portfolio_market_order_flip_handles_realized_loss_and_negative_other_upnl() {
+    // Test with negative realized_pnl and negative other_upnl to catch sign flips on both terms.
+    // Market A: 5x (IM=20%), 0 fee. Market B: 5x (IM=20%), 0 fee.
+    // Long 2 A @ 100 (IM=40), Long 1 B @ 100 (IM=20).
+    // A drops to 90/91 (uPnL = -20), B drops to 80/81 (uPnL = -20).
+    // Sell 3 A @ bid 90: closes long 2 (realized_pnl = -20), opens short 1 @ 90 (flip IM = 18).
+    // post_equity = W - 20 (realized) - 20 (other_upnl B) = W - 40.
+    // post_req    = 20 (other_req B) + 18 (flip IM) = 38.
+    // Exact boundary: W = 78.
+    let setup = |wallet_scaled: i64| {
+        let cfg = PortfolioConfig::new(
+            QuoteCurrency::new(wallet_scaled, 5),
+            vec![
+                make_linear_market_cfg("AAA", 5),
+                make_linear_market_cfg("BBB", 5),
+            ],
+        )
+        .unwrap();
+        let mut pf = LinearPortfolio::new(cfg);
+        let (a, b) = (MarketId::new(0), MarketId::new(1));
+        pf.update_market(a, &bba(99, 100, 1)).unwrap();
+        pf.update_market(b, &bba(99, 100, 1)).unwrap();
+        pf.submit_market_order(
+            a,
+            MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap(),
+        )
+        .unwrap();
+        pf.submit_market_order(
+            b,
+            MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+        )
+        .unwrap();
+        pf.update_market(a, &bba(90, 91, 2)).unwrap();
+        pf.update_market(b, &bba(80, 81, 2)).unwrap();
+        (pf, a)
+    };
+
+    let (mut pf_ok, a) = setup(7_800_000);
+    let settlement = pf_ok
+        .submit_market_order(
+            a,
+            MarketOrder::new(Side::Sell, BaseCurrency::new(3, 0)).unwrap(),
+        )
+        .unwrap();
+    // New short 1 @ 90 marks at ask 91 (-1 spread uPnL), so margin_excess = -1.
+    assert_eq!(settlement.solvency, Solvency::InitialMarginDeficit);
+    assert_eq!(pf_ok.margin_excess(), QuoteCurrency::new(-1, 0));
+
+    let (mut pf_err, a) = setup(7_799_999);
+    assert!(matches!(
+        pf_err.submit_market_order(
+            a,
+            MarketOrder::new(Side::Sell, BaseCurrency::new(3, 0)).unwrap(),
+        ),
+        Err(PortfolioError::SubmitMarketOrder(
+            SubmitMarketOrderError::NotEnoughAvailableBalance(_)
+        ))
+    ));
+}
+
+#[test]
+fn portfolio_limit_order_check_enforces_exact_margin_delta_and_maker_fee_reserve() {
+    // 5x (IM=20%), maker fee = 5% (500 bps).
+    // First rest Buy 1 @ 80: order_margin = 16, reserved_maker_fee = 4 -> total req = 20.
+    // Second rest Buy 2 @ 80: new order_margin = 48 (delta = 32), extra_fee_reserve = 8 -> extra_req = 40.
+    // Total required = 60. Test exact boundary W = 60 vs W = 59.99999.
+    let setup = |wallet_scaled: i64| {
+        let cfg = PortfolioConfig::new(
+            QuoteCurrency::new(wallet_scaled, 5),
+            vec![make_linear_market_cfg_with_fees("AAA", 5, 500, 0)],
+        )
+        .unwrap();
+        let mut pf = LinearPortfolio::new(cfg);
+        let a = MarketId::new(0);
+        pf.update_market(a, &bba(99, 100, 1)).unwrap();
+        pf.submit_limit_order(
+            a,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(80, 0),
+                BaseCurrency::new(1, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(pf.total_required_collateral(), QuoteCurrency::new(20, 0));
+        (pf, a)
+    };
+
+    let (mut pf_ok, a) = setup(6_000_000);
+    pf_ok
+        .submit_limit_order(
+            a,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(80, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(pf_ok.total_required_collateral(), QuoteCurrency::new(60, 0));
+    assert_eq!(pf_ok.margin_excess(), QuoteCurrency::zero());
+
+    let (mut pf_err, a) = setup(5_999_999);
+    assert!(matches!(
+        pf_err.submit_limit_order(
+            a,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(80, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap(),
+        ),
+        Err(PortfolioError::SubmitLimitOrder(
+            SubmitLimitOrderError::NotEnoughAvailableBalance(_)
+        ))
+    ));
+}
