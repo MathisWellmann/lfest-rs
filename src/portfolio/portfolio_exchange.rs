@@ -1389,19 +1389,28 @@ where
             return Ok(());
         }
 
-        // Position flip: compute post-trade portfolio equity vs total initial margin.
+        // Position flip: compute post-trade portfolio equity vs total initial margin,
+        // including how the flipped position changes the resting order margin on this market.
         let flip_qty = quantity - abs_qty;
         let total_notional = BaseOrQuote::PairedCurrency::convert_from(quantity, fill_price);
         let flip_notional = BaseOrQuote::PairedCurrency::convert_from(flip_qty, fill_price);
         let fee = total_notional * *slot.contract_spec.fee_taker().as_ref();
         let realized_pnl =
             BaseOrQuote::PairedCurrency::pnl(slot.position.entry_price(), fill_price, pos_qty);
+        let mut post_position = slot.position.clone();
+        let _ = post_position.change_realizing(quantity, fill_price, side);
+        let post_order_margin = slot
+            .active_limit_orders
+            .order_margin(slot.contract_spec.init_margin_req(), &post_position);
 
-        // Remove old market's uPnL and position margin, add realized_pnl - fee and flip position margin.
+        // Remove old market's uPnL, position margin, and order margin; add realized_pnl - fee,
+        // the flip position margin, and the post-flip resting order margin.
         let other_upnl = self.total_unrealized_pnl() - slot.unrealized_pnl();
-        let other_req = self.total_required_collateral() - slot.position_margin();
+        let other_req =
+            self.total_required_collateral() - slot.position_margin() - slot.order_margin();
         let post_equity = self.balances.equity() + realized_pnl - fee + other_upnl;
-        let post_req = other_req + flip_notional * slot.contract_spec.init_margin_req();
+        let post_req =
+            other_req + flip_notional * slot.contract_spec.init_margin_req() + post_order_margin;
         if post_equity < post_req {
             return Err(NotEnoughAvailableBalance);
         }
