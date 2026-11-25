@@ -804,3 +804,123 @@ fn portfolio_supports_one_market_per_market_id() {
         Err(PortfolioError::MaxMarketsReached(MarketId::COUNT))
     );
 }
+
+fn cloned_two_market_portfolio() -> (LinearPortfolio, MarketId) {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(10_000, 0),
+        vec![make_linear_market_cfg("AAA", 2)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    // Dynamic registration must leave the buffers sized for both markets as well.
+    let b = pf.add_market(make_linear_market_cfg("BBB", 2)).unwrap();
+    pf.update_market(b, &bba(99, 100, 1)).unwrap();
+    (pf.clone(), b)
+}
+
+#[test]
+fn cloned_portfolio_reports_a_fill() {
+    // A fill pushes into `order_events`, which a derived `Clone` left without spare
+    // capacity.
+    let (mut pf, b) = cloned_two_market_portfolio();
+    rest_limit(&mut pf, b, Side::Buy, 98, 1);
+    let events = pf
+        .update_market(
+            b,
+            &Trade {
+                price: QuoteCurrency::new(97, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Sell,
+                timestamp_exchange_ns: 2.into(),
+            },
+        )
+        .unwrap();
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert!(matches!(events[0].event, LimitOrderEvent::Fill(_)));
+    assert_eq!(
+        pf.market(b).unwrap().position.quantity(),
+        BaseCurrency::new(1, 0)
+    );
+}
+
+#[test]
+fn cloned_portfolio_reports_a_triggered_stop() {
+    // Election pushes into the elected-stop scratch buffer, which a derived `Clone` left
+    // without spare capacity.
+    let (mut pf, b) = cloned_two_market_portfolio();
+    pf.submit_market_order(
+        b,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+    )
+    .unwrap();
+    pf.submit_stop_order(
+        b,
+        StopOrder::stop_market(
+            Side::Sell,
+            QuoteCurrency::new(95, 0),
+            BaseCurrency::new(1, 0),
+            NoUserOrderId,
+        )
+        .unwrap()
+        .with_trigger_price_type(TriggerPriceType::Last),
+    )
+    .unwrap();
+
+    let mut cloned = pf.clone();
+    cloned
+        .update_market(
+            b,
+            &Trade {
+                price: QuoteCurrency::new(94, 0),
+                quantity: BaseCurrency::new(1, 0),
+                side: Side::Sell,
+                timestamp_exchange_ns: 2.into(),
+            },
+        )
+        .unwrap();
+
+    assert!(cloned.pending_stops(b).expect("market exists").is_empty());
+    assert!(cloned.market(b).unwrap().position.quantity().is_zero());
+    let events = cloned.stop_events();
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(events[0].market_id, b);
+    assert!(matches!(events[0].event, StopOrderEvent::Filled { .. }));
+}
+
+#[test]
+fn cloned_portfolio_reports_a_forced_cancel() {
+    // Shrinking the position below a resting reduce-only order force-cancels it through
+    // `forced_cancel_scratch`, which a derived `Clone` left without spare capacity.
+    let (mut pf, b) = cloned_two_market_portfolio();
+    pf.submit_market_order(
+        b,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap(),
+    )
+    .unwrap();
+    let reduce = pf
+        .submit_limit_order(
+            b,
+            LimitOrder::new(
+                Side::Sell,
+                QuoteCurrency::new(110, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap()
+            .with_reduce_only(true),
+        )
+        .unwrap()
+        .id();
+
+    let mut cloned = pf.clone();
+    let settlement = cloned
+        .submit_market_order(
+            b,
+            MarketOrder::new(Side::Sell, BaseCurrency::new(1, 0)).unwrap(),
+        )
+        .unwrap();
+
+    assert_eq!(settlement.solvency, Solvency::Solvent);
+    assert_eq!(settlement.forced_cancels.len(), 1);
+    assert_eq!(settlement.forced_cancels[0].1.id(), reduce);
+    assert!(cloned.market(b).unwrap().active_limit_orders.is_empty());
+}

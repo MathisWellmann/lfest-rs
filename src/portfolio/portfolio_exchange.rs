@@ -86,6 +86,7 @@ use crate::{
         TimestampNs,
         UserOrderId,
     },
+    utils::reserve_to_capacity,
 };
 
 /// Internal per-market slot stored contiguously in [`PortfolioExchange::markets`].
@@ -246,7 +247,7 @@ where
 /// All registered markets share a single [`Balances`] wallet. Profits in winning
 /// positions offset losses in losing positions under cross-margin, and forced
 /// cancellations / liquidations reconcile across the entire portfolio.
-#[derive(Debug, Clone, Getters)]
+#[derive(Debug, Getters)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serde",
@@ -308,6 +309,70 @@ where
     ledger: Option<Ledger<I, D, BaseOrQuote::PairedCurrency>>,
 }
 
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Clone
+    for PortfolioExchange<I, D, BaseOrQuote, UserOrderIdT>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    /// Clone the portfolio with the pre-allocated buffers of a freshly constructed one.
+    ///
+    /// `Vec::clone` keeps only the length, so a derived clone left the event and scratch
+    /// buffers without spare capacity and the first fill, elected stop or forced cancel
+    /// panicked in `push_within_capacity`. `Clone` is cold, so restoring the bounds here
+    /// keeps every push path free of capacity checks. The per-market `ActiveLimitOrders`
+    /// and `PendingStops` retain their own capacity in their `Clone`.
+    fn clone(&self) -> Self {
+        let mut cloned = Self {
+            balances: self.balances.clone(),
+            markets: self.markets.clone(),
+            ticker_index: self.ticker_index.clone(),
+            next_order_id: self.next_order_id,
+            order_events: self.order_events.clone(),
+            stop_events: self.stop_events.clone(),
+            max_pending_stops: self.max_pending_stops,
+            elected_stops_scratch: self.elected_stops_scratch.clone(),
+            forced_cancel_scratch: self.forced_cancel_scratch.clone(),
+            liquidated_during_fills: self.liquidated_during_fills,
+            ledger: self.ledger.clone(),
+        };
+        cloned.reserve_preallocated_capacities();
+        cloned
+    }
+}
+
+/// Capacity of the per-call buffers, derived from the summed `max_num_open_orders` of all
+/// markets.
+///
+/// Shared by [`PortfolioExchange::new`], [`PortfolioExchange::add_market`] and
+/// [`PortfolioExchange::clone`] so the bounds cannot drift apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BufferCapacities {
+    order_events: usize,
+    stop_events: usize,
+    elected_stops_scratch: usize,
+    forced_cancel_scratch: usize,
+}
+
+impl BufferCapacities {
+    fn for_total_orders(total_order_cap: usize) -> Self {
+        // Every market's bids and asks each hold up to `max_num_open_orders`, so one call
+        // can fill or force-cancel twice the total. Order events cover the fills plus as
+        // many forced cancels.
+        let scratch_cap = (total_order_cap * 2).max(16);
+        Self {
+            order_events: scratch_cap * 2,
+            // `PendingStops` holds up to `max_num_open_orders` stops per market, and each
+            // yields at most one event per call.
+            stop_events: total_order_cap,
+            elected_stops_scratch: scratch_cap,
+            forced_cancel_scratch: scratch_cap,
+        }
+    }
+}
+
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> PortfolioExchange<I, D, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -349,22 +414,35 @@ where
                 .expect(EXPECT_CAPACITY);
         }
 
-        let scratch_cap = (total_order_cap * 2).max(16);
-        // `PendingStops` holds up to `max_num_open_orders` stops per market.
-        let max_pending_stops = total_order_cap;
+        let caps = BufferCapacities::for_total_orders(total_order_cap);
         Self {
             balances,
             markets,
             ticker_index,
             next_order_id: OrderId::default(),
-            order_events: Vec::with_capacity(scratch_cap * 2),
-            stop_events: Vec::with_capacity(max_pending_stops),
-            max_pending_stops,
-            elected_stops_scratch: Vec::with_capacity(scratch_cap),
-            forced_cancel_scratch: Vec::with_capacity(scratch_cap),
+            order_events: Vec::with_capacity(caps.order_events),
+            stop_events: Vec::with_capacity(caps.stop_events),
+            max_pending_stops: caps.stop_events,
+            elected_stops_scratch: Vec::with_capacity(caps.elected_stops_scratch),
+            forced_cancel_scratch: Vec::with_capacity(caps.forced_cancel_scratch),
             liquidated_during_fills: false,
             ledger: None,
         }
+    }
+
+    /// Give the per-call buffers the capacity [`BufferCapacities`] prescribes for the
+    /// current set of markets.
+    ///
+    /// [`Self::new`] allocates them up front, [`Self::add_market`] grows them to the new
+    /// total and [`PortfolioExchange::clone`] restores them after `Vec::clone` dropped
+    /// the spare capacity.
+    fn reserve_preallocated_capacities(&mut self) {
+        let caps = BufferCapacities::for_total_orders(self.max_pending_stops);
+        assert_eq!(caps.stop_events, self.max_pending_stops);
+        reserve_to_capacity(&mut self.order_events, caps.order_events);
+        reserve_to_capacity(&mut self.stop_events, caps.stop_events);
+        reserve_to_capacity(&mut self.elected_stops_scratch, caps.elected_stops_scratch);
+        reserve_to_capacity(&mut self.forced_cancel_scratch, caps.forced_cancel_scratch);
     }
 
     /// Enable the opt-in portfolio cashflow [`Ledger`] anchored at current wallet equity.
@@ -426,17 +504,12 @@ where
             }
             self.ticker_index.insert(ticker.clone(), market_id);
         }
-        let add_cap = usize::from(market_cfg.max_num_open_orders().get()) * 2;
-        self.forced_cancel_scratch.reserve(add_cap);
-        self.order_events.reserve(add_cap * 2);
+        // `max_pending_stops` is the summed order capacity of all markets, see
+        // `BufferCapacities`. Grow every buffer to the new total: a relative
+        // `Vec::reserve` only guarantees `len + additional`, and the buffers are empty
+        // between calls, so it would not grow them at all.
         self.max_pending_stops += usize::from(market_cfg.max_num_open_orders().get());
-        // `reserve` is relative to `len`, so size against the total stop capacity instead.
-        self.stop_events.reserve(
-            self.max_pending_stops
-                .saturating_sub(self.stop_events.len()),
-        );
-        assert!(self.stop_events.capacity() >= self.max_pending_stops);
-        self.elected_stops_scratch.reserve(add_cap);
+        self.reserve_preallocated_capacities();
         #[allow(
             clippy::disallowed_methods,
             reason = "add_market is a cold-path dynamic market registration"
@@ -2155,8 +2228,8 @@ where
     /// Clear `stop_events` at the start of a public call which can emit stop events.
     ///
     /// Also restores the capacity bound (one event per possible pending stop of every
-    /// market), because `#[derive(Clone)]` does not keep spare `Vec` capacity.
-    /// Allocation-free except on the first call after a clone.
+    /// market) if it is missing. `Clone` and `add_market` keep it, so only a deserialized
+    /// portfolio (serde cannot restore spare `Vec` capacity) takes that branch.
     #[inline]
     fn reset_stop_events(&mut self) {
         self.stop_events.clear();
