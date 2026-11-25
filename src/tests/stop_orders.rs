@@ -1160,3 +1160,66 @@ fn trailing_stop_on_a_candle_trails_before_testing_the_adverse_extreme() {
         other => panic!("expected fill, got {other:?}"),
     }
 }
+
+#[test]
+fn cloned_exchange_accepts_new_stop_orders() {
+    // A derived `Clone` kept only the length of the pre-allocated stop store, so admission
+    // failed with `MaxPendingStops(0)`. A clone must behave like a fresh exchange.
+    let ex = small_exchange(10, 1_000);
+    let mut cloned = ex.clone();
+    cloned
+        .submit_stop_order(
+            StopOrder::stop_market(
+                Side::Sell,
+                QuoteCurrency::new(95, 0),
+                BaseCurrency::new(1, 0),
+                NoUserOrderId,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(cloned.pending_stops().len(), 1);
+}
+
+#[test]
+fn cloned_exchange_reports_a_triggered_stop() {
+    // Election pushes into the elected-stop and stop-event scratch buffers, which a
+    // derived `Clone` left without spare capacity.
+    let mut ex = small_exchange(10, 1_000);
+    ex.submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap())
+        .unwrap();
+    ex.submit_stop_order(reduce_only_sell_stop(95)).unwrap();
+
+    let mut cloned = ex.clone();
+    cloned.update_state(&bba_94_95()).unwrap();
+
+    assert!(cloned.pending_stops().is_empty());
+    assert!(cloned.account().position().quantity().is_zero());
+    let events = cloned.stop_order_events();
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert!(matches!(events[0], StopOrderEvent::Filled { .. }));
+}
+
+#[test]
+fn cloned_portfolio_accepts_new_stop_orders() {
+    // A portfolio clone shrinks each market's pre-allocated stop store to its length, so
+    // admission must not fail with `MaxPendingStops(0)`.
+    let pf = levered_portfolio(QuoteCurrency::new(200, 0));
+    let mut cloned = pf.clone();
+    cloned
+        .submit_stop_order(
+            MarketId::new(0),
+            StopOrder::stop_market(
+                Side::Sell,
+                QuoteCurrency::new(95, 0),
+                BaseCurrency::new(1, 0),
+                NoUserOrderId,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let stops = cloned
+        .pending_stops(MarketId::new(0))
+        .expect("market exists");
+    assert_eq!(stops.len(), 1);
+}
