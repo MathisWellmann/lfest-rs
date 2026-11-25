@@ -1282,3 +1282,472 @@ fn portfolio_limit_order_check_enforces_exact_margin_delta_and_maker_fee_reserve
         ))
     ));
 }
+
+#[test]
+fn portfolio_reserved_maker_fees_and_required_collateral_sum_bids_and_asks() {
+    // 5x (IM=20%), maker fee = 5% (500 bps).
+    // Buy 2 @ 80 (notional 160), Sell 1 @ 120 (notional 120).
+    // order_margin = max(160, 120) * 0.20 = 32.
+    // reserved_maker_fees = (160 + 120) * 0.05 = 14.
+    // required_collateral = 0 + 32 + 14 = 46.
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(100, 0),
+        vec![make_linear_market_cfg_with_fees("AAA", 5, 500, 0)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.submit_limit_order(
+        a,
+        LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(80, 0),
+            BaseCurrency::new(2, 0),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    pf.submit_limit_order(
+        a,
+        LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(120, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!(pf.total_required_collateral(), QuoteCurrency::new(46, 0));
+    assert_eq!(pf.margin_excess(), QuoteCurrency::new(54, 0));
+}
+
+#[test]
+fn portfolio_margin_call_selects_largest_marginal_collateral_contributor_across_sides_and_markets()
+{
+    // Two markets, both 5x (IM=20%).
+    // Market A (maker fee 1% = 100 bps): flat, resting Buy 2 @ 80 (notional 160),
+    //   Sell 1 @ 110 (notional 110), and Sell 1 @ 120 (notional 120).
+    //   asks_notional = 230 > bids_notional = 160 -> order_margin = 230 * 0.20 = 46.
+    //   Marginal deltas on A:
+    //   - Buy 2 @ 80 (notional 160): removing leaves max(0, 230)*0.2 = 46 -> delta = 0 + 1.6 = 1.6.
+    //   - Sell 1 @ 110 (notional 110): removing leaves max(160, 120)*0.2 = 32 -> delta = 14 + 1.1 = 15.1.
+    //   - Sell 1 @ 120 (notional 120): removing leaves max(160, 110)*0.2 = 32 -> delta = 14 + 1.2 = 15.2.
+    //   Note: with `/` instead of `-` in asks_notional - order.notional(), 230 / 110 = 2.09 and
+    //   230 / 120 = 1.91 both drop below bids_notional = 160, giving the same delta = 14.
+    //   Add a third case with no bids on A (bids = 0) and asks 110 + 120 = 230, where removing 120
+    //   leaves 110 (delta = 24 + 1.2 = 25.2) vs B's Buy 1.4 @ 90 (notional 126, delta = 25.2 ->
+    //   use Buy 1.5 @ 90, delta = 27.0): under `/` A's delta would become (230 - 1.91)*0.2 + 1.2 = 46.8 > 27.0!
+    // Market B (maker fee 0%): Long 1 @ 100 (IM=20) + resting Buy qty @ 90.
+    let run_case = |b_bid_qty_scaled: i64| {
+        let cfg = PortfolioConfig::new(
+            QuoteCurrency::new(88, 0),
+            vec![
+                make_linear_market_cfg_with_fees("AAA", 5, 100, 0),
+                make_linear_market_cfg_with_fees("BBB", 5, 0, 0),
+            ],
+        )
+        .unwrap();
+        let mut pf = LinearPortfolio::new(cfg);
+        let (a, b) = (MarketId::new(0), MarketId::new(1));
+        pf.update_market(a, &bba(99, 100, 1)).unwrap();
+        pf.update_market(b, &bba(99, 100, 1)).unwrap();
+        // Open Long 1 B @ 100, then mark at 100/101 so uPnL is 0.
+        pf.submit_market_order(
+            b,
+            MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+        )
+        .unwrap();
+        pf.update_market(b, &bba(100, 101, 2)).unwrap();
+
+        let _a_buy = pf
+            .submit_limit_order(
+                a,
+                LimitOrder::new(
+                    Side::Buy,
+                    QuoteCurrency::new(80, 0),
+                    BaseCurrency::new(2, 0),
+                )
+                .unwrap(),
+            )
+            .unwrap()
+            .id();
+        let _a_sell_110 = pf
+            .submit_limit_order(
+                a,
+                LimitOrder::new(
+                    Side::Sell,
+                    QuoteCurrency::new(110, 0),
+                    BaseCurrency::new(1, 0),
+                )
+                .unwrap(),
+            )
+            .unwrap()
+            .id();
+        let a_sell_120 = pf
+            .submit_limit_order(
+                a,
+                LimitOrder::new(
+                    Side::Sell,
+                    QuoteCurrency::new(120, 0),
+                    BaseCurrency::new(1, 0),
+                )
+                .unwrap(),
+            )
+            .unwrap()
+            .id();
+        let b_buy = pf
+            .submit_limit_order(
+                b,
+                LimitOrder::new(
+                    Side::Buy,
+                    QuoteCurrency::new(90, 0),
+                    BaseCurrency::new(b_bid_qty_scaled, 1),
+                )
+                .unwrap(),
+            )
+            .unwrap()
+            .id();
+        (pf, a, b, a_sell_120, b_buy)
+    };
+
+    // Case 1: B's Buy 1 @ 90 (delta 18.0) beats A's Sell 1 @ 120 (delta 15.2).
+    let (mut pf1, _a, b, _a_sell_120, b_buy) = run_case(10);
+    let rate = FundingRate::from(Decimal::try_from_scaled(1, 2).expect(EXPECT_DECIMAL));
+    let settle1 = pf1
+        .apply_funding(b, rate, QuoteCurrency::new(100, 0))
+        .unwrap();
+    assert_eq!(settle1.solvency, Solvency::Solvent);
+    assert_eq!(settle1.forced_cancels.len(), 1);
+    assert_eq!(settle1.forced_cancels[0].0, b);
+    assert_eq!(settle1.forced_cancels[0].1.id(), b_buy);
+
+    // Case 2: B's Buy 0.7 @ 90 (delta 12.6) loses to A's Sell 1 @ 120 (delta 15.2),
+    // which also beats A's Sell 1 @ 110 (delta 15.1) via the maker-fee term and beats
+    // A's Buy 2 @ 80 (notional 160, delta 1.6).
+    let (mut pf2, a, b, a_sell_120, _b_buy) = run_case(7);
+    let rate6 = FundingRate::from(Decimal::try_from_scaled(6, 2).expect(EXPECT_DECIMAL));
+    let settle2 = pf2
+        .apply_funding(b, rate6, QuoteCurrency::new(100, 0))
+        .unwrap();
+    assert_eq!(settle2.solvency, Solvency::Solvent);
+    assert_eq!(settle2.forced_cancels.len(), 1);
+    assert_eq!(settle2.forced_cancels[0].0, a);
+    assert_eq!(settle2.forced_cancels[0].1.id(), a_sell_120);
+
+    // Case 3 (ask subtraction vs division): A has two asks (110 + 120 = 230, no bids) so each
+    // ask's true delta is 120*0.2 = 24 (plus 1.2 fee = 25.2); B has a single bid of notional 150
+    // (delta = 30.0). Replacing `-` with `/` on asks_notional makes A's delta ~46.8 > 30.0.
+    let cfg3 = PortfolioConfig::new(
+        QuoteCurrency::new(100, 0),
+        vec![
+            make_linear_market_cfg_with_fees("AAA", 5, 100, 0),
+            make_linear_market_cfg_with_fees("BBB", 5, 0, 0),
+        ],
+    )
+    .unwrap();
+    let mut pf3 = LinearPortfolio::new(cfg3);
+    let (a, b) = (MarketId::new(0), MarketId::new(1));
+    pf3.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf3.update_market(b, &bba(99, 100, 1)).unwrap();
+    pf3.submit_market_order(
+        b,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+    )
+    .unwrap();
+    pf3.update_market(b, &bba(100, 101, 2)).unwrap();
+    pf3.submit_limit_order(
+        a,
+        LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(110, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    pf3.submit_limit_order(
+        a,
+        LimitOrder::new(
+            Side::Sell,
+            QuoteCurrency::new(120, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let b_single = pf3
+        .submit_limit_order(
+            b,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(75, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap()
+        .id();
+    // Total req = 46 + 2.3 (A) + 20 + 30 (B) = 98.3, wallet = 100 -> debit 2.0 -> excess -0.3.
+    let rate2 = FundingRate::from(Decimal::try_from_scaled(2, 2).expect(EXPECT_DECIMAL));
+    let settle3 = pf3
+        .apply_funding(b, rate2, QuoteCurrency::new(100, 0))
+        .unwrap();
+    assert_eq!(settle3.solvency, Solvency::Solvent);
+    assert_eq!(settle3.forced_cancels.len(), 1);
+    assert_eq!(settle3.forced_cancels[0].0, b);
+    assert_eq!(settle3.forced_cancels[0].1.id(), b_single);
+}
+
+#[test]
+fn portfolio_margin_call_selects_dominant_bid_contributor_correctly() {
+    // 5x (IM=20%), maker fee = 1% (100 bps). Long 1 @ 100 (IM=20, marked @ 100/101 -> uPnL 0).
+    // Bids: Buy 1 @ 80 (notional 80) and Buy 1 @ 90 (notional 90) -> bids_notional = 170.
+    // Asks: Sell 2 @ 120 (notional 240, offset by pos notional 100 -> asks - pos = 140 < 170).
+    // Current order_margin = 170 * 0.2 = 34.
+    // Marginal deltas:
+    //   - Buy 1 @ 90: removing leaves max(80, 140)*0.2 = 28 -> delta = 6 + 0.9 = 6.9.
+    //   - Buy 1 @ 80: removing leaves max(90, 140)*0.2 = 28 -> delta = 6 + 0.8 = 6.8.
+    //   - Sell 2 @ 120: removing leaves max(170, -100)*0.2 = 34 -> delta = 0 + 2.4 = 2.4.
+    // Total required = 20 (pos) + 34 (orders) + 4.1 (maker fees) = 58.1.
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(59, 0),
+        vec![make_linear_market_cfg_with_fees("AAA", 5, 100, 0)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+    )
+    .unwrap();
+    pf.update_market(a, &bba(100, 101, 2)).unwrap();
+
+    let _buy_80 = pf
+        .submit_limit_order(
+            a,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(80, 0),
+                BaseCurrency::new(1, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap()
+        .id();
+    let buy_90 = pf
+        .submit_limit_order(
+            a,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(90, 0),
+                BaseCurrency::new(1, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap()
+        .id();
+    let _sell_120 = pf
+        .submit_limit_order(
+            a,
+            LimitOrder::new(
+                Side::Sell,
+                QuoteCurrency::new(120, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap()
+        .id();
+
+    // Debit 1.0 via 1% funding -> equity 58.0 < 58.1 (excess -0.1). Must cancel buy_90 (delta 6.9).
+    let rate = FundingRate::from(Decimal::try_from_scaled(1, 2).expect(EXPECT_DECIMAL));
+    let settlement = pf
+        .apply_funding(a, rate, QuoteCurrency::new(100, 0))
+        .unwrap();
+    assert_eq!(settlement.solvency, Solvency::Solvent);
+    assert_eq!(settlement.forced_cancels.len(), 1);
+    assert_eq!(settlement.forced_cancels[0].1.id(), buy_90);
+
+    // Bid subtraction vs division: A has two bids (80 + 90 = 170, no asks), so each bid's true
+    // delta is 90*0.2 = 18.0 (plus 0.9 fee = 18.9); B has a single ask of notional 110 (delta 22.0).
+    // Replacing `-` with `/` on bids_notional makes A's delta ~(170 - 1.89)*0.2 + 0.9 = 34.5 > 22.0.
+    let cfg2 = PortfolioConfig::new(
+        QuoteCurrency::new(80, 0),
+        vec![
+            make_linear_market_cfg_with_fees("AAA", 5, 100, 0),
+            make_linear_market_cfg_with_fees("BBB", 5, 0, 0),
+        ],
+    )
+    .unwrap();
+    let mut pf2 = LinearPortfolio::new(cfg2);
+    let (a, b) = (MarketId::new(0), MarketId::new(1));
+    pf2.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf2.update_market(b, &bba(99, 100, 1)).unwrap();
+    pf2.submit_market_order(
+        b,
+        MarketOrder::new(Side::Sell, BaseCurrency::new(1, 0)).unwrap(),
+    )
+    .unwrap();
+    pf2.update_market(b, &bba(98, 99, 2)).unwrap();
+    pf2.submit_limit_order(
+        a,
+        LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(80, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    pf2.submit_limit_order(
+        a,
+        LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(90, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let b_ask = pf2
+        .submit_limit_order(
+            b,
+            LimitOrder::new(
+                Side::Sell,
+                QuoteCurrency::new(110, 0),
+                BaseCurrency::new(1, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap()
+        .id();
+    // Total req = 34 + 1.7 (A) + 19.8 + 22 (B) = 77.5, wallet = 80 -> debit 3.0 -> excess -0.5.
+    let rate_neg3 = FundingRate::from(Decimal::try_from_scaled(-3, 2).expect(EXPECT_DECIMAL));
+    let settle2 = pf2
+        .apply_funding(b, rate_neg3, QuoteCurrency::new(100, 0))
+        .unwrap();
+    assert_eq!(settle2.solvency, Solvency::Solvent);
+    assert_eq!(settle2.forced_cancels.len(), 1);
+    assert_eq!(settle2.forced_cancels[0].0, b);
+    assert_eq!(settle2.forced_cancels[0].1.id(), b_ask);
+}
+
+#[test]
+fn portfolio_reconcile_margin_respects_exact_zero_and_maintenance_boundaries() {
+    // 5x (IM=20%, MM=10%). Long 1 @ 100 (IM=20, MM=10), marked at 100/101 -> uPnL = 0.
+    let setup = |wallet: i64| {
+        let cfg = PortfolioConfig::new(
+            QuoteCurrency::new(wallet, 0),
+            vec![make_linear_market_cfg("AAA", 5)],
+        )
+        .unwrap();
+        let mut pf = LinearPortfolio::new(cfg);
+        let a = MarketId::new(0);
+        pf.update_market(a, &bba(99, 100, 1)).unwrap();
+        pf.submit_market_order(
+            a,
+            MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+        )
+        .unwrap();
+        pf.update_market(a, &bba(100, 101, 2)).unwrap();
+        (pf, a)
+    };
+
+    // 1. Exact margin_excess == 0 with a resting order: must NOT force-cancel and stays Solvent.
+    let (mut pf1, a) = setup(35);
+    pf1.submit_limit_order(
+        a,
+        LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(50, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let rate5 = FundingRate::from(Decimal::try_from_scaled(5, 2).expect(EXPECT_DECIMAL));
+    let s1 = pf1
+        .apply_funding(a, rate5, QuoteCurrency::new(100, 0))
+        .unwrap();
+    assert_eq!(s1.solvency, Solvency::Solvent);
+    assert!(s1.forced_cancels.is_empty());
+    assert_eq!(pf1.market(a).unwrap().active_limit_orders.len(), 1);
+    assert_eq!(pf1.margin_excess(), QuoteCurrency::zero());
+
+    // 2. Exact total_equity == total_maintenance_margin (10 == 10) with no resting orders:
+    //    must NOT liquidate, and must report InitialMarginDeficit (10 < IM 20).
+    let (mut pf2, a) = setup(20);
+    let rate10 = FundingRate::from(Decimal::try_from_scaled(10, 2).expect(EXPECT_DECIMAL));
+    let s2 = pf2
+        .apply_funding(a, rate10, QuoteCurrency::new(100, 0))
+        .unwrap();
+    assert_eq!(s2.solvency, Solvency::InitialMarginDeficit);
+    assert_eq!(pf2.total_equity(), QuoteCurrency::new(10, 0));
+    assert_eq!(pf2.total_maintenance_margin(), QuoteCurrency::new(10, 0));
+    assert_eq!(
+        pf2.market(a).unwrap().position.quantity(),
+        BaseCurrency::new(1, 0)
+    );
+
+    // 3. Exact margin_excess == 0 with no resting orders reports Solvent (not InitialMarginDeficit).
+    let (mut pf3, a) = setup(20);
+    let s3 = pf3
+        .apply_funding(
+            a,
+            FundingRate::from(Decimal::zero()),
+            QuoteCurrency::new(100, 0),
+        )
+        .unwrap();
+    assert_eq!(s3.solvency, Solvency::Solvent);
+    assert_eq!(pf3.margin_excess(), QuoteCurrency::zero());
+
+    // 4. One tick of funding below MM (total_equity < 10) liquidates.
+    let rate_tiny = FundingRate::from(Decimal::try_from_scaled(1, 5).expect(EXPECT_DECIMAL));
+    let s4 = pf2
+        .apply_funding(a, rate_tiny, QuoteCurrency::new(100, 0))
+        .unwrap();
+    assert_eq!(s4.solvency, Solvency::Liquidated);
+    assert!(pf2.market(a).unwrap().position.quantity().is_zero());
+}
+
+#[test]
+fn portfolio_update_market_at_exact_maintenance_margin_does_not_liquidate() {
+    // 5x (IM=20%, MM=10%). Open Long 1 @ 100 with wallet 20, debit 1 via funding -> wallet = 19.
+    // At bid = 90: equity = 19 + (90 - 100) = 9 == MM (90 * 0.1 = 9) -> survives.
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(20, 0),
+        vec![make_linear_market_cfg("AAA", 5)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+    )
+    .unwrap();
+    pf.apply_funding(
+        a,
+        FundingRate::from(Decimal::try_from_scaled(1, 2).expect(EXPECT_DECIMAL)),
+        QuoteCurrency::new(100, 0),
+    )
+    .unwrap();
+    assert_eq!(pf.balances().equity(), QuoteCurrency::new(19, 0));
+
+    pf.update_market(a, &bba(90, 91, 2)).unwrap();
+    assert_eq!(pf.total_equity(), QuoteCurrency::new(9, 0));
+    assert_eq!(pf.total_maintenance_margin(), QuoteCurrency::new(9, 0));
+    assert_eq!(
+        pf.market(a).unwrap().position.quantity(),
+        BaseCurrency::new(1, 0)
+    );
+
+    // Drop bid by 1 tick below 90 -> liquidates.
+    let err = pf.update_market(a, &bba(89, 90, 3)).unwrap_err();
+    assert!(matches!(err, PortfolioError::Risk(RiskError::Liquidate)));
+}
