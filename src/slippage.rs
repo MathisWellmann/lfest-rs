@@ -518,4 +518,62 @@ mod tests {
         let huge = model.quote(&ms, Side::Buy, BaseCurrency::new(i64::MAX, 5), cent());
         assert_eq!(huge.slippage_rate(), dec(5, 2));
     }
+
+    #[test]
+    fn fixed_rate_rejects_rates_outside_the_half_open_unit_interval() {
+        // Zero is a valid no-op rate.
+        SlippageModel::<i64, 5>::fixed_rate(Decimal::zero()).unwrap();
+
+        assert_eq!(
+            SlippageModel::<i64, 5>::fixed_rate(Decimal::one()),
+            Err(ConfigError::InvalidSlippageModel)
+        );
+        assert_eq!(
+            SlippageModel::<i64, 5>::fixed_rate(dec(1001, 3)),
+            Err(ConfigError::InvalidSlippageModel)
+        );
+        assert_eq!(
+            SlippageModel::<i64, 5>::fixed_rate(dec(-1, 3)),
+            Err(ConfigError::InvalidSlippageModel)
+        );
+    }
+
+    #[test]
+    fn linear_sqrt_rejects_each_invalid_parameter_individually() {
+        let base = dec(1, 3);
+        let linear = dec(2, 2);
+        let sqrt = dec(1, 2);
+        let volume = dec(100, 0);
+        let cap = dec(5, 2);
+        SlippageModel::<i64, 5>::linear_sqrt(base, linear, sqrt, volume, cap).unwrap();
+
+        let negative = dec(-1, 3);
+        let cases = [
+            (negative, linear, sqrt, volume, cap),
+            (base, negative, sqrt, volume, cap),
+            (base, linear, negative, volume, cap),
+            (base, linear, sqrt, Decimal::zero(), cap),
+            (base, linear, sqrt, negative, cap),
+            (base, linear, sqrt, volume, Decimal::zero()),
+            (base, linear, sqrt, volume, Decimal::one()),
+            (base, linear, sqrt, volume, dec(1001, 3)),
+        ];
+        for (idx, (b, l, s, v, c)) in cases.into_iter().enumerate() {
+            assert_eq!(
+                SlippageModel::<i64, 5>::linear_sqrt(b, l, s, v, c),
+                Err(ConfigError::InvalidSlippageModel),
+                "invalid parameter combination {idx}"
+            );
+        }
+
+        // Zero coefficients are allowed; the remaining terms still apply.
+        SlippageModel::<i64, 5>::linear_sqrt(
+            Decimal::zero(),
+            Decimal::zero(),
+            Decimal::zero(),
+            volume,
+            cap,
+        )
+        .unwrap();
+    }
 }

@@ -173,6 +173,79 @@ mod tests {
     }
 
     #[test]
+    fn quantity_filter_boundaries_are_inclusive() {
+        let filter = QuantityFilter {
+            min_quantity: Some(QuoteCurrency::<i64, 2>::new(10, 0)),
+            max_quantity: Some(QuoteCurrency::new(1_000, 0)),
+            tick_size: QuoteCurrency::one(),
+            _quote: std::marker::PhantomData,
+        };
+
+        // Exactly the minimum and maximum pass.
+        filter
+            .validate_order_quantity(QuoteCurrency::new(10, 0))
+            .unwrap();
+        filter
+            .validate_order_quantity(QuoteCurrency::new(1_000, 0))
+            .unwrap();
+
+        // One tick outside either bound fails.
+        assert_eq!(
+            filter.validate_order_quantity(QuoteCurrency::new(9, 0)),
+            Err(ValidateOrderQuantityError::QuantityTooLow)
+        );
+        assert_eq!(
+            filter.validate_order_quantity(QuoteCurrency::new(1_001, 0)),
+            Err(ValidateOrderQuantityError::QuantityTooHigh)
+        );
+    }
+
+    #[test]
+    fn quantity_filter_checks_the_step_relative_to_the_minimum() {
+        let filter = QuantityFilter {
+            min_quantity: Some(QuoteCurrency::<i64, 2>::new(10, 0)),
+            max_quantity: None,
+            tick_size: QuoteCurrency::new(3, 0),
+            _quote: std::marker::PhantomData,
+        };
+
+        // (13 - 10) % 3 == 0, but (13 + 10) % 3 != 0.
+        filter
+            .validate_order_quantity(QuoteCurrency::new(13, 0))
+            .unwrap();
+        // (14 - 10) % 3 != 0.
+        assert_eq!(
+            filter.validate_order_quantity(QuoteCurrency::new(14, 0)),
+            Err(ValidateOrderQuantityError::InvalidQuantityStepSize)
+        );
+    }
+
+    #[test]
+    fn quantity_filter_constructor_rejects_invalid_config() {
+        // The minimum must lie on the tick grid.
+        assert!(matches!(
+            QuantityFilter::<i64, 2, QuoteCurrency<i64, 2>>::new(
+                Some(QuoteCurrency::new(5, 0)),
+                None,
+                QuoteCurrency::new(2, 0),
+            ),
+            Err(ConfigError::InvalidMinQuantity)
+        ));
+        // A zero tick is invalid. `min_quantity` is `None` because the constructor
+        // checks the modulus first, which would divide by zero.
+        assert!(matches!(
+            QuantityFilter::<i64, 2, QuoteCurrency<i64, 2>>::new(None, None, QuoteCurrency::zero(),),
+            Err(ConfigError::InvalidTickSize)
+        ));
+        QuantityFilter::<i64, 2, QuoteCurrency<i64, 2>>::new(
+            Some(QuoteCurrency::new(4, 0)),
+            None,
+            QuoteCurrency::new(2, 0),
+        )
+        .unwrap();
+    }
+
+    #[test]
     fn size_of_quantity_filter() {
         assert_eq!(
             size_of::<QuantityFilter<i64, 5, BaseCurrency<i64, 5>>>(),

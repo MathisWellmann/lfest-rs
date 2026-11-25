@@ -380,6 +380,109 @@ mod tests {
             Err(ConfigError::InvalidMaintenanceMarginTier)
         );
     }
+
+    #[test]
+    fn from_brackets_rejects_rates_outside_the_unit_interval() {
+        type S = MaintenanceMarginSchedule<i64, 5, QuoteCurrency<i64, 5>>;
+        let cap = Some(QuoteCurrency::new(10_000, 0));
+
+        for rate in [Decimal::zero(), Decimal::try_from_scaled(-1, 3).unwrap()] {
+            assert_eq!(
+                S::from_brackets(&[(cap, rate)]),
+                Err(ConfigError::InvalidMaintenanceMarginTier),
+                "rate {rate:?}"
+            );
+        }
+
+        // 100% is the inclusive upper bound...
+        S::from_brackets(&[(cap, Decimal::one())]).unwrap();
+        // ...but anything above it is rejected.
+        assert_eq!(
+            S::from_brackets(&[(cap, Decimal::try_from_scaled(1001, 3).unwrap())]),
+            Err(ConfigError::InvalidMaintenanceMarginTier)
+        );
+    }
+
+    #[test]
+    fn from_brackets_rejects_non_positive_caps() {
+        let rate = Decimal::<i64, 5>::try_from_scaled(5, 3).unwrap();
+
+        assert_eq!(
+            MaintenanceMarginSchedule::from_brackets(&[(Some(QuoteCurrency::zero()), rate)]),
+            Err(ConfigError::InvalidMaintenanceMarginTier)
+        );
+        assert_eq!(
+            MaintenanceMarginSchedule::from_brackets(&[(Some(QuoteCurrency::new(-1, 0)), rate)]),
+            Err(ConfigError::InvalidMaintenanceMarginTier)
+        );
+    }
+
+    #[test]
+    fn from_brackets_accepts_equal_consecutive_rates() {
+        let rate = Decimal::<i64, 5>::try_from_scaled(5, 3).unwrap();
+
+        let sched = MaintenanceMarginSchedule::from_brackets(&[
+            (Some(QuoteCurrency::new(10_000, 0)), rate),
+            (None, rate),
+        ])
+        .unwrap();
+
+        // No rate change means no continuity offset.
+        assert!(sched.tiers()[1].maintenance_amount().is_zero());
+    }
+
+    #[test]
+    fn from_brackets_rejects_a_rate_decrease_that_keeps_the_offset_non_negative() {
+        // The large previous cap makes `cap * (rate - prev_rate)` smaller than the
+        // accumulated offset, so the tier constructor accepts the amount. Only the
+        // explicit non-decreasing-rate check can reject this bracket.
+        let low = Decimal::<i64, 5>::try_from_scaled(1, 3).unwrap(); // 0.001
+        let high = Decimal::<i64, 5>::try_from_scaled(1, 1).unwrap(); // 0.1
+        let lower = Decimal::<i64, 5>::try_from_scaled(999, 4).unwrap(); // 0.0999
+
+        assert_eq!(
+            MaintenanceMarginSchedule::from_brackets(&[
+                (Some(QuoteCurrency::new(10_000, 0)), low),
+                (Some(QuoteCurrency::new(1_000_000, 0)), high),
+                (Some(QuoteCurrency::new(1_000_001, 0)), lower),
+            ]),
+            Err(ConfigError::InvalidMaintenanceMarginTier)
+        );
+    }
+
+    #[test]
+    fn tier_lookup_uses_inclusive_caps_and_falls_back_to_the_top_tier() {
+        let r1 = Decimal::<i64, 5>::try_from_scaled(5, 3).unwrap();
+        let r2 = Decimal::<i64, 5>::try_from_scaled(1, 2).unwrap();
+        let sched = MaintenanceMarginSchedule::from_brackets(&[
+            (Some(QuoteCurrency::new(10_000, 0)), r1),
+            (Some(QuoteCurrency::new(50_000, 0)), r2),
+        ])
+        .unwrap();
+
+        assert_eq!(
+            sched.tier_index_for_notional(QuoteCurrency::new(9_999, 0)),
+            0
+        );
+        // Caps are inclusive.
+        assert_eq!(
+            sched.tier_index_for_notional(QuoteCurrency::new(10_000, 0)),
+            0
+        );
+        assert_eq!(
+            sched.tier_index_for_notional(QuoteCurrency::new(10_001, 0)),
+            1
+        );
+        assert_eq!(
+            sched.tier_index_for_notional(QuoteCurrency::new(50_000, 0)),
+            1
+        );
+        // Above the top cap the top tier applies instead of an out-of-bounds index.
+        assert_eq!(
+            sched.tier_index_for_notional(QuoteCurrency::new(1_000_000, 0)),
+            1
+        );
+    }
 }
 
 #[cfg(test)]
@@ -440,6 +543,55 @@ mod from_tiers_tests {
         assert_eq!(
             MaintenanceMarginSchedule::from_tiers(&[tier(Some(10_000), 10, 0), tier(None, 5, 0)]),
             err
+        );
+    }
+
+    #[test]
+    fn from_tiers_rejects_empty_and_unbounded_non_final_tiers() {
+        assert_eq!(
+            MaintenanceMarginSchedule::<i64, 5, QuoteCurrency<i64, 5>>::from_tiers(&[]),
+            Err(ConfigError::InvalidMaintenanceMarginTier)
+        );
+        assert_eq!(
+            MaintenanceMarginSchedule::from_tiers(&[tier(None, 5, 0), tier(None, 10, 0)]),
+            Err(ConfigError::InvalidMaintenanceMarginTier)
+        );
+    }
+
+    #[test]
+    fn from_tiers_rejects_decreasing_caps_with_continuous_offsets() {
+        // Equal rates keep the offset at zero, so only the cap ordering can reject.
+        assert_eq!(
+            MaintenanceMarginSchedule::from_tiers(&[
+                tier(Some(20_000), 5, 0),
+                tier(Some(10_000), 5, 0),
+            ]),
+            Err(ConfigError::InvalidMaintenanceMarginTier)
+        );
+    }
+
+    #[test]
+    fn from_tiers_accepts_equal_consecutive_rates() {
+        let sched =
+            MaintenanceMarginSchedule::from_tiers(&[tier(Some(10_000), 5, 0), tier(None, 5, 0)])
+                .unwrap();
+
+        // No rate change means no continuity offset.
+        assert!(sched.tiers()[1].maintenance_amount().is_zero());
+    }
+
+    #[test]
+    fn from_tiers_rejects_a_rate_decrease_that_keeps_the_offset_non_negative() {
+        // The large first cap makes the accumulated offset exceed the drop in the
+        // second cap's rate, so every tier constructor accepts its amount. Only the
+        // explicit non-decreasing-rate check can reject this schedule.
+        assert_eq!(
+            MaintenanceMarginSchedule::from_tiers(&[
+                tier(Some(100_000), 1, 0),
+                tier(Some(1_000_000), 100, 9_900),
+                tier(Some(1_000_001), 99, 8_900),
+            ]),
+            Err(ConfigError::InvalidMaintenanceMarginTier)
         );
     }
 
