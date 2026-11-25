@@ -67,6 +67,24 @@ pub fn scale<F: num::Float>(from_min: F, from_max: F, to_min: F, to_max: F, valu
     to_min + ((value - from_min) * (to_max - to_min)) / (from_max - from_min)
 }
 
+/// Grow `vec` to hold at least `capacity` elements without dropping its contents.
+///
+/// `Vec::clone` keeps only the length, while the event push paths
+/// (`push_within_capacity`) rely on the spare capacity that the exchange constructors
+/// pre-allocate. Used by their `Clone` impls. Allocation-free once the bound is in place.
+pub(crate) fn reserve_to_capacity<T>(vec: &mut Vec<T>, capacity: usize) {
+    let len_before = vec.len();
+    if vec.capacity() < capacity {
+        vec.reserve_exact(capacity - len_before);
+    }
+    assert!(vec.capacity() >= capacity);
+    assert_eq!(
+        vec.len(),
+        len_before,
+        "reserving must not change the contents"
+    );
+}
+
 /// The margin requirement for all the tracked orders.
 #[inline(always)]
 pub(crate) fn order_margin<I, const D: u8, BaseOrQuote>(

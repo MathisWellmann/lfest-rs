@@ -81,6 +81,7 @@ use crate::{
         TimestampNs,
         UserOrderId,
     },
+    utils::reserve_to_capacity,
 };
 
 /// Result of submitting a limit order via [`Exchange::submit_limit_order_with_execution`],
@@ -301,20 +302,6 @@ impl BufferCapacities {
             stop_order_events: max,
         }
     }
-}
-
-/// Grow `vec` to hold at least `capacity` elements without dropping its contents.
-///
-/// `Vec::clone` keeps only the length, while the event push paths
-/// (`push_within_capacity`) rely on the spare capacity that [`Exchange::new`]
-/// pre-allocates. Allocation-free once the bound is in place.
-fn reserve_to_capacity<T>(vec: &mut Vec<T>, capacity: usize) {
-    if vec.capacity() >= capacity {
-        return;
-    }
-    assert!(vec.len() <= capacity);
-    vec.reserve_exact(capacity - vec.len());
-    assert!(vec.capacity() >= capacity);
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Exchange<I, D, BaseOrQuote, UserOrderIdT>
@@ -2055,8 +2042,8 @@ where
 
     /// Give `stop_order_events` enough spare capacity for the next event.
     ///
-    /// `#[derive(Clone)]` does not keep spare `Vec` capacity, so a cloned exchange has to
-    /// allocate on its first stop event. Every other exchange already has the bound.
+    /// `Clone` restores the bound, so only a deserialized exchange (serde cannot restore
+    /// spare `Vec` capacity) has to allocate on its first stop event.
     #[cold]
     #[inline(never)]
     fn restore_stop_order_event_capacity(&mut self) {
