@@ -2,6 +2,11 @@
 
 use std::fmt::Display;
 
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use thiserror::Error;
 
 use crate::{
@@ -13,6 +18,7 @@ use crate::{
 };
 
 #[derive(Error, Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub struct OrderQuantityLTEZero;
 
@@ -23,6 +29,7 @@ impl Display for OrderQuantityLTEZero {
 }
 
 #[derive(Debug, Clone, Error, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum ValidateOrderQuantityError {
     #[error("order size is less than or equal zero.")]
@@ -39,6 +46,7 @@ pub enum ValidateOrderQuantityError {
 }
 
 #[derive(Debug, Clone, Copy, Error, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum ValidateOrderNotionalError {
     #[error("The order notional value is below the configured minimum notional")]
@@ -49,6 +57,7 @@ pub enum ValidateOrderNotionalError {
 }
 
 #[derive(Debug, Clone, Error, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum SubmitMarketOrderError {
     #[error(transparent)]
@@ -68,10 +77,12 @@ pub enum SubmitMarketOrderError {
 }
 
 #[derive(Error, Debug, Clone, Eq, PartialEq, derive_more::Display)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub struct MaxNumberOfActiveOrders(pub u16);
 
 #[derive(Debug, Clone, Error, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum OrderIdNotFound<UserOrderIdT> {
     OrderId(OrderId),

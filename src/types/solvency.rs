@@ -1,3 +1,9 @@
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 /// The solvency of the account after a fill or funding payment was settled and the
 /// collateral reconciled.
 ///
@@ -6,6 +12,7 @@
 /// The exchange then reconciles the account like a real venue would and reports the
 /// outcome through this type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Solvency {
     /// The account equity covers the required collateral.
     Solvent,

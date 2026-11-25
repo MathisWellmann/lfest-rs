@@ -21,6 +21,11 @@
 //! `Balances::bad_debt` accrued since the ledger was enabled.
 
 use getset::CopyGetters;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::types::{
     MarginCurrency,
@@ -32,6 +37,7 @@ use crate::types::{
 
 /// Classification of a cashflow entry recorded in [`Ledger`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum LedgerEntryKind {
     /// Realized PnL from reducing or closing a position.
     RealizedPnl,
@@ -49,6 +55,7 @@ pub enum LedgerEntryKind {
 
 /// Single immutable cashflow entry in [`Ledger`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LedgerEntry<I, const D: u8, Margin>
 where
     I: Mon<D>,
@@ -85,6 +92,7 @@ where
 
 /// Append-only accounting journal tracking every wallet equity change.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Ledger<I, const D: u8, Margin>
 where
     I: Mon<D>,

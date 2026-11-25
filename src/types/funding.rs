@@ -3,6 +3,7 @@
 use std::fmt;
 
 use const_decimal::Decimal;
+#[cfg(feature = "serde")]
 use serde::{
     Deserialize,
     Serialize,
@@ -17,9 +18,8 @@ use super::Mon;
 /// - Positive (`> 0`): longs pay shorts.
 /// - Negative (`< 0`): shorts pay longs.
 /// - Zero (`0`): no funding is exchanged.
-#[derive(
-    Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[repr(transparent)]
 pub struct FundingRate<I, const D: u8>(Decimal<I, D>);
 

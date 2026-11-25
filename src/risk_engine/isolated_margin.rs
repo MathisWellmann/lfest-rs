@@ -1,5 +1,10 @@
 use const_decimal::Decimal;
 use num::Zero;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use tracing::trace;
 
 use super::RiskEngine;
@@ -28,6 +33,14 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "I: Serialize, BaseOrQuote: Serialize, BaseOrQuote::PairedCurrency: Serialize",
+        deserialize = "I: Deserialize<'de>, BaseOrQuote: Deserialize<'de>, BaseOrQuote::PairedCurrency: Deserialize<'de>"
+    ))
+)]
 pub(crate) struct IsolatedMarginRiskEngine<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,

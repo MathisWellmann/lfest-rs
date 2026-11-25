@@ -1,7 +1,14 @@
 //! Time-in-force and execution flags (`ReduceOnly`) for market and limit orders.
 
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 /// Time-in-force policy governing how a limit order behaves upon admission.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum TimeInForce {
     /// Post-only / Good-Til-Crossing (default for backwards compatibility):
     /// rejects immediately if the limit price locks or crosses the best opposite quote.

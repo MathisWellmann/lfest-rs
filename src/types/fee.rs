@@ -1,4 +1,9 @@
 use const_decimal::Decimal;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use super::Mon;
 use crate::types::{
@@ -9,6 +14,7 @@ use crate::types::{
 /// Fee as a part per one hundred thousand.
 /// The generic `MarkerTaker` marker indicates to the type system if its a maker or taker fee.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Fee<I, const D: u8, MakerTaker> {
     value: Decimal<I, D>,
     _fee_type: std::marker::PhantomData<MakerTaker>,
@@ -59,10 +65,12 @@ where
 
 /// The fee limit orders pay.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Maker;
 
 /// The fee market orders pay.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Taker;
 
 #[cfg(test)]

@@ -2,6 +2,11 @@ use getset::{
     CopyGetters,
     Getters,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use super::{
     Currency,
@@ -25,6 +30,7 @@ use crate::types::OrderQuantityLTEZero;
 /// - `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
 /// - `OrderStatus`: The status of the order for each stage, contains different information based on the stage.
 #[derive(Debug, Clone, PartialEq, Eq, Getters, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MarketOrder<I, const D: u8, BaseOrQuote, UserOrderIdT, OrderStatus>
 where
     I: Mon<D>,

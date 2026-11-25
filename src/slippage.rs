@@ -9,6 +9,11 @@ use num_traits::{
     Signed,
     Zero,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::{
     market_state::MarketState,
@@ -23,6 +28,7 @@ use crate::{
 
 /// Structured quote returned by a [`SlippageModel`] for an aggressive order.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MarketImpactQuote<I, const D: u8>
 where
     I: Mon<D>,
@@ -48,6 +54,7 @@ where
 
 /// Pluggable execution slippage / market-impact model for aggressive orders.
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum SlippageModel<I, const D: u8>
 where
     I: Mon<D>,

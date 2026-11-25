@@ -1,5 +1,12 @@
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 /// An error related to market filters `PriceFilter`
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum PriceFilterError {
     #[error("Some price in MarketUpdate is too low.")]

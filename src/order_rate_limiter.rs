@@ -2,16 +2,24 @@
 
 use std::num::NonZeroU32;
 
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 use crate::types::TimestampNs;
 
 /// The rate limit was reached.
 #[derive(Debug, Clone, thiserror::Error, derive_more::Display, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RateLimitReached;
 
 // TODO: write a benchmark for it.
 /// Limits the rate at which limit orders can be submitted.
 /// Operates on buckets measured in seconds.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct OrderRateLimiter {
     /// The start of the rate limiting bucket in seconds.
     bucket_start_ns: TimestampNs,

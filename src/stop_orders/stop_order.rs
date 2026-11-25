@@ -6,6 +6,11 @@ use num_traits::{
     One,
     Zero,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use thiserror::Error;
 
 use super::StopProtection;
@@ -28,6 +33,7 @@ use crate::{
 
 /// Which market price feeds a stop order's trigger and watermark evaluation.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum TriggerPriceType {
     /// Contract mark price (from `ContractSpecification::mark_method()`).
     #[default]
@@ -40,6 +46,7 @@ pub enum TriggerPriceType {
 
 /// Direction in which the reference price must cross `stop_price` to elect the order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum TriggerDirection {
     /// Triggers when `reference_price >= stop_price` (e.g. buy stop-loss, sell take-profit).
     AtOrAbove,
@@ -49,6 +56,7 @@ pub enum TriggerDirection {
 
 /// Trail distance for [`StopKind::TrailingStop`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum TrailDistance<I, const D: u8>
 where
     I: Mon<D>,
@@ -61,6 +69,7 @@ where
 
 /// Concrete conditional order behavior once elected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum StopKind<I, const D: u8>
 where
     I: Mon<D>,
@@ -97,6 +106,7 @@ where
 
 /// A pending off-book conditional / stop order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StopOrder<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -428,6 +438,7 @@ where
 
 /// Reason a triggered or pending stop order was cancelled without executing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum StopCancelReason {
     /// Triggered market execution price fell outside the configured [`StopProtection`] collar.
     StopProtectionBand,
@@ -443,6 +454,7 @@ pub enum StopCancelReason {
 
 /// Event emitted when a pending stop order triggers during `update_state` / `update_market`.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum StopOrderEvent<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -494,6 +506,7 @@ where
 
 /// Errors returned when constructing, submitting, or cancelling a [`StopOrder`].
 #[derive(Debug, Clone, Error, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum StopOrderError {
     #[error("stop price must be strictly positive")]

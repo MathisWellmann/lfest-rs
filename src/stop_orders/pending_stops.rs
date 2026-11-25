@@ -5,6 +5,12 @@
 
 use std::num::NonZeroU16;
 
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 use super::{
     StopKind,
     StopOrder,
@@ -35,6 +41,7 @@ pub type ElectedStop<I, const D: u8, BaseOrQuote, UserOrderIdT> = (
 /// Capacity is pre-allocated at construction so admission and election never allocate
 /// on the hot path.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct PendingStops<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,

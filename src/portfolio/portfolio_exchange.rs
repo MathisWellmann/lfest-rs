@@ -5,6 +5,11 @@ use std::collections::HashMap;
 use const_decimal::Decimal;
 use getset::Getters;
 use num_traits::Zero;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use tracing::{
     debug,
     info,
@@ -85,6 +90,14 @@ use crate::{
 
 /// Internal per-market slot stored contiguously in [`PortfolioExchange::markets`].
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "I: Serialize, BaseOrQuote: Serialize, UserOrderIdT: Serialize, BaseOrQuote::PairedCurrency: Serialize",
+        deserialize = "I: Deserialize<'de>, BaseOrQuote: Deserialize<'de>, UserOrderIdT: Deserialize<'de>, BaseOrQuote::PairedCurrency: Deserialize<'de>"
+    ))
+)]
 struct MarketSlot<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -234,6 +247,14 @@ where
 /// positions offset losses in losing positions under cross-margin, and forced
 /// cancellations / liquidations reconcile across the entire portfolio.
 #[derive(Debug, Clone, Getters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "I: Serialize, BaseOrQuote: Serialize, UserOrderIdT: Serialize, BaseOrQuote::PairedCurrency: Serialize",
+        deserialize = "I: Deserialize<'de>, BaseOrQuote: Deserialize<'de>, UserOrderIdT: Deserialize<'de>, BaseOrQuote::PairedCurrency: Deserialize<'de>"
+    ))
+)]
 pub struct PortfolioExchange<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,

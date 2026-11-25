@@ -13,6 +13,11 @@ use num_traits::{
     Signed,
     Zero,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use super::{
     Currency,
@@ -48,6 +53,7 @@ use super::{
     derive_more::From,
     derive_more::AsRef,
 )]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[mul(forward)]
 #[div(forward)]
 #[repr(transparent)]

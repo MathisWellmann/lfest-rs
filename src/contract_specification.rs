@@ -8,6 +8,11 @@ use num_traits::{
     One,
     Zero,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::{
     EXPECT_CONVERSION,
@@ -37,6 +42,14 @@ use crate::{
 /// - `D`: The constant decimal precision of the currencies
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 #[derive(Debug, Clone, Getters, CopyGetters, Setters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "I: Serialize, BaseOrQuote: Serialize, BaseOrQuote::PairedCurrency: Serialize",
+        deserialize = "I: Deserialize<'de>, BaseOrQuote: Deserialize<'de>, BaseOrQuote::PairedCurrency: Deserialize<'de>"
+    ))
+)]
 pub struct ContractSpecification<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
@@ -262,6 +275,7 @@ where
 
 /// Which price to use in `mark-to-market` calculations
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum MarkMethod {
     /// Take the last mid price of the market.
     MidPrice,

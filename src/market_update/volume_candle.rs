@@ -11,6 +11,11 @@ use num_traits::{
     One,
     Zero,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use super::{
     MarketUpdate,
@@ -45,6 +50,7 @@ use crate::{
 /// A candle update that caps total passive limit-order fill quantity to a configured
 /// fraction (`participation_rate`) of the bar's traded volume.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct VolumeCandle<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,

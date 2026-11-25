@@ -6,6 +6,11 @@ use getset::{
     Setters,
 };
 use num_traits::Zero;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use super::{
     Currency,
@@ -41,6 +46,7 @@ use crate::{
 /// - `UserOrderId`: The type of user order id to use. Set to `()` if you don't need one.
 /// - `OrderStatus`: The status of the order for each stage, contains different information based on the stage.
 #[derive(Debug, Clone, PartialEq, Eq, Getters, CopyGetters, Setters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LimitOrder<I, const D: u8, BaseOrQuote, UserOrderIdT, OrderStatus>
 where
     I: Mon<D>,

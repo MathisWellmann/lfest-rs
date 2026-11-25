@@ -4,6 +4,11 @@ use getset::{
     Getters,
     Setters,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::{
     prelude::{
@@ -21,6 +26,7 @@ use crate::{
 /// - `I`: The numeric data type of currencies.
 /// - `D`: The constant decimal precision of the currency.
 #[derive(Debug, Default, Clone, Getters, CopyGetters, Setters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MarketState<I, const D: u8>
 where
     I: Mon<D>,

@@ -1,6 +1,11 @@
 //! Order notional filter enforcing minimum and maximum order notional value.
 
 use getset::CopyGetters;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::{
     prelude::{
@@ -17,6 +22,7 @@ use crate::{
 /// Both bounds default to `None` so existing configurations behave identically
 /// unless opted in.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NotionalFilter<I, const D: u8, Margin>
 where
     I: Mon<D>,

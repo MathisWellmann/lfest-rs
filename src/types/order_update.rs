@@ -1,5 +1,11 @@
 use std::fmt::Display;
 
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 use super::{
     Currency,
     Filled,
@@ -11,6 +17,14 @@ use super::{
 
 /// An event concerning a resting limit order, emitted by `Exchange::update_state`.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "I: Serialize, BaseOrQuote: Serialize, UserOrderIdT: Serialize, BaseOrQuote::PairedCurrency: Serialize",
+        deserialize = "I: Deserialize<'de>, BaseOrQuote: Deserialize<'de>, UserOrderIdT: Deserialize<'de>, BaseOrQuote::PairedCurrency: Deserialize<'de>"
+    ))
+)]
 pub enum LimitOrderEvent<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D> + Display,
@@ -26,6 +40,7 @@ where
 
 /// Contains the possible updates to limit orders.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum LimitOrderFill<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D> + Display,

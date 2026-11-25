@@ -1,5 +1,11 @@
 //! Structured result for bulk / mass-cancel operations (adapted from OrderBook-rs).
 
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 use crate::types::{
     Currency,
     LimitOrder,
@@ -13,6 +19,7 @@ use crate::types::{
 ///
 /// Orders are returned in deterministic price-time order.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MassCancelResult<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,

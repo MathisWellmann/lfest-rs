@@ -3,6 +3,11 @@ use getset::{
     Getters,
 };
 use num_traits::Zero;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use super::Balances;
 use crate::{
@@ -19,6 +24,7 @@ use crate::{
 
 /// The side of the position depends on its quantity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum PositionSide {
     /// A negative position quantity.
     Short,
@@ -43,6 +49,7 @@ impl PositionSide {
 
 /// A futures position can be one of three variants.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Getters, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Position<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,

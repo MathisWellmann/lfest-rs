@@ -2,6 +2,11 @@
 //! (adapted from `OrderBook-rs` `stop_protection.rs`).
 
 use num_traits::Zero;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::types::{
     ConfigError,
@@ -20,6 +25,7 @@ use crate::types::{
 /// If the market gaps past the protection limit, the elected stop cancels with
 /// `StopCancelReason::StopProtectionBand` rather than executing at a ruinous fill.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StopProtection<I, const D: u8>
 where
     I: Mon<D>,

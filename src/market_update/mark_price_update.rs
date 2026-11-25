@@ -1,6 +1,11 @@
 //! Mark / fair price market update for `MarkMethod::FairPrice` valuation and margining.
 
 use getset::CopyGetters;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use super::MarketUpdate;
 use crate::{
@@ -32,6 +37,7 @@ use crate::{
 ///
 /// This update never fills resting limit orders (`CAN_FILL_LIMIT_ORDERS = false`).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MarkPriceUpdate<I, const D: u8>
 where
     I: Mon<D>,

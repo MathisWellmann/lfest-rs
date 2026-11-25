@@ -1,3 +1,8 @@
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use thiserror::Error;
 
 use crate::{
@@ -16,6 +21,7 @@ use crate::{
 
 /// The possible errors that can occur when submitting a limit order.
 #[derive(Error, Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum SubmitLimitOrderError {
     #[error(transparent)]
@@ -62,6 +68,7 @@ pub enum SubmitLimitOrderError {
 }
 
 #[derive(Error, Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum NewLimitOrderError {
     #[error("The limit price is less than or equal zero.")]
@@ -72,6 +79,7 @@ pub enum NewLimitOrderError {
 }
 
 #[derive(Debug, Clone, Error, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum AmendLimitOrderError {
     #[error(transparent)]
@@ -96,6 +104,7 @@ pub enum AmendLimitOrderError {
 }
 
 #[derive(Debug, Clone, Error, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum CancelLimitOrderError<UserOrderIdT> {
     #[error(transparent)]

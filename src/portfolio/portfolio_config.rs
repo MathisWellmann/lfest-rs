@@ -9,6 +9,11 @@ use getset::{
     CopyGetters,
     Getters,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::{
     contract_specification::ContractSpecification,
@@ -25,6 +30,14 @@ use crate::{
 
 /// Configuration for a single market inside a [`crate::portfolio::PortfolioExchange`].
 #[derive(Debug, Clone, Getters, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "I: Serialize, Margin: Serialize, Margin::PairedCurrency: Serialize",
+        deserialize = "I: Deserialize<'de>, Margin: Deserialize<'de>, Margin::PairedCurrency: Deserialize<'de>"
+    ))
+)]
 pub struct MarketConfig<I, const D: u8, Margin>
 where
     I: Mon<D>,
@@ -65,6 +78,14 @@ where
 
 /// Top-level configuration for a [`crate::portfolio::PortfolioExchange`].
 #[derive(Debug, Clone, Getters, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "I: Serialize, Margin: Serialize, Margin::PairedCurrency: Serialize",
+        deserialize = "I: Deserialize<'de>, Margin: Deserialize<'de>, Margin::PairedCurrency: Deserialize<'de>"
+    ))
+)]
 pub struct PortfolioConfig<I, const D: u8, Margin>
 where
     I: Mon<D>,

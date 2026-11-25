@@ -2,11 +2,18 @@
 
 use std::fmt::Display;
 
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 /// Dense zero-based index identifying a market inside a [`crate::portfolio::PortfolioExchange`].
 ///
 /// Using a compact `u16` newtype avoids hashing on the hot path and prevents
 /// mixing market indices with order IDs or timestamps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[repr(transparent)]
 pub struct MarketId(u16);
 
@@ -52,6 +59,7 @@ impl Display for MarketId {
 
 /// Lifecycle state of a market in a multi-symbol exchange.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum MarketStatus {
     /// Normal trading: both risk-increasing and risk-reducing orders are accepted.
     #[default]

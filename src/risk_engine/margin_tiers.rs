@@ -12,6 +12,11 @@ use num_traits::{
     One,
     Zero,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::types::{
     ConfigError,
@@ -21,6 +26,7 @@ use crate::types::{
 
 /// A single bracket in a [`MaintenanceMarginSchedule`].
 #[derive(Debug, Clone, Copy, Eq, PartialEq, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MaintenanceMarginTier<I, const D: u8, Margin>
 where
     I: Mon<D>,
@@ -86,6 +92,7 @@ where
 /// (either `notional_cap: None`, or if capped, notionals above the top cap use
 /// the top tier's rate).
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MaintenanceMarginSchedule<I, const D: u8, Margin>
 where
     I: Mon<D>,
