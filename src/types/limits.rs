@@ -1,6 +1,7 @@
 use std::num::NonZeroU32;
 
 use getset::CopyGetters;
+#[cfg(feature = "serde")]
 use serde::{
     Deserialize,
     Serialize,
@@ -9,7 +10,8 @@ use serde::{
 use crate::EXPECT_NON_ZERO;
 
 /// Defines the maximum order message rates, e.g.: limits order submission to 10 per second.
-#[derive(Debug, Clone, Copy, CopyGetters, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct OrderRateLimits {
     /// How many orders can be submitted per second.
     #[getset(get_copy = "pub")]

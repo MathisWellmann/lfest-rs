@@ -5,6 +5,11 @@ use num_traits::{
     One,
     Zero,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use tracing::trace;
 
 use super::{
@@ -38,6 +43,7 @@ use crate::{
 
 /// Selects how an exchange computes account equity and liquidation thresholds.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum MarginMode {
     /// Legacy isolated-margin mode: static entry-price liquidation threshold and
     /// wallet-only available balance (default for backwards compatibility).
@@ -58,6 +64,14 @@ pub enum MarginMode {
 /// - Computes dynamic liquidation prices reflecting actual wallet balance, funding
 ///   erosion, realized fees, and bracket maintenance offsets.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "I: Serialize, BaseOrQuote: Serialize, BaseOrQuote::PairedCurrency: Serialize",
+        deserialize = "I: Deserialize<'de>, BaseOrQuote: Deserialize<'de>, BaseOrQuote::PairedCurrency: Deserialize<'de>"
+    ))
+)]
 pub struct CrossMarginRiskEngine<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,

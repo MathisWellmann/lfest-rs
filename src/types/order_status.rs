@@ -4,6 +4,11 @@ use getset::{
     MutGetters,
     Setters,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use super::{
     Currency,
@@ -16,6 +21,7 @@ use super::{
 /// A new order has not been received by the exchange and has thus some pieces of information not available.
 /// This also means the various filters (e.g `PriceFilter` and `QuantityFilter`) have not been checked.
 #[derive(Debug, Clone, Eq, PartialEq, derive_more::Display)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NewOrder;
 
 /// The order is pending execution, but it already has additional information filled in by the exchange.
@@ -23,6 +29,7 @@ pub struct NewOrder;
 /// - `D`: The constant decimal precision of the currencies.
 /// - `BaseOrQuote`: Either `BaseCurrency` or `QuoteCurrency` depending on the futures type.
 #[derive(Debug, Clone, Eq, PartialEq, Getters, Setters, MutGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(test, derive(typed_builder::TypedBuilder))]
 pub struct Pending<I, const D: u8, BaseOrQuote>
 where
@@ -68,6 +75,7 @@ where
 
 /// Contains the filled order quantity along with the average fill price.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum FilledQuantity<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,
@@ -108,6 +116,7 @@ where
 /// The order has been fully filled.
 /// The executed order quantity is stored elsewhere.
 #[derive(Debug, Clone, Eq, PartialEq, Getters, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Filled<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,

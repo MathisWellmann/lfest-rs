@@ -2,6 +2,11 @@ use getset::{
     CopyGetters,
     Getters,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use super::{
     Bba,
@@ -26,6 +31,7 @@ use crate::{
 /// A data structure for aggregated trades with the ability to approximate realistic taker fill flow.
 /// Basically a `Candle` buy one that does not blindly fill active limit orders with taker flow that does not exist.
 #[derive(Debug, Clone, Eq, PartialEq, Getters, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SmartCandle<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,

@@ -2,6 +2,11 @@
 
 use std::fmt::Display;
 
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use thiserror::Error;
 
 use crate::{
@@ -35,6 +40,14 @@ use crate::{
 
 /// A limit order event tagged with the [`MarketId`] on which it occurred.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "I: Serialize, BaseOrQuote: Serialize, UserOrderIdT: Serialize, BaseOrQuote::PairedCurrency: Serialize",
+        deserialize = "I: Deserialize<'de>, BaseOrQuote: Deserialize<'de>, UserOrderIdT: Deserialize<'de>, BaseOrQuote::PairedCurrency: Deserialize<'de>"
+    ))
+)]
 pub struct PortfolioOrderEvent<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D> + Display,
@@ -49,6 +62,14 @@ where
 
 /// A stop order event tagged with the [`MarketId`] on which it occurred.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "I: Serialize, BaseOrQuote: Serialize, UserOrderIdT: Serialize, BaseOrQuote::PairedCurrency: Serialize",
+        deserialize = "I: Deserialize<'de>, BaseOrQuote: Deserialize<'de>, UserOrderIdT: Deserialize<'de>, BaseOrQuote::PairedCurrency: Deserialize<'de>"
+    ))
+)]
 pub struct PortfolioStopEvent<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -73,6 +94,7 @@ pub type TaggedForcedCancels<I, const D: u8, BaseOrQuote, UserOrderIdT> =
 
 /// Atomic result of settling a market order on [`crate::portfolio::PortfolioExchange`].
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct PortfolioMarketOrderSettlement<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -92,6 +114,7 @@ where
 
 /// Atomic result of settling perpetual funding on one market of [`crate::portfolio::PortfolioExchange`].
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct PortfolioFundingSettlement<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -111,6 +134,7 @@ where
 
 /// Atomic result of delisting a market via [`crate::portfolio::PortfolioExchange::delist_market`].
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DelistSettlement<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -136,7 +160,19 @@ where
 }
 
 /// Read-only snapshot reference to a single market's state inside [`crate::portfolio::PortfolioExchange`].
+///
+/// With the `serde` feature, only [`Serialize`](https://docs.rs/serde/latest/serde/trait.Serialize.html)
+/// is implemented: the view borrows market state, so a
+/// `Deserialize` impl would have to hand out references into the deserializer's
+/// input buffer, which serde cannot express.
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "I: Serialize, BaseOrQuote: Serialize, UserOrderIdT: Serialize, BaseOrQuote::PairedCurrency: Serialize"
+    ))
+)]
 pub struct MarketSlotView<'slot, I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -160,6 +196,7 @@ where
 
 /// Errors specific to multi-symbol [`crate::portfolio::PortfolioExchange`] operations.
 #[derive(Debug, Clone, Error, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum PortfolioError<UserOrderIdT> {
     #[error("unknown market id {0}")]

@@ -1,7 +1,13 @@
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use thiserror::Error;
 
 /// The error that the `RiskEngine` outputs, if any.
 #[derive(Error, Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum RiskError {
     #[error(transparent)]
@@ -12,5 +18,6 @@ pub enum RiskError {
 }
 
 #[derive(Error, Debug, Clone, Eq, PartialEq, derive_more::Display)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub struct NotEnoughAvailableBalance;

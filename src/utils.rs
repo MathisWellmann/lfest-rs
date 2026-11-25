@@ -1,9 +1,15 @@
 use const_decimal::Decimal;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::prelude::*;
 
 /// When no user specified order id is required.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NoUserOrderId;
 
 impl std::fmt::Display for NoUserOrderId {

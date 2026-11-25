@@ -1,6 +1,13 @@
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 /// When the limit order is priced at marketable prices (e.g a buy at or above the ask price),
 /// decide what to do.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum RePricing {
     /// A limit order is marketable if it can take liquidity from the book.
     /// If the entry price locks or crosses the opposite top-of-book quote, it executes

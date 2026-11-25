@@ -1,5 +1,12 @@
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 /// An error with the configuration.
 #[derive(thiserror::Error, Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum ConfigError {
     #[error("The specified leverage must be > 0")]

@@ -1,6 +1,11 @@
 use std::marker::PhantomData;
 
 use getset::CopyGetters;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use tracing::trace;
 use typed_builder::TypedBuilder;
 
@@ -11,6 +16,7 @@ use crate::types::{
 
 /// Contains user balances including margin amounts.
 #[derive(Debug, Clone, Eq, PartialEq, TypedBuilder, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Balances<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,

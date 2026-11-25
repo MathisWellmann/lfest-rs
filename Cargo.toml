@@ -1,6 +1,6 @@
 [package]
 name = "lfest"
-version = "0.142.0"
+version = "0.143.0"
 authors = ["MathisWellmann <wellmannmathis@gmail.com>"]
 edition = "2024"
 license-file = "LICENSE"
@@ -196,10 +196,10 @@ implicit_clone = "warn"
 
 [dependencies]
 tracing = { version = "0.1", features = ["release_max_level_info"] }
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive"], optional = true }
 thiserror = "2"
 derive_more = { version = "2", features = ["full"] }
-const-decimal = { version = "0.4.0", features = ["serde"] }
+const-decimal = "0.4.0"
 num-traits = "0.2"
 typed-builder = "0.23"
 getset = "0.1.2"
@@ -224,6 +224,7 @@ fpdec = { version = "0.10.3", git = "https://github.com/MathisWellmann/fpdec.rs"
 proptest = "1.6"
 
 [features]
+serde = ["dep:serde", "const-decimal/serde"]
 trade_aggregation = ["dep:trade_aggregation"]
 
 [[bench]]

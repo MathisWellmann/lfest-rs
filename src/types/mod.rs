@@ -1,3 +1,9 @@
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 mod errors;
 mod fee;
 mod funding;
@@ -62,6 +68,12 @@ pub(crate) use timestamp_ns::NANOS_PER_SECOND;
 pub use timestamp_ns::TimestampNs;
 
 /// Natural Logarithmic Returns newtype wrapping a borrowed slice of generic floats.
+///
+/// With the `serde` feature, only [`Serialize`](https://docs.rs/serde/latest/serde/trait.Serialize.html)
+/// is implemented: deserializing into a borrowed slice would
+/// require the caller's buffer to outlive the deserializer, which serde cannot
+/// express for a generic slice reference.
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct LnReturns<'a, T: num_traits::Float>(pub &'a [T]);
 
 /// A custom user order id must satisfy this trait bound.
@@ -79,6 +91,7 @@ impl<T> UserOrderId for T where
 /// Whether to cancel a limit order by its `OrderId` or the `UserOrderId`.
 #[allow(missing_docs, reason = "Self documenting")]
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum CancelBy<UserOrderIdT: UserOrderId> {
     OrderId(OrderId),
     UserOrderId(UserOrderIdT),

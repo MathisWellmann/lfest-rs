@@ -4,6 +4,11 @@ use getset::{
     MutGetters,
 };
 use num_traits::Zero;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use tracing::{
     debug,
     info,
@@ -79,6 +84,7 @@ use crate::{
 /// Result of submitting a limit order via [`Exchange::submit_limit_order_with_execution`],
 /// distinguishing between a resting passive order and an immediately filled marketable order.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum LimitOrderSubmission<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -109,6 +115,7 @@ pub type ForcedCancels<I, const D: u8, BaseOrQuote, UserOrderIdT> =
 /// The result of a settled market order: the fill itself together with every side effect
 /// of settling it, emitted atomically so the caller cannot miss account-changing events.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MarketOrderSettlement<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -130,6 +137,7 @@ where
 /// together with any margin-call side effects so the caller cannot miss
 /// account-changing events.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct FundingSettlement<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -154,6 +162,14 @@ where
 
 /// The main leveraged futures exchange for simulated trading
 #[derive(Debug, Clone, Getters, MutGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "I: Serialize, BaseOrQuote: Serialize, UserOrderIdT: Serialize, BaseOrQuote::PairedCurrency: Serialize",
+        deserialize = "I: Deserialize<'de>, BaseOrQuote: Deserialize<'de>, UserOrderIdT: Deserialize<'de>, BaseOrQuote::PairedCurrency: Deserialize<'de>"
+    ))
+)]
 pub struct Exchange<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,

@@ -11,6 +11,11 @@ use getset::{
     Getters,
 };
 use num::Zero;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::{
     account::Cmp,
@@ -35,6 +40,7 @@ use crate::{
 /// The best bid price and oldest timestamp order will be at the last index.
 /// Bids and asks are stored separately, hence the `SideT` generic.
 #[derive(Debug, PartialEq, Eq, CopyGetters, Getters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SortedOrders<I, const D: u8, BaseOrQuote, UserOrderIdT, SideT>
 where
     I: Mon<D>,

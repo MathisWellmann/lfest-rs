@@ -1,4 +1,9 @@
 use getset::CopyGetters;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use typed_builder::TypedBuilder;
 
 use super::MarketUpdate;
@@ -28,6 +33,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]
 pub enum NewCandleError {
     BidBelowLow,
@@ -41,6 +47,7 @@ pub enum NewCandleError {
 /// Here we can use the `high` and `low` prices to see if our simulated resting orders
 /// have been executed over the last period as a proxy in absence of actual `Trade` flow.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, TypedBuilder, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Candle<I, const D: u8>
 where
     I: Mon<D>,

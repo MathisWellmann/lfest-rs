@@ -1,6 +1,11 @@
 //! This module contains order filtering related code
 
 use getset::CopyGetters;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::{
     prelude::{
@@ -14,6 +19,7 @@ use crate::{
 
 /// The `SizeFilter` defines the quantity rules that each order needs to follow
 #[derive(Debug, Clone, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct QuantityFilter<I, const D: u8, BaseOrQuote>
 where
     I: Mon<D>,

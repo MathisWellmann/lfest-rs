@@ -1,4 +1,9 @@
 use const_decimal::Decimal;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use super::MarketUpdate;
 use crate::{
@@ -29,6 +34,7 @@ use crate::{
 /// For now we don't handle the quantity a these price levels.
 /// This will change in future versions.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Bba<I, const D: u8>
 where
     I: Mon<D>,

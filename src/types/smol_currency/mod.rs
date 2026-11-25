@@ -9,6 +9,11 @@ use const_decimal::{
 };
 pub use margin_currency_trait::MarginCurrency;
 pub use quote_currency::QuoteCurrency;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 /// A trait for monetary values.
 pub trait Mon<const D: u8>:
@@ -31,6 +36,7 @@ impl<const D: u8> Mon<D> for i128 {}
 /// Whether a [`Currency`] is the base or the quote currency of a symbol,
 /// e.g. BTC or USD of BTCUSD.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum CurrencyKind {
     /// The base currency, e.g. BTC of BTCUSD: [`BaseCurrency`].
     Base,

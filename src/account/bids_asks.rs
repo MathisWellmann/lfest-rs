@@ -1,5 +1,11 @@
 use std::cmp::Ordering;
 
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 use crate::types::{
     Currency,
     LimitOrder,
@@ -11,6 +17,7 @@ use crate::types::{
 
 /// zero-sized marker struct indicating sorting for bids.
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Bids;
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Cmp<I, D, BaseOrQuote, UserOrderIdT> for Bids
@@ -53,6 +60,7 @@ where
 
 /// zero-sized marker struct indicating sorting for asks.
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Asks;
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Cmp<I, D, BaseOrQuote, UserOrderIdT> for Asks

@@ -1,6 +1,11 @@
 use const_decimal::Decimal;
 use derive_more::Display;
 use num_traits::One;
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use super::{
     ConfigError,
@@ -21,6 +26,7 @@ macro_rules! leverage {
 
 /// Leverage
 #[derive(Default, Debug, Clone, Copy, PartialEq, Display, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Leverage<I, const D: u8>(Decimal<I, D>);
 
 impl<I, const D: u8> Leverage<I, D>

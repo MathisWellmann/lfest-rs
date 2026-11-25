@@ -1,13 +1,15 @@
 use std::fmt::Formatter;
 
 use Side::*;
+#[cfg(feature = "serde")]
 use serde::{
     Deserialize,
     Serialize,
 };
 
 /// Side of the order
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[repr(u8)]
 pub enum Side {
     /// Buy side

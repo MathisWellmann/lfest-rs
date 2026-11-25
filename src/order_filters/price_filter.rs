@@ -4,6 +4,11 @@ use num_traits::{
     One,
     Zero,
 };
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::prelude::{
     ConfigError,
@@ -14,6 +19,7 @@ use crate::prelude::{
 
 /// The `PriceFilter` defines the price rules for a symbol
 #[derive(Debug, Clone, CopyGetters)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct PriceFilter<I, const D: u8>
 where
     I: Mon<D>,

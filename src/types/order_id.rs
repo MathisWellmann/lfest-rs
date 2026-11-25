@@ -1,7 +1,14 @@
 use std::fmt::Display;
 
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 /// The type for the global order id sequence number used by the exchange.
 #[derive(Debug, Default, Clone, Copy, std::hash::Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct OrderId(u64);
 
 impl From<u64> for OrderId {
