@@ -63,13 +63,15 @@ where
         max_quantity: Option<BaseOrQuote>,
         tick_size: BaseOrQuote,
     ) -> Result<Self, ConfigError> {
+        // Reject a zero tick before reducing the minimum modulo it: the modulus
+        // would otherwise divide by zero and panic instead of returning the error.
+        if tick_size == BaseOrQuote::zero() {
+            return Err(ConfigError::InvalidTickSize);
+        }
         if let Some(min_qty) = min_quantity
             && (min_qty % tick_size) != BaseOrQuote::zero()
         {
             return Err(ConfigError::InvalidMinQuantity);
-        }
-        if tick_size == BaseOrQuote::zero() {
-            return Err(ConfigError::InvalidTickSize);
         }
 
         Ok(Self {
@@ -231,10 +233,14 @@ mod tests {
             ),
             Err(ConfigError::InvalidMinQuantity)
         ));
-        // A zero tick is invalid. `min_quantity` is `None` because the constructor
-        // checks the modulus first, which would divide by zero.
+        // A zero tick is rejected before the minimum is reduced modulo it, so a
+        // configured minimum returns an error instead of panicking.
         assert!(matches!(
-            QuantityFilter::<i64, 2, QuoteCurrency<i64, 2>>::new(None, None, QuoteCurrency::zero(),),
+            QuantityFilter::<i64, 2, QuoteCurrency<i64, 2>>::new(
+                Some(QuoteCurrency::new(4, 0)),
+                None,
+                QuoteCurrency::zero(),
+            ),
             Err(ConfigError::InvalidTickSize)
         ));
         QuantityFilter::<i64, 2, QuoteCurrency<i64, 2>>::new(
