@@ -354,6 +354,10 @@ where
     /// the market crossed its liquidation price or because a fill left the equity below
     /// the maintenance margin; the accompanying forced cancellations are then available
     /// through [`Exchange::limit_order_events`].
+    ///
+    /// A quote-only update of a flat account is cheap enough to be inlined into the
+    /// caller's event loop.
+    #[inline]
     pub fn update_state<U>(
         &mut self,
         market_update: &U,
@@ -361,12 +365,42 @@ where
     where
         U: MarketUpdate<I, D, BaseOrQuote>,
     {
-        self.limit_order_events.clear();
-        self.reset_stop_order_events();
-        self.liquidated_during_fills = false;
+        // With all paths in one body, LLVM outlined `update_state` (664 B frame), so the
+        // market state, account and config were reloaded from memory on every update:
+        // 20 -> 77 retired instructions per update and 2.4x slower on
+        // `benches/update_state.rs`. Only the provably event-free case stays here.
+        //
+        // A flat account cannot be liquidated and has nothing to force-cancel, and an
+        // update which cannot fill leaves resting orders alone, so this update only
+        // refreshes the market state and clears the event buffers.
+        let quote_only = !U::CAN_FILL_LIMIT_ORDERS
+            && self.pending_stops.is_empty()
+            && matches!(self.config.margin_mode(), MarginMode::Isolated)
+            && self.account.position().quantity().is_zero();
 
-        self.market_state
-            .update_state(market_update, self.config.contract_spec().price_filter());
+        if !quote_only {
+            return self.update_state_checked(market_update);
+        }
+
+        self.begin_update(market_update);
+        Ok(&self.limit_order_events)
+    }
+
+    /// The full update path: pending stops, limit order fills, cross margin and
+    /// liquidation.
+    ///
+    /// Outlined on purpose. It is the same work as the quote-only hot path in
+    /// [`Self::update_state`] except that it can emit events, so inlining it there would
+    /// push the caller over LLVM's inlining budget and cost far more than this call.
+    #[inline(never)]
+    fn update_state_checked<U>(
+        &mut self,
+        market_update: &U,
+    ) -> Result<&Vec<LimitOrderEvent<I, D, BaseOrQuote, UserOrderIdT>>, RiskError>
+    where
+        U: MarketUpdate<I, D, BaseOrQuote>,
+    {
+        self.begin_update(market_update);
 
         if !self.pending_stops.is_empty() {
             self.evaluate_pending_stops(market_update.price_range());
@@ -377,26 +411,14 @@ where
         }
 
         let mm_check = match self.config.margin_mode() {
-            MarginMode::Isolated => <IsolatedMarginRiskEngine<I, D, BaseOrQuote> as RiskEngine<
-                I,
-                D,
-                BaseOrQuote,
-                UserOrderIdT,
-            >>::check_maintenance_margin(
-                &self.risk_engine,
-                &self.market_state,
-                self.account.position(),
-            ),
+            MarginMode::Isolated => self.check_isolated_maintenance_margin(),
             MarginMode::Cross => self
                 .cross_risk_engine
                 .check_mark_to_market_maintenance_margin(&self.market_state, &self.account),
         };
         if let Err(e) = mm_check {
-            core::hint::cold_path();
-            self.force_liquidate();
-            self.drain_forced_cancels_into_events();
-            return Err(e);
-        };
+            return self.liquidate_on_margin_call(e);
+        }
 
         self.fill_active_orders(market_update.clone());
         if self.liquidated_during_fills {
@@ -404,6 +426,48 @@ where
             return Err(RiskError::Liquidate);
         }
         Ok(&self.limit_order_events)
+    }
+
+    /// Clear the event buffers of the previous update and apply the new market state.
+    #[inline]
+    fn begin_update<U>(&mut self, market_update: &U)
+    where
+        U: MarketUpdate<I, D, BaseOrQuote>,
+    {
+        self.limit_order_events.clear();
+        self.reset_stop_order_events();
+        self.liquidated_during_fills = false;
+
+        self.market_state
+            .update_state(market_update, self.config.contract_spec().price_filter());
+    }
+
+    /// The isolated maintenance-margin check of the current position.
+    #[inline]
+    fn check_isolated_maintenance_margin(&self) -> Result<(), RiskError> {
+        <IsolatedMarginRiskEngine<I, D, BaseOrQuote> as RiskEngine<
+            I,
+            D,
+            BaseOrQuote,
+            UserOrderIdT,
+        >>::check_maintenance_margin(
+            &self.risk_engine,
+            &self.market_state,
+            self.account.position(),
+        )
+    }
+
+    /// Force-close the position on a failed margin check, record the cancellations it
+    /// caused, and propagate `error`.
+    #[cold]
+    #[inline(never)]
+    fn liquidate_on_margin_call(
+        &mut self,
+        error: RiskError,
+    ) -> Result<&Vec<LimitOrderEvent<I, D, BaseOrQuote, UserOrderIdT>>, RiskError> {
+        self.force_liquidate();
+        self.drain_forced_cancels_into_events();
+        Err(error)
     }
 
     /// Set the best bid and ask, alternatively a `Bba` `MarketUpdate` can be passed into `update_state`
@@ -1892,27 +1956,37 @@ where
 
     /// Clear `stop_order_events` at the start of a public call which can emit stop events.
     ///
-    /// Also restores the capacity bound (one event per possible pending stop), because
-    /// `#[derive(Clone)]` does not keep spare `Vec` capacity. Allocation-free except on
-    /// the first call after a clone.
+    /// A single store. The capacity bound (one event per possible pending stop) is
+    /// restored lazily by [`Self::push_stop_event`], the only place that needs it, so the
+    /// quote-only update path does not pay for a compare it never takes.
     #[inline]
     fn reset_stop_order_events(&mut self) {
         self.stop_order_events.clear();
+    }
+
+    /// Give `stop_order_events` enough spare capacity for the next event.
+    ///
+    /// `#[derive(Clone)]` does not keep spare `Vec` capacity, so a cloned exchange has to
+    /// allocate on its first stop event. Every other exchange already has the bound.
+    #[cold]
+    #[inline(never)]
+    fn restore_stop_order_event_capacity(&mut self) {
         let max_stops = usize::from(self.config.max_num_open_orders().get());
-        if self.stop_order_events.capacity() < max_stops {
-            core::hint::cold_path();
-            self.stop_order_events.reserve_exact(max_stops);
-        }
+        assert!(self.stop_order_events.len() < max_stops);
+        self.stop_order_events
+            .reserve_exact(max_stops - self.stop_order_events.len());
         assert!(self.stop_order_events.capacity() >= max_stops);
-        assert!(self.stop_order_events.is_empty());
     }
 
     /// Record a stop event. Cannot overflow: see the `stop_order_events` field docs.
     #[inline]
     fn push_stop_event(&mut self, event: StopOrderEvent<I, D, BaseOrQuote, UserOrderIdT>) {
-        assert2::debug_assert!(
-            self.stop_order_events.len() < usize::from(self.config.max_num_open_orders().get())
-        );
+        let max_stops = usize::from(self.config.max_num_open_orders().get());
+        assert2::debug_assert!(self.stop_order_events.len() < max_stops);
+        if self.stop_order_events.len() == self.stop_order_events.capacity() {
+            core::hint::cold_path();
+            self.restore_stop_order_event_capacity();
+        }
         self.stop_order_events
             .push_within_capacity(event)
             .expect("each pending stop yields at most one event per call");
