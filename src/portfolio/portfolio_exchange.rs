@@ -37,7 +37,10 @@ use crate::{
         Position,
     },
     contract_specification::ContractSpecification,
-    execution_rules::fill_flows,
+    execution_rules::{
+        BufferCapacities,
+        fill_flows,
+    },
     ledger::{
         Ledger,
         LedgerEntryKind,
@@ -343,36 +346,6 @@ where
     }
 }
 
-/// Capacity of the per-call buffers, derived from the summed `max_num_open_orders` of all
-/// markets.
-///
-/// Shared by [`PortfolioExchange::new`], [`PortfolioExchange::add_market`] and
-/// [`PortfolioExchange::clone`] so the bounds cannot drift apart.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct BufferCapacities {
-    order_events: usize,
-    stop_events: usize,
-    elected_stops_scratch: usize,
-    forced_cancel_scratch: usize,
-}
-
-impl BufferCapacities {
-    fn for_total_orders(total_order_cap: usize) -> Self {
-        // Every market's bids and asks each hold up to `max_num_open_orders`, so one call
-        // can fill or force-cancel twice the total. Order events cover the fills plus as
-        // many forced cancels.
-        let scratch_cap = (total_order_cap * 2).max(16);
-        Self {
-            order_events: scratch_cap * 2,
-            // `PendingStops` holds up to `max_num_open_orders` stops per market, and each
-            // yields at most one event per call.
-            stop_events: total_order_cap,
-            elected_stops_scratch: scratch_cap,
-            forced_cancel_scratch: scratch_cap,
-        }
-    }
-}
-
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> PortfolioExchange<I, D, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -414,17 +387,17 @@ where
                 .expect(EXPECT_CAPACITY);
         }
 
-        let caps = BufferCapacities::for_total_orders(total_order_cap);
+        let caps = BufferCapacities::for_order_slots(total_order_cap);
         Self {
             balances,
             markets,
             ticker_index,
             next_order_id: OrderId::default(),
-            order_events: Vec::with_capacity(caps.order_events),
-            stop_events: Vec::with_capacity(caps.stop_events),
-            max_pending_stops: caps.stop_events,
-            elected_stops_scratch: Vec::with_capacity(caps.elected_stops_scratch),
-            forced_cancel_scratch: Vec::with_capacity(caps.forced_cancel_scratch),
+            order_events: Vec::with_capacity(caps.order_events()),
+            stop_events: Vec::with_capacity(caps.stop_events()),
+            max_pending_stops: total_order_cap,
+            elected_stops_scratch: Vec::with_capacity(caps.elected_stops()),
+            forced_cancel_scratch: Vec::with_capacity(caps.forced_cancels()),
             liquidated_during_fills: false,
             ledger: None,
         }
@@ -437,12 +410,13 @@ where
     /// total and [`PortfolioExchange::clone`] restores them after `Vec::clone` dropped
     /// the spare capacity.
     fn reserve_preallocated_capacities(&mut self) {
-        let caps = BufferCapacities::for_total_orders(self.max_pending_stops);
-        assert_eq!(caps.stop_events, self.max_pending_stops);
-        reserve_to_capacity(&mut self.order_events, caps.order_events);
-        reserve_to_capacity(&mut self.stop_events, caps.stop_events);
-        reserve_to_capacity(&mut self.elected_stops_scratch, caps.elected_stops_scratch);
-        reserve_to_capacity(&mut self.forced_cancel_scratch, caps.forced_cancel_scratch);
+        // The summed pending-stop capacity is the summed order capacity of all markets.
+        let caps = BufferCapacities::for_order_slots(self.max_pending_stops);
+        assert_eq!(caps.stop_events(), self.max_pending_stops);
+        reserve_to_capacity(&mut self.order_events, caps.order_events());
+        reserve_to_capacity(&mut self.stop_events, caps.stop_events());
+        reserve_to_capacity(&mut self.elected_stops_scratch, caps.elected_stops());
+        reserve_to_capacity(&mut self.forced_cancel_scratch, caps.forced_cancels());
     }
 
     /// Enable the opt-in portfolio cashflow [`Ledger`] anchored at current wallet equity.

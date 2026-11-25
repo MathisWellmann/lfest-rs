@@ -4,6 +4,7 @@
 //! Both venues implement the same order semantics on different account models. Keeping
 //! the rules here as pure functions means a fix cannot land in only one of them.
 
+use getset::CopyGetters;
 use num_traits::Zero;
 
 use crate::{
@@ -17,6 +18,7 @@ use crate::{
         Currency,
         LimitOrder,
         MarginCurrency,
+        MarketId,
         Mon,
         NewOrder,
         QuoteCurrency,
@@ -330,6 +332,51 @@ where
     trade_range.is_some() && price_type == TriggerPriceType::Last
 }
 
+/// Capacity of the per-call event and scratch buffers of both exchanges.
+///
+/// The bounds depend only on the number of order slots `n`: the `max_num_open_orders`
+/// of an [`crate::prelude::Exchange`], or the sum over all markets of a
+/// [`crate::prelude::PortfolioExchange`]. Bids and asks each rest up to that many
+/// orders, and the pending stops are capped at the same number.
+/// `new`, `add_market` and `clone` of both exchanges size their buffers from here, so the
+/// bounds cannot drift apart. The push paths use `push_within_capacity`, so a bound which
+/// is too small panics instead of allocating.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, CopyGetters)]
+pub(crate) struct BufferCapacities {
+    /// Fills and forced cancellations of one call: up to `2n` fills of the resting bids and
+    /// asks plus as many forced cancellations.
+    #[getset(get_copy = "pub(crate)")]
+    order_events: usize,
+    /// Orders force-cancelled between two drains: each of the at most `2n` resting
+    /// orders is cancelled at most once.
+    #[getset(get_copy = "pub(crate)")]
+    forced_cancels: usize,
+    /// Stops elected by one evaluation, which covers a single market's pending stops.
+    #[getset(get_copy = "pub(crate)")]
+    elected_stops: usize,
+    /// One event per pending stop per call; a portfolio liquidation drains every market.
+    #[getset(get_copy = "pub(crate)")]
+    stop_events: usize,
+}
+
+impl BufferCapacities {
+    /// The capacities for `order_slots` slots, see the field docs for each bound.
+    #[must_use]
+    pub(crate) fn for_order_slots(order_slots: usize) -> Self {
+        // Both callers sum `NonZeroU16` limits over at most `MarketId::COUNT` markets.
+        assert!(order_slots <= MarketId::COUNT * usize::from(u16::MAX));
+        let caps = Self {
+            order_events: order_slots * 4,
+            forced_cancels: order_slots * 2,
+            elected_stops: order_slots,
+            stop_events: order_slots,
+        };
+        assert!(caps.order_events >= caps.forced_cancels);
+        assert!(caps.forced_cancels >= caps.elected_stops);
+        caps
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -338,6 +385,35 @@ mod tests {
         Bba,
         PriceFilter,
     };
+
+    #[test]
+    fn buffer_capacities_scale_with_order_slots() {
+        let caps = BufferCapacities::for_order_slots(10);
+        assert_eq!(caps.order_events(), 40);
+        assert_eq!(caps.forced_cancels(), 20);
+        assert_eq!(caps.elected_stops(), 10);
+        assert_eq!(caps.stop_events(), 10);
+
+        // A portfolio without markets has no order slots and must not allocate.
+        let empty = BufferCapacities::for_order_slots(0);
+        assert_eq!(empty.order_events(), 0);
+        assert_eq!(empty.forced_cancels(), 0);
+        assert_eq!(empty.elected_stops(), 0);
+        assert_eq!(empty.stop_events(), 0);
+
+        // The largest valid input: every market id with the largest order cap.
+        let max_slots = MarketId::COUNT * usize::from(u16::MAX);
+        assert_eq!(
+            BufferCapacities::for_order_slots(max_slots).order_events(),
+            max_slots * 4
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn buffer_capacities_reject_more_slots_than_any_config_allows() {
+        let _ = BufferCapacities::for_order_slots(MarketId::COUNT * usize::from(u16::MAX) + 1);
+    }
 
     fn quoted_market(bid: i64, ask: i64) -> MarketState<i64, 5> {
         let mut ms = MarketState::<i64, 5>::default();
