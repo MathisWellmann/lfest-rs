@@ -1751,3 +1751,620 @@ fn portfolio_update_market_at_exact_maintenance_margin_does_not_liquidate() {
     let err = pf.update_market(a, &bba(89, 90, 3)).unwrap_err();
     assert!(matches!(err, PortfolioError::Risk(RiskError::Liquidate)));
 }
+
+#[test]
+fn portfolio_amend_limit_order_distinguishes_missing_ids_and_enforces_cboe_leaves_qty() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![make_linear_market_cfg("AAA", 5)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+
+    // 1. Order id equal to next_order_id (0, never issued yet) -> OrderIdNotFound (not OrderNoLongerActive).
+    let unseen_id = OrderId::from(0u64);
+    assert!(matches!(
+        pf.amend_limit_order(
+            a,
+            unseen_id,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(90, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap(),
+        ),
+        Err(PortfolioError::AmendLimitOrder(
+            AmendLimitOrderError::OrderIdNotFound { order_id }
+        )) if order_id == unseen_id
+    ));
+
+    // 2. Submit Buy 5 @ 95 (order id 0), partially fill 2 via a Sell trade @ 94 -> remaining 3.
+    let orig = pf
+        .submit_limit_order(
+            a,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(95, 0),
+                BaseCurrency::new(5, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    pf.update_market(
+        a,
+        &Trade {
+            price: QuoteCurrency::new(94, 0),
+            quantity: BaseCurrency::new(2, 0),
+            side: Side::Sell,
+            timestamp_exchange_ns: 2.into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        pf.market(a)
+            .unwrap()
+            .active_limit_orders
+            .best_bid()
+            .unwrap()
+            .remaining_quantity(),
+        BaseCurrency::new(3, 0)
+    );
+
+    // 3. Amend total_qty from 5 -> 7: qty_delta = +2, new_leaves_qty = 3 + 2 = 5.
+    //    `set_remaining_quantity(5)` updates the replacement order's size to 5.
+    let amended = pf
+        .amend_limit_order(
+            a,
+            orig.id(),
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(94, 0),
+                BaseCurrency::new(7, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(amended.total_quantity(), BaseCurrency::new(5, 0));
+    assert_eq!(amended.remaining_quantity(), BaseCurrency::new(5, 0));
+
+    // 4. Amending the already-replaced order id (< next_order_id) -> OrderNoLongerActive.
+    assert!(matches!(
+        pf.amend_limit_order(
+            a,
+            orig.id(),
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(94, 0),
+                BaseCurrency::new(4, 0),
+            )
+            .unwrap(),
+        ),
+        Err(PortfolioError::AmendLimitOrder(
+            AmendLimitOrderError::OrderNoLongerActive
+        ))
+    ));
+
+    // 5. Post-only crossing amend is rejected with GoodTillCrossingRejectedOrder (not
+    //    WouldExecuteImmediately) and leaves the amended order intact.
+    assert!(matches!(
+        pf.amend_limit_order(
+            a,
+            amended.id(),
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(105, 0),
+                BaseCurrency::new(7, 0),
+            )
+            .unwrap()
+            .with_time_in_force(TimeInForce::GoodTilCrossing),
+        ),
+        Err(PortfolioError::SubmitLimitOrder(
+            SubmitLimitOrderError::GoodTillCrossingRejectedOrder { .. }
+        ))
+    ));
+    assert!(
+        pf.market(a)
+            .unwrap()
+            .active_limit_orders
+            .get_by_id(amended.id(), Side::Buy)
+            .is_some()
+    );
+
+    // 6. Partially fill 3 of the 5-unit amended order (remaining = 2), then amend total_qty
+    //    from 5 -> 3 (qty_delta = -2, new_leaves_qty = 0) -> cancels order and returns
+    //    AmendQtyAlreadyFilled.
+    pf.update_market(
+        a,
+        &Trade {
+            price: QuoteCurrency::new(93, 0),
+            quantity: BaseCurrency::new(3, 0),
+            side: Side::Sell,
+            timestamp_exchange_ns: 3.into(),
+        },
+    )
+    .unwrap();
+    assert!(matches!(
+        pf.amend_limit_order(
+            a,
+            amended.id(),
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(94, 0),
+                BaseCurrency::new(3, 0),
+            )
+            .unwrap(),
+        ),
+        Err(PortfolioError::AmendLimitOrder(
+            AmendLimitOrderError::AmendQtyAlreadyFilled
+        ))
+    ));
+    assert!(pf.market(a).unwrap().active_limit_orders.is_empty());
+}
+
+#[test]
+fn portfolio_enforces_limit_submit_rate_limit_and_post_only_crossing_rejection() {
+    let spec = ContractSpecification::new(
+        leverage!(5),
+        Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+        PriceFilter::default(),
+        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
+        Fee::from(Decimal::zero()),
+        Fee::from(Decimal::zero()),
+    )
+    .expect(EXPECT_CONTRACT_SPEC)
+    .with_ticker("AAA");
+    let rate_limits = OrderRateLimits::new(std::num::NonZeroU32::new(1).expect(EXPECT_NON_ZERO));
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![MarketConfig::new(
+            NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+            spec,
+            rate_limits,
+        )],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+
+    // Post-only crossing buy via submit_limit_order hits GoodTillCrossingRejectedOrder, not
+    // WouldExecuteImmediately, and consumes the single rate-limit slot in this second.
+    assert!(matches!(
+        pf.submit_limit_order(
+            a,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(100, 0),
+                BaseCurrency::new(1, 0),
+            )
+            .unwrap()
+            .with_time_in_force(TimeInForce::GoodTilCrossing),
+        ),
+        Err(PortfolioError::SubmitLimitOrder(
+            SubmitLimitOrderError::GoodTillCrossingRejectedOrder { .. }
+        ))
+    ));
+
+    // Second submission in the same second is rejected by the rate limiter.
+    assert!(matches!(
+        pf.submit_limit_order(
+            a,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(90, 0),
+                BaseCurrency::new(1, 0),
+            )
+            .unwrap(),
+        ),
+        Err(PortfolioError::SubmitLimitOrder(
+            SubmitLimitOrderError::RateLimitReached(_)
+        ))
+    ));
+}
+
+#[test]
+fn portfolio_unquoted_market_zeroes_upnl_and_add_market_grows_stop_event_capacity() {
+    // 1. Fresh market with no quotes yet has zero unrealized PnL even after quotes arrive on
+    //    another market, and does not falsely trigger stops on submit_stop_order.
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(500, 0),
+        vec![make_linear_market_cfg("AAA", 5)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+
+    // Immediately triggered stop on quoted market A is rejected (covers stop_reference_price_for_slot).
+    assert!(matches!(
+        pf.submit_stop_order(
+            a,
+            StopOrder::stop_market(
+                Side::Sell,
+                QuoteCurrency::new(100, 0),
+                BaseCurrency::new(1, 0),
+                NoUserOrderId,
+            )
+            .unwrap()
+            .with_trigger_price_type(TriggerPriceType::BestBidAsk),
+        ),
+        Err(PortfolioError::StopOrder(StopOrderError::StopWouldTrigger))
+    ));
+
+    // Dynamically add market B (max 20 orders) -> total stop capacity grows from 20 to 40.
+    // If `add_market` used `*=` instead of `+=` or skipped growing stop capacity, emitting
+    // > 20 stop events in a single portfolio liquidation would overflow or under-allocate.
+    let small_cfg = |ticker: &str| {
+        let spec = ContractSpecification::new(
+            leverage!(5),
+            Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+            PriceFilter::default(),
+            QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
+            Fee::from(Decimal::zero()),
+            Fee::from(Decimal::zero()),
+        )
+        .expect(EXPECT_CONTRACT_SPEC)
+        .with_ticker(ticker);
+        MarketConfig::new(
+            NonZeroU16::new(2).expect(EXPECT_NON_ZERO),
+            spec,
+            OrderRateLimits::default(),
+        )
+    };
+    let mut pf_cap = LinearPortfolio::new(
+        PortfolioConfig::new(QuoteCurrency::new(100, 0), vec![small_cfg("AAA")]).unwrap(),
+    );
+    let ma = MarketId::new(0);
+    let mb = pf_cap.add_market(small_cfg("BBB")).unwrap();
+    // Unquoted market B has zero unrealized PnL.
+    assert_eq!(pf_cap.total_unrealized_pnl(), QuoteCurrency::zero());
+    pf_cap.update_market(ma, &bba(99, 100, 1)).unwrap();
+    pf_cap.update_market(mb, &bba(99, 100, 1)).unwrap();
+    // Place 2 stops on ma and 2 stops on mb (4 total > initial capacity 2).
+    for m in [ma, mb] {
+        for p in [50, 51] {
+            pf_cap
+                .submit_stop_order(
+                    m,
+                    StopOrder::stop_market(
+                        Side::Sell,
+                        QuoteCurrency::new(p, 0),
+                        BaseCurrency::new(1, 0),
+                        NoUserOrderId,
+                    )
+                    .unwrap()
+                    .with_trigger_price_type(TriggerPriceType::Last),
+                )
+                .unwrap();
+        }
+    }
+    // Delisting mb drains its 2 pending stops and emits ForcedCancel events.
+    pf_cap
+        .delist_market(mb, QuoteCurrency::new(100, 0))
+        .unwrap();
+    assert_eq!(pf_cap.stop_events().len(), 2);
+    assert!(matches!(
+        pf_cap.stop_events()[0].event,
+        StopOrderEvent::Cancelled {
+            reason: StopCancelReason::ForcedCancel,
+            ..
+        }
+    ));
+    // Updating a delisted market does not fire stops or fill resting orders.
+    assert!(
+        pf_cap
+            .update_market(mb, &bba(10, 11, 2))
+            .unwrap()
+            .is_empty()
+    );
+
+    // Add a third market of capacity 1: with `+=`, total cap is 2 + 2 + 1 = 5; with `*=`,
+    // total cap would stay 2 * 2 * 1 = 4, which would panic when liquidating 5 stops.
+    let mc = pf_cap
+        .add_market({
+            let spec = ContractSpecification::new(
+                leverage!(5),
+                Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+                PriceFilter::default(),
+                QuantityFilter::new(None, None, BaseCurrency::new(1, 2))
+                    .expect(EXPECT_QUANTITY_FILTER),
+                Fee::from(Decimal::zero()),
+                Fee::from(Decimal::zero()),
+            )
+            .expect(EXPECT_CONTRACT_SPEC)
+            .with_ticker("CCC");
+            MarketConfig::new(
+                NonZeroU16::new(1).expect(EXPECT_NON_ZERO),
+                spec,
+                OrderRateLimits::default(),
+            )
+        })
+        .unwrap();
+    pf_cap.update_market(mc, &bba(99, 100, 1)).unwrap();
+    pf_cap
+        .submit_stop_order(
+            mc,
+            StopOrder::stop_market(
+                Side::Sell,
+                QuoteCurrency::new(50, 0),
+                BaseCurrency::new(1, 0),
+                NoUserOrderId,
+            )
+            .unwrap()
+            .with_trigger_price_type(TriggerPriceType::Last),
+        )
+        .unwrap();
+    // Open a leveraged position on ma and liquidate via funding -> cancels 2 stops on ma + 1 on mc = 3 stops (> initial 2).
+    pf_cap
+        .submit_market_order(
+            ma,
+            MarketOrder::new(Side::Buy, BaseCurrency::new(4, 0)).unwrap(),
+        )
+        .unwrap();
+    let liq = pf_cap
+        .apply_funding(
+            ma,
+            FundingRate::from(Decimal::try_from_scaled(25, 2).expect(EXPECT_DECIMAL)),
+            QuoteCurrency::new(100, 0),
+        )
+        .unwrap();
+    assert!(matches!(
+        liq.solvency,
+        Solvency::Liquidated | Solvency::Bankrupt
+    ));
+    assert_eq!(pf_cap.stop_events().len(), 3);
+
+    // Open a short on A and verify stop-protection collar cancels a gapped buy stop.
+    let cfg_collar = PortfolioConfig::new(
+        QuoteCurrency::new(500, 0),
+        vec![{
+            let spec = ContractSpecification::new(
+                leverage!(5),
+                Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+                PriceFilter::default(),
+                QuantityFilter::new(None, None, BaseCurrency::new(1, 2))
+                    .expect(EXPECT_QUANTITY_FILTER),
+                Fee::from(Decimal::zero()),
+                Fee::from(Decimal::zero()),
+            )
+            .expect(EXPECT_CONTRACT_SPEC)
+            .with_ticker("AAA")
+            .with_stop_protection(StopProtection::new(QuoteCurrency::new(2, 0)).unwrap());
+            MarketConfig::new(
+                NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+                spec,
+                OrderRateLimits::default(),
+            )
+        }],
+    )
+    .unwrap();
+    let mut pf_c = LinearPortfolio::new(cfg_collar);
+    pf_c.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf_c.submit_market_order(
+        a,
+        MarketOrder::new(Side::Sell, BaseCurrency::new(1, 0)).unwrap(),
+    )
+    .unwrap();
+    pf_c.submit_stop_order(
+        a,
+        StopOrder::stop_market(
+            Side::Buy,
+            QuoteCurrency::new(105, 0),
+            BaseCurrency::new(1, 0),
+            NoUserOrderId,
+        )
+        .unwrap()
+        .with_trigger_price_type(TriggerPriceType::BestBidAsk),
+    )
+    .unwrap();
+    // Gap ask to 120 (> stop 105 + collar 2 = 107) -> cancelled with StopProtectionBand.
+    pf_c.update_market(a, &bba(119, 120, 2)).unwrap();
+    assert_eq!(pf_c.stop_events().len(), 1);
+    assert!(matches!(
+        pf_c.stop_events()[0].event,
+        StopOrderEvent::Cancelled {
+            reason: StopCancelReason::StopProtectionBand,
+            ..
+        }
+    ));
+    // Position remains short 1 because the stop was protected.
+    assert_eq!(
+        pf_c.market(a).unwrap().position.quantity(),
+        BaseCurrency::new(-1, 0)
+    );
+
+    // Confirm short reduce-only market order strictly reducing succeeds under ReduceOnly status.
+    pf_c.set_market_status(a, MarketStatus::ReduceOnly).unwrap();
+    let settle = pf_c
+        .submit_market_order(
+            a,
+            MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+        )
+        .unwrap();
+    assert_eq!(settle.solvency, Solvency::Solvent);
+    assert!(pf_c.market(a).unwrap().position.quantity().is_zero());
+}
+
+#[test]
+fn portfolio_delisted_market_ignores_limit_fills_and_reduce_only_rejects_short_flip() {
+    // 1. ReduceOnly market rejects a short-flipping buy (Buy 2 against Short 1), rejects a
+    //    short-increasing sell (Sell 1 against Short 1), and accepts Buy 1.
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(500, 0),
+        vec![make_linear_market_cfg("AAA", 5)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Sell, BaseCurrency::new(1, 0)).unwrap(),
+    )
+    .unwrap();
+    pf.set_market_status(a, MarketStatus::ReduceOnly).unwrap();
+
+    // Selling 1 against Short 1 is NOT strictly reducing (must reject with MarketReduceOnly).
+    assert!(matches!(
+        pf.submit_market_order(
+            a,
+            MarketOrder::new(Side::Sell, BaseCurrency::new(1, 0)).unwrap(),
+        ),
+        Err(PortfolioError::MarketReduceOnly(m)) if m == a
+    ));
+    // Selling 2 against Long 1 flips to Short 1 (not strictly reducing -> MarketReduceOnly).
+    let mut pf_long = LinearPortfolio::new(
+        PortfolioConfig::new(
+            QuoteCurrency::new(500, 0),
+            vec![make_linear_market_cfg("AAA", 5)],
+        )
+        .unwrap(),
+    );
+    pf_long.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf_long
+        .submit_market_order(
+            a,
+            MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+        )
+        .unwrap();
+    pf_long
+        .set_market_status(a, MarketStatus::ReduceOnly)
+        .unwrap();
+    assert!(matches!(
+        pf_long.submit_market_order(
+            a,
+            MarketOrder::new(Side::Sell, BaseCurrency::new(2, 0)).unwrap(),
+        ),
+        Err(PortfolioError::MarketReduceOnly(m)) if m == a
+    ));
+    // Buying 2 against Short 1 flips to Long 1: must be rejected with MarketReduceOnly.
+    assert!(matches!(
+        pf.submit_limit_order(
+            a,
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(90, 0),
+                BaseCurrency::new(2, 0),
+            )
+            .unwrap(),
+        ),
+        Err(PortfolioError::MarketReduceOnly(m)) if m == a
+    ));
+    // Limit Buy 1 @ 90 strictly reduces Short 1: accepted.
+    pf.submit_limit_order(
+        a,
+        LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(90, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    // 2. Apply funding with zero position and non-zero rate returns zero cashflow.
+    let delist = pf.delist_market(a, QuoteCurrency::new(100, 0)).unwrap();
+    assert_eq!(delist.solvency, Solvency::Solvent);
+    let funding = pf
+        .apply_funding(
+            a,
+            FundingRate::from(Decimal::try_from_scaled(5, 2).expect(EXPECT_DECIMAL)),
+            QuoteCurrency::new(100, 0),
+        )
+        .unwrap();
+    assert_eq!(funding.cashflow, QuoteCurrency::zero());
+}
+
+#[test]
+fn portfolio_liquidation_with_clearance_fee_reconciles_ledger_and_add_market_sums_capacity() {
+    // 1. Portfolio liquidation with positive clearance fee must record a negative ledger entry
+    //    so `record_ledger_flows`'s exact-equity assertion passes (kills `delete -` on clearance_fee).
+    let spec_with_liq_fee = |ticker: &str| {
+        let spec = ContractSpecification::new(
+            leverage!(5),
+            Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+            PriceFilter::default(),
+            QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
+            Fee::from(Decimal::zero()),
+            Fee::from(Decimal::zero()),
+        )
+        .expect(EXPECT_CONTRACT_SPEC)
+        .with_ticker(ticker)
+        .with_liquidation_fee(Decimal::try_from_scaled(1, 2).expect(EXPECT_DECIMAL))
+        .unwrap();
+        MarketConfig::new(
+            NonZeroU16::new(2).expect(EXPECT_NON_ZERO),
+            spec,
+            OrderRateLimits::default(),
+        )
+    };
+    let mut pf = LinearPortfolio::new(
+        PortfolioConfig::new(QuoteCurrency::new(25, 0), vec![spec_with_liq_fee("AAA")]).unwrap(),
+    );
+    pf.enable_ledger(64);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    pf.submit_market_order(
+        a,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+    )
+    .unwrap();
+    // Bid drops to 84 -> equity = 25 - 16 = 9 < MM 8.4? Wait: MM = 8.4, so drop to 83 -> equity 8 < 8.3.
+    let err = pf.update_market(a, &bba(83, 84, 2)).unwrap_err();
+    assert!(matches!(err, PortfolioError::Risk(RiskError::Liquidate)));
+    // Closed at 83 (realized -17 -> equity 8), clearance fee = 83 * 0.01 = 0.83 -> equity 7.17.
+    assert_eq!(pf.balances().equity(), QuoteCurrency::new(717, 2));
+    assert!(pf.ledger().unwrap().reconciles_to(pf.balances().equity()));
+
+    // 2. Starting with capacity 1 and dynamically adding capacity 1 gives total 2 (`1 + 1 = 2`,
+    //    whereas `1 * 1 = 1`), so liquidating 2 pending stops across both markets must succeed.
+    let cap1 = |ticker: &str| {
+        let spec = ContractSpecification::new(
+            leverage!(5),
+            Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+            PriceFilter::default(),
+            QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
+            Fee::from(Decimal::zero()),
+            Fee::from(Decimal::zero()),
+        )
+        .expect(EXPECT_CONTRACT_SPEC)
+        .with_ticker(ticker);
+        MarketConfig::new(
+            NonZeroU16::new(1).expect(EXPECT_NON_ZERO),
+            spec,
+            OrderRateLimits::default(),
+        )
+    };
+    let mut pf2 = LinearPortfolio::new(
+        PortfolioConfig::new(QuoteCurrency::new(25, 0), vec![cap1("AAA")]).unwrap(),
+    );
+    let ma = MarketId::new(0);
+    let mb = pf2.add_market(cap1("BBB")).unwrap();
+    pf2.update_market(ma, &bba(99, 100, 1)).unwrap();
+    pf2.update_market(mb, &bba(99, 100, 1)).unwrap();
+    pf2.submit_market_order(
+        ma,
+        MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap(),
+    )
+    .unwrap();
+    for m in [ma, mb] {
+        pf2.submit_stop_order(
+            m,
+            StopOrder::stop_market(
+                Side::Sell,
+                QuoteCurrency::new(50, 0),
+                BaseCurrency::new(1, 0),
+                NoUserOrderId,
+            )
+            .unwrap()
+            .with_trigger_price_type(TriggerPriceType::Last),
+        )
+        .unwrap();
+    }
+    let err2 = pf2.update_market(ma, &bba(83, 84, 2)).unwrap_err();
+    assert!(matches!(err2, PortfolioError::Risk(RiskError::Liquidate)));
+    assert_eq!(pf2.stop_events().len(), 2);
+}
