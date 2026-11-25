@@ -40,7 +40,7 @@ pub type ElectedStop<I, const D: u8, BaseOrQuote, UserOrderIdT> = (
 ///
 /// Capacity is pre-allocated at construction so admission and election never allocate
 /// on the hot path.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct PendingStops<I, const D: u8, BaseOrQuote, UserOrderIdT>
 where
@@ -49,6 +49,23 @@ where
     UserOrderIdT: UserOrderId,
 {
     stops: Vec<StopOrder<I, D, BaseOrQuote, UserOrderIdT>>,
+}
+
+/// A clone impl which retains the capacity: admission uses it as the configured bound and
+/// rejects with [`StopOrderError::MaxPendingStops`] instead of allocating.
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Clone
+    for PendingStops<I, D, BaseOrQuote, UserOrderIdT>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    fn clone(&self) -> Self {
+        let mut stops = self.stops.clone();
+        stops.reserve_exact(self.stops.capacity() - self.stops.len());
+        debug_assert_eq!(stops.capacity(), self.stops.capacity());
+        Self { stops }
+    }
 }
 
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> PendingStops<I, D, BaseOrQuote, UserOrderIdT>

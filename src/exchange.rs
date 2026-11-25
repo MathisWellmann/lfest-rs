@@ -1,3 +1,5 @@
+use std::num::NonZeroU16;
+
 use assert2::assert;
 use getset::{
     Getters,
@@ -161,7 +163,7 @@ where
 }
 
 /// The main leveraged futures exchange for simulated trading
-#[derive(Debug, Clone, Getters, MutGetters)]
+#[derive(Debug, Getters, MutGetters)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serde",
@@ -238,6 +240,83 @@ where
     order_rate_limiter: OrderRateLimiter,
 }
 
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Clone for Exchange<I, D, BaseOrQuote, UserOrderIdT>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    /// Clone the exchange with the pre-allocated buffers of a freshly constructed one.
+    ///
+    /// `Vec::clone` keeps only the length, so a derived clone left the event and scratch
+    /// buffers without spare capacity and the first fill, forced cancel or stop event
+    /// panicked in `push_within_capacity`. `Clone` is cold, so restoring the bounds costs
+    /// one allocation per non-empty buffer and keeps every push path free of capacity
+    /// checks. `PendingStops` retains its own capacity in its `Clone`.
+    fn clone(&self) -> Self {
+        let mut cloned = Self {
+            config: self.config.clone(),
+            market_state: self.market_state.clone(),
+            risk_engine: self.risk_engine.clone(),
+            cross_risk_engine: self.cross_risk_engine.clone(),
+            next_order_id: self.next_order_id,
+            account: self.account.clone(),
+            limit_order_events: self.limit_order_events.clone(),
+            forced_cancel_scratch: self.forced_cancel_scratch.clone(),
+            liquidated_during_fills: self.liquidated_during_fills,
+            pending_stops: self.pending_stops.clone(),
+            stop_order_events: self.stop_order_events.clone(),
+            elected_stops_scratch: self.elected_stops_scratch.clone(),
+            ledger: self.ledger.clone(),
+            order_rate_limiter: self.order_rate_limiter.clone(),
+        };
+        cloned.reserve_preallocated_capacities();
+        cloned
+    }
+}
+
+/// Capacity of the per-update buffers, derived from the maximum number of open orders.
+///
+/// Shared by [`Exchange::new`] and [`Exchange::clone`] so the bounds cannot drift apart.
+#[derive(Debug, Clone, Copy)]
+struct BufferCapacities {
+    limit_order_events: usize,
+    forced_cancel_scratch: usize,
+    elected_stops_scratch: usize,
+    stop_order_events: usize,
+}
+
+impl BufferCapacities {
+    fn for_orders(max_orders: NonZeroU16) -> Self {
+        let max = usize::from(max_orders.get());
+        Self {
+            // Bids and asks each fill up to `max` times, and every fill can force-cancel
+            // as many orders again.
+            limit_order_events: max * 4,
+            // At most two forced cancellations per resting order, one elected stop and one
+            // stop event per order.
+            forced_cancel_scratch: max * 2,
+            elected_stops_scratch: max,
+            stop_order_events: max,
+        }
+    }
+}
+
+/// Grow `vec` to hold at least `capacity` elements without dropping its contents.
+///
+/// `Vec::clone` keeps only the length, while the event push paths
+/// (`push_within_capacity`) rely on the spare capacity that [`Exchange::new`]
+/// pre-allocates. Allocation-free once the bound is in place.
+fn reserve_to_capacity<T>(vec: &mut Vec<T>, capacity: usize) {
+    if vec.capacity() >= capacity {
+        return;
+    }
+    assert!(vec.len() <= capacity);
+    vec.reserve_exact(capacity - vec.len());
+    assert!(vec.capacity() >= capacity);
+}
+
 impl<I, const D: u8, BaseOrQuote, UserOrderIdT> Exchange<I, D, BaseOrQuote, UserOrderIdT>
 where
     I: Mon<D>,
@@ -263,10 +342,10 @@ where
         let balances = Balances::new(config.starting_wallet_balance());
         let init_margin_req = config.contract_spec().init_margin_req();
         let maker_fee = *config.contract_spec().fee_maker().as_ref();
-        let pending_stops = PendingStops::with_capacity(max_active_orders);
+        let caps = BufferCapacities::for_orders(max_active_orders);
         // Every pending stop yields at most one event per public call (it is elected or
         // force-cancelled once), and the buffer is cleared at the start of every such call.
-        let stop_order_events = Vec::with_capacity(usize::from(max_active_orders.get()));
+        let stop_order_events = Vec::with_capacity(caps.stop_order_events);
         Self {
             config,
             market_state,
@@ -274,17 +353,27 @@ where
             cross_risk_engine,
             next_order_id: OrderId::default(),
             account: Account::new(balances, max_active_orders, init_margin_req, maker_fee),
-            // Bids and asks each have a capacity of `max_active_orders`, so one update
-            // can emit at most `2 * max_active_orders` fills plus as many forced cancels.
-            limit_order_events: Vec::with_capacity(usize::from(max_active_orders.get()) * 4),
-            forced_cancel_scratch: Vec::with_capacity(usize::from(max_active_orders.get()) * 2),
+            limit_order_events: Vec::with_capacity(caps.limit_order_events),
+            forced_cancel_scratch: Vec::with_capacity(caps.forced_cancel_scratch),
             liquidated_during_fills: false,
-            pending_stops,
+            pending_stops: PendingStops::with_capacity(max_active_orders),
             stop_order_events,
-            elected_stops_scratch: Vec::with_capacity(usize::from(max_active_orders.get())),
+            elected_stops_scratch: Vec::with_capacity(caps.elected_stops_scratch),
             ledger: None,
             order_rate_limiter,
         }
+    }
+
+    /// Give the per-update buffers the capacity of a freshly constructed exchange.
+    ///
+    /// [`Exchange::new`] allocates them up front, [`Exchange::clone`] restores them after
+    /// `Vec::clone` dropped the spare capacity. See [`reserve_to_capacity`].
+    fn reserve_preallocated_capacities(&mut self) {
+        let caps = BufferCapacities::for_orders(self.config.max_num_open_orders());
+        reserve_to_capacity(&mut self.limit_order_events, caps.limit_order_events);
+        reserve_to_capacity(&mut self.forced_cancel_scratch, caps.forced_cancel_scratch);
+        reserve_to_capacity(&mut self.elected_stops_scratch, caps.elected_stops_scratch);
+        reserve_to_capacity(&mut self.stop_order_events, caps.stop_order_events);
     }
 
     /// Enable the opt-in cashflow [`Ledger`] with initial capacity `capacity`, anchored at

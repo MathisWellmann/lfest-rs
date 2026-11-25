@@ -151,3 +151,37 @@ fn quote_update_of_flat_account_still_elects_pending_stops() {
     assert!(ex.pending_stops().is_empty());
     assert_eq!(ex.account().position().quantity(), BaseCurrency::new(1, 0));
 }
+
+#[test]
+fn cloned_exchange_reports_a_fill() {
+    // A fill pushes into `limit_order_events`, which a derived `Clone` left without spare
+    // capacity.
+    let mut ex = mock_exchange_linear();
+    ex.update_state(&bba(100, 101, 1)).unwrap();
+
+    let mut cloned = ex.clone();
+    cloned
+        .submit_limit_order(
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(100, 0),
+                BaseCurrency::new(1, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    // The trade prints strictly through the resting bid, which is the worst queue position.
+    let events = cloned
+        .update_state(&Trade {
+            price: QuoteCurrency::new(99, 0),
+            quantity: BaseCurrency::new(1, 0),
+            side: Side::Sell,
+            timestamp_exchange_ns: 2.into(),
+        })
+        .unwrap();
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(
+        cloned.account().position().quantity(),
+        BaseCurrency::new(1, 0)
+    );
+}
