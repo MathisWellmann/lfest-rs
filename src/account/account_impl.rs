@@ -228,16 +228,7 @@ where
         rate: FundingRate<I, D>,
         mark_price: QuoteCurrency<I, D>,
     ) -> BaseOrQuote::PairedCurrency {
-        assert!(
-            mark_price > QuoteCurrency::zero(),
-            "funding mark price must be strictly positive, got {mark_price}"
-        );
-        let qty = self.position.quantity();
-        if qty.is_zero() || rate.as_ref().is_zero() {
-            return Zero::zero();
-        }
-        let signed_position_value = BaseOrQuote::PairedCurrency::convert_from(qty, mark_price);
-        -(signed_position_value * *rate.as_ref())
+        self.position.funding_cashflow(rate, mark_price)
     }
 
     /// Apply a signed funding cashflow directly to the account balances.

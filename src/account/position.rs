@@ -192,6 +192,30 @@ where
         }
     }
 
+    /// The signed perpetual funding cashflow of this position at `mark_price` and `rate`,
+    /// see [`crate::prelude::Account::funding_cashflow`].
+    ///
+    /// # Panics
+    /// Panics if `mark_price <= 0`.
+    #[inline]
+    #[must_use]
+    pub(crate) fn funding_cashflow(
+        &self,
+        rate: crate::types::FundingRate<I, D>,
+        mark_price: QuoteCurrency<I, D>,
+    ) -> BaseOrQuote::PairedCurrency {
+        assert!(
+            mark_price > QuoteCurrency::zero(),
+            "funding mark price must be strictly positive, got {mark_price}"
+        );
+        if self.quantity.is_zero() || rate.as_ref().is_zero() {
+            return Zero::zero();
+        }
+        let signed_position_value =
+            BaseOrQuote::PairedCurrency::convert_from(self.quantity, mark_price);
+        -(signed_position_value * *rate.as_ref())
+    }
+
     /// Change a position while doing proper accounting and balance transfers.
     #[inline]
     pub fn change(
