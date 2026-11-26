@@ -37,7 +37,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     for n in 1..20 {
         group.bench_with_input(BenchmarkId::new("insert", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)
             }));
             b.iter_with_setup(
@@ -61,7 +61,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         /*
         group.bench_with_input(BenchmarkId::new("fill_order", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)
             }));
             b.iter_with_setup(
@@ -93,7 +93,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         */
         group.bench_with_input(BenchmarkId::new("remove", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)
             }));
             b.iter_with_setup(
@@ -120,7 +120,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         });
         group.bench_with_input(BenchmarkId::new("order_margin_neutral", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)
             }));
             b.iter_with_setup(
@@ -143,7 +143,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         });
         group.bench_with_input(BenchmarkId::new("order_margin_long", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)
             }));
             b.iter_with_setup(
@@ -166,7 +166,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         });
         group.bench_with_input(BenchmarkId::new("order_margin_short", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
-                let meta = ExchangeOrderMeta::new(i.into(), (i as i64).into());
+                let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());
                 order.clone().into_pending(meta)
             }));
             b.iter_with_setup(
