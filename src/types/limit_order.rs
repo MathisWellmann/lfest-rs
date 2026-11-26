@@ -331,6 +331,19 @@ where
         }
     }
 
+    /// `true` if the order crosses (or locks) the top of book of `market_state`.
+    #[inline]
+    #[must_use]
+    pub(crate) fn is_marketable(
+        &self,
+        market_state: &crate::market_state::MarketState<I, D>,
+    ) -> bool {
+        match self.side {
+            Side::Buy => self.limit_price >= market_state.ask(),
+            Side::Sell => self.limit_price <= market_state.bid(),
+        }
+    }
+
     /// Modify the `remaining_quantity`.
     /// The `new_qty` must be GT than zero.
     pub(crate) fn set_remaining_quantity(&mut self, new_qty: BaseOrQuote) {
@@ -736,5 +749,33 @@ mod tests {
             assert_eq!(order.remaining_quantity, init_qty - filled_quantity);
             assert_eq!(order.total_quantity(), init_qty);
         }
+    }
+
+    type Qty = BaseCurrency<i64, 5>;
+    type NewLimit = LimitOrder<i64, 5, Qty, NoUserOrderId, NewOrder>;
+
+    fn qty(q: i64) -> Qty {
+        Qty::new(q, 0)
+    }
+
+    fn limit(side: Side, price: i64, q: i64) -> NewLimit {
+        LimitOrder::new(side, QuoteCurrency::new(price, 0), qty(q)).expect("valid order")
+    }
+
+    #[test]
+    fn is_marketable_when_crossing_or_locking_the_touch() {
+        let ms = crate::market_state::MarketState::<i64, 5>::from_components(
+            QuoteCurrency::new(100, 0),
+            QuoteCurrency::new(101, 0),
+            QuoteCurrency::new(100, 0),
+            1.into(),
+            1,
+        );
+        assert!(limit(Side::Buy, 101, 1).is_marketable(&ms));
+        assert!(limit(Side::Buy, 102, 1).is_marketable(&ms));
+        assert!(!limit(Side::Buy, 100, 1).is_marketable(&ms));
+        assert!(limit(Side::Sell, 100, 1).is_marketable(&ms));
+        assert!(limit(Side::Sell, 99, 1).is_marketable(&ms));
+        assert!(!limit(Side::Sell, 101, 1).is_marketable(&ms));
     }
 }

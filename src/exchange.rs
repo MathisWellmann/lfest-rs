@@ -1134,7 +1134,7 @@ where
             )?;
         }
 
-        let marketable = self.is_marketable(&order);
+        let marketable = order.is_marketable(&self.market_state);
         let is_post_only = order.is_post_only();
         if !marketable || is_post_only {
             // An executing order is validated at its fill price instead, see
@@ -1208,7 +1208,7 @@ where
         &mut self,
         order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
     ) -> Result<LimitOrderSubmission<I, D, BaseOrQuote, UserOrderIdT>, SubmitLimitOrderError> {
-        assert!(self.is_marketable(&order));
+        assert!(order.is_marketable(&self.market_state));
         let fill_price = execution_rules::marketable_limit_fill_price(
             self.config.contract_spec().slippage_model(),
             self.config.contract_spec().price_filter().tick_size(),
@@ -1270,15 +1270,6 @@ where
         })
     }
 
-    /// `true` if `order` crosses (or locks) the current top of book.
-    #[inline]
-    fn is_marketable(&self, order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>) -> bool {
-        match order.side() {
-            Buy => order.limit_price() >= self.market_state.ask(),
-            Sell => order.limit_price() <= self.market_state.bid(),
-        }
-    }
-
     /// Submit a resting passive limit order.
     ///
     /// This API never trades: an order which would execute immediately (it crosses the
@@ -1304,7 +1295,7 @@ where
         LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         SubmitLimitOrderError,
     > {
-        if self.is_marketable(&order) && !order.is_post_only() {
+        if order.is_marketable(&self.market_state) && !order.is_post_only() {
             return Err(SubmitLimitOrderError::WouldExecuteImmediately);
         }
         // A resting order never settles a fill, so it cannot liquidate or emit stop events.
@@ -1375,7 +1366,7 @@ where
             return Err(AmendQtyAlreadyFilled);
         }
         // Validate what does not depend on the original order before cancelling it.
-        if self.is_marketable(&new_order) && !new_order.is_post_only() {
+        if new_order.is_marketable(&self.market_state) && !new_order.is_post_only() {
             return Err(SubmitLimitOrderError::WouldExecuteImmediately.into());
         }
 
