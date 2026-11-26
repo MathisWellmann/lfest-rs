@@ -118,9 +118,7 @@ where
     #[inline(always)]
     #[must_use]
     pub fn reserved_maker_fees(&self) -> BaseOrQuote::PairedCurrency {
-        (self.active_limit_orders.bids().notional_sum()
-            + self.active_limit_orders.asks().notional_sum())
-            * self.maker_fee.max(Decimal::zero())
+        self.active_limit_orders.reserved_maker_fees(self.maker_fee)
     }
 
     /// The canonical collateral requirement of the account:
@@ -158,11 +156,9 @@ where
     #[inline(always)]
     #[must_use]
     pub(crate) fn largest_collateral_contributor(&self) -> Option<OrderId> {
-        self.active_limit_orders.largest_collateral_contributor(
-            self.init_margin_req,
-            &self.position,
-            self.maker_fee,
-        )
+        self.active_limit_orders
+            .largest_collateral_contributor(self.init_margin_req, &self.position, self.maker_fee)
+            .map(|(order_id, _)| order_id)
     }
 
     /// The margin excess if `new_order` were also resting,

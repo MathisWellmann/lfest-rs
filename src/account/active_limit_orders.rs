@@ -176,8 +176,19 @@ where
         )
     }
 
-    /// The id of the resting order whose cancellation frees the most collateral:
-    /// the largest marginal contributor of order margin plus reserved maker fee.
+    /// The maker fees reserved for the resting orders, so that any of their fills can
+    /// always be paid for. A negative (rebate) `maker_fee` reserves nothing.
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn reserved_maker_fees(
+        &self,
+        maker_fee: Decimal<I, D>,
+    ) -> BaseOrQuote::PairedCurrency {
+        (self.bids.notional_sum() + self.asks.notional_sum()) * maker_fee.max(Decimal::zero())
+    }
+
+    /// The id of the resting order whose cancellation frees the most collateral, and
+    /// that amount: the largest marginal contributor of order margin plus reserved maker fee.
     ///
     /// The marginal contribution is computed with the same canonical
     /// [`order_margin`] function which admission is based on, so the margin call
@@ -188,25 +199,30 @@ where
         init_margin_req: Decimal<I, D>,
         position: &Position<I, D, BaseOrQuote>,
         maker_fee: Decimal<I, D>,
-    ) -> Option<OrderId> {
+    ) -> Option<(OrderId, BaseOrQuote::PairedCurrency)> {
         let bids_notional = self.bids.notional_sum();
         let asks_notional = self.asks.notional_sum();
         let current_margin = order_margin(bids_notional, asks_notional, init_margin_req, position);
         let fee = maker_fee.max(Decimal::zero());
 
-        let marginal_collateral =
-            |order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>| {
+        let contributor = self
+            .iter()
+            .map(|order| {
                 let (bids, asks) = match order.side() {
                     Buy => (bids_notional - order.notional(), asks_notional),
                     Sell => (bids_notional, asks_notional - order.notional()),
                 };
                 let margin_without = order_margin(bids, asks, init_margin_req, position);
-                current_margin - margin_without + order.notional() * fee
-            };
-
-        self.iter()
-            .max_by_key(|order| marginal_collateral(order))
-            .map(|order| order.id())
+                (
+                    order.id(),
+                    current_margin - margin_without + order.notional() * fee,
+                )
+            })
+            .max_by_key(|&(_, freed)| freed);
+        if let Some((_, freed)) = contributor {
+            assert2::debug_assert!(freed >= Zero::zero(), "cancelling never adds collateral");
+        }
+        contributor
     }
 
     /// Get the order margin if a new order were to be added.
