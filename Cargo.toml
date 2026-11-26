@@ -266,3 +266,7 @@ harness = false
 [[bench]]
 name = "trade_update"
 harness = false
+
+[[bench]]
+name = "order_book"
+harness = false
