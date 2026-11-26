@@ -66,6 +66,9 @@ procs:
   cargo-bench_OrderBook/try_insert_order:
     shell: "cargo bench OrderBook/try_insert_order"
     autostart: false
+  cargo-bench_Exchange/submit_amend_cancel:
+    shell: "cargo bench Exchange/submit_amend_cancel"
+    autostart: false
   # Formatting
   taplo:
     shell: "taplo fmt"
