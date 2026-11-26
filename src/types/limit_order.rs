@@ -391,6 +391,26 @@ where
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderIdT: UserOrderId,
 {
+    /// The remaining quantity after amending this order to `new_order`, or `None` if the
+    /// amendment leaves nothing to fill, in which case the order is cancelled.
+    ///
+    /// As per cboe: "Changes in OrderQty result in an adjustment of the current order's
+    /// OrderQty. The new OrderQty does not directly replace the current order's LeavesQty.
+    /// Rather, a delta is computed from the current OrderQty and the replacement OrderQty.
+    /// This delta is then applied to the current LeavesQty. If the resulting LeavesQty is
+    /// less than or equal to zero, the order is cancelled." Binance behaves the same way.
+    /// So an amendment which overlaps partial fills never adds unintended exposure.
+    #[inline]
+    #[must_use]
+    pub(crate) fn amended_leaves_qty(
+        &self,
+        new_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Option<BaseOrQuote> {
+        assert2::debug_assert!(self.side == new_order.side);
+        let leaves = self.remaining_quantity + new_order.total_quantity() - self.total_quantity();
+        (leaves > BaseOrQuote::zero()).then_some(leaves)
+    }
+
     /// Used when an order gets some `quantity` filled at its limit price.
     #[inline(always)]
     pub fn fill(&mut self, filled_quantity: BaseOrQuote) {
@@ -843,5 +863,23 @@ mod tests {
     fn clamp_resting_reduce_only_rejects_an_unclamped_order() {
         let mut order = limit(Side::Sell, 100, 11).with_reduce_only(true);
         let _ = order.clamp_to_reduce_only_room(qty(10), Qty::zero());
+    }
+
+    #[test]
+    fn amended_leaves_qty_applies_the_total_quantity_delta() {
+        let meta = ExchangeOrderMeta::new(0.into(), 0.into());
+        let mut existing = limit(Side::Buy, 100, 10).into_pending(meta);
+        let leaves = |existing: &LimitOrder<_, 5, Qty, _, _>, total| {
+            existing.amended_leaves_qty(&limit(Side::Buy, 100, total))
+        };
+        // Untouched order: the new total replaces the leaves.
+        assert_eq!(leaves(&existing, 4), Some(qty(4)));
+        existing.fill(qty(6));
+        // 6 of 10 filled, 4 left: amending to 12 leaves 4 + 2.
+        assert_eq!(leaves(&existing, 12), Some(qty(6)));
+        assert_eq!(leaves(&existing, 7), Some(qty(1)));
+        // Amending to the filled quantity or below leaves nothing.
+        assert_eq!(leaves(&existing, 6), None);
+        assert_eq!(leaves(&existing, 1), None);
     }
 }

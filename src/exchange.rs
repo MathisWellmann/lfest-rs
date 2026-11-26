@@ -1312,22 +1312,11 @@ where
                 }
             })?;
 
-        // When the order is in partially filled status and the new quantity <= `filled_quantity`, as per `binance` docs.
-        //
-        // As per cboe: "Changes in OrderQty result in an adjustment of the current order’s OrderQty. The new OrderQty does
-        // not directly replace the current order’s LeavesQty. Rather, a delta is computed from the current
-        // OrderQty and the replacement OrderQty. This delta is then applied to the current LeavesQty. If the
-        // resulting LeavesQty is less than or equal to zero, the order is cancelled. This results in safer behavior
-        // when the modification request overlaps partial fills for the current order, leaving the Member in total
-        // control of the share exposure of the order"
-        let qty_delta = new_order.total_quantity() - existing_order.total_quantity();
-        trace!("qty_delta: {qty_delta}");
-        let new_leaves_qty = existing_order.remaining_quantity() + qty_delta;
-        if new_leaves_qty <= BaseOrQuote::zero() {
+        let Some(new_leaves_qty) = existing_order.amended_leaves_qty(&new_order) else {
             self.cancel_limit_order(CancelBy::OrderId(existing_order_id))
                 .expect("Can cancel this order");
             return Err(AmendQtyAlreadyFilled);
-        }
+        };
         // Validate what does not depend on the original order before cancelling it.
         if new_order.is_marketable(&self.market_state) && !new_order.is_post_only() {
             return Err(SubmitLimitOrderError::WouldExecuteImmediately.into());
