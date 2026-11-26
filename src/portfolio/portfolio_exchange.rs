@@ -170,10 +170,8 @@ where
 
     #[inline]
     fn reserved_maker_fees(&self) -> BaseOrQuote::PairedCurrency {
-        let maker_fee = (*self.contract_spec.fee_maker().as_ref()).max(Decimal::zero());
-        (self.active_limit_orders.bids().notional_sum()
-            + self.active_limit_orders.asks().notional_sum())
-            * maker_fee
+        self.active_limit_orders
+            .reserved_maker_fees(*self.contract_spec.fee_maker().as_ref())
     }
 
     #[inline]
@@ -215,24 +213,11 @@ where
 
     #[inline]
     fn largest_collateral_contributor(&self) -> Option<(OrderId, BaseOrQuote::PairedCurrency)> {
-        let bids_notional = self.active_limit_orders.bids().notional_sum();
-        let asks_notional = self.active_limit_orders.asks().notional_sum();
-        let im = self.contract_spec.init_margin_req();
-        let fee = (*self.contract_spec.fee_maker().as_ref()).max(Decimal::zero());
-        let current_margin = self.order_margin();
-
-        self.active_limit_orders
-            .iter()
-            .map(|order| {
-                let (bids, asks) = match order.side() {
-                    Buy => (bids_notional - order.notional(), asks_notional),
-                    Sell => (bids_notional, asks_notional - order.notional()),
-                };
-                let margin_without = crate::utils::order_margin(bids, asks, im, &self.position);
-                let delta = current_margin - margin_without + order.notional() * fee;
-                (order.id(), delta)
-            })
-            .max_by_key(|&(_, delta)| delta)
+        self.active_limit_orders.largest_collateral_contributor(
+            self.contract_spec.init_margin_req(),
+            &self.position,
+            *self.contract_spec.fee_maker().as_ref(),
+        )
     }
 }
 
