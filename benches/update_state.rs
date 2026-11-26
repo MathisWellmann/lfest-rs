@@ -7,6 +7,8 @@
     reason = "Benchmarks don't use all dev-dependencies"
 )]
 
+mod common;
+
 use std::{
     hint::black_box,
     num::NonZeroU16,
@@ -81,7 +83,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     const COUNT: usize = 1_000_000;
     assert_eq!(trades.len(), COUNT);
 
-    let mut group = c.benchmark_group("Exchange");
+    let mut group = common::group(c, "Exchange");
     group.throughput(criterion::Throughput::Elements(COUNT as u64));
     group.bench_with_input(
         BenchmarkId::new("update_state_trade", COUNT),

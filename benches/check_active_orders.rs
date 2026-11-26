@@ -6,6 +6,8 @@
     reason = "Benchmarks don't use all dev-dependencies"
 )]
 
+mod common;
+
 use std::{
     hint::black_box,
     num::{
@@ -54,7 +56,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     )
     .unwrap();
 
-    let mut group = c.benchmark_group("Exchange");
+    let mut group = common::group(c, "Exchange");
 
     let trade = Trade {
         timestamp_exchange_ns: 0.into(),
@@ -63,7 +65,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         side: Side::Sell,
     };
 
-    for n in 1..50 {
+    for n in common::sweep(100) {
         group.bench_with_input(BenchmarkId::new("check_active_orders", n), &n, |b, _n| {
             b.iter_with_setup(
                 || {

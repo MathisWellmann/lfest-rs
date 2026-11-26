@@ -4,6 +4,8 @@
     reason = "Benchmarks don't use all dev-dependencies"
 )]
 
+mod common;
+
 use std::{
     hint::black_box,
     num::NonZeroU16,
@@ -28,7 +30,7 @@ use rand::{
 fn criterion_benchmark(c: &mut Criterion) {
     const MAX_CAP: usize = 10;
 
-    let mut group = c.benchmark_group("SortedOrders");
+    let mut group = common::group(c, "SortedOrders");
 
     let mut rng = SmallRng::seed_from_u64(0);
 
@@ -43,7 +45,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         .into_pending(meta)
     }));
 
-    for cap in 1..MAX_CAP {
+    for cap in common::sweep(MAX_CAP - 1) {
         group.throughput(Throughput::Elements(cap as u64));
         group.bench_function(format!("with_capacity_{cap}_try_insert"), |b| {
             b.iter_with_setup(
