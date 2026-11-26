@@ -7,12 +7,28 @@
 
 #![allow(dead_code, reason = "not every benchmark uses every helper")]
 
-use std::time::Duration;
+use std::{
+    num::{
+        NonZeroU16,
+        NonZeroU32,
+    },
+    time::Duration,
+};
 
+use const_decimal::Decimal;
 use criterion::{
     BenchmarkGroup,
     Criterion,
     measurement::WallTime,
+};
+use lfest::{
+    EXPECT_CONFIG,
+    EXPECT_CONTRACT_SPEC,
+    EXPECT_DECIMAL,
+    EXPECT_QUANTITY_FILTER,
+    prelude::*,
+    test_fee_maker,
+    test_fee_taker,
 };
 
 /// Samples per benchmark.
@@ -61,4 +77,42 @@ pub(crate) fn sweep(max: usize) -> Vec<usize> {
         "sweep must be strictly increasing: {points:?}"
     );
     points
+}
+
+/// Decimal precision used by the order path benchmarks.
+pub(crate) const DECIMALS: u8 = 5;
+
+/// A linear futures exchange for the order path benchmarks.
+///
+/// Size is denoted in `BaseCurrency` and margin in `QuoteCurrency`, like
+/// `lfest::mock_exchange_linear`, but with a balance and an order capacity
+/// large enough to hold the sweeps (100+ resting orders).
+pub(crate) fn linear_exchange(
+    max_active_orders: NonZeroU16,
+) -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+    assert!(max_active_orders.get() > 0);
+    let contract_spec = ContractSpecification::new(
+        leverage!(1),
+        Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+        PriceFilter::new(
+            None,
+            None,
+            QuoteCurrency::new(5, 1),
+            Decimal::TWO,
+            Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+        )
+        .expect("is a valid price filter"),
+        QuantityFilter::new(None, None, BaseCurrency::new(1, 2)).expect(EXPECT_QUANTITY_FILTER),
+        test_fee_maker(),
+        test_fee_taker(),
+    )
+    .expect(EXPECT_CONTRACT_SPEC);
+    let config = Config::new(
+        QuoteCurrency::new(100_000, 0),
+        max_active_orders,
+        contract_spec,
+        OrderRateLimits::new(NonZeroU32::MAX),
+    )
+    .expect(EXPECT_CONFIG);
+    Exchange::new(config)
 }
