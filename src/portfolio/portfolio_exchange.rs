@@ -1119,19 +1119,9 @@ where
         }
 
         if order.reduce_only() {
-            // Resting reduce-only orders on one side may jointly never exceed the
-            // position; clamp the new one to the room the existing ones leave.
             let slot = &self.markets[idx];
             let resting = slot.active_limit_orders.reduce_only_remaining(order.side());
-            // The reduce-only check above guarantees the position is on the opposite side.
-            let room = slot.position.quantity().abs() - resting;
-            if room <= BaseOrQuote::zero() {
-                return Err(SubmitLimitOrderError::ReduceOnlyRejected.into());
-            }
-            if room < order.remaining_quantity() {
-                order.set_remaining_quantity(room);
-            }
-            assert2::debug_assert!(order.remaining_quantity() <= room);
+            order.clamp_to_reduce_only_room(slot.position.quantity(), resting)?;
         }
 
         let meta = ExchangeOrderMeta::new(self.next_order_id(), ts_ns);

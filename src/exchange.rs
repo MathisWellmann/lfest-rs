@@ -996,17 +996,6 @@ where
         }
     }
 
-    /// Return `true` when an order of `(side, quantity)` strictly reduces or closes
-    /// the current open position without flipping its direction.
-    #[inline]
-    fn is_strictly_reducing(&self, side: crate::types::Side, quantity: BaseOrQuote) -> bool {
-        let pos_qty = self.account.position().quantity();
-        match side {
-            Buy => pos_qty.is_negative() && quantity <= pos_qty.abs(),
-            Sell => pos_qty.is_positive() && quantity <= pos_qty,
-        }
-    }
-
     /// Compute the clamped executable quantity for a `reduce_only` order, or `None`
     /// if the account has no opposite-side position to reduce.
     #[inline]
@@ -1020,36 +1009,6 @@ where
             side,
             quantity,
         )
-    }
-
-    /// Clamp a `reduce_only` order which is about to rest to the room the already resting
-    /// reduce-only orders of its side leave within the position, because together they
-    /// may never exceed it.
-    ///
-    /// # Errors
-    /// [`SubmitLimitOrderError::ReduceOnlyRejected`] if there is no room left.
-    fn clamp_resting_reduce_only(
-        &self,
-        order: &mut LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
-    ) -> Result<(), SubmitLimitOrderError> {
-        assert!(order.reduce_only());
-        assert!(
-            self.is_strictly_reducing(order.side(), order.remaining_quantity()),
-            "the reduce-only quantity was clamped to the position before"
-        );
-        let resting = self
-            .account
-            .active_limit_orders()
-            .reduce_only_remaining(order.side());
-        let room = self.account.position().quantity().abs() - resting;
-        if room <= BaseOrQuote::zero() {
-            return Err(SubmitLimitOrderError::ReduceOnlyRejected);
-        }
-        if room < order.remaining_quantity() {
-            order.set_remaining_quantity(room);
-        }
-        assert2::debug_assert!(order.remaining_quantity() <= room);
-        Ok(())
     }
 
     /// Force-cancel resting `reduce_only` limit orders which no longer fit within the
@@ -1184,7 +1143,11 @@ where
         }
 
         if order.reduce_only() {
-            self.clamp_resting_reduce_only(&mut order)?;
+            let resting = self
+                .account
+                .active_limit_orders()
+                .reduce_only_remaining(order.side());
+            order.clamp_to_reduce_only_room(self.account.position().quantity(), resting)?;
         }
 
         let meta = ExchangeOrderMeta::new(
