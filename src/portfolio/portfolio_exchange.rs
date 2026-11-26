@@ -38,6 +38,7 @@ use crate::{
     },
     contract_specification::ContractSpecification,
     execution_rules::{
+        self,
         BufferCapacities,
         fill_flows,
     },
@@ -208,7 +209,7 @@ where
 
     #[inline]
     fn clamp_reduce_only_quantity(&self, side: Side, quantity: BaseOrQuote) -> Option<BaseOrQuote> {
-        crate::execution_rules::clamp_reduce_only_quantity(self.position.quantity(), side, quantity)
+        execution_rules::clamp_reduce_only_quantity(self.position.quantity(), side, quantity)
     }
 
     #[inline]
@@ -842,7 +843,7 @@ where
                 self.markets[idx].contract_spec.price_filter().tick_size(),
             )
             .execution_price();
-        crate::execution_rules::validate_order_notional(
+        execution_rules::validate_order_notional(
             self.markets[idx].contract_spec.notional_filter(),
             order.quantity(),
             fill_price,
@@ -1003,7 +1004,7 @@ where
             .map_err(SubmitLimitOrderError::from)?;
 
         if order.reduce_only() {
-            crate::execution_rules::clamp_reduce_only_limit_order(
+            execution_rules::clamp_reduce_only_limit_order(
                 &mut order,
                 self.markets[idx].position.quantity(),
             )?;
@@ -1018,7 +1019,7 @@ where
         let is_post_only = order.is_post_only();
         // An executing order is validated at its fill price, a resting one at its limit.
         let notional_price = if marketable && !is_post_only {
-            crate::execution_rules::marketable_limit_fill_price(
+            execution_rules::marketable_limit_fill_price(
                 self.markets[idx].contract_spec.slippage_model(),
                 self.markets[idx].contract_spec.price_filter().tick_size(),
                 &self.markets[idx].market_state,
@@ -1029,7 +1030,7 @@ where
         } else {
             order.limit_price()
         };
-        crate::execution_rules::validate_order_notional(
+        execution_rules::validate_order_notional(
             self.markets[idx].contract_spec.notional_filter(),
             order.remaining_quantity(),
             notional_price,
@@ -1616,7 +1617,7 @@ where
         // The clearance fee is collected only from the equity the closed portfolio has
         // left, so the fee alone never turns into bad debt the venue absorbs itself.
         let clearance_fee =
-            crate::execution_rules::capped_clearance_fee(clearance_fee, self.balances.equity());
+            execution_rules::capped_clearance_fee(clearance_fee, self.balances.equity());
         if !clearance_fee.is_zero() {
             let eq_before = self.balances.equity();
             self.balances.account_for_shared_wallet_fee(clearance_fee);
@@ -1879,7 +1880,7 @@ where
         side: Side,
     ) -> Option<QuoteCurrency<I, D>> {
         let slot = &self.markets[idx];
-        crate::execution_rules::stop_reference_price(
+        execution_rules::stop_reference_price(
             &slot.market_state,
             slot.contract_spec.mark_method(),
             price_type,
@@ -1898,7 +1899,7 @@ where
         let ms = &slot.market_state;
         slot.pending_stops.evaluate_and_drain(
             |stop| {
-                crate::execution_rules::stop_trigger_band(
+                execution_rules::stop_trigger_band(
                     ms,
                     mark_method,
                     stop.trigger_price_type(),
@@ -1913,7 +1914,7 @@ where
         for i in 0..n {
             let (stop, trigger_price) = self.elected_stops_scratch[i];
             let intrabar =
-                crate::execution_rules::elected_intrabar(stop.trigger_price_type(), candle_range);
+                execution_rules::elected_intrabar(stop.trigger_price_type(), candle_range);
             self.execute_elected_stop_for_market(idx, stop, trigger_price, intrabar);
             if self.liquidated_during_fills {
                 core::hint::cold_path();
@@ -1996,7 +1997,7 @@ where
         };
 
         let slot = &self.markets[idx];
-        let fill_price = crate::execution_rules::market_stop_fill_price(
+        let fill_price = execution_rules::market_stop_fill_price(
             slot.contract_spec.slippage_model(),
             slot.contract_spec.price_filter().tick_size(),
             &slot.market_state,
