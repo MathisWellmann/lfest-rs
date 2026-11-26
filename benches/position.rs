@@ -27,7 +27,6 @@ fn criterion_benchmark(c: &mut Criterion) {
     const N: usize = 1000;
 
     let mut group = common::group(c, "Position");
-    group.throughput(Throughput::Elements(N as u64));
 
     let mut rng = SmallRng::seed_from_u64(0);
     let starting_positions = [
@@ -49,19 +48,14 @@ fn criterion_benchmark(c: &mut Criterion) {
     let ask = QuoteCurrency::new(101, 0);
 
     for pos in starting_positions {
+        // `unrealized_pnl` and `notional` do real arithmetic, so they are
+        // measured once per starting position. The `quantity` and
+        // `entry_price` benchmarks were dropped: they are `getset` field
+        // reads that benchmark a single load.
+        group.throughput(Throughput::Elements(1));
         group.bench_function(format!("{pos}_unrealized_pnl"), |b| {
             b.iter(|| {
                 let _ = black_box(pos.unrealized_pnl(bid, ask));
-            })
-        });
-        group.bench_function(format!("{pos}_quantity"), |b| {
-            b.iter(|| {
-                let _ = black_box(pos.quantity());
-            })
-        });
-        group.bench_function(format!("{pos}_entry_price"), |b| {
-            b.iter(|| {
-                let _ = black_box(pos.entry_price());
             })
         });
         group.bench_function(format!("{pos}_notional"), |b| {
@@ -70,6 +64,9 @@ fn criterion_benchmark(c: &mut Criterion) {
             })
         });
 
+        // 1000 position changes per iteration, so the throughput applies to
+        // this family only; a group wide throughput mislabels the getters.
+        group.throughput(Throughput::Elements(N as u64));
         for side in [Side::Buy, Side::Sell] {
             group.bench_function(format!("{pos}_{side}_1000_change_position"), |b| {
                 b.iter_with_setup(

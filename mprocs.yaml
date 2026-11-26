@@ -39,9 +39,6 @@ procs:
   cargo-bench_OrderMargin/insert:
     shell: "cargo bench OrderMargin/insert"
     autostart: false
-  cargo-bench_OrderMargin/fill_order:
-    shell: "cargo bench OrderMargin/fill_order"
-    autostart: false
   cargo-bench_OrderMargin/remove:
     shell: "cargo bench OrderMargin/remove"
     autostart: false

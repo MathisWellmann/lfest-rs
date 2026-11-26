@@ -41,11 +41,15 @@ fn criterion_benchmark(c: &mut Criterion) {
         side: Side::Sell,
     };
 
-    for cap in 1..MAX_CAP {
+    for cap in common::sweep(MAX_CAP - 1) {
         group.throughput(Throughput::Elements(cap as u64));
+        // Only the first `cap` orders are tested. The previous version looped
+        // over all `MAX_CAP` orders for every `cap`, so all ids measured the
+        // same work and only the id label changed.
+        let bids = &test_bids[..cap];
         group.bench_function(format!("fills_order_{cap}"), |b| {
             b.iter(|| {
-                for order in test_bids.iter() {
+                for order in bids.iter() {
                     let _ = black_box(trade.fills_order(black_box(order)));
                 }
             })
