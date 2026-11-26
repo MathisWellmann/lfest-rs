@@ -6,6 +6,8 @@
     reason = "Benchmarks don't use all dev-dependencies"
 )]
 
+mod common;
+
 use std::{
     hint::black_box,
     num::NonZeroU16,
@@ -23,7 +25,7 @@ use lfest::{
 };
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("OrderMargin");
+    let mut group = common::group(c, "OrderMargin");
 
     let order = LimitOrder::new(
         Side::Buy,
@@ -34,7 +36,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let max_active_orders = NonZeroU16::new(100).unwrap();
 
-    for n in 1..20 {
+    for n in common::sweep(100) {
         group.bench_with_input(BenchmarkId::new("insert", n), &n, |b, _n| {
             let orders = Vec::from_iter((0..n).map(|i| {
                 let meta = ExchangeOrderMeta::new((i as u64).into(), (i as i64).into());

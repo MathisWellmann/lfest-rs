@@ -4,6 +4,8 @@
     reason = "Benchmarks don't use all dev-dependencies"
 )]
 
+mod common;
+
 use std::hint::black_box;
 
 use criterion::*;
@@ -17,7 +19,7 @@ use rand::{
 fn criterion_benchmark(c: &mut Criterion) {
     const MAX_CAP: usize = 10;
 
-    let mut group = c.benchmark_group("Trade");
+    let mut group = common::group(c, "Trade");
 
     let mut rng = SmallRng::seed_from_u64(0);
 

@@ -6,6 +6,8 @@
     reason = "Benchmarks don't use all dev-dependencies"
 )]
 
+mod common;
+
 use std::hint::black_box;
 
 use criterion::{
@@ -24,7 +26,7 @@ use rand::{
 fn criterion_benchmark(c: &mut Criterion) {
     const N: usize = 1000;
 
-    let mut group = c.benchmark_group("Position");
+    let mut group = common::group(c, "Position");
     group.throughput(Throughput::Elements(N as u64));
 
     let mut rng = SmallRng::seed_from_u64(0);

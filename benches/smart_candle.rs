@@ -6,6 +6,8 @@
     reason = "Benchmarks don't use all dev-dependencies"
 )]
 
+mod common;
+
 use std::num::NonZeroU16;
 
 use const_decimal::Decimal;
@@ -67,7 +69,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     }));
     assert_eq!(candles.len(), 1_000);
 
-    let mut group = c.benchmark_group("SmartCandle");
+    let mut group = common::group(c, "SmartCandle");
     group.throughput(criterion::Throughput::Elements(COUNT as u64));
     group.bench_function("update_state", |b| {
         b.iter(|| {

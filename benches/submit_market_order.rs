@@ -6,6 +6,8 @@
     reason = "Benchmarks don't use all dev-dependencies"
 )]
 
+mod common;
+
 use std::{
     hint::black_box,
     num::{
@@ -43,7 +45,7 @@ fn submit_market_orders<I, const D: u8, BaseOrQuote, U>(
 
 fn criterion_benchmark(c: &mut Criterion) {
     let order = MarketOrder::new(Side::Buy, QuoteCurrency::new(1, 2)).unwrap();
-    let mut group = c.benchmark_group("Exchange");
+    let mut group = common::group(c, "Exchange");
     const N: usize = 1_000;
     group.throughput(criterion::Throughput::Elements(N as u64));
     group.bench_with_input(BenchmarkId::new("submit_market_order", N), &N, |b, _n| {

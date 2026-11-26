@@ -6,6 +6,8 @@
     reason = "Benchmarks don't use all dev-dependencies"
 )]
 
+mod common;
+
 use std::hint::black_box;
 
 use criterion::{
@@ -20,7 +22,7 @@ use fpdec::{
 use lfest::prelude::*;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("decimal_comparison");
+    let mut group = common::group(c, "decimal_comparison");
 
     group.bench_function("fpdec_quote_convert_from".to_string(), |b| {
         b.iter(|| {
