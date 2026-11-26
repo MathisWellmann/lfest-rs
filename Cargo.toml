@@ -274,3 +274,7 @@ harness = false
 [[bench]]
 name = "exchange_fills"
 harness = false
+
+[[bench]]
+name = "amend_limit_order"
+harness = false
