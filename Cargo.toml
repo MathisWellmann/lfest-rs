@@ -278,3 +278,7 @@ harness = false
 [[bench]]
 name = "amend_limit_order"
 harness = false
+
+[[bench]]
+name = "order_lifecycle"
+harness = false
