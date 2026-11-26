@@ -1228,15 +1228,13 @@ where
                 }
             })?;
 
-        let qty_delta = new_order.total_quantity() - existing.total_quantity();
-        let new_leaves_qty = existing.remaining_quantity() + qty_delta;
-        if new_leaves_qty <= BaseOrQuote::zero() {
+        let Some(new_leaves_qty) = existing.amended_leaves_qty(&new_order) else {
             self.markets[idx]
                 .active_limit_orders
                 .remove_limit_order(CancelBy::OrderId(existing_order_id))
                 .expect("existing active order can be cancelled");
             return Err(AmendLimitOrderError::AmendQtyAlreadyFilled.into());
-        }
+        };
         // Validate what does not depend on the original order before cancelling it.
         if new_order.is_marketable(&self.markets[idx].market_state) && !new_order.is_post_only() {
             return Err(
