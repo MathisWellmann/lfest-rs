@@ -270,3 +270,7 @@ harness = false
 [[bench]]
 name = "order_book"
 harness = false
+
+[[bench]]
+name = "exchange_fills"
+harness = false
