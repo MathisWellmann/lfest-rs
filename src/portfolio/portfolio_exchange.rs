@@ -208,15 +208,6 @@ where
         }
     }
 
-    /// `true` if `order` crosses (or locks) the market's current top of book.
-    #[inline]
-    fn is_marketable(&self, order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>) -> bool {
-        match order.side() {
-            Buy => order.limit_price() >= self.market_state.ask(),
-            Sell => order.limit_price() <= self.market_state.bid(),
-        }
-    }
-
     #[inline]
     fn clamp_reduce_only_quantity(&self, side: Side, quantity: BaseOrQuote) -> Option<BaseOrQuote> {
         crate::execution_rules::clamp_reduce_only_quantity(self.position.quantity(), side, quantity)
@@ -1046,7 +1037,7 @@ where
         if status == MarketStatus::ReduceOnly && !strictly_reducing {
             return Err(PortfolioError::MarketReduceOnly(market_id));
         }
-        let marketable = self.markets[idx].is_marketable(&order);
+        let marketable = order.is_marketable(&self.markets[idx].market_state);
         let is_post_only = order.is_post_only();
         // An executing order is validated at its fill price, a resting one at its limit.
         let notional_price = if marketable && !is_post_only {
@@ -1173,7 +1164,7 @@ where
     ) -> Result<PendingLimitOrder<I, D, BaseOrQuote, UserOrderIdT>, PortfolioError<UserOrderIdT>>
     {
         let idx = self.validate_market_index(market_id)?;
-        if self.markets[idx].is_marketable(&order) && !order.is_post_only() {
+        if order.is_marketable(&self.markets[idx].market_state) && !order.is_post_only() {
             return Err(SubmitLimitOrderError::WouldExecuteImmediately.into());
         }
         // A resting order never settles a fill, so it cannot liquidate or emit stop events.
@@ -1257,7 +1248,7 @@ where
             return Err(AmendLimitOrderError::AmendQtyAlreadyFilled.into());
         }
         // Validate what does not depend on the original order before cancelling it.
-        if self.markets[idx].is_marketable(&new_order) && !new_order.is_post_only() {
+        if new_order.is_marketable(&self.markets[idx].market_state) && !new_order.is_post_only() {
             return Err(
                 AmendLimitOrderError::from(SubmitLimitOrderError::WouldExecuteImmediately).into(),
             );
