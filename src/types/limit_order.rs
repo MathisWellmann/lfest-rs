@@ -32,6 +32,7 @@ use crate::{
         NewLimitOrderError,
         OrderQuantityLTEZero,
         Side,
+        SubmitLimitOrderError,
         TimestampNs,
     },
     utils::NoUserOrderId,
@@ -342,6 +343,36 @@ where
             Side::Buy => self.limit_price >= market_state.ask(),
             Side::Sell => self.limit_price <= market_state.bid(),
         }
+    }
+
+    /// Clamp a `reduce_only` order which is about to rest to the room which the already
+    /// resting reduce-only orders of its side (`resting_reduce_only`) leave within the
+    /// position of `position_qty`, because together they may never exceed it.
+    ///
+    /// # Errors
+    /// [`SubmitLimitOrderError::ReduceOnlyRejected`] if there is no room left.
+    pub(crate) fn clamp_to_reduce_only_room(
+        &mut self,
+        position_qty: BaseOrQuote,
+        resting_reduce_only: BaseOrQuote,
+    ) -> Result<(), SubmitLimitOrderError> {
+        assert!(self.reduce_only);
+        assert!(resting_reduce_only >= BaseOrQuote::zero());
+        let remaining = self.remaining_quantity;
+        assert_eq!(
+            crate::execution_rules::clamp_reduce_only_quantity(position_qty, self.side, remaining),
+            Some(remaining),
+            "the reduce-only quantity was clamped to the position before"
+        );
+        let room = position_qty.abs() - resting_reduce_only;
+        if room <= BaseOrQuote::zero() {
+            return Err(SubmitLimitOrderError::ReduceOnlyRejected);
+        }
+        if room < remaining {
+            self.set_remaining_quantity(room);
+        }
+        assert!(self.remaining_quantity <= room);
+        Ok(())
     }
 
     /// Modify the `remaining_quantity`.
@@ -777,5 +808,40 @@ mod tests {
         assert!(limit(Side::Sell, 100, 1).is_marketable(&ms));
         assert!(limit(Side::Sell, 99, 1).is_marketable(&ms));
         assert!(!limit(Side::Sell, 101, 1).is_marketable(&ms));
+    }
+
+    #[test]
+    fn clamp_resting_reduce_only_to_the_room_left() {
+        let sell = |q| limit(Side::Sell, 100, q).with_reduce_only(true);
+        // Enough room: unchanged.
+        let mut order = sell(3);
+        order
+            .clamp_to_reduce_only_room(qty(10), qty(7))
+            .expect("room of 3");
+        assert_eq!(order.remaining_quantity(), qty(3));
+        // Less room than requested: clamped.
+        let mut order = sell(5);
+        order
+            .clamp_to_reduce_only_room(qty(10), qty(7))
+            .expect("room of 3");
+        assert_eq!(order.remaining_quantity(), qty(3));
+        // No room left: rejected, also for a short position.
+        let mut order = sell(1);
+        assert_eq!(
+            order.clamp_to_reduce_only_room(qty(10), qty(10)),
+            Err(SubmitLimitOrderError::ReduceOnlyRejected)
+        );
+        let mut order = limit(Side::Buy, 100, 2).with_reduce_only(true);
+        assert_eq!(
+            order.clamp_to_reduce_only_room(qty(-4), qty(4)),
+            Err(SubmitLimitOrderError::ReduceOnlyRejected)
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "clamped to the position before")]
+    fn clamp_resting_reduce_only_rejects_an_unclamped_order() {
+        let mut order = limit(Side::Sell, 100, 11).with_reduce_only(true);
+        let _ = order.clamp_to_reduce_only_room(qty(10), Qty::zero());
     }
 }
