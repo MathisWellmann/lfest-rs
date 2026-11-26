@@ -30,6 +30,12 @@ procs:
   cargo-bench_check_active_orders:
     shell: "cargo bench Exchange/check_active_orders"
     autostart: false
+  cargo-bench_Exchange/amend_price:
+    shell: "cargo bench Exchange/amend_price"
+    autostart: false
+  cargo-bench_Exchange/amend_quantity:
+    shell: "cargo bench Exchange/amend_quantity"
+    autostart: false
   cargo-bench_Exchange/update_state_fills:
     shell: "cargo bench Exchange/update_state_fills"
     autostart: false
