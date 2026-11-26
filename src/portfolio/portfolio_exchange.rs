@@ -765,20 +765,12 @@ where
         PortfolioFundingSettlement<I, D, BaseOrQuote, UserOrderIdT>,
         PortfolioError<UserOrderIdT>,
     > {
-        assert!(
-            mark_price > QuoteCurrency::zero(),
-            "funding mark price must be strictly positive, got {mark_price}"
-        );
         let idx = self.validate_market_index(market_id)?;
+        let cashflow = self.markets[idx]
+            .position
+            .funding_cashflow(rate, mark_price);
         // A liquidation reports its stop cancellations in `stop_events`.
         self.reset_stop_events();
-        let qty = self.markets[idx].position.quantity();
-        let cashflow = if qty.is_zero() || rate.as_ref().is_zero() {
-            Zero::zero()
-        } else {
-            let signed_val = BaseOrQuote::PairedCurrency::convert_from(qty, mark_price);
-            -(signed_val * *rate.as_ref())
-        };
 
         let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
