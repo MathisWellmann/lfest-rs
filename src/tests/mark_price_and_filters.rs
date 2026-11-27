@@ -755,3 +755,78 @@ fn market_order_slippage_fill_snaps_to_the_tick_away_from_the_trader() {
         QuoteCurrency::new(98, 0)
     );
 }
+
+/// `(quantity in hundredths, expected rejection)` for resting buys at 100 against the
+/// `[50, 500]` notional filter: both bounds are inclusive.
+const RESTING_NOTIONAL_CASES: [(i64, Option<ValidateOrderNotionalError>); 4] = [
+    (500, None),
+    (501, Some(ValidateOrderNotionalError::NotionalTooHigh)),
+    (50, None),
+    (49, Some(ValidateOrderNotionalError::NotionalTooLow)),
+];
+
+fn resting_gtc_buy(
+    qty_hundredths: i64,
+) -> LimitOrder<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId, NewOrder> {
+    LimitOrder::new(
+        Side::Buy,
+        QuoteCurrency::new(100, 0),
+        BaseCurrency::new(qty_hundredths, 2),
+    )
+    .unwrap()
+    .with_time_in_force(TimeInForce::GoodTilCancelled)
+}
+
+#[test]
+fn resting_gtc_limit_notional_is_validated_at_the_limit_price() {
+    let mut ex = build_linear_exchange(notional_filter_spec(), QuoteCurrency::new(1000, 0));
+    ex.update_state(&Bba {
+        bid: QuoteCurrency::new(100, 0),
+        ask: QuoteCurrency::new(101, 0),
+        timestamp_exchange_ns: 1.into(),
+    })
+    .unwrap();
+    for (qty, rejection) in RESTING_NOTIONAL_CASES {
+        let order = resting_gtc_buy(qty);
+        assert!(!order.is_post_only());
+        assert_eq!(
+            ex.submit_limit_order(order).err(),
+            rejection.map(SubmitLimitOrderError::ValidateOrderNotional),
+            "qty {qty}/100"
+        );
+    }
+    assert_eq!(ex.account().active_limit_orders().len(), 2);
+}
+
+#[test]
+fn portfolio_resting_gtc_limit_notional_is_validated_at_the_limit_price() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![MarketConfig::new(
+            NonZeroU16::new(20).expect(EXPECT_NON_ZERO),
+            notional_filter_spec(),
+            OrderRateLimits::default(),
+        )],
+    )
+    .unwrap();
+    let mut pf =
+        PortfolioExchange::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>::new(cfg);
+    let m = MarketId::new(0);
+    pf.update_market(
+        m,
+        &Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 1.into(),
+        },
+    )
+    .unwrap();
+    for (qty, rejection) in RESTING_NOTIONAL_CASES {
+        assert_eq!(
+            pf.submit_limit_order(m, resting_gtc_buy(qty)).err(),
+            rejection.map(|e| SubmitLimitOrderError::ValidateOrderNotional(e).into()),
+            "qty {qty}/100"
+        );
+    }
+    assert_eq!(pf.market(m).unwrap().active_limit_orders.len(), 2);
+}

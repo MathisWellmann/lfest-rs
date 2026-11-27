@@ -212,15 +212,12 @@ where
     assert2::debug_assert!(quantity > BaseOrQuote::zero());
     assert2::debug_assert!(price > QuoteCurrency::zero());
     let notional = BaseOrQuote::PairedCurrency::convert_from(quantity, price);
-    if !reduce_only {
-        return filter.validate_order_notional(notional);
+    match filter.validate_order_notional(notional) {
+        // `NotionalFilter::new` ensures `min <= max`, so an order below the minimum is
+        // also within the maximum.
+        Err(ValidateOrderNotionalError::NotionalTooLow) if reduce_only => Ok(()),
+        result => result,
     }
-    if let Some(max_notional) = filter.max_notional()
-        && notional > max_notional
-    {
-        return Err(ValidateOrderNotionalError::NotionalTooHigh);
-    }
-    Ok(())
 }
 
 /// Cap the liquidation clearance fee at the equity left once the liquidation's realized
@@ -385,6 +382,34 @@ mod tests {
         Bba,
         PriceFilter,
     };
+
+    #[test]
+    fn reduce_only_orders_skip_only_the_min_notional() {
+        use ValidateOrderNotionalError::*;
+        let filter = NotionalFilter::new(
+            Some(QuoteCurrency::<i64, 5>::new(50, 0)),
+            Some(QuoteCurrency::new(500, 0)),
+        )
+        .unwrap();
+        // `(quantity in tenths at a price of 100, plain result, reduce-only result)`
+        for (qty_tenths, plain, reduce_only) in [
+            (4, Err(NotionalTooLow), Ok(())),
+            (5, Ok(()), Ok(())),
+            (50, Ok(()), Ok(())),
+            (51, Err(NotionalTooHigh), Err(NotionalTooHigh)),
+        ] {
+            let validate = |reduce_only| {
+                validate_order_notional(
+                    &filter,
+                    BaseCurrency::<i64, 5>::new(qty_tenths, 1),
+                    QuoteCurrency::new(100, 0),
+                    reduce_only,
+                )
+            };
+            assert_eq!(validate(false), plain, "{qty_tenths}/10");
+            assert_eq!(validate(true), reduce_only, "{qty_tenths}/10");
+        }
+    }
 
     #[test]
     fn buffer_capacities_scale_with_order_slots() {
