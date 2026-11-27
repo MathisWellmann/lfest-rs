@@ -71,12 +71,12 @@ pub fn scale<F: num::Float>(from_min: F, from_max: F, to_min: F, to_max: F, valu
 ///
 /// `Vec::clone` keeps only the length, while the event push paths
 /// (`push_within_capacity`) rely on the spare capacity that the exchange constructors
-/// pre-allocate. Used by their `Clone` impls. Allocation-free once the bound is in place.
+/// pre-allocate. Used by their `Clone` impls, and to restore the capacity after
+/// deserialization. Allocation-free once the bound is in place.
 pub(crate) fn reserve_to_capacity<T>(vec: &mut Vec<T>, capacity: usize) {
     let len_before = vec.len();
-    if vec.capacity() < capacity {
-        vec.reserve_exact(capacity - len_before);
-    }
+    // `reserve_exact` takes the additional length and does nothing if it already fits.
+    vec.reserve_exact(capacity.saturating_sub(len_before));
     assert!(vec.capacity() >= capacity);
     assert_eq!(
         vec.len(),
@@ -115,6 +115,25 @@ pub(crate) mod tests {
     use proptest::prelude::*;
 
     use super::*;
+
+    #[test]
+    fn reserve_to_capacity_grows_without_touching_the_contents() {
+        let mut vec = vec![1, 2, 3];
+        reserve_to_capacity(&mut vec, 10);
+        assert!(vec.capacity() >= 10);
+        assert_eq!(vec, [1, 2, 3]);
+
+        // A capacity which is already there is kept.
+        let capacity = vec.capacity();
+        reserve_to_capacity(&mut vec, 5);
+        reserve_to_capacity(&mut vec, 0);
+        assert_eq!(vec.capacity(), capacity);
+
+        let mut empty = Vec::<u8>::new();
+        reserve_to_capacity(&mut empty, 4);
+        assert!(empty.capacity() >= 4);
+        assert!(empty.is_empty());
+    }
 
     proptest! {
         #[test]

@@ -1906,29 +1906,14 @@ where
         self.stop_order_events.clear();
     }
 
-    /// Give `stop_order_events` enough spare capacity for the next event.
-    ///
-    /// `Clone` restores the bound, so only a deserialized exchange (serde cannot restore
-    /// spare `Vec` capacity) has to allocate on its first stop event.
-    #[cold]
-    #[inline(never)]
-    fn restore_stop_order_event_capacity(&mut self) {
-        let max_stops = usize::from(self.config.max_num_open_orders().get());
-        assert!(self.stop_order_events.len() < max_stops);
-        self.stop_order_events
-            .reserve_exact(max_stops - self.stop_order_events.len());
-        assert!(self.stop_order_events.capacity() >= max_stops);
-    }
-
     /// Record a stop event. Cannot overflow: see the `stop_order_events` field docs.
     #[inline]
     fn push_stop_event(&mut self, event: StopOrderEvent<I, D, BaseOrQuote, UserOrderIdT>) {
         let max_stops = usize::from(self.config.max_num_open_orders().get());
         assert2::debug_assert!(self.stop_order_events.len() < max_stops);
-        if self.stop_order_events.len() == self.stop_order_events.capacity() {
-            core::hint::cold_path();
-            self.restore_stop_order_event_capacity();
-        }
+        // Allocates only for a deserialized exchange: serde cannot restore the spare
+        // capacity, while `Clone` keeps it.
+        reserve_to_capacity(&mut self.stop_order_events, max_stops);
         self.stop_order_events
             .push_within_capacity(event)
             .expect("each pending stop yields at most one event per call");

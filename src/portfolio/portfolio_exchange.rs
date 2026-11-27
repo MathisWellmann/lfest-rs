@@ -2143,15 +2143,11 @@ where
     ///
     /// Also restores the capacity bound (one event per possible pending stop of every
     /// market) if it is missing. `Clone` and `add_market` keep it, so only a deserialized
-    /// portfolio (serde cannot restore spare `Vec` capacity) takes that branch.
+    /// portfolio (serde cannot restore spare `Vec` capacity) allocates here.
     #[inline]
     fn reset_stop_events(&mut self) {
         self.stop_events.clear();
-        if self.stop_events.capacity() < self.max_pending_stops {
-            core::hint::cold_path();
-            self.stop_events.reserve_exact(self.max_pending_stops);
-        }
-        assert!(self.stop_events.capacity() >= self.max_pending_stops);
+        reserve_to_capacity(&mut self.stop_events, self.max_pending_stops);
         assert!(self.stop_events.is_empty());
     }
 

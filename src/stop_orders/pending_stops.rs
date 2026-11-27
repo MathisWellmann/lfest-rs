@@ -62,7 +62,7 @@ where
 {
     fn clone(&self) -> Self {
         let mut stops = self.stops.clone();
-        stops.reserve_exact(self.stops.capacity() - self.stops.len());
+        crate::utils::reserve_to_capacity(&mut stops, self.stops.capacity());
         debug_assert_eq!(stops.capacity(), self.stops.capacity());
         Self { stops }
     }
