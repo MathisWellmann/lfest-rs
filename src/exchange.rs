@@ -839,13 +839,10 @@ where
             .validate_order_quantity(order.quantity())?;
 
         if order.reduce_only() {
-            let Some(clamped) = self.clamp_reduce_only_quantity(order.side(), order.quantity())
-            else {
-                return Err(SubmitMarketOrderError::ReduceOnlyRejected);
-            };
-            if clamped < order.quantity() {
-                order.set_quantity(clamped);
-            }
+            execution_rules::clamp_reduce_only_market_order(
+                &mut order,
+                self.account.position().quantity(),
+            )?;
         }
 
         let meta = ExchangeOrderMeta::new(

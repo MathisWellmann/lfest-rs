@@ -829,14 +829,10 @@ where
             .map_err(SubmitMarketOrderError::from)?;
 
         if order.reduce_only() {
-            let Some(clamped) =
-                self.markets[idx].clamp_reduce_only_quantity(order.side(), order.quantity())
-            else {
-                return Err(SubmitMarketOrderError::ReduceOnlyRejected.into());
-            };
-            if clamped < order.quantity() {
-                order.set_quantity(clamped);
-            }
+            execution_rules::clamp_reduce_only_market_order(
+                &mut order,
+                self.markets[idx].position.quantity(),
+            )?;
         }
 
         let strictly_reducing =

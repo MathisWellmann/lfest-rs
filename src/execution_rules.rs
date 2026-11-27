@@ -19,11 +19,13 @@ use crate::{
         LimitOrder,
         MarginCurrency,
         MarketId,
+        MarketOrder,
         Mon,
         NewOrder,
         QuoteCurrency,
         Side,
         SubmitLimitOrderError,
+        SubmitMarketOrderError,
         TimeInForce,
         UserOrderId,
         ValidateOrderNotionalError,
@@ -53,6 +55,29 @@ where
     assert2::debug_assert!(clamped > BaseOrQuote::zero());
     assert2::debug_assert!(clamped <= quantity);
     Some(clamped)
+}
+
+/// Clamp a new `reduce_only` market order to the open position of `position_qty`.
+///
+/// # Errors
+/// [`SubmitMarketOrderError::ReduceOnlyRejected`] if there is no opposite position.
+pub(crate) fn clamp_reduce_only_market_order<I, const D: u8, BaseOrQuote, UserOrderIdT>(
+    order: &mut MarketOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    position_qty: BaseOrQuote,
+) -> Result<(), SubmitMarketOrderError>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    assert!(order.reduce_only());
+    let requested = order.quantity();
+    let clamped = clamp_reduce_only_quantity(position_qty, order.side(), requested)
+        .ok_or(SubmitMarketOrderError::ReduceOnlyRejected)?;
+    order.set_quantity(clamped);
+    assert!(order.quantity() <= position_qty.abs());
+    assert!(order.quantity() <= requested);
+    Ok(())
 }
 
 /// Clamp a new `reduce_only` limit order to the open position of `position_qty`.
@@ -237,11 +262,10 @@ where
     Margin: MarginCurrency<I, D>,
 {
     assert!(clearance_fee >= Margin::zero());
-    let capped = if equity_left > Margin::zero() {
-        crate::utils::min(clearance_fee, equity_left)
-    } else {
-        Margin::zero()
-    };
+    let capped = crate::utils::max(
+        crate::utils::min(clearance_fee, equity_left),
+        Margin::zero(),
+    );
     assert!(capped >= Margin::zero());
     assert!(capped <= clearance_fee);
     if equity_left >= Margin::zero() {
