@@ -1223,3 +1223,45 @@ fn cloned_portfolio_accepts_new_stop_orders() {
         .expect("market exists");
     assert_eq!(stops.len(), 1);
 }
+
+#[test]
+fn trailing_stop_rejects_trail_distances_outside_their_range() {
+    let rate = |scaled, scale| Decimal::try_from_scaled(scaled, scale).expect(EXPECT_DECIMAL);
+    let trailing = |side, trail| {
+        StopOrder::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>::trailing_stop(
+            side,
+            QuoteCurrency::new(100, 0),
+            trail,
+            BaseCurrency::new(1, 0),
+            NoUserOrderId,
+        )
+    };
+    for side in [Side::Buy, Side::Sell] {
+        for invalid in [
+            TrailDistance::CallbackRate(Decimal::zero()),
+            TrailDistance::CallbackRate(rate(-5, 2)),
+            TrailDistance::CallbackRate(Decimal::one()),
+            TrailDistance::Absolute(QuoteCurrency::zero()),
+            TrailDistance::Absolute(QuoteCurrency::new(-5, 0)),
+        ] {
+            assert_eq!(
+                trailing(side, invalid).unwrap_err(),
+                StopOrderError::InvalidTrailDistance,
+                "{side:?} {invalid:?}"
+            );
+        }
+    }
+    // 5% below / above the watermark of 100.
+    assert_eq!(
+        trailing(Side::Sell, TrailDistance::CallbackRate(rate(5, 2)))
+            .unwrap()
+            .stop_price(),
+        QuoteCurrency::new(95, 0)
+    );
+    assert_eq!(
+        trailing(Side::Buy, TrailDistance::CallbackRate(rate(5, 2)))
+            .unwrap()
+            .stop_price(),
+        QuoteCurrency::new(105, 0)
+    );
+}
