@@ -110,8 +110,10 @@ where
         })
     }
 
+    /// Whether the candle range crosses the limit price of `order`. Touching it is not
+    /// enough, as the queue position of the order is unknown.
     #[inline(always)]
-    fn fills_limit_order<UserOrderIdT, BaseOrQuote>(
+    pub(crate) fn fills_limit_order<UserOrderIdT, BaseOrQuote>(
         &self,
         order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
     ) -> bool
@@ -156,18 +158,8 @@ where
         debug_assert!(order.remaining_quantity() > BaseOrQuote::zero());
 
         // As a simplifying assumption, the order always get executed fully when using candles if the price is right.
-        if self.fills_limit_order(order) {
-            // Order is executed fully with candles.
-            Some((
-                match order.side() {
-                    Side::Buy => order.remaining_quantity(),
-                    Side::Sell => order.remaining_quantity(),
-                },
-                false,
-            ))
-        } else {
-            None
-        }
+        self.fills_limit_order(order)
+            .then(|| (order.remaining_quantity(), false))
     }
 
     fn validate_market_update(
@@ -216,19 +208,6 @@ where
     fn can_fill_asks(&self) -> bool {
         true
     }
-}
-
-/// Creates the `Candle` struct used as a `MarketUpdate`.
-#[macro_export]
-macro_rules! candle {
-    ( $b:expr, $a:expr, $l:expr, $h:expr ) => {{
-        $crate::prelude::Candle {
-            bid: $b,
-            ask: $a,
-            low: $l,
-            high: $h,
-        }
-    }};
 }
 
 #[cfg(test)]
@@ -366,6 +345,29 @@ mod test {
         );
         assert_eq!(state.bid(), QuoteCurrency::new(100, 0));
         assert_eq!(state.ask(), QuoteCurrency::new(101, 0));
+
+        // Unlike volume-aware updates, a candle never runs out of liquidity.
+        assert!(<Candle<i64, 5> as MarketUpdate<
+            i64,
+            5,
+            BaseCurrency<i64, 5>,
+        >>::can_fill_bids(&candle));
+        assert!(<Candle<i64, 5> as MarketUpdate<
+            i64,
+            5,
+            BaseCurrency<i64, 5>,
+        >>::can_fill_asks(&candle));
+        let crossed_buy = LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(96, 0),
+            BaseCurrency::new(5, 0),
+        )
+        .unwrap()
+        .into_pending(ExchangeOrderMeta::new(1.into(), 1.into()));
+        assert_eq!(
+            candle.limit_order_filled(&crossed_buy),
+            Some((BaseCurrency::new(5, 0), false))
+        );
     }
 
     #[test]
