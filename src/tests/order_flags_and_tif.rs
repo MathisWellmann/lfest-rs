@@ -5,6 +5,7 @@ use std::num::NonZeroU16;
 
 use const_decimal::Decimal;
 
+use super::bba;
 use crate::{
     DECIMALS,
     EXPECT_CONTRACT_SPEC,
@@ -167,6 +168,49 @@ fn reduce_only_clamps_excess_rejects_flat_and_prunes_stale_resting_orders() {
     assert!(ex.account().position().quantity().is_zero());
     assert_eq!(settlement.forced_cancels.len(), 1);
     assert_eq!(settlement.forced_cancels[0].id(), ro_limit.id());
+    assert!(ex.account().active_limit_orders().is_empty());
+}
+
+/// A reduce-only buy can only shrink a short. Flat and long positions have nothing to
+/// reduce, so it is rejected instead of being clamped to the position size.
+#[test]
+fn reduce_only_buy_is_rejected_while_flat_or_long() {
+    let mut ex = mock_exchange_linear();
+    ex.update_state(&bba(100, 101, 1)).unwrap();
+    let ro_market_buy = || {
+        MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0))
+            .unwrap()
+            .with_reduce_only(true)
+    };
+    let ro_limit_buy = || {
+        LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(95, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap()
+        .with_reduce_only(true)
+    };
+    assert_eq!(
+        ex.submit_market_order(ro_market_buy()).unwrap_err(),
+        SubmitMarketOrderError::ReduceOnlyRejected
+    );
+    assert_eq!(
+        ex.submit_limit_order(ro_limit_buy()).unwrap_err(),
+        SubmitLimitOrderError::ReduceOnlyRejected
+    );
+
+    ex.submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(2, 0)).unwrap())
+        .unwrap();
+    assert_eq!(
+        ex.submit_market_order(ro_market_buy()).unwrap_err(),
+        SubmitMarketOrderError::ReduceOnlyRejected
+    );
+    assert_eq!(
+        ex.submit_limit_order(ro_limit_buy()).unwrap_err(),
+        SubmitLimitOrderError::ReduceOnlyRejected
+    );
+    assert_eq!(ex.account().position().quantity(), BaseCurrency::new(2, 0));
     assert!(ex.account().active_limit_orders().is_empty());
 }
 
