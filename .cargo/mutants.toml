@@ -1,3 +1,23 @@
 # CI tests with `--all-features`; without it the feature-gated tests (e.g. `trade_aggregation`)
 # are not compiled and every mutant in that code is reported as missed.
 all_features = true
+
+# Mutants which cannot change observable behavior. Each entry says why, so it can be
+# dropped once the reason no longer holds. Matched against the mutant name without its
+# line number, so the entries survive unrelated edits.
+exclude_re = [
+  # `Default` of the currencies is zero.
+  'replace <impl Zero for (Base|Quote)Currency<I, D>>::zero -> Self with Default::default\(\)',
+  # At a new equity of exactly zero both branches leave equity and bad debt unchanged;
+  # only the bankruptcy warning is logged.
+  'replace < with <= in Balances<I, D, BaseOrQuote>::apply_to_equity',
+  # The stop price is always derived from the watermark, so an equal price neither moves
+  # the watermark nor tightens the stop.
+  'replace > with >= in StopOrder<I, D, BaseOrQuote, UserOrderIdT>::trail_to',
+  'replace < with <= in StopOrder<I, D, BaseOrQuote, UserOrderIdT>::trail_to',
+  # A fast path: without resting reduce-only orders the full check cancels nothing either.
+  'replace ActiveLimitOrders<I, D, BaseOrQuote, UserOrderIdT>::num_reduce_only -> usize with 1',
+  # Defence in depth: resting reduce-only orders are pruned to the position after every
+  # position change, so their clamp at fill time cannot bind.
+  'replace \|\| with && in PortfolioExchange<I, D, BaseOrQuote, UserOrderIdT>::apply_limit_fill',
+]
