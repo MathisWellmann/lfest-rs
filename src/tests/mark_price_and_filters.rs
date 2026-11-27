@@ -272,6 +272,14 @@ fn liquidation_clearance_fee_charged_in_addition_to_taker_fee() {
         spec.clone().with_liquidation_fee(Decimal::ONE).unwrap_err(),
         ConfigError::InvalidLiquidationFee
     );
+    // The fee is optional, so zero is valid.
+    assert_eq!(
+        spec.clone()
+            .with_liquidation_fee(Decimal::zero())
+            .unwrap()
+            .liquidation_fee(),
+        Decimal::zero()
+    );
 
     let mut exchange = build_linear_exchange(spec, QuoteCurrency::new(1000, 0));
     exchange

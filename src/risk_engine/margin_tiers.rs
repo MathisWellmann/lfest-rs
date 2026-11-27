@@ -139,26 +139,21 @@ where
         let mut prev_rate = Decimal::zero();
         let mut prev_amount = Margin::zero();
 
+        // `MaintenanceMarginTier::new` validates each rate and cap on its own, so only
+        // the relations between consecutive tiers are checked here. The first tier
+        // compares against a `prev_rate` of zero, which `new` rejects anyway.
         for (idx, &(cap, rate)) in brackets.iter().enumerate() {
-            if rate <= Decimal::zero() || rate > Decimal::one() {
-                return Err(ConfigError::InvalidMaintenanceMarginTier);
-            }
-            if idx > 0 && rate < prev_rate {
+            if rate < prev_rate {
                 return Err(ConfigError::InvalidMaintenanceMarginTier);
             }
             let is_last = idx + 1 == brackets.len();
             if !is_last && cap.is_none() {
                 return Err(ConfigError::InvalidMaintenanceMarginTier);
             }
-            if let Some(c) = cap {
-                if c <= Margin::zero() {
-                    return Err(ConfigError::InvalidMaintenanceMarginTier);
-                }
-                if let Some(pc) = prev_cap
-                    && c <= pc
-                {
-                    return Err(ConfigError::InvalidMaintenanceMarginTier);
-                }
+            if let (Some(c), Some(pc)) = (cap, prev_cap)
+                && c <= pc
+            {
+                return Err(ConfigError::InvalidMaintenanceMarginTier);
             }
             let amount = if let Some(pc) = prev_cap {
                 prev_amount + pc * (rate - prev_rate)
