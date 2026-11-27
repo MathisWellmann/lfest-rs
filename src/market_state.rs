@@ -4,6 +4,7 @@ use getset::{
     Getters,
     Setters,
 };
+use num_traits::Zero;
 #[cfg(feature = "serde")]
 use serde::{
     Deserialize,
@@ -114,6 +115,17 @@ where
         (self.bid + self.ask) / Decimal::TWO
     }
 
+    /// Whether both sides of the book are quoted at a positive price.
+    ///
+    /// A zero quote means "not known yet" (e.g. a feed of only `Trade` updates) or a
+    /// one-sided book, so marking a position to it would invent a loss of the full
+    /// entry value.
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn has_positive_quotes(&self) -> bool {
+        self.bid > QuoteCurrency::zero() && self.ask > QuoteCurrency::zero()
+    }
+
     /// Resolve the contract's mark price according to `method`.
     ///
     /// - `MarkMethod::MidPrice`: `(bid + ask) / 2`.
@@ -195,6 +207,23 @@ mod test {
         prelude::Bba,
         types::BaseCurrency,
     };
+
+    #[test]
+    fn has_positive_quotes_needs_both_sides_of_the_book() {
+        let state = |bid, ask| {
+            MarketState::<i64, 1>::from_components(
+                QuoteCurrency::new(bid, 0),
+                QuoteCurrency::new(ask, 0),
+                QuoteCurrency::zero(),
+                0.into(),
+                0,
+            )
+        };
+        assert!(state(100, 101).has_positive_quotes());
+        assert!(!state(0, 0).has_positive_quotes());
+        assert!(!state(0, 101).has_positive_quotes());
+        assert!(!state(100, 0).has_positive_quotes());
+    }
 
     #[test]
     fn market_state_display() {
