@@ -486,3 +486,38 @@ fn submit_limit_buy_order_turnaround_short() {
     //     }
     // );
 }
+
+#[test]
+fn limit_order_admission_reserves_the_maker_fee_of_the_new_order() {
+    // Wallet 1000 at 1x with a maker fee of 0.02%.
+    let mut exchange = mock_exchange_linear();
+    exchange.update_state(&super::bba(100, 101, 0)).unwrap();
+
+    // IM 1000 fits the wallet exactly, but its maker fee reserve of 0.2 does not.
+    assert_eq!(
+        exchange.submit_limit_order(
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(100, 0),
+                BaseCurrency::new(10, 0)
+            )
+            .unwrap()
+        ),
+        Err(NotEnoughAvailableBalance.into())
+    );
+    // IM 999 plus a reserve of 0.1998 fits.
+    exchange
+        .submit_limit_order(
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(100, 0),
+                BaseCurrency::new(999, 2),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(
+        exchange.account().available_balance(),
+        QuoteCurrency::new(8002, 4)
+    );
+}
