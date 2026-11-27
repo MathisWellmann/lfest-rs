@@ -590,7 +590,7 @@ where
         let bd_before = self.account.balances().bad_debt();
         let realized = self
             .account
-            .change_position_realizing(quantity, fill_price, side, taker_fee);
+            .change_position(quantity, fill_price, side, taker_fee);
         assert!(self.account.position().quantity().is_zero());
         // Charged after the close, so the cap sees the exact equity left.
         let bd_after_close = self.account.balances().bad_debt();
@@ -915,9 +915,9 @@ where
 
         let eq_before = self.account.balances().equity();
         let bad_debt_before = self.account.balances().bad_debt();
-        let realized =
-            self.account
-                .change_position_realizing(filled_qty, fill_price, order.side(), fee);
+        let realized = self
+            .account
+            .change_position(filled_qty, fill_price, order.side(), fee);
         self.record_ledger_flows(
             Some(order.state().meta().id()),
             fill_flows(realized, fee),
@@ -1209,9 +1209,9 @@ where
         let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
         let eq_before = self.account.balances().equity();
         let bad_debt_before = self.account.balances().bad_debt();
-        let realized =
-            self.account
-                .change_position_realizing(filled_qty, fill_price, pending.side(), fee);
+        let realized = self
+            .account
+            .change_position(filled_qty, fill_price, pending.side(), fee);
         self.record_ledger_flows(
             Some(pending.id()),
             fill_flows(realized, fee),
@@ -1578,7 +1578,7 @@ where
 
         let (realized, filled) =
             self.account
-                .fill_best_realizing(side, filled_quantity, limit_price, fee, ts_ns);
+                .fill_best(side, filled_quantity, limit_price, fee, ts_ns);
         let res = match filled {
             Some(order_after_fill) => LimitOrderFill::FullyFilled {
                 filled_quantity,
@@ -1828,9 +1828,9 @@ where
         let fee = notional * *self.config.contract_spec().fee_taker().as_ref();
         let eq_before = self.account.balances().equity();
         let bad_debt_before = self.account.balances().bad_debt();
-        let realized =
-            self.account
-                .change_position_realizing(exec_qty, fill_price, stop.side(), fee);
+        let realized = self
+            .account
+            .change_position(exec_qty, fill_price, stop.side(), fee);
         self.record_ledger_flows(
             Some(stop.id()),
             fill_flows(realized, fee),

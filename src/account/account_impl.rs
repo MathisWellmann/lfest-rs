@@ -237,23 +237,11 @@ where
     }
 
     /// Change the account position, modifying its balances.
-    /// This method is usually called by `Exchange`, but exposed for advanced use cases.
-    #[inline(always)]
-    pub fn change_position(
-        &mut self,
-        filled_qty: BaseOrQuote,
-        fill_price: QuoteCurrency<I, D>,
-        side: Side,
-        fee: BaseOrQuote::PairedCurrency,
-    ) {
-        let _realized = self.change_position_realizing(filled_qty, fill_price, side, fee);
-    }
-
-    /// [`Self::change_position`], returning the nominal realized pnl (excluding `fee`) so
-    /// the venue can journal pnl and fee separately.
+    /// Returns the nominal realized pnl (excluding `fee`), so the venue can journal pnl and
+    /// fee separately.
     #[inline]
     #[must_use]
-    pub(crate) fn change_position_realizing(
+    pub(crate) fn change_position(
         &mut self,
         filled_qty: BaseOrQuote,
         fill_price: QuoteCurrency<I, D>,
@@ -285,29 +273,12 @@ where
         self.active_limit_orders.try_insert(order)
     }
 
-    // TODO: this API in princible only need to know `id` (and maybe `side`)
-    /// Fill an existing limit order and change the position accordingly; reduces order margin.
-    ///
-    /// # Panics:
-    /// panics if the order id was not found.
-    #[inline(always)]
-    #[must_use]
-    pub fn fill_best(
-        &mut self,
-        side: Side,
-        filled_quantity: BaseOrQuote,
-        limit_price: QuoteCurrency<I, D>,
-        fee: BaseOrQuote::PairedCurrency,
-        ts_ns: TimestampNs,
-    ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Filled<I, D, BaseOrQuote>>> {
-        self.fill_best_realizing(side, filled_quantity, limit_price, fee, ts_ns)
-            .1
-    }
-
-    /// [`Self::fill_best`], also returning the nominal realized pnl (excluding `fee`).
+    /// Fill the best resting order on `side` and change the position accordingly.
+    /// Returns the nominal realized pnl (excluding `fee`) and the order if it is now fully
+    /// filled.
     #[inline]
     #[must_use]
-    pub(crate) fn fill_best_realizing(
+    pub(crate) fn fill_best(
         &mut self,
         side: Side,
         filled_quantity: BaseOrQuote,
@@ -318,7 +289,7 @@ where
         BaseOrQuote::PairedCurrency,
         Option<FilledLimitOrder<I, D, BaseOrQuote, UserOrderIdT>>,
     ) {
-        let realized = self.change_position_realizing(filled_quantity, limit_price, side, fee);
+        let realized = self.change_position(filled_quantity, limit_price, side, fee);
         let filled = self
             .active_limit_orders
             .fill_best(side, filled_quantity, ts_ns);
