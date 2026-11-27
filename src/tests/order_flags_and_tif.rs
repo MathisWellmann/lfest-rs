@@ -703,7 +703,13 @@ fn portfolio_legacy_limit_apis_reject_marketable_orders_without_trading() {
         BaseCurrency::new(50, 0),
     )
     .unwrap();
-    assert!(pf.amend_limit_order(m, original.id(), too_large).is_err());
+    assert!(matches!(
+        pf.amend_limit_order(m, original.id(), too_large)
+            .unwrap_err(),
+        PortfolioError::AmendLimitOrder(AmendLimitOrderError::SubmitLimitOrder(
+            SubmitLimitOrderError::NotEnoughAvailableBalance(_)
+        ))
+    ));
     assert!(pf.market(m).unwrap().position.quantity().is_zero());
     assert_eq!(pf.balances(), &balances_before);
     assert_eq!(

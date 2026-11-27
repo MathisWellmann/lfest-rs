@@ -1854,8 +1854,10 @@ fn portfolio_amend_limit_order_distinguishes_missing_ids_and_enforces_cboe_leave
             .unwrap()
             .with_time_in_force(TimeInForce::GoodTilCrossing),
         ),
-        Err(PortfolioError::SubmitLimitOrder(
-            SubmitLimitOrderError::GoodTillCrossingRejectedOrder { .. }
+        Err(PortfolioError::AmendLimitOrder(
+            AmendLimitOrderError::SubmitLimitOrder(
+                SubmitLimitOrderError::GoodTillCrossingRejectedOrder { .. }
+            )
         ))
     ));
     assert!(

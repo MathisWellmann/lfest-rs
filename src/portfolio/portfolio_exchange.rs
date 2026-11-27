@@ -1002,10 +1002,9 @@ where
         if status == MarketStatus::ReduceOnly && !strictly_reducing {
             return Err(PortfolioError::MarketReduceOnly(market_id));
         }
-        let marketable = order.is_marketable(&self.markets[idx].market_state);
-        let is_post_only = order.is_post_only();
+        let takes_liquidity = order.would_take_liquidity(&self.markets[idx].market_state);
         // An executing order is validated at its fill price, a resting one at its limit.
-        let notional_price = if marketable && !is_post_only {
+        let notional_price = if takes_liquidity {
             execution_rules::marketable_limit_fill_price(
                 self.markets[idx].contract_spec.slippage_model(),
                 self.markets[idx].contract_spec.price_filter().tick_size(),
@@ -1025,7 +1024,8 @@ where
         )
         .map_err(SubmitLimitOrderError::from)?;
 
-        if marketable && is_post_only {
+        if !takes_liquidity && order.is_marketable(&self.markets[idx].market_state) {
+            assert!(order.is_post_only());
             let meta = ExchangeOrderMeta::new(self.next_order_id(), ts_ns);
             let pending = order.into_pending(meta);
             self.check_portfolio_limit_order(idx, &pending)
@@ -1040,7 +1040,7 @@ where
             .into());
         }
 
-        if marketable {
+        if takes_liquidity {
             let fill_price = notional_price;
             self.check_portfolio_market_order(
                 idx,
@@ -1119,11 +1119,26 @@ where
     ) -> Result<PendingLimitOrder<I, D, BaseOrQuote, UserOrderIdT>, PortfolioError<UserOrderIdT>>
     {
         let idx = self.validate_market_index(market_id)?;
-        if order.is_marketable(&self.markets[idx].market_state) && !order.is_post_only() {
+        // Checked before the rate limiter, so such a rejection costs no slot.
+        if order.would_take_liquidity(&self.markets[idx].market_state) {
             return Err(SubmitLimitOrderError::WouldExecuteImmediately.into());
         }
         // A resting order never settles a fill, so it cannot liquidate or emit stop events.
         self.acquire_submit_rate_limit(market_id)?;
+        self.rest_limit_order_no_rate_limit(market_id, order)
+    }
+
+    /// [`Self::submit_limit_order`] without the user's rate limiter.
+    fn rest_limit_order_no_rate_limit(
+        &mut self,
+        market_id: MarketId,
+        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Result<PendingLimitOrder<I, D, BaseOrQuote, UserOrderIdT>, PortfolioError<UserOrderIdT>>
+    {
+        let idx = self.validate_market_index(market_id)?;
+        if order.would_take_liquidity(&self.markets[idx].market_state) {
+            return Err(SubmitLimitOrderError::WouldExecuteImmediately.into());
+        }
         match self.submit_limit_order_no_rate_limit(market_id, order)? {
             crate::exchange::LimitOrderSubmission::Resting(pending) => {
                 assert!(pending.remaining_quantity() > BaseOrQuote::zero());
@@ -1184,13 +1199,7 @@ where
             .active_limit_orders
             .get_by_id(existing_order_id, new_order.side())
             .ok_or_else(|| {
-                if existing_order_id < self.next_order_id {
-                    AmendLimitOrderError::OrderNoLongerActive
-                } else {
-                    AmendLimitOrderError::OrderIdNotFound {
-                        order_id: existing_order_id,
-                    }
-                }
+                AmendLimitOrderError::order_not_on_book(existing_order_id, self.next_order_id)
             })?;
 
         let Some(new_leaves_qty) = existing.amended_leaves_qty(&new_order) else {
@@ -1200,12 +1209,6 @@ where
                 .expect("existing active order can be cancelled");
             return Err(AmendLimitOrderError::AmendQtyAlreadyFilled.into());
         };
-        // Validate what does not depend on the original order before cancelling it.
-        if new_order.is_marketable(&self.markets[idx].market_state) && !new_order.is_post_only() {
-            return Err(
-                AmendLimitOrderError::from(SubmitLimitOrderError::WouldExecuteImmediately).into(),
-            );
-        }
         new_order.set_remaining_quantity(new_leaves_qty);
         let original = self.markets[idx]
             .active_limit_orders
@@ -1213,8 +1216,15 @@ where
             .expect("existing active order can be cancelled");
         // The admission checks must see the book without the original order, so it is
         // removed first and restored (same id and queue priority) if the replacement fails.
+        // The amend already paid its rate-limit slot above.
         let side = new_order.side();
-        let result = self.submit_limit_order(market_id, new_order);
+        // Like `Exchange::amend_limit_order`, a rejected replacement is an amend error.
+        let result = self
+            .rest_limit_order_no_rate_limit(market_id, new_order)
+            .map_err(|e| match e {
+                PortfolioError::SubmitLimitOrder(e) => AmendLimitOrderError::from(e).into(),
+                other => other,
+            });
         if result.is_err() {
             self.markets[idx]
                 .active_limit_orders

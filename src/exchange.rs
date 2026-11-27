@@ -1082,20 +1082,19 @@ where
             )?;
         }
 
-        let marketable = order.is_marketable(&self.market_state);
-        let is_post_only = order.is_post_only();
-        if !marketable || is_post_only {
-            // An executing order is validated at its fill price instead, see
-            // `execute_marketable_limit_order`.
-            execution_rules::validate_order_notional(
-                self.config.contract_spec().notional_filter(),
-                order.remaining_quantity(),
-                order.limit_price(),
-                order.reduce_only(),
-            )?;
+        if order.would_take_liquidity(&self.market_state) {
+            // Its notional is validated at the fill price instead of the limit price.
+            return self.execute_marketable_limit_order(order);
         }
+        execution_rules::validate_order_notional(
+            self.config.contract_spec().notional_filter(),
+            order.remaining_quantity(),
+            order.limit_price(),
+            order.reduce_only(),
+        )?;
 
-        if marketable && is_post_only {
+        if order.is_marketable(&self.market_state) {
+            assert!(order.is_post_only());
             let meta = ExchangeOrderMeta::new(
                 self.next_order_id(),
                 self.market_state.current_timestamp_ns(),
@@ -1118,10 +1117,6 @@ where
                     Sell => self.market_state.bid().to_string(),
                 },
             });
-        }
-
-        if marketable {
-            return self.execute_marketable_limit_order(order);
         }
 
         if matches!(
@@ -1247,12 +1242,27 @@ where
         LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         SubmitLimitOrderError,
     > {
-        if order.is_marketable(&self.market_state) && !order.is_post_only() {
+        // Checked before the rate limiter, so such a rejection costs no slot.
+        if order.would_take_liquidity(&self.market_state) {
             return Err(SubmitLimitOrderError::WouldExecuteImmediately);
         }
         // A resting order never settles a fill, so it cannot liquidate or emit stop events.
         self.order_rate_limiter
             .aquire(self.market_state.current_ts_ns())?;
+        self.rest_limit_order_no_rate_limit(order)
+    }
+
+    /// [`Self::submit_limit_order`] without the order rate limiter.
+    fn rest_limit_order_no_rate_limit(
+        &mut self,
+        order: LimitOrder<I, D, BaseOrQuote, UserOrderIdT, NewOrder>,
+    ) -> Result<
+        LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+        SubmitLimitOrderError,
+    > {
+        if order.would_take_liquidity(&self.market_state) {
+            return Err(SubmitLimitOrderError::WouldExecuteImmediately);
+        }
         match self.submit_limit_order_no_rate_limit(order)? {
             LimitOrderSubmission::Resting(pending) => {
                 assert!(pending.remaining_quantity() > BaseOrQuote::zero());
@@ -1283,8 +1293,6 @@ where
         LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         AmendLimitOrderError,
     > {
-        use AmendLimitOrderError::*;
-
         self.order_rate_limiter
             .aquire(self.market_state.current_ts_ns())?;
         let existing_order = self
@@ -1292,25 +1300,14 @@ where
             .active_limit_orders()
             .get_by_id(existing_order_id, new_order.side()) // Its assumed that `new_order` has the same side as existing order.
             .ok_or_else(|| {
-                if existing_order_id < self.next_order_id {
-                    OrderNoLongerActive
-                } else {
-                    OrderIdNotFound {
-                        order_id: existing_order_id,
-                    }
-                }
+                AmendLimitOrderError::order_not_on_book(existing_order_id, self.next_order_id)
             })?;
 
         let Some(new_leaves_qty) = existing_order.amended_leaves_qty(&new_order) else {
-            self.cancel_limit_order(CancelBy::OrderId(existing_order_id))
+            self.cancel_limit_order_no_rate_limit(CancelBy::OrderId(existing_order_id))
                 .expect("Can cancel this order");
-            return Err(AmendQtyAlreadyFilled);
+            return Err(AmendLimitOrderError::AmendQtyAlreadyFilled);
         };
-        // Validate what does not depend on the original order before cancelling it.
-        if new_order.is_marketable(&self.market_state) && !new_order.is_post_only() {
-            return Err(SubmitLimitOrderError::WouldExecuteImmediately.into());
-        }
-
         new_order.set_remaining_quantity(new_leaves_qty);
 
         let original = self
@@ -1318,8 +1315,9 @@ where
             .expect("Can always cancel the order here");
         // The admission checks (margin, reduce-only room) must see the book without the
         // original order, so it is removed first and restored if the replacement fails.
+        // The amend already paid its rate-limit slot above.
         let side = new_order.side();
-        match self.submit_limit_order(new_order) {
+        match self.rest_limit_order_no_rate_limit(new_order) {
             Ok(order) => Ok(order),
             Err(e) => {
                 self.account
