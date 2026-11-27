@@ -129,20 +129,27 @@ where
         &mut self,
         cancel_by: CancelBy<UserOrderIdT>,
     ) -> Result<StopOrder<I, D, BaseOrQuote, UserOrderIdT>, StopOrderError> {
-        let pos = match cancel_by {
-            CancelBy::OrderId(oid) => self.stops.iter().position(|s| s.id() == oid),
-            CancelBy::UserOrderId(uid) => self.stops.iter().position(|s| s.user_order_id() == uid),
-        };
-        let Some(idx) = pos else {
-            return Err(StopOrderError::NotFound);
-        };
-        Ok(self.stops.remove(idx))
+        let len_before = self.stops.len();
+        let idx = self.position(cancel_by).ok_or(StopOrderError::NotFound)?;
+        let removed = self.stops.remove(idx);
+        assert_eq!(self.stops.len() + 1, len_before);
+        Ok(removed)
     }
 
-    /// Cancel and drain every pending stop order into `out`.
-    pub fn drain_all(&mut self, out: &mut Vec<StopOrder<I, D, BaseOrQuote, UserOrderIdT>>) {
-        for stop in self.stops.drain(..) {
-            out.push_within_capacity(stop).expect(EXPECT_CAPACITY);
+    /// Cancel every pending stop order, returning them in admission order.
+    #[must_use]
+    pub(crate) fn take_all(&mut self) -> Vec<StopOrder<I, D, BaseOrQuote, UserOrderIdT>> {
+        let mut out = Vec::with_capacity(self.stops.len());
+        out.append(&mut self.stops);
+        assert!(self.stops.is_empty());
+        out
+    }
+
+    #[inline]
+    fn position(&self, cancel_by: CancelBy<UserOrderIdT>) -> Option<usize> {
+        match cancel_by {
+            CancelBy::OrderId(oid) => self.stops.iter().position(|s| s.id() == oid),
+            CancelBy::UserOrderId(uid) => self.stops.iter().position(|s| s.user_order_id() == uid),
         }
     }
 
@@ -274,7 +281,8 @@ where
     #[inline]
     #[must_use]
     pub fn get_by_id(&self, id: OrderId) -> Option<&StopOrder<I, D, BaseOrQuote, UserOrderIdT>> {
-        self.stops.iter().find(|s| s.id() == id)
+        self.position(CancelBy::OrderId(id))
+            .map(|idx| &self.stops[idx])
     }
 }
 
@@ -501,11 +509,95 @@ mod tests {
         assert_eq!(elected.len(), 6);
         assert_eq!(store.len(), 26);
         let ids: Vec<OrderId> = store.iter().map(|s| s.id()).collect();
+        assert_eq!(ids.len(), 26);
         assert!(ids.windows(2).all(|w| w[0] < w[1]));
         // Equal stop prices fall back to the admission id.
         assert!(elected[..3].windows(2).all(|w| {
             w[0].0.stop_price() > w[1].0.stop_price()
                 || (w[0].0.stop_price() == w[1].0.stop_price() && w[0].0.id() < w[1].0.id())
         }));
+    }
+
+    fn ids(
+        store: &PendingStops<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, impl UserOrderId>,
+    ) -> Vec<OrderId> {
+        store.iter().map(|s| s.id()).collect()
+    }
+
+    fn order_ids(ids: impl IntoIterator<Item = u64>) -> Vec<OrderId> {
+        ids.into_iter().map(OrderId::from).collect()
+    }
+
+    #[test]
+    fn remove_by_order_id_removes_exactly_that_stop() {
+        let mut store = mixed_stops();
+        let removed = store.remove(CancelBy::OrderId(OrderId::from(5))).unwrap();
+        assert_eq!(removed.id(), OrderId::from(5));
+        assert!(store.get_by_id(OrderId::from(5)).is_none());
+        assert_eq!(
+            store.get_by_id(OrderId::from(6)).unwrap().id(),
+            OrderId::from(6)
+        );
+        assert_eq!(ids(&store), order_ids((1..=32).filter(|id| *id != 5)));
+
+        for gone in [5, 0, 33] {
+            assert_eq!(
+                store
+                    .remove(CancelBy::OrderId(OrderId::from(gone)))
+                    .unwrap_err(),
+                StopOrderError::NotFound
+            );
+        }
+        assert_eq!(store.len(), 31);
+    }
+
+    #[test]
+    fn remove_by_user_order_id_removes_the_first_match() {
+        let mut store =
+            PendingStops::<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, u64>::with_capacity(
+                NonZeroU16::new(4).unwrap(),
+            );
+        for (id, user_id) in [(1, 10), (2, 20), (3, 20)] {
+            let mut stop = StopOrder::stop_market(
+                Side::Sell,
+                QuoteCurrency::new(90, 0),
+                BaseCurrency::new(1, 0),
+                user_id,
+            )
+            .unwrap();
+            stop.stamp_admitted(OrderId::from(id), 0.into());
+            store.try_insert(stop).unwrap();
+        }
+
+        let removed = store.remove(CancelBy::UserOrderId(20)).unwrap();
+        assert_eq!(removed.id(), OrderId::from(2));
+        assert_eq!(removed.user_order_id(), 20);
+        assert_eq!(ids(&store), order_ids([1, 3]));
+        assert_eq!(
+            store.remove(CancelBy::UserOrderId(30)).unwrap_err(),
+            StopOrderError::NotFound
+        );
+        assert_eq!(store.len(), 2);
+    }
+
+    #[test]
+    fn take_all_returns_every_stop_in_admission_order_and_keeps_the_capacity() {
+        let mut store = mixed_stops();
+        let taken: Vec<OrderId> = store.take_all().iter().map(|s| s.id()).collect();
+        assert_eq!(taken, order_ids(1..=32));
+        assert!(store.is_empty());
+        assert!(store.take_all().is_empty());
+
+        // `try_insert` enforces the capacity, so losing it would reject every new stop.
+        let mut stop = Stop::stop_market(
+            Side::Sell,
+            QuoteCurrency::new(90, 0),
+            BaseCurrency::new(1, 0),
+            NoUserOrderId,
+        )
+        .unwrap();
+        stop.stamp_admitted(OrderId::from(33), 0.into());
+        store.try_insert(stop).unwrap();
+        assert_eq!(ids(&store), order_ids([33]));
     }
 }

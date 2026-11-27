@@ -436,6 +436,28 @@ where
     }
 }
 
+impl<I, const D: u8, BaseOrQuote, UserOrderIdT> StopOrder<I, D, BaseOrQuote, UserOrderIdT>
+where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    /// The event reporting that this stop was cancelled for `reason`.
+    #[inline]
+    #[must_use]
+    pub(crate) fn cancelled_event(
+        &self,
+        reason: StopCancelReason,
+    ) -> StopOrderEvent<I, D, BaseOrQuote, UserOrderIdT> {
+        StopOrderEvent::Cancelled {
+            stop_order_id: self.id(),
+            user_order_id: self.user_order_id(),
+            reason,
+        }
+    }
+}
+
 /// Reason a triggered or pending stop order was cancelled without executing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

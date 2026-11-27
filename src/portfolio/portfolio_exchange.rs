@@ -609,19 +609,12 @@ where
         self.reset_stop_events();
 
         let cancelled_orders = self.markets[idx].active_limit_orders.cancel_all(None);
-        if !self.markets[idx].pending_stops.is_empty() {
-            let mut drained = Vec::with_capacity(self.markets[idx].pending_stops.len());
-            self.markets[idx].pending_stops.drain_all(&mut drained);
-            for stop in drained {
-                self.push_stop_event(
-                    market_id,
-                    StopOrderEvent::Cancelled {
-                        stop_order_id: stop.id(),
-                        user_order_id: stop.user_order_id(),
-                        reason: StopCancelReason::ForcedCancel,
-                    },
-                );
-            }
+        // `take_all` does not allocate when no stop is pending.
+        for stop in self.markets[idx].pending_stops.take_all() {
+            self.push_stop_event(
+                market_id,
+                stop.cancelled_event(StopCancelReason::ForcedCancel),
+            );
         }
         let eq_before = self.balances.equity();
         let bad_debt_before = self.balances.bad_debt();
@@ -1536,21 +1529,13 @@ where
                     .push_within_capacity((market_id, cancelled))
                     .expect(EXPECT_CAPACITY);
             }
-            if !slot.pending_stops.is_empty() {
-                let mut drained = Vec::with_capacity(slot.pending_stops.len());
-                slot.pending_stops.drain_all(&mut drained);
-                for stop in drained {
-                    self.stop_events
-                        .push_within_capacity(PortfolioStopEvent {
-                            market_id,
-                            event: StopOrderEvent::Cancelled {
-                                stop_order_id: stop.id(),
-                                user_order_id: stop.user_order_id(),
-                                reason: StopCancelReason::ForcedCancel,
-                            },
-                        })
-                        .expect("each pending stop yields at most one event per call");
-                }
+            for stop in slot.pending_stops.take_all() {
+                self.stop_events
+                    .push_within_capacity(PortfolioStopEvent {
+                        market_id,
+                        event: stop.cancelled_event(StopCancelReason::ForcedCancel),
+                    })
+                    .expect("each pending stop yields at most one event per call");
             }
         }
         let n_markets = self.markets.len();
@@ -1920,11 +1905,7 @@ where
                     let (left, _) = self.elected_stops_scratch[j];
                     self.push_stop_event(
                         market_id,
-                        StopOrderEvent::Cancelled {
-                            stop_order_id: left.id(),
-                            user_order_id: left.user_order_id(),
-                            reason: StopCancelReason::ForcedCancel,
-                        },
+                        left.cancelled_event(StopCancelReason::ForcedCancel),
                     );
                 }
                 break;
@@ -1977,11 +1958,7 @@ where
             else {
                 self.push_stop_event(
                     market_id,
-                    StopOrderEvent::Cancelled {
-                        stop_order_id: stop.id(),
-                        user_order_id: stop.user_order_id(),
-                        reason: StopCancelReason::ReduceOnlyNoPosition,
-                    },
+                    stop.cancelled_event(StopCancelReason::ReduceOnlyNoPosition),
                 );
                 return;
             };
@@ -2009,11 +1986,7 @@ where
         {
             self.push_stop_event(
                 market_id,
-                StopOrderEvent::Cancelled {
-                    stop_order_id: stop.id(),
-                    user_order_id: stop.user_order_id(),
-                    reason: StopCancelReason::StopProtectionBand,
-                },
+                stop.cancelled_event(StopCancelReason::StopProtectionBand),
             );
             return;
         }
@@ -2024,11 +1997,7 @@ where
         {
             self.push_stop_event(
                 market_id,
-                StopOrderEvent::Cancelled {
-                    stop_order_id: stop.id(),
-                    user_order_id: stop.user_order_id(),
-                    reason: StopCancelReason::InsufficientMargin,
-                },
+                stop.cancelled_event(StopCancelReason::InsufficientMargin),
             );
             return;
         }
@@ -2084,11 +2053,7 @@ where
         ) else {
             self.push_stop_event(
                 market_id,
-                StopOrderEvent::Cancelled {
-                    stop_order_id: stop.id(),
-                    user_order_id: stop.user_order_id(),
-                    reason: StopCancelReason::ChildLimitRejected,
-                },
+                stop.cancelled_event(StopCancelReason::ChildLimitRejected),
             );
             return;
         };
@@ -2139,21 +2104,13 @@ where
             Err(PortfolioError::SubmitLimitOrder(SubmitLimitOrderError::ReduceOnlyRejected)) => {
                 self.push_stop_event(
                     market_id,
-                    StopOrderEvent::Cancelled {
-                        stop_order_id: stop.id(),
-                        user_order_id: stop.user_order_id(),
-                        reason: StopCancelReason::ReduceOnlyNoPosition,
-                    },
+                    stop.cancelled_event(StopCancelReason::ReduceOnlyNoPosition),
                 );
             }
             Err(_) => {
                 self.push_stop_event(
                     market_id,
-                    StopOrderEvent::Cancelled {
-                        stop_order_id: stop.id(),
-                        user_order_id: stop.user_order_id(),
-                        reason: StopCancelReason::ChildLimitRejected,
-                    },
+                    stop.cancelled_event(StopCancelReason::ChildLimitRejected),
                 );
             }
         }
