@@ -12,10 +12,6 @@ use serde::{
 };
 use tracing::trace;
 
-use super::{
-    RiskEngine,
-    isolated_margin::isolated_liquidation_price,
-};
 use crate::{
     account::{
         Account,
@@ -346,71 +342,6 @@ where
         }
     };
     (liq_dec > Decimal::zero()).then(|| QuoteCurrency::from(liq_dec))
-}
-
-impl<I, const D: u8, BaseOrQuote, UserOrderIdT> RiskEngine<I, D, BaseOrQuote, UserOrderIdT>
-    for CrossMarginRiskEngine<I, D, BaseOrQuote>
-where
-    I: Mon<D>,
-    BaseOrQuote: Currency<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-    UserOrderIdT: UserOrderId,
-{
-    fn check_market_order(
-        &self,
-        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
-        order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        fill_price: QuoteCurrency<I, D>,
-    ) -> Result<(), NotEnoughAvailableBalance> {
-        let mut ms = MarketState::default();
-        ms.set_bid(fill_price);
-        ms.set_ask(fill_price);
-        self.check_market_order_with_market(account, &ms, order, fill_price)
-    }
-
-    fn check_limit_order(
-        &self,
-        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
-        order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-    ) -> Result<(), NotEnoughAvailableBalance> {
-        let excess = account.margin_excess_with_order(order);
-        if excess < Zero::zero() {
-            return Err(NotEnoughAvailableBalance);
-        }
-        Ok(())
-    }
-
-    fn check_maintenance_margin(
-        &self,
-        market_state: &MarketState<I, D>,
-        position: &Position<I, D, BaseOrQuote>,
-    ) -> Result<(), RiskError> {
-        // Fallback for the trait method without `Account`: delegates to static
-        // entry-price threshold. `Exchange` in Cross mode calls
-        // `check_mark_to_market_maintenance_margin` with the full `Account`.
-        use std::cmp::Ordering::*;
-        let mark_method = self.contract_spec.mark_method();
-        match position.quantity().cmp(&Zero::zero()) {
-            Less => {
-                let liquidation_price = isolated_liquidation_price(&self.contract_spec, position);
-                let reference_price =
-                    market_state.mark_price_for_position(mark_method, PositionSide::Short);
-                if reference_price > liquidation_price {
-                    return Err(RiskError::Liquidate);
-                }
-            }
-            Equal => return Ok(()),
-            Greater => {
-                let liquidation_price = isolated_liquidation_price(&self.contract_spec, position);
-                let reference_price =
-                    market_state.mark_price_for_position(mark_method, PositionSide::Long);
-                if reference_price < liquidation_price {
-                    return Err(RiskError::Liquidate);
-                }
-            }
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
