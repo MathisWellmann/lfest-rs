@@ -276,9 +276,12 @@ where
     /// Fill the best resting order on `side` and change the position accordingly.
     /// Returns the nominal realized pnl (excluding `fee`) and the order if it is now fully
     /// filled.
+    ///
+    /// Usually called by `Exchange`, but public so that a client can mirror the venue's
+    /// account from its own fill reports.
     #[inline]
     #[must_use]
-    pub(crate) fn fill_best(
+    pub fn fill_best(
         &mut self,
         side: Side,
         filled_quantity: BaseOrQuote,
