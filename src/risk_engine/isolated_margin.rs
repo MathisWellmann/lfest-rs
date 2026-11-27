@@ -12,6 +12,7 @@ use crate::{
     account::{
         Account,
         Position,
+        PositionSide,
     },
     contract_specification::ContractSpecification,
     market_state::MarketState,
@@ -81,7 +82,7 @@ where
     // maintenance fraction) and moved it the wrong way for higher tiers.
     let max_move = init_rate - mm_rate;
     assert!(max_move >= Decimal::zero());
-    if position.quantity() > Zero::zero() {
+    if position.side() == PositionSide::Long {
         position.entry_price().liquidation_price_long(max_move)
     } else {
         position.entry_price().liquidation_price_short(max_move)
@@ -107,18 +108,43 @@ where
     BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
     UserOrderIdT: UserOrderId,
 {
-    // TODO: just pass in `Account` instead of `Position` and `Balances` separately
     fn check_market_order(
         &self,
         account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
         order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
         fill_price: QuoteCurrency<I, D>,
     ) -> Result<(), NotEnoughAvailableBalance> {
-        use Side::*;
-        match order.side() {
-            Buy => self.check_market_buy_order(account, order, fill_price),
-            Sell => self.check_market_sell_order(account, order, fill_price),
+        let position_qty = account.position().quantity();
+        let reduces_position = match order.side() {
+            Side::Buy => position_qty.is_negative(),
+            Side::Sell => position_qty.is_positive(),
+        };
+        let (opened_qty, released_margin) = if reduces_position {
+            let abs_qty = position_qty.abs();
+            if order.quantity() <= abs_qty {
+                // The order strictly reduces the position, so no additional margin is required
+                // and a risk-reducing order is never rejected. Any collateral shortfall its
+                // settlement causes (fees, realized losses, resting orders losing their
+                // position offset) is resolved by `Exchange::reconcile_margin`, which
+                // force-cancels resting limit orders like a real venue's margin call.
+                return Ok(());
+            }
+            // The order closes the position, releasing its margin, and opens the rest on
+            // the other side.
+            (order.quantity() - abs_qty, account.position_margin())
+        } else {
+            (order.quantity(), Zero::zero())
+        };
+        assert2::debug_assert!(opened_qty > BaseOrQuote::zero());
+        assert2::debug_assert!(opened_qty <= order.quantity());
+
+        let notional = BaseOrQuote::PairedCurrency::convert_from(opened_qty, fill_price);
+        let init_margin = notional * self.contract_spec.init_margin_req();
+        let fee = notional * *self.contract_spec.fee_taker().as_ref();
+        if init_margin + fee > account.available_balance() + released_margin {
+            return Err(NotEnoughAvailableBalance);
         }
+        Ok(())
     }
 
     fn check_limit_order(
@@ -143,167 +169,23 @@ where
         market_state: &MarketState<I, D>,
         position: &Position<I, D, BaseOrQuote>,
     ) -> Result<(), RiskError> {
-        use std::cmp::Ordering::*;
-        let mark_method = self.contract_spec.mark_method();
-        match position.quantity().cmp(&Zero::zero()) {
-            Less => {
-                let liquidation_price = isolated_liquidation_price(&self.contract_spec, position);
-                let reference_price = market_state
-                    .mark_price_for_position(mark_method, crate::account::PositionSide::Short);
-                if reference_price > liquidation_price {
-                    return Err(RiskError::Liquidate);
-                }
-            }
-            Equal => return Ok(()),
-            Greater => {
-                let liquidation_price = isolated_liquidation_price(&self.contract_spec, position);
-                let reference_price = market_state
-                    .mark_price_for_position(mark_method, crate::account::PositionSide::Long);
-                if reference_price < liquidation_price {
-                    return Err(RiskError::Liquidate);
-                }
-            }
+        let side = position.side();
+        if side == PositionSide::Neutral {
+            return Ok(());
         }
-
-        Ok(())
-    }
-}
-
-impl<I, const D: u8, BaseOrQuote> IsolatedMarginRiskEngine<I, D, BaseOrQuote>
-where
-    I: Mon<D>,
-    BaseOrQuote: Currency<I, D>,
-    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
-{
-    fn check_market_buy_order<UserOrderIdT>(
-        &self,
-        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
-        order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        fill_price: QuoteCurrency<I, D>,
-    ) -> Result<(), NotEnoughAvailableBalance>
-    where
-        UserOrderIdT: UserOrderId,
-    {
-        debug_assert_eq!(order.side(), Side::Buy);
-
-        use std::cmp::Ordering::*;
-        match account.position().quantity().cmp(&Zero::zero()) {
-            Equal | Greater => {
-                // A long position increases in size.
-                let notional_value =
-                    BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
-                let init_margin = notional_value * self.contract_spec.init_margin_req();
-
-                let fee = notional_value * *self.contract_spec.fee_taker().as_ref();
-                if init_margin + fee > account.available_balance() {
-                    return Err(NotEnoughAvailableBalance);
-                }
-            }
-            Less => {
-                let abs_qty = account.position().quantity().abs();
-                if order.quantity() <= abs_qty {
-                    // The order strictly reduces the position, so no additional margin is required
-                    // and a risk-reducing order is never rejected. Any collateral shortfall its
-                    // settlement causes (fees, realized losses, resting orders losing their
-                    // position offset) is resolved by `Exchange::reconcile_margin`, which
-                    // force-cancels resting limit orders like a real venue's margin call.
-                    return Ok(());
-                }
-                // The order reduces the short and puts on a long
-                let released_from_old_pos = account.position_margin();
-
-                let new_long_size = order.quantity() - abs_qty;
-                assert2::debug_assert!(new_long_size > BaseOrQuote::zero());
-                let new_notional_value =
-                    BaseOrQuote::PairedCurrency::convert_from(new_long_size, fill_price);
-                assert2::debug_assert!(new_notional_value > BaseOrQuote::PairedCurrency::zero());
-                let new_init_margin = new_notional_value * self.contract_spec.init_margin_req();
-                assert2::debug_assert!(new_init_margin > BaseOrQuote::PairedCurrency::zero());
-
-                let fee = new_notional_value * *self.contract_spec.fee_taker().as_ref();
-
-                if Self::margin_exceeds_risk(
-                    new_init_margin,
-                    fee,
-                    account.available_balance(),
-                    released_from_old_pos,
-                ) {
-                    return Err(NotEnoughAvailableBalance);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn check_market_sell_order<UserOrderIdT>(
-        &self,
-        account: &Account<I, D, BaseOrQuote, UserOrderIdT>,
-        order: &MarketOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
-        fill_price: QuoteCurrency<I, D>,
-    ) -> Result<(), NotEnoughAvailableBalance>
-    where
-        UserOrderIdT: UserOrderId,
-    {
-        debug_assert_eq!(order.side(), Side::Sell);
-
-        use std::cmp::Ordering::*;
-        match account.position().quantity().cmp(&Zero::zero()) {
-            Equal | Less => {
-                let notional_value =
-                    BaseOrQuote::PairedCurrency::convert_from(order.quantity(), fill_price);
-                let init_margin = notional_value * self.contract_spec.init_margin_req();
-                let fee = notional_value * *self.contract_spec.fee_taker().as_ref();
-
-                if init_margin + fee > account.available_balance() {
-                    return Err(NotEnoughAvailableBalance);
-                }
-            }
-            Greater => {
-                let abs_qty = account.position().quantity().abs();
-                // Else its a long position which needs to be reduced
-                if order.quantity() <= abs_qty {
-                    // The order strictly reduces the position, so no additional margin is required
-                    // and a risk-reducing order is never rejected. Any collateral shortfall its
-                    // settlement causes (fees, realized losses, resting orders losing their
-                    // position offset) is resolved by `Exchange::reconcile_margin`, which
-                    // force-cancels resting limit orders like a real venue's margin call.
-                    return Ok(());
-                }
-                // The order reduces the long position and opens a short.
-                let released_from_old_pos = account.position_margin();
-
-                let new_short_size = order.quantity() - abs_qty;
-                assert2::debug_assert!(new_short_size > BaseOrQuote::zero());
-                let new_notional_value =
-                    BaseOrQuote::PairedCurrency::convert_from(new_short_size, fill_price);
-                assert2::debug_assert!(new_notional_value > BaseOrQuote::PairedCurrency::zero());
-                let new_init_margin = new_notional_value * self.contract_spec.init_margin_req();
-                assert2::debug_assert!(new_init_margin > BaseOrQuote::PairedCurrency::zero());
-
-                let fee = new_notional_value * *self.contract_spec.fee_taker().as_ref();
-
-                if Self::margin_exceeds_risk(
-                    new_init_margin,
-                    fee,
-                    account.available_balance(),
-                    released_from_old_pos,
-                ) {
-                    return Err(NotEnoughAvailableBalance);
-                }
-            }
+        let liquidation_price = isolated_liquidation_price(&self.contract_spec, position);
+        let reference_price =
+            market_state.mark_price_for_position(self.contract_spec.mark_method(), side);
+        // A long is liquidated below its liquidation price, a short above it.
+        let breached = if side == PositionSide::Long {
+            reference_price < liquidation_price
+        } else {
+            reference_price > liquidation_price
+        };
+        if breached {
+            return Err(RiskError::Liquidate);
         }
         Ok(())
-    }
-
-    #[inline(always)]
-    fn margin_exceeds_risk(
-        new_margin_req: BaseOrQuote::PairedCurrency,
-        tx_fee: BaseOrQuote::PairedCurrency,
-        available_wallet_balance: BaseOrQuote::PairedCurrency,
-        released_margin_from_old_pos: BaseOrQuote::PairedCurrency,
-    ) -> bool {
-        new_margin_req + tx_fee > available_wallet_balance + released_margin_from_old_pos
     }
 }
 
@@ -320,32 +202,113 @@ mod tests {
         test_fee_taker,
     };
 
+    type Base = BaseCurrency<i64, DECIMALS>;
+    type Acc = Account<i64, DECIMALS, Base, NoUserOrderId>;
+
+    /// Fee-free engine with 2x leverage and an account of 1000 quote holding
+    /// `position_qty` (signed) entered at 100.
+    fn engine_and_account(
+        position_qty: i64,
+    ) -> (IsolatedMarginRiskEngine<i64, DECIMALS, Base>, Acc) {
+        let spec = ContractSpecification::new(
+            Leverage::new(2).unwrap(),
+            Decimal::try_from_scaled(5, 1).unwrap(),
+            PriceFilter::default(),
+            QuantityFilter::default(),
+            Fee::from(Decimal::zero()),
+            Fee::from(Decimal::zero()),
+        )
+        .unwrap();
+        let mut account = Acc::new(
+            Balances::new(QuoteCurrency::new(1000, 0)),
+            std::num::NonZeroU16::new(10).unwrap(),
+            spec.init_margin_req(),
+            Decimal::zero(),
+        );
+        if position_qty != 0 {
+            let side = if position_qty > 0 {
+                Side::Buy
+            } else {
+                Side::Sell
+            };
+            let realized = account.change_position(
+                Base::new(position_qty.abs(), 0),
+                QuoteCurrency::new(100, 0),
+                side,
+                QuoteCurrency::zero(),
+            );
+            assert_eq!(realized, QuoteCurrency::zero());
+        }
+        (IsolatedMarginRiskEngine::new(spec), account)
+    }
+
+    /// Check a market order of `qty_scaled` (5 decimals) filled at 100.
+    fn check_market(
+        position_qty: i64,
+        side: Side,
+        qty_scaled: i64,
+    ) -> Result<(), NotEnoughAvailableBalance> {
+        let (engine, account) = engine_and_account(position_qty);
+        let order = MarketOrder::new(side, Base::new(qty_scaled, 5))
+            .unwrap()
+            .into_pending(ExchangeOrderMeta::new(0.into(), 0.into()));
+        engine.check_market_order(&account, &order, QuoteCurrency::new(100, 0))
+    }
+
+    #[test_case::test_matrix([Side::Buy, Side::Sell])]
+    fn isolated_market_order_may_use_exactly_the_available_balance(side: Side) {
+        // 20 at 100 with 2x leverage needs all of the 1000.
+        assert_eq!(check_market(0, side, 20_00000), Ok(()));
+        assert_eq!(
+            check_market(0, side, 20_00001),
+            Err(NotEnoughAvailableBalance)
+        );
+    }
+
+    #[test_case::test_matrix([Side::Buy, Side::Sell])]
+    fn isolated_market_order_increasing_a_position_uses_the_available_balance(side: Side) {
+        let position_qty = if side == Side::Buy { 2 } else { -2 };
+        // The position of 2 locks 100, leaving 900 for 18 more.
+        assert_eq!(check_market(position_qty, side, 18_00000), Ok(()));
+        assert_eq!(
+            check_market(position_qty, side, 18_00001),
+            Err(NotEnoughAvailableBalance)
+        );
+    }
+
+    #[test_case::test_matrix([Side::Buy, Side::Sell])]
+    fn isolated_market_order_reducing_a_position_needs_no_margin(side: Side) {
+        let position_qty = if side == Side::Buy { -2 } else { 2 };
+        assert_eq!(check_market(position_qty, side, 1_00000), Ok(()));
+        assert_eq!(check_market(position_qty, side, 2_00000), Ok(()));
+    }
+
+    #[test_case::test_matrix([Side::Buy, Side::Sell])]
+    fn isolated_market_order_flipping_a_position_reuses_its_margin(side: Side) {
+        let position_qty = if side == Side::Buy { -2 } else { 2 };
+        // Closing the 2 releases their 100 to the 900 available: room for 20 on the other side.
+        assert_eq!(check_market(position_qty, side, 22_00000), Ok(()));
+        assert_eq!(
+            check_market(position_qty, side, 22_00001),
+            Err(NotEnoughAvailableBalance)
+        );
+    }
+
     #[test]
-    fn isolated_margin_exceeds_risk() {
-        assert!(
-            !IsolatedMarginRiskEngine::<i64, 5, BaseCurrency<i64, 5>>::margin_exceeds_risk(
-                QuoteCurrency::<i64, 5>::new(10, 0),
-                QuoteCurrency::new(1, 1),
-                QuoteCurrency::new(1000, 0),
-                QuoteCurrency::new(0, 0)
+    fn isolated_limit_order_may_use_exactly_the_available_balance() {
+        let (engine, account) = engine_and_account(0);
+        let check = |qty_scaled| {
+            let order = LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(100, 0),
+                Base::new(qty_scaled, 5),
             )
-        );
-        assert!(
-            IsolatedMarginRiskEngine::<i64, 5, BaseCurrency<i64, 5>>::margin_exceeds_risk(
-                QuoteCurrency::<i64, 5>::new(1000, 0),
-                QuoteCurrency::new(1, 1),
-                QuoteCurrency::new(1000, 0),
-                QuoteCurrency::new(0, 0)
-            )
-        );
-        assert!(
-            !IsolatedMarginRiskEngine::<i64, 5, BaseCurrency<i64, 5>>::margin_exceeds_risk(
-                QuoteCurrency::<i64, 5>::new(1000, 0),
-                QuoteCurrency::new(1, 1),
-                QuoteCurrency::new(1000, 0),
-                QuoteCurrency::new(1, 0)
-            )
-        );
+            .unwrap()
+            .into_pending(ExchangeOrderMeta::new(0.into(), 0.into()));
+            RiskEngine::check_limit_order(&engine, &account, &order)
+        };
+        assert_eq!(check(20_00000), Ok(()));
+        assert_eq!(check(20_00001), Err(NotEnoughAvailableBalance));
     }
 
     #[test_case::test_case(2, 75)]
