@@ -769,6 +769,50 @@ fn portfolio_elected_stop_limit_child_ignores_the_user_rate_limit() {
 }
 
 #[test]
+fn cancel_stop_order_removes_only_the_requested_stop() {
+    let mut ex = small_exchange(10, 100);
+    let ids = [95, 94, 93].map(|price| {
+        ex.submit_stop_order(reduce_only_sell_stop(price))
+            .unwrap()
+            .id()
+    });
+
+    let cancelled = ex.cancel_stop_order(CancelBy::OrderId(ids[1])).unwrap();
+    assert_eq!(cancelled.id(), ids[1]);
+    assert_eq!(cancelled.stop_price(), QuoteCurrency::new(94, 0));
+    assert_eq!(
+        ex.cancel_stop_order(CancelBy::OrderId(ids[1])).unwrap_err(),
+        StopOrderError::NotFound
+    );
+    let pending: Vec<OrderId> = ex.pending_stops().iter().map(|s| s.id()).collect();
+    assert_eq!(pending, vec![ids[0], ids[2]]);
+
+    let all: Vec<OrderId> = ex
+        .cancel_all_stop_orders()
+        .unwrap()
+        .iter()
+        .map(|s| s.id())
+        .collect();
+    assert_eq!(all, vec![ids[0], ids[2]]);
+    assert!(ex.pending_stops().is_empty());
+    assert!(ex.cancel_all_stop_orders().unwrap().is_empty());
+    // Cancelling is no fill: no events and the stops never execute.
+    ex.update_state(&bba_94_95()).unwrap();
+    assert!(ex.stop_order_events().is_empty());
+}
+
+#[test]
+fn cancel_all_stop_orders_is_rate_limited() {
+    let mut ex = small_exchange(10, 1);
+    ex.submit_stop_order(reduce_only_sell_stop(95)).unwrap();
+    assert_eq!(
+        ex.cancel_all_stop_orders().unwrap_err(),
+        StopOrderError::RateLimitReached(crate::order_rate_limiter::RateLimitReached)
+    );
+    assert_eq!(ex.pending_stops().len(), 1);
+}
+
+#[test]
 fn liquidation_from_apply_funding_reports_every_stop_cancellation() {
     // Two pending stops at most, so two events fill the stop event buffer.
     let mut ex = small_exchange(2, 100);

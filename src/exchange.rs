@@ -565,16 +565,9 @@ where
                 .expect(EXPECT_CAPACITY);
         }
 
-        if !self.pending_stops.is_empty() {
-            let mut drained = Vec::with_capacity(self.pending_stops.len());
-            self.pending_stops.drain_all(&mut drained);
-            for stop in drained {
-                self.push_stop_event(StopOrderEvent::Cancelled {
-                    stop_order_id: stop.id(),
-                    user_order_id: stop.user_order_id(),
-                    reason: StopCancelReason::ForcedCancel,
-                });
-            }
+        // `take_all` does not allocate when no stop is pending.
+        for stop in self.pending_stops.take_all() {
+            self.push_stop_event(stop.cancelled_event(StopCancelReason::ForcedCancel));
         }
 
         let position_qty = self.account.position().quantity();
@@ -1660,9 +1653,7 @@ where
     ) -> Result<Vec<StopOrder<I, D, BaseOrQuote, UserOrderIdT>>, StopOrderError> {
         self.order_rate_limiter
             .aquire(self.market_state.current_ts_ns())?;
-        let mut out = Vec::with_capacity(self.pending_stops.len());
-        self.pending_stops.drain_all(&mut out);
-        Ok(out)
+        Ok(self.pending_stops.take_all())
     }
 
     #[inline]
@@ -1713,11 +1704,7 @@ where
                 // them here, otherwise the user never learns their fate.
                 for j in (i + 1)..n_elected {
                     let (left, _) = self.elected_stops_scratch[j];
-                    self.push_stop_event(StopOrderEvent::Cancelled {
-                        stop_order_id: left.id(),
-                        user_order_id: left.user_order_id(),
-                        reason: StopCancelReason::ForcedCancel,
-                    });
+                    self.push_stop_event(left.cancelled_event(StopCancelReason::ForcedCancel));
                 }
                 break;
             }
@@ -1757,11 +1744,7 @@ where
         let exec_qty = if stop.reduce_only() {
             let Some(clamped) = self.clamp_reduce_only_quantity(stop.side(), stop.quantity())
             else {
-                self.push_stop_event(StopOrderEvent::Cancelled {
-                    stop_order_id: stop.id(),
-                    user_order_id: stop.user_order_id(),
-                    reason: StopCancelReason::ReduceOnlyNoPosition,
-                });
+                self.push_stop_event(stop.cancelled_event(StopCancelReason::ReduceOnlyNoPosition));
                 return;
             };
             clamped
@@ -1787,11 +1770,7 @@ where
         if let Some(collar) = protection
             && !collar.allows_execution(stop.side(), stop.stop_price(), fill_price)
         {
-            self.push_stop_event(StopOrderEvent::Cancelled {
-                stop_order_id: stop.id(),
-                user_order_id: stop.user_order_id(),
-                reason: StopCancelReason::StopProtectionBand,
-            });
+            self.push_stop_event(stop.cancelled_event(StopCancelReason::StopProtectionBand));
             return;
         }
 
@@ -1816,11 +1795,7 @@ where
                 .is_ok(),
         };
         if !risk_ok {
-            self.push_stop_event(StopOrderEvent::Cancelled {
-                stop_order_id: stop.id(),
-                user_order_id: stop.user_order_id(),
-                reason: StopCancelReason::InsufficientMargin,
-            });
+            self.push_stop_event(stop.cancelled_event(StopCancelReason::InsufficientMargin));
             return;
         }
 
@@ -1868,11 +1843,7 @@ where
             stop.quantity(),
             stop.user_order_id(),
         ) else {
-            self.push_stop_event(StopOrderEvent::Cancelled {
-                stop_order_id: stop.id(),
-                user_order_id: stop.user_order_id(),
-                reason: StopCancelReason::ChildLimitRejected,
-            });
+            self.push_stop_event(stop.cancelled_event(StopCancelReason::ChildLimitRejected));
             return;
         };
         let child = child
@@ -1916,25 +1887,13 @@ where
                 }
             }
             Err(SubmitLimitOrderError::ReduceOnlyRejected) => {
-                self.push_stop_event(StopOrderEvent::Cancelled {
-                    stop_order_id: stop.id(),
-                    user_order_id: stop.user_order_id(),
-                    reason: StopCancelReason::ReduceOnlyNoPosition,
-                });
+                self.push_stop_event(stop.cancelled_event(StopCancelReason::ReduceOnlyNoPosition));
             }
             Err(SubmitLimitOrderError::NotEnoughAvailableBalance(_)) => {
-                self.push_stop_event(StopOrderEvent::Cancelled {
-                    stop_order_id: stop.id(),
-                    user_order_id: stop.user_order_id(),
-                    reason: StopCancelReason::InsufficientMargin,
-                });
+                self.push_stop_event(stop.cancelled_event(StopCancelReason::InsufficientMargin));
             }
             Err(_) => {
-                self.push_stop_event(StopOrderEvent::Cancelled {
-                    stop_order_id: stop.id(),
-                    user_order_id: stop.user_order_id(),
-                    reason: StopCancelReason::ChildLimitRejected,
-                });
+                self.push_stop_event(stop.cancelled_event(StopCancelReason::ChildLimitRejected));
             }
         }
     }
