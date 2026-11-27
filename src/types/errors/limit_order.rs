@@ -103,6 +103,19 @@ pub enum AmendLimitOrderError {
     SubmitLimitOrder(#[from] SubmitLimitOrderError),
 }
 
+impl AmendLimitOrderError {
+    /// The error for amending `order_id` when it is not on the book: it was active once
+    /// if the venue already assigned it, i.e. it is below `next_order_id`.
+    #[must_use]
+    pub(crate) fn order_not_on_book(order_id: OrderId, next_order_id: OrderId) -> Self {
+        if order_id < next_order_id {
+            Self::OrderNoLongerActive
+        } else {
+            Self::OrderIdNotFound { order_id }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Error, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(missing_docs, reason = "Self documenting")]

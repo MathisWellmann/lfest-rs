@@ -345,6 +345,16 @@ where
         }
     }
 
+    /// `true` if the order would execute on entry: it is marketable and not post-only.
+    #[inline]
+    #[must_use]
+    pub(crate) fn would_take_liquidity(
+        &self,
+        market_state: &crate::market_state::MarketState<I, D>,
+    ) -> bool {
+        self.is_marketable(market_state) && !self.is_post_only()
+    }
+
     /// Clamp a `reduce_only` order which is about to rest to the room which the already
     /// resting reduce-only orders of its side (`resting_reduce_only`) leave within the
     /// position of `position_qty`, because together they may never exceed it.
