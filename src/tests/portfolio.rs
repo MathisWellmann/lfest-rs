@@ -234,6 +234,76 @@ fn portfolio_reduce_only_and_delist_market_settle_position_and_cancel_orders() {
 }
 
 #[test]
+fn delisted_market_keeps_no_orders_and_ignores_market_updates() {
+    let cfg = PortfolioConfig::new(
+        QuoteCurrency::new(1000, 0),
+        vec![make_linear_market_cfg("AAA", 2)],
+    )
+    .unwrap();
+    let mut pf = LinearPortfolio::new(cfg);
+    let a = MarketId::new(0);
+    pf.update_market(a, &bba(99, 100, 1)).unwrap();
+    let buy_90 = || {
+        LimitOrder::new(
+            Side::Buy,
+            QuoteCurrency::new(90, 0),
+            BaseCurrency::new(1, 0),
+        )
+        .unwrap()
+    };
+    let sell_stop_80 = || {
+        StopOrder::stop_market(
+            Side::Sell,
+            QuoteCurrency::new(80, 0),
+            BaseCurrency::new(1, 0),
+            NoUserOrderId,
+        )
+        .unwrap()
+    };
+    let resting = pf.submit_limit_order(a, buy_90()).unwrap();
+    let stop = pf.submit_stop_order(a, sell_stop_80()).unwrap();
+
+    let settlement = pf.delist_market(a, QuoteCurrency::new(100, 0)).unwrap();
+    assert_eq!(settlement.cancelled_orders, vec![resting.clone()]);
+    assert_eq!(
+        pf.stop_events()
+            .iter()
+            .map(|e| e.event.clone())
+            .collect::<Vec<_>>(),
+        vec![stop.cancelled_event(StopCancelReason::ForcedCancel)]
+    );
+
+    let delisted = PortfolioError::MarketDelisted(a);
+    assert_eq!(pf.submit_limit_order(a, buy_90()).unwrap_err(), delisted);
+    assert_eq!(
+        pf.submit_limit_order_with_execution(a, buy_90())
+            .unwrap_err(),
+        delisted
+    );
+    assert_eq!(
+        pf.submit_stop_order(a, sell_stop_80()).unwrap_err(),
+        delisted
+    );
+    assert_eq!(
+        pf.amend_limit_order(a, resting.id(), buy_90()).unwrap_err(),
+        delisted
+    );
+
+    // A candle through both former prices fills and elects nothing.
+    let candle = Candle::new(
+        QuoteCurrency::new(70, 0),
+        QuoteCurrency::new(71, 0),
+        QuoteCurrency::new(70, 0),
+        QuoteCurrency::new(100, 0),
+        2.into(),
+    )
+    .unwrap();
+    assert!(pf.update_market(a, &candle).unwrap().is_empty());
+    assert!(pf.stop_events().is_empty());
+    assert!(pf.market(a).unwrap().position.quantity().is_zero());
+}
+
+#[test]
 fn single_exchange_and_portfolio_mass_cancel_operations() {
     // Single-symbol Exchange mass cancel by side and all.
     let mut ex = mock_exchange_linear();

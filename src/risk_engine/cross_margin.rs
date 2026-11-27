@@ -383,6 +383,29 @@ mod tests {
     }
 
     #[test]
+    fn no_liquidation_price_without_a_position_or_a_reference_price() {
+        let re = engine::<BaseCurrency<i64, DECIMALS>>(&[(None, rate(5, 2))]);
+        let equity = QuoteCurrency::new(625, 0);
+        let long = Position::new(BaseCurrency::new(10, 0), QuoteCurrency::new(100, 0)).unwrap();
+        let reference = QuoteCurrency::new(100, 0);
+        assert!(
+            re.estimated_liquidation_price(equity, &long, reference)
+                .is_some()
+        );
+
+        assert_eq!(
+            re.estimated_liquidation_price(equity, &Position::default(), reference),
+            None
+        );
+        for reference in [QuoteCurrency::zero(), QuoteCurrency::new(-1, 0)] {
+            assert_eq!(
+                re.estimated_liquidation_price(equity, &long, reference),
+                None
+            );
+        }
+    }
+
+    #[test]
     fn linear_long_liquidation_price_drops_into_lower_tier() {
         // Reference notional 1000 is in tier 2 (20%, amount 75), but the tier-2 price
         // 37.5 has notional 375 (tier 1). Tier 1: P = (1000 - 625) / (10 * 0.95).

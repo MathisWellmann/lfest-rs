@@ -145,7 +145,9 @@ where
 
     #[inline]
     fn unrealized_pnl(&self) -> BaseOrQuote::PairedCurrency {
-        if self.position.quantity().is_zero() || !self.market_state.has_positive_quotes() {
+        // Without both quotes there is no price to mark the position at. A neutral position
+        // is handled by `unrealized_pnl_marked`.
+        if !self.market_state.has_positive_quotes() {
             return Zero::zero();
         }
         self.position
@@ -693,9 +695,14 @@ where
             slot.market_state.update_state(market_update, &pf);
         }
 
-        if !self.markets[idx].pending_stops.is_empty()
-            && self.markets[idx].status != MarketStatus::Delisted
-        {
+        if self.markets[idx].status == MarketStatus::Delisted {
+            // `delist_market` cancelled every order of the market, and every way to place
+            // a new one rejects a delisted market, so nothing below can fill there.
+            assert!(self.markets[idx].pending_stops.is_empty());
+            assert!(self.markets[idx].active_limit_orders.is_empty());
+        }
+
+        if !self.markets[idx].pending_stops.is_empty() {
             self.evaluate_pending_stops_for_market(idx, market_update.price_range());
             if self.liquidated_during_fills {
                 core::hint::cold_path();
@@ -710,7 +717,7 @@ where
             return Err(RiskError::Liquidate.into());
         }
 
-        if U::CAN_FILL_LIMIT_ORDERS && self.markets[idx].status != MarketStatus::Delisted {
+        if U::CAN_FILL_LIMIT_ORDERS {
             self.check_active_orders_for_market(idx, market_update.clone());
             if self.liquidated_during_fills {
                 core::hint::cold_path();
@@ -2153,5 +2160,69 @@ where
         self.stop_events
             .push_within_capacity(PortfolioStopEvent { market_id, event })
             .expect("each pending stop yields at most one event per call");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use const_decimal::Decimal;
+
+    use super::*;
+    use crate::{
+        DECIMALS,
+        prelude::{
+            BaseCurrency,
+            Bba,
+            Fee,
+            Leverage,
+            PriceFilter,
+            QuantityFilter,
+        },
+        utils::NoUserOrderId,
+    };
+
+    type Slot = MarketSlot<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>;
+
+    fn long_2_at_100_slot() -> Slot {
+        let spec = ContractSpecification::new(
+            Leverage::new(1).unwrap(),
+            Decimal::try_from_scaled(5, 1).unwrap(),
+            PriceFilter::default(),
+            QuantityFilter::default(),
+            Fee::from(Decimal::zero()),
+            Fee::from(Decimal::zero()),
+        )
+        .unwrap();
+        let mut slot = Slot::new(
+            MarketId::new(0),
+            MarketConfig::new(
+                std::num::NonZeroU16::new(1).unwrap(),
+                spec,
+                crate::prelude::OrderRateLimits::default(),
+            ),
+        );
+        slot.position = Position::new(BaseCurrency::new(2, 0), QuoteCurrency::new(100, 0)).unwrap();
+        slot
+    }
+
+    #[test]
+    fn market_slot_marks_a_position_only_against_a_two_sided_book() {
+        let mut slot = long_2_at_100_slot();
+        // A new market has no quotes yet.
+        assert!(!slot.market_state.has_positive_quotes());
+        assert_eq!(slot.unrealized_pnl(), QuoteCurrency::zero());
+
+        let pf = slot.contract_spec.price_filter().clone();
+        let bba = Bba {
+            bid: QuoteCurrency::new(110, 0),
+            ask: QuoteCurrency::new(111, 0),
+            timestamp_exchange_ns: 1.into(),
+        };
+        slot.market_state
+            .update_state::<_, BaseCurrency<i64, DECIMALS>>(&bba, &pf);
+        assert_ne!(slot.unrealized_pnl(), QuoteCurrency::zero());
+
+        slot.position = Position::default();
+        assert_eq!(slot.unrealized_pnl(), QuoteCurrency::zero());
     }
 }
