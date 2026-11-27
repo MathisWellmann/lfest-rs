@@ -154,6 +154,26 @@ where
             .unrealized_pnl_marked(&self.market_state, self.contract_spec.mark_method())
     }
 
+    /// The side and price at which a forced liquidation closes the open position: the
+    /// opposite best quote, or the entry price if that side of the book is empty.
+    #[must_use]
+    fn liquidation_close(&self) -> (Side, QuoteCurrency<I, D>) {
+        let quantity = self.position.quantity();
+        assert!(!quantity.is_zero());
+        let (side, quote) = if quantity.is_negative() {
+            (Buy, self.market_state.ask())
+        } else {
+            (Sell, self.market_state.bid())
+        };
+        let price = if quote > QuoteCurrency::zero() {
+            quote
+        } else {
+            self.position.entry_price()
+        };
+        assert!(price > QuoteCurrency::zero());
+        (side, price)
+    }
+
     #[inline]
     fn position_margin(&self) -> BaseOrQuote::PairedCurrency {
         self.position.notional() * self.contract_spec.init_margin_req()
@@ -1564,21 +1584,7 @@ where
             }
             let market_id = self.markets[idx].market_id;
             let ts_ns = self.markets[idx].market_state.current_timestamp_ns();
-            let (side, fill_price) = if pos_qty.is_negative() {
-                let p = if self.markets[idx].market_state.ask() > QuoteCurrency::zero() {
-                    self.markets[idx].market_state.ask()
-                } else {
-                    self.markets[idx].position.entry_price()
-                };
-                (Buy, p)
-            } else {
-                let p = if self.markets[idx].market_state.bid() > QuoteCurrency::zero() {
-                    self.markets[idx].market_state.bid()
-                } else {
-                    self.markets[idx].position.entry_price()
-                };
-                (Sell, p)
-            };
+            let (side, fill_price) = self.markets[idx].liquidation_close();
             let qty = pos_qty.abs();
             let notional = BaseOrQuote::PairedCurrency::convert_from(qty, fill_price);
             let fee = notional * *self.markets[idx].contract_spec.fee_taker().as_ref();
@@ -2203,6 +2209,29 @@ mod tests {
         );
         slot.position = Position::new(BaseCurrency::new(2, 0), QuoteCurrency::new(100, 0)).unwrap();
         slot
+    }
+
+    #[test]
+    fn market_slot_liquidates_at_the_opposite_quote_or_the_entry_price() {
+        let q = |p| QuoteCurrency::<i64, DECIMALS>::new(p, 0);
+        let mut slot = long_2_at_100_slot();
+        for (bid, ask, long_close, short_close) in [
+            (110, 111, (Sell, q(110)), (Buy, q(111))),
+            // An empty side of the book falls back to the entry price of 100.
+            (0, 111, (Sell, q(100)), (Buy, q(111))),
+            (110, 0, (Sell, q(110)), (Buy, q(100))),
+            (0, 0, (Sell, q(100)), (Buy, q(100))),
+        ] {
+            slot.market_state = MarketState::from_components(q(bid), q(ask), q(0), 1.into(), 1);
+            slot.position = Position::new(BaseCurrency::new(2, 0), q(100)).unwrap();
+            assert_eq!(slot.liquidation_close(), long_close, "bid {bid}, ask {ask}");
+            slot.position = Position::new(BaseCurrency::new(-2, 0), q(100)).unwrap();
+            assert_eq!(
+                slot.liquidation_close(),
+                short_close,
+                "bid {bid}, ask {ask}"
+            );
+        }
     }
 
     #[test]
