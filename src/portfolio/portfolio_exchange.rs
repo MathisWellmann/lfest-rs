@@ -144,14 +144,8 @@ where
     }
 
     #[inline]
-    fn has_positive_quotes(&self) -> bool {
-        self.market_state.bid() > QuoteCurrency::zero()
-            && self.market_state.ask() > QuoteCurrency::zero()
-    }
-
-    #[inline]
     fn unrealized_pnl(&self) -> BaseOrQuote::PairedCurrency {
-        if self.position.quantity().is_zero() || !self.has_positive_quotes() {
+        if self.position.quantity().is_zero() || !self.market_state.has_positive_quotes() {
             return Zero::zero();
         }
         self.position
@@ -185,7 +179,7 @@ where
         if self.position.quantity().is_zero() {
             return Zero::zero();
         }
-        let notional = if self.has_positive_quotes() {
+        let notional = if self.market_state.has_positive_quotes() {
             let mark_price = self
                 .market_state
                 .mark_price_for_position(self.contract_spec.mark_method(), self.position.side());

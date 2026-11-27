@@ -493,3 +493,124 @@ fn maintenance_schedule_must_stay_below_initial_margin_rate() {
         Decimal::try_from_scaled(5, 2).expect(EXPECT_DECIMAL)
     );
 }
+
+/// Settle a funding rate of zero, which only runs the margin reconciliation.
+fn reconcile(
+    exchange: &mut LinearExchange,
+) -> FundingSettlement<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+    exchange.apply_funding(
+        FundingRate::from(Decimal::zero()),
+        QuoteCurrency::new(100, 0),
+    )
+}
+
+#[test]
+fn cross_margin_call_cancels_resting_orders_once_unrealized_loss_eats_the_excess() {
+    // Wallet 100 at 2x: long 1 @ 100 (IM 50) and a resting buy 1 @ 80 (IM 40).
+    let mut exchange = build_cross_linear(
+        fee_free_linear_spec(leverage!(2)),
+        QuoteCurrency::new(100, 0),
+    );
+    exchange.update_state(&bba(99, 100, 1)).unwrap();
+    exchange
+        .submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap())
+        .unwrap();
+    exchange
+        .submit_limit_order(
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(80, 0),
+                BaseCurrency::new(1, 0),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    // The wallet-only excess stays 10, but the uPnL of -11 makes it -1.
+    exchange.update_state(&bba(89, 90, 2)).unwrap();
+
+    let settlement = reconcile(&mut exchange);
+    assert_eq!(settlement.forced_cancels.len(), 1);
+    assert_eq!(
+        settlement.forced_cancels[0].limit_price(),
+        QuoteCurrency::new(80, 0)
+    );
+    assert_eq!(settlement.solvency, Solvency::Solvent);
+    assert_eq!(exchange.account().active_limit_orders().num_active(), 0);
+    assert_eq!(
+        exchange.account().position().quantity(),
+        BaseCurrency::new(1, 0)
+    );
+}
+
+#[test]
+fn cross_margin_call_keeps_orders_which_unrealized_profit_covers_exactly() {
+    // Wallet 100 at 2x: long 1 @ 100 (IM 50), then the bid rises to 119 (uPnL +19).
+    let mut exchange = build_cross_linear(
+        fee_free_linear_spec(leverage!(2)),
+        QuoteCurrency::new(100, 0),
+    );
+    exchange.update_state(&bba(99, 100, 1)).unwrap();
+    exchange
+        .submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap())
+        .unwrap();
+    exchange.update_state(&bba(119, 120, 2)).unwrap();
+    // IM 69 leaves a wallet-only excess of -19, which the uPnL raises to exactly 0.
+    exchange
+        .submit_limit_order(
+            LimitOrder::new(
+                Side::Buy,
+                QuoteCurrency::new(100, 0),
+                BaseCurrency::new(138, 2),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+    let settlement = reconcile(&mut exchange);
+    assert!(settlement.forced_cancels.is_empty());
+    assert_eq!(settlement.solvency, Solvency::Solvent);
+    assert_eq!(exchange.account().active_limit_orders().num_active(), 1);
+}
+
+/// Long 1 @ 100 at 2x (IM 50), then the bids vanish and leave a one-sided book.
+fn long_with_missing_bid(wallet: QuoteCurrency<i64, DECIMALS>) -> LinearExchange {
+    let mut exchange = build_cross_linear(fee_free_linear_spec(leverage!(2)), wallet);
+    exchange.update_state(&bba(99, 100, 1)).unwrap();
+    exchange
+        .submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(1, 0)).unwrap())
+        .unwrap();
+    exchange.set_best_bid_and_ask(QuoteCurrency::zero(), QuoteCurrency::new(100, 0));
+    assert!(!exchange.market_state().has_positive_quotes());
+    exchange
+}
+
+#[test]
+fn cross_margin_does_not_mark_a_long_to_a_missing_bid() {
+    // Marking the long to a bid of 0 would book a loss of 100 and wipe out the wallet.
+    let mut exchange = long_with_missing_bid(QuoteCurrency::new(100, 0));
+    let settlement = reconcile(&mut exchange);
+    assert_eq!(settlement.solvency, Solvency::Solvent);
+    assert_eq!(
+        exchange.account().position().quantity(),
+        BaseCurrency::new(1, 0)
+    );
+}
+
+#[test]
+fn cross_margin_without_quotes_checks_maintenance_margin_against_the_entry_notional() {
+    let mut exchange = long_with_missing_bid(QuoteCurrency::new(50, 0));
+    assert_eq!(reconcile(&mut exchange).solvency, Solvency::Solvent);
+
+    // The long pays 25 of funding: equity 25 still covers the MM of 100 * 0.25 = 25,
+    // so it keeps the position, but no longer covers its initial margin of 50.
+    let settlement = exchange.apply_funding(
+        FundingRate::from(Decimal::try_from_scaled(25, 2).expect(EXPECT_DECIMAL)),
+        QuoteCurrency::new(100, 0),
+    );
+    assert_eq!(settlement.cashflow, -QuoteCurrency::new(25, 0));
+    assert_eq!(settlement.solvency, Solvency::InitialMarginDeficit);
+    assert_eq!(
+        exchange.account().position().quantity(),
+        BaseCurrency::new(1, 0)
+    );
+}

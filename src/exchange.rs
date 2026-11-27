@@ -649,9 +649,7 @@ where
                 if self.account.position().quantity().is_zero() {
                     false
                 } else {
-                    let has_positive_quotes = self.market_state.bid() > QuoteCurrency::zero()
-                        && self.market_state.ask() > QuoteCurrency::zero();
-                    if has_positive_quotes {
+                    if self.market_state.has_positive_quotes() {
                         self.cross_risk_engine
                             .check_mark_to_market_maintenance_margin(
                                 &self.market_state,
@@ -685,9 +683,7 @@ where
                 match config.margin_mode() {
                     MarginMode::Isolated => account.margin_excess(),
                     MarginMode::Cross => {
-                        let has_positive_quotes = market_state.bid() > QuoteCurrency::zero()
-                            && market_state.ask() > QuoteCurrency::zero();
-                        let upnl = if has_positive_quotes {
+                        let upnl = if market_state.has_positive_quotes() {
                             account.position().unrealized_pnl_marked(
                                 market_state,
                                 config.contract_spec().mark_method(),
