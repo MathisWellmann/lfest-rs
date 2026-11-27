@@ -14,6 +14,7 @@ use super::{
     Trade,
 };
 use crate::{
+    EXPECT_CAPACITY,
     market_update::market_update_trait::Exhausted,
     prelude::PriceFilter,
     types::{
@@ -25,7 +26,10 @@ use crate::{
         TimestampNs,
         UserOrderId,
     },
-    utils::min,
+    utils::{
+        max,
+        min,
+    },
 };
 
 /// A data structure for aggregated trades with the ability to approximate realistic taker fill flow.
@@ -90,81 +94,52 @@ where
         for trade in taker_trades {
             // only retain the most important stuff.
             assert2::debug_assert!(trade.quantity > BaseOrQuote::zero());
-            #[allow(
-                clippy::disallowed_methods,
-                reason = "Don't know if we have enough capacity"
-            )]
-            match trade.side {
-                Side::Buy => buys.push((trade.price, trade.quantity)),
-                Side::Sell => sells.push((trade.price, trade.quantity)),
-            }
-            if trade.price < low {
-                low = trade.price;
-            }
-            if trade.price > high {
-                high = trade.price;
-            }
+            let flow = match trade.side {
+                Side::Buy => &mut buys,
+                Side::Sell => &mut sells,
+            };
+            flow.push_within_capacity((trade.price, trade.quantity))
+                .expect(EXPECT_CAPACITY);
+            low = min(low, trade.price);
+            high = max(high, trade.price);
         }
 
-        // sort by prices.
-        glidesort::sort_by_key(&mut buys, |t| -t.0); // Reverse is easier here.
+        // Taker buys fill resting sells priced below them, so the most aggressive (highest)
+        // buy comes first; for taker sells the lowest comes first.
+        glidesort::sort_by_key(&mut buys, |t| -t.0);
         glidesort::sort_by_key(&mut sells, |t| t.0);
-
-        // aggregate price levels, summing up the quantities.
-        let mut aggregate_buy_volume = Vec::with_capacity(10);
-        if !buys.is_empty() {
-            let mut last_buy_price = buys[0].0;
-            let mut buy_volume_sum = BaseOrQuote::zero();
-            // Largest prices first.
-            for (buy_price, buy_qty) in buys {
-                if buy_price != last_buy_price {
-                    #[allow(
-                        clippy::disallowed_methods,
-                        reason = "Don't know if we have enough capacity"
-                    )]
-                    aggregate_buy_volume.push((last_buy_price, buy_volume_sum));
-                    last_buy_price = buy_price
-                }
-                buy_volume_sum += buy_qty;
-            }
-            #[allow(
-                clippy::disallowed_methods,
-                reason = "Don't know if we have enough capacity"
-            )]
-            aggregate_buy_volume.push((last_buy_price, buy_volume_sum));
-        }
-
-        let mut aggregate_sell_volume = Vec::with_capacity(10);
-        if !sells.is_empty() {
-            let mut last_sell_price = sells[0].0;
-            let mut sell_volume_sum = BaseOrQuote::zero();
-            // Smallest prices first
-            for (sell_price, sell_qty) in sells {
-                if sell_price != last_sell_price {
-                    #[allow(
-                        clippy::disallowed_methods,
-                        reason = "Don't know if we have enough capacity"
-                    )]
-                    aggregate_sell_volume.push((last_sell_price, sell_volume_sum));
-                    last_sell_price = sell_price;
-                }
-                sell_volume_sum += sell_qty;
-            }
-            #[allow(
-                clippy::disallowed_methods,
-                reason = "Don't know if we have enough capacity"
-            )]
-            aggregate_sell_volume.push((last_sell_price, sell_volume_sum));
-        }
 
         Self {
             high,
             low,
-            aggregate_buy_volume,
-            aggregate_sell_volume,
+            aggregate_buy_volume: Self::into_cumulative_levels(buys),
+            aggregate_sell_volume: Self::into_cumulative_levels(sells),
             last_timestamp_exchange_ns: taker_trades[taker_trades.len() - 1].timestamp_exchange_ns,
             bba,
         }
+    }
+
+    /// Merge the sorted `(price, quantity)` flow into one level per price, holding the
+    /// quantity of that level and of all levels before it. Reuses the allocation.
+    fn into_cumulative_levels(
+        mut levels: Vec<(QuoteCurrency<I, D>, BaseOrQuote)>,
+    ) -> Vec<(QuoteCurrency<I, D>, BaseOrQuote)> {
+        levels.dedup_by(|next, kept| {
+            let same_price = next.0 == kept.0;
+            if same_price {
+                kept.1 += next.1;
+            }
+            same_price
+        });
+        let mut cumulative = BaseOrQuote::zero();
+        for level in &mut levels {
+            cumulative += level.1;
+            level.1 = cumulative;
+        }
+        levels.shrink_to_fit();
+        debug_assert!(levels.windows(2).all(|w| w[0].0 != w[1].0));
+        debug_assert!(levels.windows(2).all(|w| w[0].1 <= w[1].1));
+        levels
     }
 
     /// Decrement `consumed` volume from a cumulative level array while preserving
@@ -181,20 +156,16 @@ where
         consumed: BaseOrQuote,
     ) {
         assert2::debug_assert!(consumed > BaseOrQuote::zero());
-        assert2::debug_assert!(pos < levels.len());
-        let cap_after = levels[pos].1 - consumed;
+        assert2::debug_assert!(consumed <= levels[pos].1);
+        // The levels are non-decreasing, so none of `levels[pos..]` drops below zero.
         for level in &mut levels[pos..] {
-            level.1 = if level.1 > consumed {
-                level.1 - consumed
-            } else {
-                BaseOrQuote::zero()
-            };
+            level.1 -= consumed;
         }
+        let cap_after = levels[pos].1;
         for level in &mut levels[..pos] {
-            if level.1 > cap_after {
-                level.1 = cap_after;
-            }
+            level.1 = min(level.1, cap_after);
         }
+        debug_assert!(levels.windows(2).all(|w| w[0].1 <= w[1].1));
     }
 }
 
@@ -232,48 +203,33 @@ where
             crate::prelude::Pending<I, D, BaseOrQuote>,
         >,
     ) -> Option<(BaseOrQuote, Exhausted)> {
-        match limit_order.side() {
+        let limit = limit_order.limit_price();
+        // Taker flow fills a resting order when it trades through the limit price; the
+        // cumulative level just inside the limit holds all the flow that did.
+        let (levels, pos) = match limit_order.side() {
             Side::Buy => {
-                if self.low >= limit_order.limit_price() {
-                    return None;
-                }
                 let pos = self
                     .aggregate_sell_volume
                     .iter()
-                    .rposition(|v| v.0 < limit_order.limit_price())?;
-                let avail = self.aggregate_sell_volume[pos].1;
-                if avail <= BaseOrQuote::zero() {
-                    return None;
-                }
-                let filled = min(avail, limit_order.remaining_quantity());
-                Self::deplete_cumulative_levels(&mut self.aggregate_sell_volume, pos, filled);
-                let exhausted = self
-                    .aggregate_sell_volume
-                    .last()
-                    .is_none_or(|v| v.1 <= BaseOrQuote::zero());
-                Some((filled, exhausted))
+                    .rposition(|v| v.0 < limit)?;
+                (&mut self.aggregate_sell_volume, pos)
             }
             Side::Sell => {
-                if self.high <= limit_order.limit_price() {
-                    return None;
-                }
                 let pos = self
                     .aggregate_buy_volume
                     .iter()
-                    .rposition(|v| v.0 > limit_order.limit_price())?;
-                let avail = self.aggregate_buy_volume[pos].1;
-                if avail <= BaseOrQuote::zero() {
-                    return None;
-                }
-                let filled = min(avail, limit_order.remaining_quantity());
-                Self::deplete_cumulative_levels(&mut self.aggregate_buy_volume, pos, filled);
-                let exhausted = self
-                    .aggregate_buy_volume
-                    .last()
-                    .is_none_or(|v| v.1 <= BaseOrQuote::zero());
-                Some((filled, exhausted))
+                    .rposition(|v| v.0 > limit)?;
+                (&mut self.aggregate_buy_volume, pos)
             }
+        };
+        let avail = levels[pos].1;
+        if avail <= BaseOrQuote::zero() {
+            return None;
         }
+        let filled = min(avail, limit_order.remaining_quantity());
+        Self::deplete_cumulative_levels(levels, pos, filled);
+        let exhausted = levels.last().is_none_or(|v| v.1 <= BaseOrQuote::zero());
+        Some((filled, exhausted))
     }
 
     #[inline(always)]
@@ -705,6 +661,120 @@ mod tests {
         assert_eq!(
             smart_candle.limit_order_filled(&limit_order),
             Some((BaseCurrency::new(2, 0), false))
+        );
+    }
+
+    /// The candle of `smart_candle_execute_limit_order`: sell levels
+    /// `[(98, 2), (99, 5), (100, 7), (101, 8)]`, buy levels
+    /// `[(102, 1), (101, 2), (100, 4), (99, 7)]`.
+    fn mixed_flow_candle() -> SmartCandle<i64, 5, BaseCurrency<i64, 5>> {
+        let trade = |ts: i64, price: i64, qty: i64, side: Side| Trade {
+            timestamp_exchange_ns: ts.into(),
+            price: QuoteCurrency::<i64, 5>::new(price, 0),
+            quantity: BaseCurrency::new(qty, 0),
+            side,
+        };
+        let trades = [
+            trade(0, 100, 1, Side::Buy),
+            trade(1, 100, 1, Side::Buy),
+            trade(2, 99, 3, Side::Buy),
+            trade(3, 101, 1, Side::Buy),
+            trade(3, 102, 1, Side::Buy),
+            trade(4, 100, 1, Side::Sell),
+            trade(5, 100, 1, Side::Sell),
+            trade(6, 99, 3, Side::Sell),
+            trade(7, 98, 2, Side::Sell),
+            trade(8, 101, 1, Side::Sell),
+        ];
+        let bba = Bba {
+            bid: QuoteCurrency::new(100, 0),
+            ask: QuoteCurrency::new(101, 0),
+            timestamp_exchange_ns: 0.into(),
+        };
+        SmartCandle::new(&trades, bba, &PriceFilter::default())
+    }
+
+    fn pending(
+        side: Side,
+        price: i64,
+        qty: i64,
+    ) -> LimitOrder<
+        i64,
+        5,
+        BaseCurrency<i64, 5>,
+        NoUserOrderId,
+        crate::prelude::Pending<i64, 5, BaseCurrency<i64, 5>>,
+    > {
+        LimitOrder::new(
+            side,
+            QuoteCurrency::new(price, 0),
+            BaseCurrency::new(qty, 0),
+        )
+        .unwrap()
+        .into_pending(ExchangeOrderMeta::new(0.into(), 0.into()))
+    }
+
+    #[test]
+    fn smart_candle_successive_buys_share_the_depleted_sell_flow() {
+        let mut candle = mixed_flow_candle();
+        // Sells at 98 and 99 (5 in total) traded through a buy at 100.
+        assert_eq!(
+            candle.limit_order_filled(&pending(Side::Buy, 100, 3)),
+            Some((BaseCurrency::new(3, 0), false))
+        );
+        assert_eq!(
+            candle.aggregate_sell_volume,
+            vec![
+                (QuoteCurrency::new(98, 0), BaseCurrency::new(2, 0)),
+                (QuoteCurrency::new(99, 0), BaseCurrency::new(2, 0)),
+                (QuoteCurrency::new(100, 0), BaseCurrency::new(4, 0)),
+                (QuoteCurrency::new(101, 0), BaseCurrency::new(5, 0)),
+            ]
+        );
+        // Only 2 of the sell flow below 100 are left for a second buy at 100 ..
+        assert_eq!(
+            candle.limit_order_filled(&pending(Side::Buy, 100, 10)),
+            Some((BaseCurrency::new(2, 0), false))
+        );
+        // .. and the rest of the sell flow then exhausts it.
+        assert_eq!(
+            candle.limit_order_filled(&pending(Side::Buy, 102, 10)),
+            Some((BaseCurrency::new(3, 0), true))
+        );
+        assert_eq!(candle.limit_order_filled(&pending(Side::Buy, 102, 1)), None);
+        // The buy flow is untouched.
+        assert_eq!(
+            candle.limit_order_filled(&pending(Side::Sell, 98, 10)),
+            Some((BaseCurrency::new(7, 0), true))
+        );
+    }
+
+    #[test]
+    fn smart_candle_does_not_fill_at_the_traded_price() {
+        let mut candle = mixed_flow_candle();
+        // No sell traded below 98 and no buy above 102.
+        assert_eq!(candle.limit_order_filled(&pending(Side::Buy, 98, 1)), None);
+        assert_eq!(
+            candle.limit_order_filled(&pending(Side::Sell, 102, 1)),
+            None
+        );
+        assert_eq!(
+            candle.limit_order_filled(&pending(Side::Sell, 101, 5)),
+            Some((BaseCurrency::new(1, 0), false))
+        );
+    }
+
+    #[test]
+    fn smart_candle_reports_its_range_and_time() {
+        let candle = mixed_flow_candle();
+        assert_eq!(
+            candle.price_range(),
+            Some((QuoteCurrency::new(98, 0), QuoteCurrency::new(102, 0)))
+        );
+        assert_eq!(candle.timestamp_exchange_ns(), 8.into());
+        assert_eq!(
+            candle.to_string(),
+            "SmartCandle with 4 buy volume levels and 4 sell volume levels. last_timestamp_exchange_ns: 8"
         );
     }
 
