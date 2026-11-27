@@ -5,6 +5,7 @@ use std::num::NonZeroU16;
 
 use const_decimal::Decimal;
 
+use super::bba;
 use crate::{
     DECIMALS,
     EXPECT_CONFIG,
@@ -16,14 +17,6 @@ use crate::{
     prelude::*,
     utils::NoUserOrderId,
 };
-
-fn bba(bid: i64, ask: i64, ts: i64) -> Bba<i64, DECIMALS> {
-    Bba {
-        bid: QuoteCurrency::new(bid, 0),
-        ask: QuoteCurrency::new(ask, 0),
-        timestamp_exchange_ns: ts.into(),
-    }
-}
 
 /// 5x leverage, so an isolated long can be liquidated by a moderate price drop.
 fn levered_exchange(

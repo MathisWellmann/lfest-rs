@@ -6,6 +6,7 @@ use std::num::NonZeroU16;
 
 use const_decimal::Decimal;
 
+use super::bba;
 use crate::{
     DECIMALS,
     EXPECT_CONTRACT_SPEC,
@@ -321,14 +322,6 @@ fn single_exchange_and_portfolio_mass_cancel_operations() {
 }
 
 type LinearPortfolio = PortfolioExchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId>;
-
-fn bba(bid: i64, ask: i64, ts: i64) -> Bba<i64, DECIMALS> {
-    Bba {
-        bid: QuoteCurrency::new(bid, 0),
-        ask: QuoteCurrency::new(ask, 0),
-        timestamp_exchange_ns: ts.into(),
-    }
-}
 
 /// Wallet 100 at 50x (IM 2%, MM 1%): long 10 `AAA` @ 100 and short 10 `BBB` @ 100,
 /// then `BBB` falls to 79/80 (short uPnL +200) and `AAA` to `aaa_bid`/`aaa_bid + 1`.

@@ -15,6 +15,20 @@ mod submit_market_buy_order;
 mod submit_market_sell_order;
 mod update_state;
 
+use crate::{
+    DECIMALS,
+    prelude::*,
+};
+
+/// A best bid and ask update with whole-number prices, shared by the integration tests.
+fn bba(bid: i64, ask: i64, ts: i64) -> Bba<i64, DECIMALS> {
+    Bba {
+        bid: QuoteCurrency::new(bid, 0),
+        ask: QuoteCurrency::new(ask, 0),
+        timestamp_exchange_ns: ts.into(),
+    }
+}
+
 #[allow(unused, reason = "Used in benchmarks")]
 use criterion::*;
 #[allow(unused, reason = "Used in benchmarks")]
