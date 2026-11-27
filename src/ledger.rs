@@ -203,26 +203,116 @@ where
     /// Sum of the `delta` of every recorded entry of `kind`.
     #[must_use]
     pub fn total_by_kind(&self, kind: LedgerEntryKind) -> Margin {
-        let mut total = Margin::zero();
-        for e in self.entries.iter().filter(|e| e.kind == kind) {
-            total += e.delta;
-        }
-        total
+        sum_deltas(self.entries.iter().filter(|e| e.kind == kind))
     }
 
     /// Sum of every recorded cashflow `delta`.
     #[must_use]
     pub fn net_cashflow(&self) -> Margin {
-        let mut total = Margin::zero();
-        for e in &self.entries {
-            total += e.delta;
-        }
-        total
+        sum_deltas(self.entries.iter())
     }
 
     /// Verify that `starting_balance + net_cashflow == expected_equity`.
     #[must_use]
     pub fn reconciles_to(&self, expected_equity: Margin) -> bool {
         self.starting_balance + self.net_cashflow() == expected_equity
+    }
+}
+
+/// Sum of the `delta` of `entries`.
+fn sum_deltas<'a, I, const D: u8, Margin>(
+    entries: impl Iterator<Item = &'a LedgerEntry<I, D, Margin>>,
+) -> Margin
+where
+    I: Mon<D> + 'a,
+    Margin: MarginCurrency<I, D> + 'a,
+{
+    let mut total = Margin::zero();
+    for e in entries {
+        total += e.delta;
+    }
+    total
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prelude::{
+        QuoteCurrency,
+        Zero,
+    };
+
+    type QuoteLedger = Ledger<i64, 5, QuoteCurrency<i64, 5>>;
+
+    fn q(integer: i64, scale: u8) -> QuoteCurrency<i64, 5> {
+        QuoteCurrency::new(integer, scale)
+    }
+
+    #[test]
+    fn new_ledger_is_empty_and_anchored_at_the_starting_balance() {
+        let ledger = QuoteLedger::with_capacity(q(100, 0), 4);
+        assert!(ledger.is_empty());
+        assert_eq!(ledger.len(), 0);
+        assert_eq!(ledger.starting_balance(), q(100, 0));
+        assert!(ledger.net_cashflow().is_zero());
+        assert!(ledger.reconciles_to(q(100, 0)));
+        assert!(!ledger.reconciles_to(q(0, 0)));
+    }
+
+    #[test]
+    fn record_flows_skips_zero_flows_and_tracks_the_running_equity() {
+        let mut ledger = QuoteLedger::with_capacity(q(100, 0), 4);
+        let flows = [
+            (LedgerEntryKind::TradingFee, q(-1, 0)),
+            (LedgerEntryKind::Funding, q(0, 0)),
+            (LedgerEntryKind::RealizedPnl, q(5, 0)),
+            (LedgerEntryKind::TradingFee, q(-25, 1)),
+        ];
+        let equity = ledger.record_flows(1.into(), None, Some(7.into()), &flows, q(100, 0));
+        assert_eq!(equity, q(1015, 1));
+        assert!(!ledger.is_empty());
+        assert_eq!(ledger.len(), 3);
+        let equity_after: Vec<_> = ledger.entries().iter().map(|e| e.equity_after()).collect();
+        assert_eq!(equity_after, vec![q(99, 0), q(104, 0), q(1015, 1)]);
+        assert!(
+            ledger
+                .entries()
+                .iter()
+                .all(|e| e.order_id() == Some(7.into()))
+        );
+
+        assert_eq!(ledger.net_cashflow(), q(15, 1));
+        assert_eq!(ledger.total_by_kind(LedgerEntryKind::TradingFee), q(-35, 1));
+        assert_eq!(ledger.total_by_kind(LedgerEntryKind::RealizedPnl), q(5, 0));
+        assert!(ledger.total_by_kind(LedgerEntryKind::Funding).is_zero());
+    }
+
+    #[test]
+    fn reconciles_to_detects_any_mismatch() {
+        let mut ledger = QuoteLedger::with_capacity(q(100, 0), 1);
+        let _ = ledger.record_flows(
+            1.into(),
+            None,
+            None,
+            &[(LedgerEntryKind::Funding, q(-3, 0))],
+            q(100, 0),
+        );
+        assert!(ledger.reconciles_to(q(97, 0)));
+        assert!(!ledger.reconciles_to(q(100, 0)));
+        assert!(!ledger.reconciles_to(q(9_700_001, 5)));
+        assert!(!ledger.reconciles_to(q(9_699_999, 5)));
+    }
+
+    #[test]
+    #[should_panic(expected = "the venue only ever credits bad debt")]
+    fn record_flows_rejects_a_bad_debt_debit() {
+        let mut ledger = QuoteLedger::with_capacity(q(100, 0), 1);
+        let _ = ledger.record_flows(
+            1.into(),
+            None,
+            None,
+            &[(LedgerEntryKind::BadDebtAbsorption, q(-1, 0))],
+            q(100, 0),
+        );
     }
 }
