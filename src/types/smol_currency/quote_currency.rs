@@ -380,6 +380,9 @@ mod test {
         assert_eq!(v.abs(), QuoteCurrency::new(100, 0));
         let v = QuoteCurrency::<i64, 5>::new(0, 0);
         assert!(v.is_zero());
+        // Zero has no sign, which the reduce-only rules rely on for a flat position.
+        assert!(!v.is_positive());
+        assert!(!v.is_negative());
         assert!(!v.is_one());
         let v = QuoteCurrency::<i64, 5>::new(1, 0);
         assert!(v.is_one());
