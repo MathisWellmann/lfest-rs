@@ -195,18 +195,11 @@ where
         &mut self,
         order_id: OrderId,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        self.orders
+        let idx = self
+            .orders
             .iter()
-            .position(|order| order.id() == order_id)
-            .map(|idx| {
-                let order = self.orders.remove(idx);
-                self.notional_sum -= order.notional();
-                assert2::debug_assert!(self.notional_sum >= Zero::zero());
-                if order.reduce_only() {
-                    self.num_reduce_only -= 1;
-                }
-                order
-            })
+            .position(|order| order.id() == order_id)?;
+        Some(self.remove_at(idx))
     }
 
     /// Remove a limit order based on its user order id.
@@ -216,18 +209,22 @@ where
         &mut self,
         uid: UserOrderIdT,
     ) -> Option<LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>> {
-        self.orders
+        let idx = self
+            .orders
             .iter()
-            .position(|order| order.user_order_id() == uid)
-            .map(|idx| {
-                let order = self.orders.remove(idx);
-                self.notional_sum -= order.notional();
-                assert2::debug_assert!(self.notional_sum >= Zero::zero());
-                if order.reduce_only() {
-                    self.num_reduce_only -= 1;
-                }
-                order
-            })
+            .position(|order| order.user_order_id() == uid)?;
+        Some(self.remove_at(idx))
+    }
+
+    /// Remove the order at `idx` and undo its bookkeeping.
+    #[inline(always)]
+    fn remove_at(
+        &mut self,
+        idx: usize,
+    ) -> LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>> {
+        let order = self.orders.remove(idx);
+        untrack(&mut self.notional_sum, &mut self.num_reduce_only, &order);
+        order
     }
 
     /// Insert a new limit orders if there is enough capacity,
@@ -315,9 +312,7 @@ where
         };
         let n_before = self.orders.len();
         for order in self.orders.extract_if(..=boundary, |o| o.reduce_only()) {
-            self.notional_sum -= order.notional();
-            assert2::debug_assert!(self.notional_sum >= Zero::zero());
-            self.num_reduce_only -= 1;
+            untrack(&mut self.notional_sum, &mut self.num_reduce_only, &order);
             on_cancel(order);
         }
         assert!(
@@ -340,8 +335,7 @@ where
             .orders
             .extract_if(.., |o| !o.reduce_only() && o.remaining_quantity() > cap)
         {
-            self.notional_sum -= order.notional();
-            assert2::debug_assert!(self.notional_sum >= Zero::zero());
+            untrack(&mut self.notional_sum, &mut self.num_reduce_only, &order);
             on_cancel(order);
         }
         assert_eq!(self.num_reduce_only, n_reduce_only_before);
@@ -388,6 +382,32 @@ where
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+/// Undo the bookkeeping of [`SortedOrders::try_insert`] for an order which left the book.
+///
+/// Takes the counters instead of `&mut SortedOrders`, so a caller can use it while an
+/// `extract_if` iterator borrows the `orders`.
+#[inline(always)]
+fn untrack<I, const D: u8, BaseOrQuote, UserOrderIdT>(
+    notional_sum: &mut BaseOrQuote::PairedCurrency,
+    num_reduce_only: &mut usize,
+    order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
+) where
+    I: Mon<D>,
+    BaseOrQuote: Currency<I, D>,
+    BaseOrQuote::PairedCurrency: MarginCurrency<I, D>,
+    UserOrderIdT: UserOrderId,
+{
+    *notional_sum -= order.notional();
+    assert2::debug_assert!(*notional_sum >= Zero::zero());
+    if order.reduce_only() {
+        assert!(
+            *num_reduce_only > 0,
+            "every resting reduce-only order is counted"
+        );
+        *num_reduce_only -= 1;
     }
 }
 
@@ -440,8 +460,15 @@ mod tests {
         assert_eq!(asks.num_reduce_only(), 3);
         assert_eq!(asks.reduce_only_remaining(), BaseCurrency::new(10, 0));
 
-        // Cap 6: keep 3 @ 101 and 2 @ 103 (cumulative 5); 5 @ 104 would exceed the cap.
+        // A cap equal to the reduce-only total fits every order.
         let mut cancelled = Vec::with_capacity(4);
+        asks.cancel_reduce_only_beyond(BaseCurrency::new(10, 0), |o| {
+            cancelled.push_within_capacity(o.id()).unwrap();
+        });
+        assert!(cancelled.is_empty());
+        assert_eq!(asks.num_reduce_only(), 3);
+
+        // Cap 6: keep 3 @ 101 and 2 @ 103 (cumulative 5); 5 @ 104 would exceed the cap.
         asks.cancel_reduce_only_beyond(BaseCurrency::new(6, 0), |o| {
             cancelled.push_within_capacity(o.id()).unwrap();
         });
@@ -465,6 +492,73 @@ mod tests {
         assert_eq!(asks.len(), 1);
         assert_eq!(asks.notional_sum(), QuoteCurrency::new(102, 0));
         assert!(!asks.best().unwrap().reduce_only());
+    }
+
+    /// Bids of (price, qty, reduce_only) with order id `i` and user order id `10 + i`.
+    fn bids_with_user_ids(
+        specs: &[(i64, i64, bool)],
+    ) -> SortedOrders<i64, 6, BaseCurrency<i64, 6>, u64, Bids> {
+        let mut bids = SortedOrders::with_capacity(NonZeroU16::new(8).unwrap());
+        for (id, &(price, qty, ro)) in (0_u64..).zip(specs) {
+            let order = LimitOrder::new_with_user_order_id(
+                Side::Buy,
+                QuoteCurrency::new(price, 0),
+                BaseCurrency::new(qty, 0),
+                10 + id,
+            )
+            .unwrap()
+            .with_reduce_only(ro)
+            .into_pending(ExchangeOrderMeta::new(id.into(), 0.into()));
+            bids.try_insert(order).unwrap();
+        }
+        bids
+    }
+
+    #[test]
+    fn removing_an_order_undoes_its_bookkeeping() {
+        let specs = [(100, 1, true), (99, 2, false), (98, 3, true)];
+        let mut bids = bids_with_user_ids(&specs);
+        assert_eq!(bids.num_reduce_only(), 2);
+        assert_eq!(bids.notional_sum(), QuoteCurrency::new(100 + 198 + 294, 0));
+
+        let removed = bids.remove_by_id(0.into()).unwrap();
+        assert_eq!(removed.user_order_id(), 10);
+        assert_eq!(bids.num_reduce_only(), 1);
+        assert_eq!(bids.notional_sum(), QuoteCurrency::new(198 + 294, 0));
+
+        let removed = bids.remove_by_user_id(12).unwrap();
+        assert_eq!(removed.id(), 2.into());
+        assert_eq!(bids.num_reduce_only(), 0);
+        assert_eq!(bids.notional_sum(), QuoteCurrency::new(198, 0));
+
+        // A plain order leaves the reduce-only counter alone.
+        assert!(bids.remove_by_user_id(11).is_some());
+        assert_eq!(bids.num_reduce_only(), 0);
+        assert!(bids.notional_sum().is_zero());
+        assert!(bids.is_empty());
+
+        // Unknown ids remove nothing.
+        assert_eq!(bids.remove_by_id(0.into()), None);
+        assert_eq!(bids.remove_by_user_id(10), None);
+    }
+
+    #[test]
+    fn cancel_non_reduce_only_above_releases_the_notional_of_cancelled_orders() {
+        let specs = [(100, 1, false), (99, 2, true), (98, 3, false)];
+        let mut bids = bids_with_user_ids(&specs);
+        let mut cancelled = Vec::with_capacity(3);
+        bids.cancel_non_reduce_only_above(BaseCurrency::new(2, 0), |o| {
+            cancelled.push_within_capacity(o.id()).unwrap();
+        });
+        assert_eq!(cancelled, vec![2.into()]);
+        assert_eq!(bids.num_reduce_only(), 1);
+        assert_eq!(bids.notional_sum(), QuoteCurrency::new(100 + 198, 0));
+
+        // A cap of zero removes every plain order, the reduce-only order stays.
+        bids.cancel_non_reduce_only_above(BaseCurrency::new(0, 0), |_| {});
+        assert_eq!(bids.len(), 1);
+        assert_eq!(bids.num_reduce_only(), 1);
+        assert_eq!(bids.notional_sum(), QuoteCurrency::new(198, 0));
     }
 
     #[test]
