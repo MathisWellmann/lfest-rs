@@ -847,3 +847,61 @@ fn zero_rate_funding_reconciles_existing_collateral_shortfall() {
     assert_eq!(liq.solvency, Solvency::Liquidated);
     assert!(exchange.account().position().quantity().is_zero());
 }
+
+/// Fee-free isolated exchange at bid/ask 99/100 holding long 5 @ 100: the entry notional of
+/// 500 needs a maintenance margin of 250 (1x leverage, maintenance fraction 0.5).
+fn isolated_long_5_at_100() -> Exchange<i64, DECIMALS, BaseCurrency<i64, DECIMALS>, NoUserOrderId> {
+    let spec = ContractSpecification::new(
+        leverage!(1),
+        Decimal::try_from_scaled(5, 1).expect(EXPECT_DECIMAL),
+        PriceFilter::default(),
+        QuantityFilter::default(),
+        Fee::from(Decimal::zero()),
+        Fee::from(Decimal::zero()),
+    )
+    .expect(EXPECT_CONTRACT_SPEC);
+    let config = Config::new(
+        QuoteCurrency::new(1000, 0),
+        NonZeroU16::new(10).expect(EXPECT_NON_ZERO),
+        spec,
+        OrderRateLimits::default(),
+    )
+    .expect(EXPECT_CONFIG);
+    assert_eq!(config.margin_mode(), MarginMode::Isolated);
+    let mut exchange = Exchange::new(config);
+    exchange
+        .update_state(&Bba {
+            bid: QuoteCurrency::new(99, 0),
+            ask: QuoteCurrency::new(100, 0),
+            timestamp_exchange_ns: 0.into(),
+        })
+        .unwrap();
+    exchange
+        .submit_market_order(MarketOrder::new(Side::Buy, BaseCurrency::new(5, 0)).unwrap())
+        .unwrap();
+    assert_eq!(
+        exchange.account().balances().equity(),
+        QuoteCurrency::new(1000, 0)
+    );
+    exchange
+}
+
+#[test]
+fn isolated_equity_exactly_at_the_maintenance_margin_is_not_liquidated() {
+    // Paying 150% of the 500 notional leaves exactly the maintenance margin of 250.
+    let mut exchange = isolated_long_5_at_100();
+    let settlement = exchange.apply_funding(rate_d5(15, 1), QuoteCurrency::new(100, 0));
+    assert_eq!(settlement.cashflow, QuoteCurrency::new(-750, 0));
+    // Below the initial margin of 500, but not liquidated.
+    assert_eq!(settlement.solvency, Solvency::InitialMarginDeficit);
+    assert_eq!(
+        exchange.account().position().quantity(),
+        BaseCurrency::new(5, 0)
+    );
+
+    // A cent more of funding falls below it.
+    let mut exchange = isolated_long_5_at_100();
+    let settlement = exchange.apply_funding(rate_d5(150_001, 5), QuoteCurrency::new(100, 0));
+    assert_eq!(settlement.solvency, Solvency::Liquidated);
+    assert!(exchange.account().position().quantity().is_zero());
+}

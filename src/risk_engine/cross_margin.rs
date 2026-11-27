@@ -406,6 +406,70 @@ mod tests {
     }
 
     #[test]
+    fn linear_liquidation_price_at_zero_is_none() {
+        let re = engine::<BaseCurrency<i64, DECIMALS>>(&[(None, rate(5, 2))]);
+        let long = Position::new(BaseCurrency::new(10, 0), QuoteCurrency::new(100, 0)).unwrap();
+        let reference = QuoteCurrency::new(100, 0);
+        // P = (10 * 100 - E) / (10 * 0.95): an equity of the full entry notional gives 0.
+        assert_eq!(
+            re.estimated_liquidation_price(QuoteCurrency::new(1000, 0), &long, reference),
+            None
+        );
+        assert_eq!(
+            re.estimated_liquidation_price(QuoteCurrency::new(905, 0), &long, reference),
+            Some(QuoteCurrency::new(10, 0))
+        );
+    }
+
+    #[test]
+    fn mark_to_market_equity_exactly_at_the_maintenance_margin_is_not_liquidated() {
+        type Base = BaseCurrency<i64, DECIMALS>;
+        let re = engine::<Base>(&[(None, rate(5, 2))]);
+        let market_state = MarketState::from_components(
+            QuoteCurrency::new(100, 0),
+            QuoteCurrency::new(101, 0),
+            QuoteCurrency::new(100, 0),
+            1.into(),
+            1,
+        );
+        let account_with = |equity: QuoteCurrency<i64, DECIMALS>| {
+            let mut account = Account::<i64, DECIMALS, Base, NoUserOrderId>::new(
+                Balances::new(equity),
+                std::num::NonZeroU16::new(1).unwrap(),
+                Decimal::ONE,
+                Decimal::zero(),
+            );
+            let realized = account.change_position(
+                Base::new(10, 0),
+                QuoteCurrency::new(100, 0),
+                Side::Buy,
+                QuoteCurrency::zero(),
+            );
+            assert_eq!(realized, QuoteCurrency::zero());
+            account
+        };
+        // Shift the equity by the gap between the maintenance margin and the
+        // mark-to-market equity, whatever price the mark method picks.
+        let probe = account_with(QuoteCurrency::new(1000, 0));
+        let gap = re.maintenance_margin_requirement(&market_state, probe.position())
+            - re.mark_to_market_equity(&probe, &market_state);
+        let at_margin = account_with(QuoteCurrency::new(1000, 0) + gap);
+        assert_eq!(
+            re.mark_to_market_equity(&at_margin, &market_state),
+            re.maintenance_margin_requirement(&market_state, at_margin.position())
+        );
+        assert_eq!(
+            re.check_mark_to_market_maintenance_margin(&market_state, &at_margin),
+            Ok(())
+        );
+        let below = account_with(QuoteCurrency::new(1000, 0) + gap - QuoteCurrency::new(1, 5));
+        assert_eq!(
+            re.check_mark_to_market_maintenance_margin(&market_state, &below),
+            Err(RiskError::Liquidate)
+        );
+    }
+
+    #[test]
     fn linear_long_liquidation_price_drops_into_lower_tier() {
         // Reference notional 1000 is in tier 2 (20%, amount 75), but the tier-2 price
         // 37.5 has notional 375 (tier 1). Tier 1: P = (1000 - 625) / (10 * 0.95).

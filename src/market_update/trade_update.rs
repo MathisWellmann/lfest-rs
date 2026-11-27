@@ -164,6 +164,7 @@ mod tests {
     use crate::prelude::*;
 
     #[test_case::test_case(Buy, false, true)]
+    #[test_case::test_case(Sell, true, false)]
     fn trade_update_can_fill_bids_asks(side: Side, can_fill_bid: bool, can_fill_ask: bool) {
         let trade = Trade {
             price: QuoteCurrency::<i64, 1>::new(100, 0),
@@ -263,8 +264,9 @@ mod tests {
         assert!(trade.fills_order(&order));
     }
 
-    // A sell trade can fill a buy limit order at certain prices.
-    #[test_case::test_matrix([90, 95, 99])]
+    // A buy trade fills a sell limit order only above its limit price: like for buys,
+    // the queue position at the limit price is unknown.
+    #[test_case::test_matrix([90, 95, 99, 100])]
     fn trade_update_fills_sell_order_not(price: i64) {
         let new_order =
             LimitOrder::new(Sell, QuoteCurrency::new(100, 0), BaseCurrency::new(5, 0)).unwrap();
