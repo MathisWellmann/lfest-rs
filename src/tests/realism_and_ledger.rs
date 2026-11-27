@@ -579,6 +579,46 @@ fn ledger_records_nominal_bankrupting_liquidation_and_bad_debt_credit() {
 }
 
 #[test]
+fn ledger_journals_only_new_bad_debt_after_a_bankrupting_funding_payment() {
+    // Short 10 @ 99 from 210 (fee 0.99 -> 209.01), then the ask falls to 90.
+    let mut ex = ledger_exchange(210);
+    ex.submit_market_order(MarketOrder::new(Side::Sell, BaseCurrency::new(10, 0)).unwrap())
+        .unwrap();
+    ex.update_state(&super::bba(89, 90, 2)).unwrap();
+
+    // Funding of 10 * 90 * 30% = 270 bankrupts the wallet (bad debt 60.99). The
+    // liquidation then closes the short at the ask of 90 with a profit of 90, so the
+    // account has equity again while carrying the earlier bad debt.
+    let settlement = ex.apply_funding(
+        FundingRate::from(-Decimal::try_from_scaled(3, 1).expect(EXPECT_DECIMAL)),
+        q(90, 0),
+    );
+    assert_eq!(settlement.solvency, Solvency::Bankrupt);
+    assert!(ex.account().position().quantity().is_zero());
+    assert_eq!(ex.account().balances().bad_debt(), q(6099, 2));
+    // 90 - 0.9 taker fee - 45 clearance fee (5% of 900).
+    assert_eq!(ex.account().balances().equity(), q(441, 1));
+
+    let ledger = ex.ledger().unwrap();
+    assert_eq!(
+        kinds_and_deltas(ledger),
+        vec![
+            (LedgerEntryKind::TradingFee, q(-99, 2)),
+            (LedgerEntryKind::Funding, q(-270, 0)),
+            (LedgerEntryKind::BadDebtAbsorption, q(6099, 2)),
+            (LedgerEntryKind::Liquidation, q(90, 0)),
+            (LedgerEntryKind::TradingFee, q(-9, 1)),
+            (LedgerEntryKind::Liquidation, q(-45, 0)),
+        ]
+    );
+    assert!(ledger.reconciles_to(ex.account().balances().equity()));
+    assert_eq!(
+        ledger.total_by_kind(LedgerEntryKind::BadDebtAbsorption),
+        ex.account().balances().bad_debt()
+    );
+}
+
+#[test]
 fn portfolio_ledger_records_nominal_bankrupting_liquidation_and_bad_debt_credit() {
     let mut pf = ledger_portfolio(210);
     let m = MarketId::new(0);
