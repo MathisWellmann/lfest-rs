@@ -106,6 +106,8 @@ where
 {
     const CAN_FILL_LIMIT_ORDERS: bool = false;
 
+    // Unreachable: the venues only ask updates with `CAN_FILL_LIMIT_ORDERS` to fill.
+    #[mutants::skip]
     fn limit_order_filled<UserOrderIdT: UserOrderId>(
         &mut self,
         _limit_order: &LimitOrder<I, D, BaseOrQuote, UserOrderIdT, Pending<I, D, BaseOrQuote>>,
