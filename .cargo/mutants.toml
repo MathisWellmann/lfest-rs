@@ -1,0 +1,3 @@
+# CI tests with `--all-features`; without it the feature-gated tests (e.g. `trade_aggregation`)
+# are not compiled and every mutant in that code is reported as missed.
+all_features = true
