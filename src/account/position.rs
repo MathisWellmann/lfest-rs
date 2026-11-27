@@ -208,9 +208,6 @@ where
             mark_price > QuoteCurrency::zero(),
             "funding mark price must be strictly positive, got {mark_price}"
         );
-        if self.quantity.is_zero() || rate.as_ref().is_zero() {
-            return Zero::zero();
-        }
         let signed_position_value =
             BaseOrQuote::PairedCurrency::convert_from(self.quantity, mark_price);
         -(signed_position_value * *rate.as_ref())
@@ -393,6 +390,42 @@ mod tests {
 
     use super::*;
     use crate::prelude::*;
+
+    #[test]
+    fn notional_at_a_zero_price_is_zero_even_for_inverse_contracts() {
+        // Inverse: the notional is `quantity / price`, so a zero price must not divide.
+        let inverse = Position::new(
+            QuoteCurrency::<i64, 5>::new(100, 0),
+            QuoteCurrency::new(50, 0),
+        )
+        .unwrap();
+        assert_eq!(
+            inverse.notional_at_price(QuoteCurrency::zero()),
+            BaseCurrency::zero()
+        );
+        assert_eq!(
+            inverse.notional_at_price(QuoteCurrency::new(50, 0)),
+            BaseCurrency::new(2, 0)
+        );
+        let linear = Position::new(
+            BaseCurrency::<i64, 5>::new(-3, 0),
+            QuoteCurrency::new(50, 0),
+        )
+        .unwrap();
+        assert_eq!(
+            linear.notional_at_price(QuoteCurrency::zero()),
+            QuoteCurrency::zero()
+        );
+        assert_eq!(
+            linear.notional_at_price(QuoteCurrency::new(10, 0)),
+            QuoteCurrency::new(30, 0)
+        );
+        let neutral = Position::<i64, 5, QuoteCurrency<i64, 5>>::default();
+        assert_eq!(
+            neutral.notional_at_price(QuoteCurrency::zero()),
+            BaseCurrency::zero()
+        );
+    }
 
     #[test]
     fn position_display() {

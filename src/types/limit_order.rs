@@ -378,10 +378,9 @@ where
         if room <= BaseOrQuote::zero() {
             return Err(SubmitLimitOrderError::ReduceOnlyRejected);
         }
-        if room < remaining {
-            self.set_remaining_quantity(room);
-        }
+        self.set_remaining_quantity(crate::utils::min(room, remaining));
         assert!(self.remaining_quantity <= room);
+        assert!(self.remaining_quantity <= remaining);
         Ok(())
     }
 

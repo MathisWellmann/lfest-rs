@@ -397,11 +397,13 @@ where
         let StopKind::TrailingStop { trail, watermark } = &mut self.kind else {
             return false;
         };
-        let improved = match self.side {
-            Side::Sell => favorable_price > *watermark,
-            Side::Buy => favorable_price < *watermark,
+        // A sell stop protects a long, so higher prices favor it; a buy stop the opposite.
+        let side = self.side;
+        let favors = |a: QuoteCurrency<I, D>, b: QuoteCurrency<I, D>| match side {
+            Side::Sell => a > b,
+            Side::Buy => a < b,
         };
-        if !improved {
+        if !favors(favorable_price, *watermark) {
             return false;
         }
         *watermark = favorable_price;
@@ -409,10 +411,7 @@ where
         if candidate <= QuoteCurrency::zero() {
             return false;
         }
-        let tightened = match self.side {
-            Side::Sell => candidate > self.stop_price,
-            Side::Buy => candidate < self.stop_price,
-        };
+        let tightened = favors(candidate, self.stop_price);
         if tightened {
             self.stop_price = candidate;
         }
